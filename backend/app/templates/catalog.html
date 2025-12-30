@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}Каталог — Автокаталог{% endblock %}
+{% block content %}
+<section class="catalog">
+  <div class="la-container catalog__layout">
+    <aside class="filters-panel" id="filtersPanel">
+      <form id="filters" onsubmit="return false;">
+        {% set params = request.query_params %}
+        <div class="filter-block">
+          <h3>Основное</h3>
+          <label>Страна
+            <select name="country" id="country">
+              <option value="">Все</option>
+              {% for c in countries %}
+              <option value="{{ c }}" {% if params.get('country') == c %}selected{% endif %}>{{ c }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Марка
+            <select name="brand" id="brand">
+              <option value="">Все</option>
+              {% for b in brands|sort %}
+              <option value="{{ b }}" {% if params.get('brand') == b %}selected{% endif %}>{{ b }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Модель
+            <select name="model" id="model-select">
+              <option value="">{{ params.get('model','') or 'Все' }}</option>
+            </select>
+          </label>
+        </div>
+        <div class="filter-block">
+          <h3>Цена и год</h3>
+          <label>Цена от <input type="number" name="price_min" step="1000" value="{{ params.get('price_min','') }}" /></label>
+          <label>Цена до <input type="number" name="price_max" step="1000" value="{{ params.get('price_max','') }}" /></label>
+          <label>Год от <input type="number" name="year_min" value="{{ params.get('year_min','') }}" /></label>
+          <label>Год до <input type="number" name="year_max" value="{{ params.get('year_max','') }}" /></label>
+        </div>
+        <div class="filter-block">
+          <h3>Характеристики</h3>
+          <label>Пробег до <input type="number" name="mileage_max" step="1000" value="{{ params.get('mileage_max','') }}" /></label>
+          <label>Кузов
+            <select name="body_type">
+              <option value="">Любой</option>
+              <option value="sedan" {% if params.get('body_type') == 'sedan' %}selected{% endif %}>Седан</option>
+              <option value="wagon" {% if params.get('body_type') == 'wagon' %}selected{% endif %}>Универсал</option>
+              <option value="suv" {% if params.get('body_type') == 'suv' %}selected{% endif %}>SUV</option>
+              <option value="hatchback" {% if params.get('body_type') == 'hatchback' %}selected{% endif %}>Хэтчбек</option>
+              <option value="coupe" {% if params.get('body_type') == 'coupe' %}selected{% endif %}>Купе</option>
+              <option value="cabrio" {% if params.get('body_type') == 'cabrio' %}selected{% endif %}>Кабриолет</option>
+            </select>
+          </label>
+          <label>Топливо
+            <select name="engine_type">
+              <option value="">Любое</option>
+              <option value="Petrol" {% if params.get('engine_type') == 'Petrol' %}selected{% endif %}>Бензин</option>
+              <option value="Diesel" {% if params.get('engine_type') == 'Diesel' %}selected{% endif %}>Дизель</option>
+              <option value="Hybrid" {% if params.get('engine_type') == 'Hybrid' %}selected{% endif %}>Гибрид</option>
+              <option value="Electric" {% if params.get('engine_type') == 'Electric' %}selected{% endif %}>Электро</option>
+            </select>
+          </label>
+          <label>КПП
+            <select name="transmission">
+              <option value="">Любая</option>
+              <option value="Automatic" {% if params.get('transmission') == 'Automatic' %}selected{% endif %}>Автомат</option>
+              <option value="Manual" {% if params.get('transmission') == 'Manual' %}selected{% endif %}>Механика</option>
+            </select>
+          </label>
+          <label>Источник
+            <select name="source">
+              <option value="">Все</option>
+              <option value="mobile_de" {% if params.get('source') == 'mobile_de' %}selected{% endif %}>Партнёр 1</option>
+              <option value="encar" {% if params.get('source') == 'encar' %}selected{% endif %}>Партнёр 2</option>
+              <option value="emavto_klg" {% if params.get('source') == 'emavto_klg' %}selected{% endif %}>Партнёр 3</option>
+            </select>
+          </label>
+          <label>Цвет
+             <select name="color" id="colorSelect" class="sr-only">
+               <option value="">Любой</option>
+               {% for c in colors %}
+               <option value="{{ c.value }}" {% if params.get('color') == c.value %}selected{% endif %}>{{ c.label }}</option>
+               {% endfor %}
+             </select>
+             <div class="color-swatches" id="colorSwatches">
+               <button type="button" class="color-chip" data-value="" data-color="" data-label="Все" data-hex="#0f1014" title="Все"></button>
+               {% for c in colors %}
+              {% set val = c.value if c is mapping else c %}
+              {% set key = c.key if c is mapping else c %}
+              {% set label = c.label if c is mapping else c %}
+              {% set hex = c.hex if c is mapping else '' %}
+              <button type="button" class="color-chip" data-value="{{ val }}" data-color="{{ key }}" data-label="{{ label }}" data-hex="{{ hex }}" title="{{ label }}"></button>
+               {% endfor %}
+             </div>
+          </label>
+        </div>
+        <div class="filters-actions">
+          <button class="btn btn-ghost" id="resetFilters" type="button">Сбросить</button>
+          <button class="btn btn-primary" id="applyFilters">Применить</button>
+        </div>
+        <input type="hidden" name="page" value="{{ request.query_params.get('page', '1') if request else '1' }}">
+      </form>
+    </aside>
+    <div class="catalog__content">
+      {% set ignored = ["page","page_size"] %}
+      {% set has_filters = false %}
+      {% for k, v in params.items() %}
+        {% if v and k not in ignored %}
+          {% set has_filters = true %}
+        {% endif %}
+      {% endfor %}
+      {% set brand_filter = params.get('brand') %}
+      {% if brand_filter %}
+        {% set featured_popular = featured_popular | selectattr('brand','equalto', brand_filter) | list %}
+        {% set featured_recommended = featured_recommended | selectattr('brand','equalto', brand_filter) | list %}
+      {% endif %}
+      <div class="active-filters-row">
+        <div id="resultCount" class="muted"></div>
+        <div id="activeFilters" class="active-filters"></div>
+      </div>
+      <div class="catalog-search">
+        <input id="catalog-search" type="text" placeholder="Поиск по марке или модели (например, X5, Golf)" value="{{ params.get('model','') }}"/>
+        <button class="btn btn-primary" id="catalogSearchBtn" type="button">Искать</button>
+      </div>
+      {% if (featured_popular or featured_recommended) and not has_filters %}
+      <div id="featuredBlock" class="featured-rail">
+        <div class="section-header" style="margin-top:8px;">
+          <div>
+            <h2 class="section-title" style="margin:0;">Подборка от менеджера</h2>
+            <p class="section-sub">Популярные и рекомендуемые авто без активных фильтров</p>
+          </div>
+        </div>
+        <div class="cards cards-highlights">
+          {% for car in featured_popular %}
+          <a class="card car-card" href="/car/{{ car.id }}">
+            <div class="thumb-wrap">
+              <span class="badge-tag">Популярное</span>
+              <img class="thumb" src="{{ car.thumbnail_url or '' }}" alt="" loading="lazy" />
+            </div>
+            <div class="car-card__body">
+              <div>
+                <div class="car-card__title">
+                  {{ car.brand or '' }} {{ car.model or '' }}
+                </div>
+                {% set meta = [] %}
+                {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %}
+                {% if car.engine_type %}{% set _ = meta.append(car.engine_type) %}{% endif %}
+                {% if meta %}<div class="car-card__meta">{{ meta|join(' · ') }}</div>{% endif %}
+              </div>
+              <div class="car-card__price">
+                {% if car.price %}{{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}{% endif %}
+              </div>
+            </div>
+          </a>
+          {% endfor %}
+          {% for car in featured_recommended %}
+          <a class="card car-card" href="/car/{{ car.id }}">
+            <div class="thumb-wrap">
+              <span class="badge-tag badge-tag--alt">Рекомендуем</span>
+              <img class="thumb" src="{{ car.thumbnail_url or '' }}" alt="" loading="lazy" />
+            </div>
+            <div class="car-card__body">
+              <div>
+                <div class="car-card__title">
+                  {{ car.brand or '' }} {{ car.model or '' }}
+                </div>
+                {% set meta = [] %}
+                {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %}
+                {% if car.engine_type %}{% set _ = meta.append(car.engine_type) %}{% endif %}
+                {% if meta %}<div class="car-card__meta">{{ meta|join(' · ') }}</div>{% endif %}
+              </div>
+              <div class="car-card__price">
+                {% if car.price %}{{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}{% endif %}
+              </div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <div class="results-header">
+        <h1 style="margin:0;">Каталог</h1>
+        <button class="btn btn-secondary filters-toggle" type="button" id="filtersToggle">Фильтры</button>
+      </div>
+      <div id="spinner" class="spinner" style="display:none;">Загрузка…</div>
+      <div id="cards" class="cards"></div>
+      <div class="pagination">
+        <button class="btn" id="prevPage">‹</button>
+        <div id="pageNumbers" class="page-numbers"></div>
+        <button class="btn" id="nextPage">›</button>
+      </div>
+      <div id="pageInfo" class="muted"></div>
+    </div>
+  </div>
+</section>
+<script>
+  window.CATALOG_API = "/api/cars";
+</script>
+{% endblock %}
+
+

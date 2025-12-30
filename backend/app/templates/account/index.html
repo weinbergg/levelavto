@@ -1,0 +1,80 @@
+{% extends "base.html" %} {% block title %}Личный кабинет{% endblock %} {% block
+content %}
+<section class="section account-section">
+  <div class="la-container">
+    <div class="account-card">
+      <div class="section-header" style="margin-bottom: 8px">
+        <div>
+          <p class="eyebrow">Личный кабинет</p>
+          <h1 style="margin: 0">Ваш профиль и избранное</h1>
+        </div>
+        {% if status %}
+        <div
+          class="alert {% if status.success %}alert-success{% else %}alert-danger{% endif %}"
+        >
+          {{ status.message }}
+        </div>
+        {% endif %}
+      </div>
+      <div class="account-grid">
+        <div class="account-panel">
+          <h3>Профиль</h3>
+          <p class="muted">Контакты подставятся в заявку автоматически</p>
+          <form method="post" action="/account/profile" class="form-vertical">
+            <label>Email <input type="email" value="{{ user.email }}" disabled /></label>
+            <label>Имя <input type="text" name="full_name" value="{{ user.full_name or '' }}" /></label>
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+          </form>
+        </div>
+        <div class="account-panel">
+          <h3>Пароль</h3>
+          <p class="muted">Минимум 6 символов</p>
+          <form method="post" action="/account/password" class="form-vertical">
+            <label>Текущий пароль <input type="password" name="current_password" required /></label>
+            <label>Новый пароль <input type="password" name="new_password" required minlength="6" /></label>
+            <button type="submit" class="btn btn-secondary">Обновить пароль</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="favorites">
+  <div class="la-container">
+    <div class="section-header" style="margin-bottom: 12px">
+      <div>
+        <p class="eyebrow">Избранное</p>
+        <h2 class="section-title">Сохранённые автомобили</h2>
+        <p class="muted">Нажимайте ★ на карточках, чтобы добавить или убрать</p>
+      </div>
+    </div>
+    <div class="cards cards-favorites">
+      {% if favorites and favorites|length > 0 %}
+      {% for car in favorites %}
+      <a class="card car-card" href="/car/{{ car.id }}">
+        <div class="thumb-wrap">
+          <img class="thumb" src="{{ car.thumbnail_url or '' }}" alt="" loading="lazy" />
+          <button class="fav-btn active" data-fav-button data-car-id="{{ car.id }}" aria-label="Убрать из избранного">★</button>
+        </div>
+        <div class="car-card__body">
+          <div class="car-card__title">{{ car.brand or '' }} {{ car.model or '' }}</div>
+          <div class="car-card__meta">
+            {% set meta = [car.year or '', car.engine_type or '', car.transmission or ''] | reject('equalto','') | list %}
+            {{ meta|join(' · ') }}
+          </div>
+          <div class="car-card__price">
+            {% if car.price is not none %}{{ "{:,.0f}".format(car.price).replace(',', ' ') }} {{ car.currency or '' }}{% else %}Цена по запросу{% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state">
+        <p>Пока пусто. Добавьте автомобили, нажимая ★ на карточках.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

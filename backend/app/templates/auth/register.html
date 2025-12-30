@@ -1,0 +1,38 @@
+{% extends "base.html" %} {% block title %}Регистрация{% endblock %} {% block
+content %}
+<section class="section">
+  <div class="la-container">
+    <div class="auth-card">
+      <h1>Создать аккаунт</h1>
+      {% if success %}
+      <div class="alert alert-success">
+        Аккаунт создан. {% if is_admin %}Вы стали администратором.{% endif %}
+        <a href="/">Перейти на главную</a>
+      </div>
+      {% endif %} {% if error %}
+      <div class="alert alert-danger">{{ error }}</div>
+      {% endif %}
+      <form method="post" action="/register" class="form-vertical">
+        <label
+          >Email
+          <input type="email" name="email" required />
+        </label>
+        <label
+          >Имя
+          <input type="text" name="full_name" />
+        </label>
+        <label
+          >Пароль
+          <input type="password" name="password" required minlength="6" />
+        </label>
+        <div class="inline-actions">
+          <button type="submit" class="btn btn-primary">
+            Зарегистрироваться
+          </button>
+          <a href="/login">Уже есть аккаунт</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

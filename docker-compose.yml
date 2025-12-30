@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: autodealer_db
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: autodealer_web
+    env_file:
+      - .env
+    ports:
+      - "${WEB_PORT}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+    command: >
+      sh -c "uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  db_data:
+
+

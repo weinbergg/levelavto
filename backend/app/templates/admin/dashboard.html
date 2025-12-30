@@ -1,0 +1,85 @@
+{% extends "base.html" %} {% block title %}Админка{% endblock %} {% block
+content %}
+<section class="section">
+  <div class="la-container">
+    <div class="section-header">
+      <div>
+        <h1 class="section-title" style="margin: 0">Администрирование</h1>
+        <p class="section-sub">
+          Редактирование текстов и витрины. Всего авто: {{ total_cars }}
+        </p>
+      </div>
+    </div>
+
+    <div class="admin-block">
+      <h3>Тексты на главной</h3>
+      <form method="post" action="/admin/content" class="form-vertical">
+        <label
+          >Заголовок
+          <input
+            type="text"
+            name="hero_title"
+            value="{{ content.get('hero_title','Импорт и подбор автомобилей из Европы, Кореи и России') }}"
+          />
+        </label>
+        <label>Подзаголовок
+          <textarea name="hero_subtitle" rows="2">
+{{ content.get('hero_subtitle','Актуальные предложения от проверенных партнёров — в одном каталоге.') }}</textarea>
+        </label>
+        <label
+          >Примечание
+          <textarea name="hero_note" rows="2">
+{{ content.get('hero_note','Возим проверенные авто из Европы, Кореи и РФ. Минимальная предоплата — основная часть по факту поставки.') }}</textarea
+          >
+        </label>
+        <button type="submit" class="btn btn-primary">Сохранить тексты</button>
+      </form>
+    </div>
+
+    <div class="admin-block">
+      <h3>Подборки автомобилей</h3>
+      <p class="hero-note">
+        Выберите автомобили из списка (Ctrl/Cmd для множественного выбора).
+        Порядок важен. Если подборка пустая, на сайте покажутся последние авто с
+        фото.
+      </p>
+      {% for placement, label in placements.items() %}
+      <form
+        method="post"
+        action="/admin/featured"
+        class="form-inline"
+        style="margin-bottom: 12px"
+      >
+        <input type="hidden" name="placement" value="{{ placement }}" />
+        <label style="min-width: 240px">{{ label }}</label>
+        {% set selected_ids = featured.get(placement, []) |
+        map(attribute='car_id') | list %}
+        <input
+          type="text"
+          name="car_ids"
+          value="{{ selected_ids | join(', ') }}"
+          list="recent-cars"
+          placeholder="Начните вводить модель, выберите ID"
+          class="text-input"
+        />
+        <button type="submit" class="btn btn-secondary">Сохранить</button>
+        {% if featured_cards.get(placement) %}
+        <span class="small" style="margin-left: 8px">
+          Сейчас: {% for card in featured_cards[placement] %}#{{ card.id }} {{
+          card.title }}{% if not loop.last %}; {% endif %}{% endfor %}
+        </span>
+        {% endif %}
+      </form>
+      {% endfor %}
+      <datalist id="recent-cars">
+        {% for car in recent_cars %}
+        <option value="{{ car.id }}">
+          #{{ car.id }} — {{ car.brand or '' }} {{ car.model or '' }} {{
+          car.year or '' }}
+        </option>
+        {% endfor %}
+      </datalist>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .debug-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; background: #fff; }
+  .thumb-primary { width: 100%; height: 200px; object-fit: cover; border-radius: 6px; background: #f5f5f5; }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .thumbs img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #eee; }
+  .meta { font-size: 14px; margin-top: 8px; }
+  .meta .missing { color: #c22; font-weight: 600; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .topbar .nav a { margin-right: 8px; }
+</style>
+<div class="topbar">
+  <div>
+    <h2>Debug parsing: {{ source_key }}</h2>
+    <div>Total: {{ total }} | Showing: {{ offset }} – {{ offset + cars|length }}</div>
+  </div>
+  <div class="nav">
+    {% set prev_offset = (offset - limit) if offset - limit > 0 else 0 %}
+    {% set next_offset = offset + limit %}
+    <a href="?limit={{ limit }}&offset={{ prev_offset }}&only_with_images={{ 'true' if only_with_images else 'false' }}">Prev</a>
+    <a href="?limit={{ limit }}&offset={{ next_offset }}&only_with_images={{ 'true' if only_with_images else 'false' }}">Next</a>
+    <a href="?limit={{ limit }}&offset={{ offset }}&only_with_images={{ 'false' }}">Show all</a>
+    <a href="?limit={{ limit }}&offset={{ offset }}&only_with_images={{ 'true' }}">Only with images</a>
+  </div>
+  </div>
+<div class="debug-grid">
+  {% for c in cars %}
+  <div class="card">
+    {% set primary = c.images[0].url if c.images and c.images|length > 0 else c.thumbnail_url %}
+    {% if primary %}
+      <img class="thumb-primary" src="{{ primary }}" alt="primary"/>
+    {% else %}
+      <div class="thumb-primary"></div>
+    {% endif %}
+    <div class="thumbs">
+      {% if c.images %}
+        {% for im in c.images %}
+        {% if not loop.first %}
+          <img src="{{ im.url }}" alt="thumb {{ loop.index0 }}"/>
+        {% endif %}
+        {% endfor %}
+      {% endif %}
+    </div>
+    <div class="meta">
+      <div><strong>{{ c.brand or '—' }} {{ c.model or '' }}</strong> {% if c.year %}({{ c.year }}){% else %}<span class="missing">(Year: —)</span>{% endif %}</div>
+      <div>
+        {% if c.mileage is not none %}Mileage: {{ "{:,}".format(c.mileage) }} km{% else %}<span class="missing">Mileage: —</span>{% endif %}
+        &nbsp;|&nbsp;
+        {% if c.price is not none %}Price: {{ "{:,.0f}".format(c.price) }} {{ c.currency or '' }}{% else %}<span class="missing">Price: —</span>{% endif %}
+      </div>
+      <div>Engine: {{ c.engine_type or '—' }} | Country: {{ c.country or '—' }}</div>
+      {% if c.source_url %}
+        <div><a href="{{ c.source_url }}" target="_blank" rel="noopener noreferrer">Open source</a></div>
+      {% endif %}
+      <div>ID: {{ c.id }} | Seen: {{ c.first_seen_at }} → {{ c.last_seen_at }}</div>
+    </div>
+  </div>
+  {% endfor %}
+  {% if not cars or cars|length == 0 %}
+  <div>No cars to display.</div>
+  {% endif %}
+</div>
+{% endblock %}
+
+

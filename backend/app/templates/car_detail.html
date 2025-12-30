@@ -1,0 +1,95 @@
+{% extends "base.html" %} {% block title %}Авто — {{ car.brand }} {{ car.model
+}}{% endblock %} {% block content %}
+<section class="car-detail-page">
+  <div class="la-container">
+    {% if not car %}
+    <div class="card">Автомобиль не найден.</div>
+    {% else %}
+    <div class="detail-hero">
+      <div class="detail-gallery card">
+        {% set primary = car.images[0].url if car.images and car.images|length >
+        0 else car.thumbnail_url %}
+        <div class="detail-hero__main placeholder">
+          {% if primary %}
+          <img
+            id="primaryImage"
+            src="{{ primary }}"
+            alt="{{ car.brand }} {{ car.model }}"
+          />
+          {% else %}
+          <div class="empty-placeholder">Нет фотографий</div>
+          {% endif %}
+        </div>
+        {% if car.images and car.images|length > 1 %}
+        <div class="detail-hero__thumbs">
+          {% for im in car.images[:10] %}
+          <button
+            type="button"
+            class="thumb"
+            onclick="document.getElementById('primaryImage').src='{{ im.url }}'"
+          >
+            <img
+              src="{{ im.url }}"
+              alt="thumb {{ loop.index }}"
+              loading="lazy"
+            />
+          </button>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="detail-info card">
+        <div class="detail-heading">
+          <div>
+            <div class="badge">В наличии</div>
+            <h1>{{ car.brand or '' }} {{ car.model or '' }}</h1>
+            {% set meta = [] %} {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %} {% if car.engine_type %}{% set _ = meta.append(car.engine_type) %}{% endif %} {% if meta %}
+            <p class="muted">{{ meta|join(' · ') }}</p>
+            {% endif %}
+            <p class="muted">
+              Источник: надёжный партнёр · {% if car.country %}Страна: {{ car.country }} · {% endif %} Фото:
+              {{ car.images|length if car.images else 0 }}
+            </p>
+          </div>
+          <div class="detail-price">
+            {% if car.price %}{{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}{% else %}Цена по запросу{% endif %}
+            <button class="fav-btn" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>
+          </div>
+        </div>
+        <div class="detail-specs">
+          {% if car.mileage %}
+          <div class="chip">Пробег: {{ car.mileage }}</div>
+          {% endif %} {% if car.body_type %}
+          <div class="chip">Кузов: {{ car.body_type }}</div>
+          {% endif %} {% if car.drive_type %}
+          <div class="chip">Привод: {{ car.drive_type }}</div>
+          {% endif %} {% if car.color %}
+          <div class="chip">Цвет: {{ car.color }}</div>
+          {% endif %} {% if car.country %}
+          <div class="chip">Страна: {{ car.country }}</div>
+          {% endif %} {% if car.vin %}
+          <div class="chip">VIN: {{ car.vin }}</div>
+          {% endif %}
+        </div>
+        <div class="detail-actions">
+          <a
+            class="btn cta-lead"
+            data-lead-cta
+            data-car-title="{{ car.brand or '' }} {{ car.model or '' }}"
+            data-car-price="{% if car.price %}{{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}{% endif %}"
+            data-car-link="/car/{{ car.id }}"
+            {% if user %}
+            data-user-name="{{ user.full_name or user.email }}"
+            data-user-email="{{ user.email }}"
+            {% endif %}
+            href="/#lead-form"
+          >
+            Оставить заявку
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

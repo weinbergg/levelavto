@@ -1,0 +1,74 @@
+# Fill selectors and query params after inspecting each site with DevTools.
+# This file defines how each site is parsed without changing Python code.
+
+mobile_de:
+  key: mobile_de
+  name: "mobile.de"
+  enabled: false
+  type: "html"
+  country: "DE"
+  base_search_url: "https://suchen.mobile.de/fahrzeuge/search.html"
+  defaults:
+    currency: "EUR"
+  pagination:
+    start_page: 1
+    page_param: "pageNumber"
+    max_pages: 2
+  selectors:
+    item: "article"
+    link: 'a[class^="BaseListing_containerLink__"]'
+    image: '[class^="ListingPreviewImage_image__"]'
+    title: '[class^="ListingTitle_title__"]'
+    price: '[class^="PriceLabel_mainPrice__"]'
+    details: '[class^="BaseListing_listingAttributeLine__"] div'
+
+encar:
+  key: encar
+  name: "Encar (Carapis)"
+  country: "KR"
+  type: "json"
+  enabled: true
+  base_search_url: "https://api.carapis.com/apix/encar/v2/vehicles/"
+  defaults:
+    currency: "KRW"
+    max_pages: 2
+    limit_per_query: 50
+    brands:
+      - "BMW"
+      - "Audi"
+      - "Mercedes-Benz"
+      - "Volkswagen"
+  pagination:
+    start_page: 1
+    page_param: "page"
+    max_pages: 1
+  query_params: {}
+  selectors: {}
+
+emavto_klg:
+  key: emavto_klg
+  name: "EMAVTO KLG"
+  country: "RU"
+  type: "html"
+  enabled: true
+  base_search_url: "https://emavto.ru/"
+  query_params: {}
+  defaults:
+    currency: "USD"
+    list_rps: 1.2
+    list_concurrency: 2
+    detail_rps: 0.6
+    detail_concurrency: 1
+    max_pages_full: 200
+    max_pages_incremental: 15
+  pagination:
+    start_page: 1
+    page_param: "koreaPage"
+    max_pages: 2
+  selectors:
+    item: "div.car-card"
+    title: "a.car-title"
+    details: "p.car-details"
+    price: "p.car-price"
+    link: "a.car-title"
+    image: "img"
