@@ -528,13 +528,15 @@ p {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 14px;
+  min-height: 52px;
+  padding: 12px 18px;
   background: var(--card-soft);
   color: var(--text);
   border-radius: 12px;
   text-decoration: none;
   border: 1px solid var(--line);
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 15px;
   transition: transform 0.1s ease, background 0.2s ease, border-color 0.2s ease;
 }
 .btn:hover {
@@ -555,9 +557,7 @@ p {
   box-shadow: 0 10px 24px rgba(227, 39, 43, 0.3);
 }
 .btn-cta {
-  padding: 11px 18px;
-  font-weight: 700;
-  text-align: center;
+  min-width: 140px;
 }
 .btn-secondary {
   background: var(--card);
@@ -589,12 +589,12 @@ p {
 
 .form-vertical label {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 .auth-card,
 .account-card,
 .admin-card {
-  max-width: 780px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 22px;
   border-radius: 18px;
@@ -616,7 +616,11 @@ p {
   align-items: flex-start;
 }
 .account-card .form-vertical {
-  gap: 10px;
+  gap: 14px;
+}
+.account-card input,
+.account-card textarea {
+  width: 100%;
 }
 .account-card .btn {
   width: auto;
@@ -624,7 +628,7 @@ p {
 .auth-card .form-vertical,
 .account-card .form-vertical {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 .inline-actions {
   display: flex;

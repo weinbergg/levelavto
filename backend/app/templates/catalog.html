@@ -77,13 +77,13 @@
             </select>
           </label>
           <label>Цвет
-             <select name="color" id="colorSelect" class="sr-only">
-               <option value="">Любой</option>
-               {% for c in colors %}
+            <select name="color" id="colorSelect" class="sr-only">
+              <option value="">Любой</option>
+              {% for c in colors %}
                <option value="{{ c.value }}" {% if params.get('color') == c.value %}selected{% endif %}>{{ c.label }}</option>
-               {% endfor %}
-             </select>
-             <div class="color-swatches" id="colorSwatches">
+              {% endfor %}
+            </select>
+            <div class="color-swatches" id="colorSwatches">
                <button type="button" class="color-chip" data-value="" data-color="" data-label="Все" data-hex="#0f1014" title="Все"></button>
                {% for c in colors %}
               {% set val = c.value if c is mapping else c %}
@@ -91,8 +91,8 @@
               {% set label = c.label if c is mapping else c %}
               {% set hex = c.hex if c is mapping else '' %}
               <button type="button" class="color-chip" data-value="{{ val }}" data-color="{{ key }}" data-label="{{ label }}" data-hex="{{ hex }}" title="{{ label }}"></button>
-               {% endfor %}
-             </div>
+              {% endfor %}
+            </div>
           </label>
         </div>
         <div class="filters-actions">

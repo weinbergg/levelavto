@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Автокаталог{% endblock %}</title>
     <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/css/styles.css?v=9" />
+    <link rel="stylesheet" href="/static/css/styles.css?v=10" />
     {% block head_extra %}{% endblock %}
   </head>
   <body>
@@ -15,12 +15,12 @@
           <div class="header__shell">
             <div class="header__brand">
               <a class="header__logo" href="/" aria-label="Level Avto">
-                <img
-                  src="/static/img/logo.svg"
-                  alt="Level Avto"
-                  class="header__logo-img"
-                />
-              </a>
+          <img
+            src="/static/img/logo.svg"
+            alt="Level Avto"
+            class="header__logo-img"
+          />
+        </a>
             </div>
             <nav class="header__nav" aria-label="Главная навигация">
               <ul class="header__menu">
@@ -51,8 +51,8 @@
               </div>
               <a class="btn btn-primary btn-cta header__cta" href="/#lead-form">Связаться</a>
               <button class="header__burger header__burger--main" aria-label="Открыть меню">
-                <span></span><span></span><span></span>
-              </button>
+          <span></span><span></span><span></span>
+        </button>
             </div>
           </div>
         </div>
@@ -67,9 +67,9 @@
           </div>
           <nav class="header__drawer-nav" aria-label="Меню">
             <a class="header__link" href="/catalog">Каталог</a>
-            <a class="header__link" href="/#how-it-works">Как мы работаем</a>
-            <a class="header__link" href="/#advantages">Преимущества</a>
-            <a class="header__link" href="/#contacts">Контакты</a>
+          <a class="header__link" href="/#how-it-works">Как мы работаем</a>
+          <a class="header__link" href="/#advantages">Преимущества</a>
+          <a class="header__link" href="/#contacts">Контакты</a>
             {% if user %}
             <a class="header__link" href="/account">Кабинет</a>
             {% if user.is_admin %}<a class="header__link" href="/admin">Админка</a>{% endif %}
@@ -79,7 +79,7 @@
             <a class="header__link" href="/register">Регистрация</a>
             {% endif %}
             <a class="btn btn-primary btn-cta" href="/#lead-form">Связаться</a>
-          </nav>
+        </nav>
         </div>
       </div>
     </header>
@@ -106,7 +106,7 @@
         </div>
       </div>
     </footer>
-    <script src="/static/js/app.js?v=9"></script>
+    <script src="/static/js/app.js?v=10"></script>
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>

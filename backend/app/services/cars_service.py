@@ -90,10 +90,10 @@ class CarsService:
                 if price_max is not None:
                     conditions.append(rub_expr <= price_max)
             else:
-                if price_min is not None:
-                    conditions.append(Car.price >= price_min)
-                if price_max is not None:
-                    conditions.append(Car.price <= price_max)
+        if price_min is not None:
+            conditions.append(Car.price >= price_min)
+        if price_max is not None:
+            conditions.append(Car.price <= price_max)
         if year_min is not None:
             conditions.append(Car.year >= year_min)
         if year_max is not None:

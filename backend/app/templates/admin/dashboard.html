@@ -32,6 +32,14 @@ content %}
 {{ content.get('hero_note','Возим проверенные авто из Европы, Кореи и РФ. Минимальная предоплата — основная часть по факту поставки.') }}</textarea
           >
         </label>
+        <label>email для заявок
+          <input
+            type="email"
+            name="lead_email"
+            value="{{ content.get('lead_email','info@levelavto.ru') }}"
+          />
+          <span class="small muted">Сюда будут уходить заявки с формы</span>
+        </label>
         <button type="submit" class="btn btn-primary">Сохранить тексты</button>
       </form>
     </div>

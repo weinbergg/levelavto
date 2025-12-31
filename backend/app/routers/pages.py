@@ -2,6 +2,9 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 
 from fastapi import APIRouter, Request, Depends, Query, Form
+import os
+import smtplib
+from email.mime.text import MIMEText
 from ..db import get_db
 from ..services.cars_service import CarsService
 from ..services.content_service import ContentService
@@ -116,18 +119,39 @@ def submit_lead(
     if errors:
         status["message"] = "; ".join(errors)
     else:
-        # stub: log to server stdout
-        print(
-            "[LEAD]",
-            {
-                "name": name,
-                "phone": phone,
-                "email": email,
-                "preferred": preferred,
-                "price_range": price_range,
-                "comment": comment,
-            },
+        # send email if configured
+        content_service = ContentService(db)
+        lead_email = content_service.content_map().get("lead_email") or "info@levelavto.ru"
+        body = (
+            f"Заявка с сайта\n"
+            f"Имя: {name}\n"
+            f"Телефон: {phone}\n"
+            f"Email: {email or '—'}\n"
+            f"Предпочтения: {preferred or '—'}\n"
+            f"Бюджет: {price_range or '—'}\n"
+            f"Комментарий: {comment or '—'}\n"
         )
+        sent = False
+        try:
+            host = os.environ.get("EMAIL_HOST")
+            port = int(os.environ.get("EMAIL_PORT", "587"))
+            user = os.environ.get("EMAIL_HOST_USER")
+            pwd = os.environ.get("EMAIL_HOST_PASSWORD")
+            mail_from = os.environ.get("EMAIL_FROM", "info@levelavto.ru")
+            if host and user and pwd:
+                msg = MIMEText(body, "plain", "utf-8")
+                msg["Subject"] = "Заявка с сайта Level Avto"
+                msg["From"] = mail_from
+                msg["To"] = lead_email
+                with smtplib.SMTP(host, port, timeout=10) as smtp:
+                    smtp.starttls()
+                    smtp.login(user, pwd)
+                    smtp.sendmail(mail_from, [lead_email], msg.as_string())
+                sent = True
+        except Exception as e:
+            print("[LEAD][email_failed]", e)
+        # always log to stdout
+        print("[LEAD]", {"name": name, "phone": phone, "email": email, "preferred": preferred, "price_range": price_range, "comment": comment, "sent": sent})
         status["success"] = True
         status["message"] = "Спасибо! Мы свяжемся с вами в ближайшее время."
     extra = {"lead_status": status}

@@ -339,7 +339,7 @@
 .models-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 .cards-highlights {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -372,12 +372,16 @@
 .model-column {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 14px;
   box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
 }
 .model-column h4 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
 }
 .model-column ul {
   list-style: none;
@@ -387,8 +391,11 @@
   gap: 6px;
 }
 .model-column a {
-  color: var(--muted);
+  color: var(--color-text-primary);
   text-decoration: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
 }
 .model-column a:hover {
   color: var(--text);
@@ -418,10 +425,13 @@
 }
 .contact-map {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 16px;
   align-items: stretch;
   margin-top: 16px;
+  max-width: 1320px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .contact-card {
   background: var(--card);
