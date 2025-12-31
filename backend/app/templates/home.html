@@ -360,28 +360,7 @@
       </div>
     </div>
   </div>
-</section>
 
-<section class="section" id="vehicle-types">
-  <div class="la-container">
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Типы кузовов</h2>
-        <p class="section-sub">Сколько предложений в каждой категории</p>
-      </div>
-    </div>
-    {% set labels = { "wagon": "Универсал", "sedan": "Седан", "cabrio":
-    "Кабриолет", "suv": "Внедорожник" } %}
-    <div class="types-grid">
-      {% for bt in body_type_stats %} {% if bt.body_type|lower in labels %}
-      <a class="type-card" href="/catalog?body_type={{ bt.body_type }}">
-        <div class="title">{{ labels[bt.body_type|lower] }}</div>
-        <div class="count">Объявлений: {{ bt.count }}</div>
-      </a>
-      {% endif %} {% endfor %}
-    </div>
-  </div>
-</section>
 
 <section class="section" id="brands">
   <div class="la-container">
@@ -618,30 +597,30 @@
       </div>
       <a class="btn btn-primary" href="tel:+79110707500">Позвонить</a>
     </div>
-  </div>
-  <div class="contact-map">
-    <div class="contact-card">
-      <h3>+7 (911) 070-75-00</h3>
-      <p class="hero-note">Обратный звонок · Telegram · WhatsApp</p>
-      <p class="muted">
-        Шелепихинская набережная, 34 к.4 стр.8, Москва, м. Шелепиха
-      </p>
-      <p class="muted">Каждый день 9:00–21:00</p>
-      <div class="inline-actions" style="margin-top: 10px">
-        <a class="btn btn-secondary" href="mailto:info@levelavto.ru"
-          >Написать на email</a
-        >
-        <a class="btn btn-primary" href="#lead-form">Оставить заявку</a>
+    <div class="contact-map">
+      <div class="contact-card">
+        <h3>+7 (911) 070-75-00</h3>
+        <p class="hero-note">Обратный звонок · Telegram · WhatsApp</p>
+        <p class="muted">
+          Шелепихинская набережная, 34 к.4 стр.8, Москва, м. Шелепиха
+        </p>
+        <p class="muted">Каждый день 9:00–21:00</p>
+        <div class="inline-actions" style="margin-top: 10px">
+          <a class="btn btn-secondary" href="mailto:info@levelavto.ru"
+            >Написать на email</a
+          >
+          <a class="btn btn-primary" href="#lead-form">Оставить заявку</a>
+        </div>
       </div>
+      <iframe
+        src="https://yandex.ru/map-widget/v1/?ll=37.5209%2C55.7540&z=15&pt=37.5209,55.7540,pm2rdl"
+        width="100%"
+        height="380"
+        frameborder="0"
+        style="border: 0; border-radius: 16px; overflow: hidden"
+        allowfullscreen
+      ></iframe>
     </div>
-    <iframe
-      src="https://yandex.ru/map-widget/v1/?ll=37.5209%2C55.7540&z=15&pt=37.5209,55.7540,pm2rdl"
-      width="100%"
-      height="380"
-      frameborder="0"
-      style="border: 0; border-radius: 16px; overflow: hidden"
-      allowfullscreen
-    ></iframe>
   </div>
 </section>
 {% endblock %}
