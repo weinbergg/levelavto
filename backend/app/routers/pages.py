@@ -250,15 +250,15 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     color_options = []
     for raw in raw_colors:
         key = normalize_color(raw)
-        if not key or key not in palette or key in seen_colors:
+        if not key or key in seen_colors:
             continue
         seen_colors.add(key)
         color_options.append(
             {
                 "value": key,
                 "key": key,
-                "label": labels_ru.get(key, key.title()),
-                "hex": palette.get(key, "#8a8a8a"),
+                "label": labels_ru.get(key, raw or key.title()),
+                "hex": palette.get(key, ""),
             }
         )
 
