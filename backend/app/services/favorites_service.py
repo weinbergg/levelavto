@@ -12,7 +12,7 @@ class FavoritesService:
 
     def list_ids(self, user: User) -> list[int]:
         stmt = select(Favorite.car_id).where(Favorite.user_id == user.id)
-        return [row[0] for row in self.db.scalars(stmt)]
+        return list(self.db.scalars(stmt))
 
     def add(self, user: User, car_id: int) -> None:
         exists = self.db.scalar(select(Favorite).where(Favorite.user_id == user.id, Favorite.car_id == car_id))
