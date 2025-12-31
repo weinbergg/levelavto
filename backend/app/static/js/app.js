@@ -2,6 +2,48 @@
   const qs = (s, el = document) => el.querySelector(s)
   const qsa = (s, el = document) => Array.from(el.querySelectorAll(s))
 
+  // --- FX rates (RUB) ---
+  let fxCache = { loaded: false, rates: {} }
+
+  async function getFx() {
+    if (fxCache.loaded) return fxCache
+    try {
+      const res = await fetch('https://www.cbr-xml-daily.ru/daily_json.js', { cache: 'no-cache' })
+      const data = await res.json()
+      fxCache = {
+        loaded: true,
+        rates: {
+          EUR: data?.Valute?.EUR?.Value,
+          USD: data?.Valute?.USD?.Value,
+        },
+      }
+    } catch (e) {
+      console.warn('fx rates', e)
+      fxCache = { loaded: true, rates: {} }
+    }
+    return fxCache
+  }
+
+  function priceToRub(price, currency, fx) {
+    if (price == null) return null
+    const cur = (currency || 'EUR').toString().trim().toUpperCase()
+    if (!cur || cur === 'RUB' || cur === '₽') return Number(price)
+    const rate = fx?.rates?.[cur]
+    if (!rate) return null
+    return Number(price) * Number(rate)
+  }
+
+  function formatRub(val) {
+    return `${Number(val).toLocaleString('ru-RU')} ₽`
+  }
+
+  function formatPrice(price, currency, fx) {
+    const rub = priceToRub(price, currency, fx)
+    if (rub != null) return formatRub(rub)
+    if (price == null) return ''
+    return `${Number(price).toLocaleString('ru-RU')} ${currency || ''}`
+  }
+
   function getFilters(page) {
     const form = qs('#filters')
     const data = new FormData(form)
@@ -198,6 +240,7 @@
     spinner.style.display = 'block'
     renderSkeleton(cards)
     try {
+      const fx = await getFx()
       const params = collectParams(page)
       const res = await fetch(`${window.CATALOG_API}?${params.toString()}`)
       if (!res.ok) {
@@ -267,7 +310,7 @@
         card.href = `/car/${car.id}`
         card.className = 'car-card'
         const more = (car.images_count && car.images_count > 1 && car.thumbnail_url) ? `<span class="more-badge">+${car.images_count - 1} фото</span>` : ''
-        const price = car.price != null ? `${Number(car.price).toLocaleString('ru-RU')} ${car.currency || ''}` : ''
+        const price = car.price != null ? formatPrice(car.price, car.currency, fx) : ''
         const metaLine = [car.year, car.engine_type].filter(Boolean).join(' · ')
         const colorDot = (clr) => {
           if (!clr) return ''
@@ -653,6 +696,20 @@
     })
   }
 
+  async function convertInlinePrices() {
+    const fx = await getFx()
+    document.querySelectorAll('.js-price').forEach((el) => {
+      const price = parseFloat(el.dataset.price)
+      const cur = el.dataset.currency || ''
+      if (Number.isFinite(price)) {
+        const rub = priceToRub(price, cur, fx)
+        if (rub != null) {
+          el.textContent = formatRub(rub)
+        }
+      }
+    })
+  }
+
   function initAll() {
     initNav()
     loadFavoritesState()
@@ -660,6 +717,7 @@
     initHome()
     applyLeadPrefill()
     initLeadFromDetail()
+    convertInlinePrices()
   }
 
   if (document.readyState === 'loading') {

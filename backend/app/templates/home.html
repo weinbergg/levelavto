@@ -198,10 +198,13 @@
               <li>Страна: {{ car.country or '—' }}</li>
             </ul>
           </div>
-          <div class="car-card__price">
-            {% if car.price %}{{ '{:,.0f}'.format(car.price).replace(',', ' ')
-            }} {{ car.currency or '' }}{% endif %}
-          </div>
+        <div class="car-card__price">
+          {% if car.price %}
+          <span class="js-price" data-price="{{ car.price }}" data-currency="{{ car.currency or '' }}">
+            {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}
+          </span>
+          {% endif %}
+        </div>
         </div>
       </a>
       {% else %}
@@ -243,10 +246,13 @@
               <li>Страна: {{ car.country or '—' }}</li>
             </ul>
           </div>
-          <div class="car-card__price">
-            {% if car.price %}{{ '{:,.0f}'.format(car.price).replace(',', ' ')
-            }} {{ car.currency or '' }}{% endif %}
-          </div>
+        <div class="car-card__price">
+          {% if car.price %}
+          <span class="js-price" data-price="{{ car.price }}" data-currency="{{ car.currency or '' }}">
+            {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}
+          </span>
+          {% endif %}
+        </div>
         </div>
       </a>
       {% else %}

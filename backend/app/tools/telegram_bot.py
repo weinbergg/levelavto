@@ -5,7 +5,14 @@ import subprocess
 from typing import Optional
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
+)
 
 from ..db import SessionLocal
 from ..services.parser_control_service import ParserControlService
@@ -45,7 +52,13 @@ POLL_INTERVAL = int(os.environ.get("EMAVTO_PROGRESS_POLL_SEC", "60"))
 running_proc: Optional[subprocess.Popen] = None
 monitor_task: Optional[asyncio.Task] = None
 subscribers: set[str] = set()
-SET_CHUNKS = 1
+AWAITING_CHUNKS = "awaiting_chunks"
+
+
+async def reply(update: Update, text: str) -> None:
+    msg = update.message or (update.callback_query.message if update.callback_query else None)
+    if msg:
+        await msg.reply_text(text)
 
 
 def allowed_user(update: Update) -> bool:
@@ -119,14 +132,17 @@ async def show_menu(update: Update) -> None:
         f"pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}s, runtime={CHUNK_MAX_RUNTIME_SEC}s, total={CHUNK_TOTAL_PAGES}, mode=full\n"
         f"Кнопками ниже можно менять и запускать."
     )
-    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    if update.message:
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    elif update.callback_query and update.callback_query.message:
+        await update.callback_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not allowed_user(update):
         return
     text = format_status()
-    await update.message.reply_text(text)
+    await reply(update, text)
 
 
 async def cmd_start_parse(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -134,14 +150,14 @@ async def cmd_start_parse(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not allowed_user(update):
         return
     if running_proc and running_proc.poll() is None:
-        await update.message.reply_text("Уже запущен.")
+        await reply(update, "Уже запущен.")
         return
     # удаляем стоп-файл
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
     try:
         running_proc = subprocess.Popen(build_chunk_cmd(MODE_FULL))
-        await update.message.reply_text(
+        await reply(update,
             f"Запуск парсинга. PID={running_proc.pid} (pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}s, runtime={CHUNK_MAX_RUNTIME_SEC}s, total={CHUNK_TOTAL_PAGES})"
         )
         if monitor_task and not monitor_task.done():
@@ -149,7 +165,7 @@ async def cmd_start_parse(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         monitor_task = context.application.create_task(
             monitor_progress(context))
     except Exception as exc:
-        await update.message.reply_text(f"Ошибка запуска: {exc}")
+        await reply(update, f"Ошибка запуска: {exc}")
 
 
 async def cmd_stop_parse(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -161,7 +177,7 @@ async def cmd_stop_parse(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         msg = f"Стоп-файл создан: {STOP_FILE}. Текущий чанк завершится и остановится."
     except Exception as exc:
         msg = f"Не удалось создать стоп-файл: {exc}"
-    await update.message.reply_text(msg)
+    await reply(update, msg)
 
 
 async def cmd_start_full(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -177,21 +193,21 @@ async def start_with_mode(update: Update, context: ContextTypes.DEFAULT_TYPE, mo
     if not allowed_user(update):
         return
     if running_proc and running_proc.poll() is None:
-        await update.message.reply_text("Уже запущен.")
+        await reply(update, "Уже запущен.")
         return
     if os.path.exists(STOP_FILE):
         os.remove(STOP_FILE)
     try:
         cmd = build_chunk_cmd(mode=mode, start_page=start_page)
         running_proc = subprocess.Popen(cmd)
-        await update.message.reply_text(
+        await reply(update,
             f"Запуск ({mode}) PID={running_proc.pid} pages={CHUNK_PAGES} pause={CHUNK_PAUSE_SEC}s runtime={CHUNK_MAX_RUNTIME_SEC}s total={CHUNK_TOTAL_PAGES} start_page={start_page or 'auto'}"
         )
         if monitor_task and not monitor_task.done():
             monitor_task.cancel()
         monitor_task = context.application.create_task(monitor_progress(context))
     except Exception as exc:
-        await update.message.reply_text(f"Ошибка запуска: {exc}")
+        await reply(update, f"Ошибка запуска: {exc}")
 
 
 async def cmd_subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -199,7 +215,7 @@ async def cmd_subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     chat_id = str(update.effective_chat.id) if update.effective_chat else ""
     add_subscriber(chat_id)
-    await update.message.reply_text("Подписка на уведомления включена.")
+    await reply(update, "Подписка на уведомления включена.")
 
 
 async def cmd_unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -207,24 +223,27 @@ async def cmd_unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     chat_id = str(update.effective_chat.id) if update.effective_chat else ""
     remove_subscriber(chat_id)
-    await update.message.reply_text("Подписка на уведомления отключена.")
+    await reply(update, "Подписка на уведомления отключена.")
 
 
 async def set_chunks_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not allowed_user(update):
-        return ConversationHandler.END
-    await update.message.reply_text(
-        f"Введите chunk_pages (число) и необязательно pause_sec/runtime_sec/total_pages через пробел.\n"
-        f"Пример: 12 45 3000 0  (pages=12, pause=45, runtime=3000, total=0)\n"
+        return 0
+    context.user_data[AWAITING_CHUNKS] = True
+    await reply(update,
+        f"Введите chunk_pages и опционально pause_sec runtime_sec total_pages через пробел.\n"
+        f"Пример: 12 45 3000 0\n"
         f"Сейчас: pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}, runtime={CHUNK_MAX_RUNTIME_SEC}, total={CHUNK_TOTAL_PAGES}"
     )
-    return SET_CHUNKS
+    return 0
 
 
 async def set_chunks_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global CHUNK_PAGES, CHUNK_PAUSE_SEC, CHUNK_MAX_RUNTIME_SEC, CHUNK_TOTAL_PAGES
     if not allowed_user(update):
-        return ConversationHandler.END
+        return 0
+    if not context.user_data.get(AWAITING_CHUNKS):
+        return 0
     parts = (update.message.text or "").strip().split()
     try:
         if len(parts) >= 1:
@@ -235,12 +254,14 @@ async def set_chunks_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             CHUNK_MAX_RUNTIME_SEC = max(300, int(parts[2]))
         if len(parts) >= 4:
             CHUNK_TOTAL_PAGES = int(parts[3])
-        await update.message.reply_text(
-            f"Ок. pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}, runtime={CHUNK_MAX_RUNTIME_SEC}, total={CHUNK_TOTAL_PAGES}"
+        await reply(
+            update,
+            f"Ок. pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}, runtime={CHUNK_MAX_RUNTIME_SEC}, total={CHUNK_TOTAL_PAGES}",
         )
     except Exception:
-        await update.message.reply_text("Не понял формат. Пример: 12 45 3000 0")
-    return ConversationHandler.END
+        await reply(update, "Не понял формат. Пример: 12 45 3000 0")
+    context.user_data[AWAITING_CHUNKS] = False
+    return 0
 
 
 async def broadcast(context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
@@ -290,22 +311,35 @@ def main() -> None:
     application.add_handler(CommandHandler("stop_parse", cmd_stop_parse))
     application.add_handler(CommandHandler("subscribe", cmd_subscribe))
     application.add_handler(CommandHandler("unsubscribe", cmd_unsubscribe))
-    application.add_handler(
-        ConversationHandler(
-            entry_points=[CommandHandler("set_chunks", set_chunks_prompt)],
-            states={SET_CHUNKS: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_chunks_apply)]},
-            fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],
-        )
-    )
-    application.add_handler(
-        MessageHandler(filters.Regex("^/menu$"), lambda u, c: show_menu(u))
-    )
-    application.add_handler(
-        MessageHandler(filters.Regex("^/set_chunks$"), lambda u, c: set_chunks_prompt(u, c))
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, lambda u, c: None)
-    )
+    application.add_handler(CommandHandler("set_chunks", set_chunks_prompt))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, set_chunks_apply))
+    async def cb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not allowed_user(update):
+            await update.callback_query.answer("Нет доступа", show_alert=True)
+            return
+        q = update.callback_query
+        data = q.data
+        await q.answer()
+        if data == "status":
+            await q.message.reply_text(format_status())
+        elif data == "start_parse":
+            await cmd_start_parse(update, context)
+        elif data == "start_full":
+            await start_with_mode(update, context, MODE_FULL, start_page="1")
+        elif data == "start_incremental":
+            await start_with_mode(update, context, MODE_INCREMENTAL, start_page=None)
+        elif data == "set_chunks":
+            context.user_data[AWAITING_CHUNKS] = True
+            await q.message.reply_text(
+                f"Введите chunk_pages и опционально pause_sec runtime_sec total_pages через пробел.\n"
+                f"Сейчас: pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}, runtime={CHUNK_MAX_RUNTIME_SEC}, total={CHUNK_TOTAL_PAGES}"
+            )
+        elif data == "stop_parse":
+            await cmd_stop_parse(update, context)
+        elif data == "menu":
+            await show_menu(update)
+
+    application.add_handler(CallbackQueryHandler(cb_handler))
 
     print("Bot started. Commands: /start /status /start_parse /stop_parse")
     application.run_polling()
