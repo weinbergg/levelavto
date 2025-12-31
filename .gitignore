@@ -17,6 +17,9 @@ imports/mobilede_active_offers.csv
 imports/mobilede_active_offers.csv/
 imports/**/*.csv
 
+# local ops notes
+ops_cheatsheet.md
+
 # node/bundle (if any)
 node_modules/
 
