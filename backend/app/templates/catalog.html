@@ -148,13 +148,13 @@
                 {% if car.engine_type %}{% set _ = meta.append(car.engine_type) %}{% endif %}
                 {% if meta %}<div class="car-card__meta">{{ meta|join(' · ') }}</div>{% endif %}
               </div>
-              <div class="car-card__price">
+            <div class="car-card__price">
               {% if car.price %}
-              <span class="js-price" data-price="{{ car.price }}" data-currency="{{ car.currency or '' }}">
-                {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}
-              </span>
+              {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) %}
+              {% set rub = (car.price * rate) | round(0, 'ceil') | int %}
+              <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
               {% endif %}
-              </div>
+            </div>
             </div>
           </a>
           {% endfor %}
@@ -176,9 +176,9 @@
               </div>
               <div class="car-card__price">
               {% if car.price %}
-              <span class="js-price" data-price="{{ car.price }}" data-currency="{{ car.currency or '' }}">
-                {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}
-              </span>
+              {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) %}
+              {% set rub = (car.price * rate) | round(0, 'ceil') | int %}
+              <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
               {% endif %}
               </div>
             </div>

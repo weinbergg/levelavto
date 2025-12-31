@@ -27,6 +27,7 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
         "home_recommended", limit=8, fallback_limit=4)
     content = ContentService(db).content_map(
         ["hero_title", "hero_subtitle", "hero_note"])
+    fx_rates = service.get_fx_rates() or {}
 
     # brand logos: map brands that have logo files in static/img/brand-logos
     static_root = Path(__file__).resolve().parent.parent / \
@@ -82,6 +83,7 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
         "highlighted_cars": highlights,
         "recommended_cars": recommended,
         "content": content,
+        "fx_rates": fx_rates,
     }
     if extra:
         context.update(extra)
@@ -283,6 +285,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "colors": color_options,
             "featured_popular": featured_popular,
             "featured_recommended": featured_recommended,
+            "fx_rates": service.get_fx_rates() or {},
         },
     )
 
