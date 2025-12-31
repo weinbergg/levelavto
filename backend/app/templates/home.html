@@ -200,8 +200,8 @@
           </div>
         <div class="car-card__price">
           {% if car.price %}
-          {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) %}
-          {% set rub = (car.price * rate) | round(0, 'ceil') | int %}
+          {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) | float %}
+          {% set rub = (car.price | float * rate) | round(0, 'ceil') | int %}
           <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
           {% endif %}
         </div>
@@ -248,8 +248,8 @@
           </div>
         <div class="car-card__price">
           {% if car.price %}
-          {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) %}
-          {% set rub = (car.price * rate) | round(0, 'ceil') | int %}
+          {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) | float %}
+          {% set rub = (car.price | float * rate) | round(0, 'ceil') | int %}
           <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
           {% endif %}
         </div>
