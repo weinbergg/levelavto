@@ -30,20 +30,20 @@ MODE_INCREMENTAL = "incremental"
 
 def build_chunk_cmd(mode: str = MODE_FULL, start_page: str | None = None) -> list[str]:
     cmd = [
-        "python",
-        "-m",
-        "backend.app.tools.emavto_chunk_runner",
-        "--chunk-pages",
+    "python",
+    "-m",
+    "backend.app.tools.emavto_chunk_runner",
+    "--chunk-pages",
         str(CHUNK_PAGES),
-        "--pause-sec",
+    "--pause-sec",
         str(CHUNK_PAUSE_SEC),
-        "--max-runtime-sec",
+    "--max-runtime-sec",
         str(CHUNK_MAX_RUNTIME_SEC),
-        "--total-pages",
+    "--total-pages",
         str(CHUNK_TOTAL_PAGES),
         "--mode",
         mode,
-    ]
+]
     if start_page:
         cmd.extend(["--start-page", start_page])
     return cmd

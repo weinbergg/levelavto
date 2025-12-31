@@ -195,7 +195,7 @@ class EmAvtoKlgParser(BaseParser):
                 len(tasks),
                 len(results),
                 len(self.missing_tasks),
-            )
+        )
 
         return results
 
