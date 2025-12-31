@@ -32,7 +32,8 @@
         </div>
         <div class="filter-block">
           <h3>Цена и год</h3>
-          <label>Цена от <input type="number" name="price_min" step="1000" value="{{ params.get('price_min','') }}" /></label>
+          <label>Цена от, ₽ <input type="number" name="price_min" step="1000" placeholder="1500000" value="{{ params.get('price_min','') }}" /></label>
+          <label>Цена до, ₽ <input type="number" name="price_max" step="1000" placeholder="3000000" value="{{ params.get('price_max','') }}" /></label>
           <label>Цена до <input type="number" name="price_max" step="1000" value="{{ params.get('price_max','') }}" /></label>
           <label>Год от <input type="number" name="year_min" value="{{ params.get('year_min','') }}" /></label>
           <label>Год до <input type="number" name="year_max" value="{{ params.get('year_max','') }}" /></label>

@@ -2,13 +2,33 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, and_, or_, literal_column
+from sqlalchemy import select, func, and_, or_, literal_column, case
+import requests
+import time
 from ..models import Car, Source, FeaturedCar
 
 
 class CarsService:
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    _fx_cache: dict | None = None
+    _fx_cache_ts: float | None = None
+
+    def get_fx_rates(self) -> dict | None:
+        now = time.time()
+        if self._fx_cache and self._fx_cache_ts and now - self._fx_cache_ts < 3600:
+            return self._fx_cache
+        try:
+            res = requests.get("https://www.cbr-xml-daily.ru/daily_json.js", timeout=5)
+            data = res.json()
+            eur = float(data["Valute"]["EUR"]["Value"])
+            usd = float(data["Valute"]["USD"]["Value"])
+            self._fx_cache = {"EUR": eur, "USD": usd, "RUB": 1.0}
+            self._fx_cache_ts = now
+            return self._fx_cache
+        except Exception:
+            return None
 
     def list_cars(
         self,
@@ -57,10 +77,23 @@ class CarsService:
                     Source.key.in_(keys))).scalars().all()
                 if src_ids:
                     conditions.append(Car.source_id.in_(src_ids))
-        if price_min is not None:
-            conditions.append(Car.price >= price_min)
-        if price_max is not None:
-            conditions.append(Car.price <= price_max)
+        if price_min is not None or price_max is not None:
+            rates = self.get_fx_rates()
+            if rates:
+                rub_expr = case(
+                    (func.lower(Car.currency) == "usd", Car.price * rates.get("USD", 1.0)),
+                    (func.lower(Car.currency) == "rub", Car.price),
+                    else_=Car.price * rates.get("EUR", 1.0),
+                )
+                if price_min is not None:
+                    conditions.append(rub_expr >= price_min)
+                if price_max is not None:
+                    conditions.append(rub_expr <= price_max)
+            else:
+                if price_min is not None:
+                    conditions.append(Car.price >= price_min)
+                if price_max is not None:
+                    conditions.append(Car.price <= price_max)
         if year_min is not None:
             conditions.append(Car.year >= year_min)
         if year_max is not None:

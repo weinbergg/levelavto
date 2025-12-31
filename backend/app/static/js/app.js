@@ -34,7 +34,8 @@
   }
 
   function formatRub(val) {
-    return `${Number(val).toLocaleString('ru-RU')} ₽`
+    const rounded = Math.ceil(Number(val))
+    return `${rounded.toLocaleString('ru-RU')} ₽`
   }
 
   function formatPrice(price, currency, fx) {
