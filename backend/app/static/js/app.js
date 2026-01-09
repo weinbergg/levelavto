@@ -162,6 +162,8 @@
     const data = new FormData(form)
     const params = new URLSearchParams()
     const numericKeys = ['price_min', 'price_max', 'year_min', 'year_max', 'mileage_max']
+    const searchField = qs('#catalog-search')
+    const searchValue = searchField?.value?.trim()
     for (const [k, v] of data.entries()) {
       if (!v) continue
       if (numericKeys.includes(k)) {
@@ -172,6 +174,11 @@
         continue
       }
       params.append(k, v)
+    }
+    if (searchValue) {
+      params.set('model', searchValue)
+    } else {
+      params.delete('model')
     }
     params.set('page', String(page || 1))
     params.set('page_size', '12')
