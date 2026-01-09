@@ -18,6 +18,12 @@ backend/app/runtime/**/*.log
 backend/app/imports/**/*.csv
 backend/app/imports/**/*.log
 backend/app/imports/mobilede_active_offers.csv
+backend/app/static/img/legacy/
+фото-видео/
+*.mov
+*.webarchive
+*.xml
+*.xlsx
 
 # local ops notes
 ops_cheatsheet.md
