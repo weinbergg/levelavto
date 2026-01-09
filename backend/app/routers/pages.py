@@ -18,16 +18,22 @@ from ..utils.taxonomy import ru_body, ru_color
 
 
 router = APIRouter()
+RECOMMENDED_PLACEMENT = "recommended"
 
 
 def _home_context(request: Request, service: CarsService, db: Session, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     brand_stats = service.brand_stats()
     body_type_stats = service.body_type_stats()
     top_models = service.top_models_by_brand(max_brands=6, top_n=6)
-    highlights = service.featured_for(
-        "home_popular", limit=8, fallback_limit=8)
     recommended = service.featured_for(
-        "home_recommended", limit=8, fallback_limit=4)
+        RECOMMENDED_PLACEMENT, limit=12, fallback_limit=4)
+    if not recommended:
+        # обратная совместимость со старыми ключами
+        recommended = service.featured_for(
+            "home_recommended", limit=12, fallback_limit=4)
+    if not recommended:
+        recommended = service.featured_for(
+            "catalog_recommended", limit=12, fallback_limit=4)
     content = ContentService(db).content_map(
         [
             "hero_title",
@@ -138,7 +144,6 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
         "brand_logos": brand_logos,
         "body_type_stats": body_type_stats,
         "top_models": top_models,
-        "highlighted_cars": highlights,
         "recommended_cars": recommended,
         "content": content,
         "fx_rates": fx_rates,
@@ -307,13 +312,24 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         )
 
     brand_filter = request.query_params.get("brand")
-    featured_popular = service.featured_for(
-        "catalog_popular", limit=6, fallback_limit=3)
     featured_recommended = service.featured_for(
-        "catalog_recommended", limit=6, fallback_limit=3)
+        RECOMMENDED_PLACEMENT, limit=12, fallback_limit=6)
+    if not featured_recommended:
+        featured_recommended = service.featured_for(
+            "catalog_recommended", limit=12, fallback_limit=6)
+    if not featured_recommended:
+        featured_recommended = service.featured_for(
+            "home_recommended", limit=12, fallback_limit=6)
+    # удаляем дубли по id
+    seen_ids = set()
+    dedup = []
+    for c in featured_recommended:
+        if c.id in seen_ids:
+            continue
+        dedup.append(c)
+        seen_ids.add(c.id)
+    featured_recommended = dedup
     if brand_filter:
-        featured_popular = [c for c in featured_popular if (
-            c.brand or "").lower() == brand_filter.lower()]
         featured_recommended = [c for c in featured_recommended if (
             c.brand or "").lower() == brand_filter.lower()]
 
@@ -325,7 +341,6 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "brands": brands,
             "countries": countries,
             "colors": color_options,
-            "featured_popular": featured_popular,
             "featured_recommended": featured_recommended,
             "fx_rates": service.get_fx_rates() or {},
             "content": contact_content,

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -11,12 +11,8 @@ from ..models import User
 
 router = APIRouter()
 
-PLACEMENTS = {
-    "home_popular": "Главная — популярные",
-    "home_recommended": "Главная — рекомендуемые",
-    "catalog_popular": "Каталог — популярные",
-    "catalog_recommended": "Каталог — рекомендуемые",
-}
+RECOMMENDED_PLACEMENT = "recommended"
+LEGACY_PLACEMENTS = ["home_recommended", "catalog_recommended"]
 
 CONTENT_KEYS = {
     "hero_title": "Заголовок на главной",
@@ -32,37 +28,53 @@ CONTENT_KEYS = {
 
 
 @router.get("/admin")
-def admin_dashboard(request: Request, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def admin_dashboard(
+    request: Request,
+    q: str | None = Query(default=None),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     templates = request.app.state.templates
     admin_svc = AdminService(db)
     cars_svc = CarsService(db)
     content = admin_svc.list_site_content(CONTENT_KEYS.keys())
-    featured = {placement: admin_svc.list_featured(
-        placement) for placement in PLACEMENTS}
-    featured_cards = {
-        placement: [
-            {
-                "id": fc.car_id,
-                "title": f"{fc.car.brand or ''} {fc.car.model or ''}".strip(),
-            }
-            for fc in featured_list
-            if fc.car
-        ]
-        for placement, featured_list in featured.items()
-    }
+    featured = admin_svc.list_featured(RECOMMENDED_PLACEMENT)
+    if not featured:
+        # миграция со старых ключей
+        legacy = []
+        for p in LEGACY_PLACEMENTS:
+            legacy.extend(admin_svc.list_featured(p))
+        seen = set()
+        merged = []
+        for fc in legacy:
+            if fc.car_id in seen:
+                continue
+            seen.add(fc.car_id)
+            merged.append(fc)
+        featured = merged
+    featured_cards = [
+        {
+            "id": fc.car_id,
+            "title": f"{fc.car.brand or ''} {fc.car.model or ''}".strip(),
+        }
+        for fc in featured if fc.car
+    ]
     total_cars = cars_svc.total_cars()
-    recent_cars = cars_svc.recent_with_thumbnails(limit=120)
+    recent_cars = cars_svc.recent_with_thumbnails(limit=40)
+    search_results = cars_svc.search_featured_candidates(
+        q, limit=20) if q else []
     return templates.TemplateResponse(
         "admin/dashboard.html",
         {
             "request": request,
             "user": user,
             "content": content,
-            "placements": PLACEMENTS,
-            "featured": featured,
+            "featured": featured_cards,
             "featured_cards": featured_cards,
             "total_cars": total_cars,
             "recent_cars": recent_cars,
+            "search_query": q or "",
+            "search_results": search_results,
         },
     )
 
@@ -102,7 +114,7 @@ def update_content(
 @router.post("/admin/featured")
 def update_featured(
     request: Request,
-    placement: str = Form(...),
+    placement: str = Form(RECOMMENDED_PLACEMENT),
     car_ids: str = Form(""),
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),

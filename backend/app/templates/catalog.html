@@ -183,41 +183,15 @@
           </select>
         </div>
       </div>
-      {% if (featured_popular or featured_recommended) and not has_filters %}
+      {% if (featured_recommended) and not has_filters %}
       <div id="featuredBlock" class="featured-rail">
         <div class="section-header" style="margin-top:8px;">
           <div>
             <h2 class="section-title" style="margin:0;">Подборка от менеджера</h2>
-            <p class="section-sub">Популярные и рекомендуемые авто без активных фильтров</p>
+            <p class="section-sub">Рекомендуемые авто без активных фильтров</p>
           </div>
         </div>
         <div class="cards cards-highlights">
-          {% for car in featured_popular %}
-            <a class="card car-card" href="/car/{{ car.id }}">
-            <div class="thumb-wrap">
-              <span class="badge-tag">Популярное</span>
-              <img class="thumb" src="{{ car.thumbnail_url or '' }}" alt="" loading="lazy" />
-            </div>
-            <div class="car-card__body">
-              <div>
-                <div class="car-card__title">
-                  {{ car.brand or '' }} {{ car.model or '' }}
-                </div>
-                {% set meta = [] %}
-                {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %}
-                {% if car.engine_type %}{% set _ = meta.append(car.engine_type) %}{% endif %}
-                {% if meta %}<div class="car-card__meta">{{ meta|join(' · ') }}</div>{% endif %}
-              </div>
-            <div class="car-card__price">
-              {% if car.price %}
-              {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) | float %}
-              {% set rub = (car.price | float * rate) | round(0, 'ceil') | int %}
-              <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
-              {% endif %}
-            </div>
-            </div>
-          </a>
-          {% endfor %}
           {% for car in featured_recommended %}
           <a class="card car-card" href="/car/{{ car.id }}">
             <div class="thumb-wrap">

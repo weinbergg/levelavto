@@ -233,63 +233,6 @@
   </div>
 </section>
 
-<section class="section" id="models">
-  <div class="la-container">
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Популярные модели</h2>
-        <p class="section-sub">Живые предложения с фотографиями</p>
-      </div>
-    </div>
-    <div class="cards cards-highlights">
-      {% for car in highlighted_cars %}
-      <a class="card car-card" href="/car/{{ car.id }}">
-        <div class="thumb-wrap">
-          <span class="badge-tag">Популярное</span>
-          <img
-            class="thumb"
-            src="{{ car.thumbnail_url or '' }}"
-            width="320"
-            height="200"
-            alt=""
-            loading="lazy"
-            decoding="async"
-          />
-        </div>
-        <div class="car-card__body">
-          <div>
-            <div class="car-card__title">
-              {{ car.brand or '' }} {{ car.model or '' }}
-            </div>
-            <div class="car-card__meta">
-              {{ car.year or '' }} · {{ car.engine_type or '' }} · {{
-              car.transmission or '' }}
-            </div>
-            <ul class="specs">
-              <li>Пробег: {{ car.mileage or '—' }}</li>
-              <li>Кузов: {{ car.body_type or '—' }}</li>
-              <li>Страна: {{ car.country or '—' }}</li>
-            </ul>
-          </div>
-          <div class="car-card__price">
-            {% if car.price %} {% set rate = fx_rates.get((car.currency or
-            'EUR').upper(), 1) | float %} {% set rub = (car.price | float *
-            rate) | round(0, 'ceil') | int %}
-            <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
-            {% endif %}
-          </div>
-        </div>
-      </a>
-      {% else %}
-      <p class="hero-note">
-        Пока нет объявлений с фото. Импортируйте CSV или запустите парсер
-        источников.
-      </p>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
 <section class="section" id="recommended">
   <div class="la-container">
     <div class="section-header">

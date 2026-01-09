@@ -13,6 +13,9 @@ router = APIRouter()
 
 @router.get("/login")
 def login_page(request: Request):
+    # если уже авторизован — сразу на главную
+    if request.session.get("user_id"):
+        return RedirectResponse(url="/", status_code=302)
     templates = request.app.state.templates
     return templates.TemplateResponse("auth/login.html", {"request": request, "error": None})
 
@@ -39,6 +42,8 @@ def login(
 
 @router.get("/register")
 def register_page(request: Request):
+    if request.session.get("user_id"):
+        return RedirectResponse(url="/", status_code=302)
     templates = request.app.state.templates
     return templates.TemplateResponse("auth/register.html", {"request": request, "error": None, "success": False})
 
@@ -64,10 +69,7 @@ def register(
             status_code=400,
         )
     request.session["user_id"] = user.id
-    return templates.TemplateResponse(
-        "auth/register.html",
-        {"request": request, "error": None, "success": True, "is_admin": is_admin},
-    )
+    return RedirectResponse(url="/", status_code=302)
 
 
 @router.get("/logout")

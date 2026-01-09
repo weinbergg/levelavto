@@ -267,7 +267,8 @@ class CarsService:
         return sorted(agg.values(), key=lambda x: x["count"], reverse=True)
 
     def highlighted_cars(self, limit: int = 8) -> List[Car]:
-        return self.featured_for("home_popular", limit=limit, fallback_limit=limit)
+        # для обратной совместимости используем рекомендованные
+        return self.featured_for("recommended", limit=limit, fallback_limit=limit)
 
     def featured_for(self, placement: str, limit: int = 8, fallback_limit: int | None = None) -> List[Car]:
         stmt = (
@@ -357,3 +358,21 @@ class CarsService:
         if changed:
             self.db.commit()
         return changed
+
+    def search_featured_candidates(self, query: str, limit: int = 20) -> List[Car]:
+        if not query:
+            return []
+        q = query.strip()
+        stmt = select(Car).where(Car.is_available.is_(True))
+        conds = []
+        try:
+            cid = int(q)
+            conds.append(Car.id == cid)
+        except ValueError:
+            pass
+        like = f"%{q}%"
+        conds.append(func.lower(Car.brand).like(func.lower(like)))
+        conds.append(func.lower(Car.model).like(func.lower(like)))
+        conds.append(func.lower(func.concat(Car.brand, " ", Car.model)).like(func.lower(like)))
+        stmt = stmt.where(or_(*conds)).order_by(Car.created_at.desc(), Car.id.desc()).limit(limit)
+        return list(self.db.execute(stmt).scalars().all())
