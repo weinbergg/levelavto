@@ -1,0 +1,29 @@
+type,key,ru,raw_values
+body_type,sedan,Седан,sedan; saloon; limousine; седан
+body_type,hatchback,Хэтчбек,hatchback; schrägheck; kompaktklasse; хэтчбек; хатчбек
+body_type,wagon,Универсал,wagon; estate; kombi; универсал; комби
+body_type,suv,Внедорожник,suv; crossover; offroad; suv; geländewagen; кроссовер; внедорожник
+body_type,coupe,Купе,coupe; coupé; купе
+body_type,convertible,Кабриолет,convertible; cabriolet; roadster; cabrio; cabriolet; roadster; кабриолет; родстер
+body_type,pickup,Пикап,pickup; pick-up; pickup; пикап
+body_type,van,Минивэн/Фургон,van; minivan; mpv; van; bus; kastenwagen; минивэн; фургон; микроавтобус
+color,black,Чёрный,black; black metallic; schwarz; obsidian-schwarz; diamantschwarz; onyxschwarz
+color,white,Белый,white; pure white; pearl white; weiss (pastell); weiß; weiss; perlmutt weiss; perlmuttweiß
+color,gray,Серый,gray; grey; mineralgrau metallic; graphite; grau; mineralgrau; graphitgrau; anthrazit
+color,silver,Серебристый,silver; silber; silber metallic
+color,blue,Синий,blue; navy; blau; dunkelblau
+color,red,Красный,red; rot
+color,green,Зелёный,green; grün; gruen
+color,brown,Коричневый,brown; braun
+color,beige,Бежевый,beige; beige; sand; champagner
+color,yellow,Жёлтый,yellow; gelb
+color,orange,Оранжевый,orange; orange
+color,purple,Фиолетовый,purple; violet; lila; violett
+drivetrain,fwd,Передний,FWD; front; Front wheel drive; Vorderrad
+drivetrain,rwd,Задний,RWD; rear; Rear wheel drive; Hinterrad
+drivetrain,awd,Полный,AWD; 4WD; 4x4; all; Allrad; quattro; xDrive; 4MATIC
+fuel,petrol,Бензин,Petrol; Benzin; Gasoline
+fuel,diesel,Дизель,Diesel
+fuel,hybrid,Гибрид,Hybrid; HEV; Vollhybrid
+fuel,phev,Гибрид (PHEV),Plug-in hybrid; PHEV; Plug-in-Hybrid
+fuel,electric,Электро,Electric; EV; Elektro; BEV

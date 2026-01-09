@@ -19,6 +19,11 @@ def compute_car_hash(payload: Dict[str, Any]) -> str:
         payload.get("currency") or "",
         payload.get("vin") or "",
         payload.get("source_url") or "",
+        str(payload.get("engine_cc") or ""),
+        str(payload.get("power_hp") or ""),
+        str(payload.get("power_kw") or ""),
+        str(payload.get("registration_year") or ""),
+        str(payload.get("registration_month") or ""),
     ]
     text = "|".join(parts)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:64]
@@ -74,6 +79,11 @@ class ParsingDataService:
             if isinstance(raw_images, list):
                 images = [str(u) for u in raw_images if isinstance(
                     u, str) and u.strip()]
+            # if new images exist, set thumbnail; otherwise keep existing images/thumbnail
+            new_thumb = images[0] if images else None
+            if new_thumb:
+                payload["thumbnail_url"] = payload.get(
+                    "thumbnail_url") or new_thumb
             existing = existing_by_eid.get(eid)
             if existing:
                 if existing.hash != payload["hash"]:
@@ -101,19 +111,21 @@ class ParsingDataService:
             # Flush to get ids for newly created rows
             self.db.flush()
             if car_row and getattr(car_row, "id", None):
-                # delete old images
                 old_imgs = self.db.execute(select(CarImage).where(
-                    CarImage.car_id == car_row.id)).scalars().all()
-                for oi in old_imgs:
-                    self.db.delete(oi)
+                    CarImage.car_id == car_row.id).order_by(CarImage.position.asc())).scalars().all()
                 # decide images list
                 candidate_images: List[str] = images[:]
+                if not candidate_images and old_imgs:
+                    candidate_images = [img.url for img in old_imgs]
                 if not candidate_images and car_row.thumbnail_url:
                     candidate_images = [car_row.thumbnail_url]
-                # insert new
-                for pos, url in enumerate(candidate_images):
-                    self.db.add(CarImage(car_id=car_row.id, url=url,
-                                is_primary=(pos == 0), position=pos))
+                if candidate_images:
+                    # replace old images only when we have something to set
+                    for oi in old_imgs:
+                        self.db.delete(oi)
+                    for pos, url in enumerate(candidate_images):
+                        self.db.add(CarImage(car_id=car_row.id, url=url,
+                                    is_primary=(pos == 0), position=pos))
 
         self.db.commit()
         return inserted, updated, len(ext_ids)

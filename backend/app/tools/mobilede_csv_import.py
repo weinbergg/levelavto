@@ -5,6 +5,7 @@ from typing import List
 from sqlalchemy import select
 from datetime import datetime
 import os
+import itertools
 from ..db import SessionLocal
 from ..parsing.config import load_sites_config
 from ..parsing.mobile_de_feed import MobileDeFeedParser
@@ -23,6 +24,22 @@ def main() -> None:
     )
     ap.add_argument("--trigger", default="manual",
                     help="Trigger string, e.g., manual")
+    ap.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Optional limit of rows to import (for testing/partial load)",
+    )
+    ap.add_argument(
+        "--skip-deactivate",
+        action="store_true",
+        help="Do not deactivate missing cars (useful for partial/short-lived feeds)",
+    )
+    ap.add_argument(
+        "--stats-file",
+        help="Path to write JSON stats (processed/inserted/updated/deactivated/skipped/no_photos)",
+        default=None,
+    )
     args = ap.parse_args()
 
     if not os.path.isfile(args.file):
@@ -46,12 +63,17 @@ def main() -> None:
         db.commit()
         db.refresh(run)
 
-        inserted_total = updated_total = seen_total = 0
-        seen_external_ids: List[str] = []
-        batch: List[dict] = []
+    inserted_total = updated_total = seen_total = skipped_total = 0
+    seen_external_ids: List[str] = []
+    batch: List[dict] = []
         BATCH_SIZE = 500
 
-        for parsed in feed_parser.iter_parsed_from_csv(iter_mobilede_csv_rows(args.file)):
+        row_iter = feed_parser.iter_parsed_from_csv(
+            iter_mobilede_csv_rows(args.file))
+        if args.limit:
+            row_iter = itertools.islice(row_iter, args.limit)
+
+        for parsed in row_iter:
             seen_external_ids.append(parsed.external_id)
             batch.append(parsed.as_dict())
             if len(batch) >= BATCH_SIZE:
@@ -66,7 +88,9 @@ def main() -> None:
             updated_total += upd
             seen_total += seen
 
-        deactivated = service.deactivate_missing(source, seen_external_ids)
+        deactivated = 0
+        if not args.skip_deactivate:
+            deactivated = service.deactivate_missing(source, seen_external_ids)
 
         # Record per-source stats
         prs = ParserRunSource(
@@ -90,6 +114,20 @@ def main() -> None:
         print(
             f"Import finished: seen={seen_total}, inserted={inserted_total}, updated={updated_total}, deactivated={deactivated}"
         )
+        if args.stats_file:
+            import json, os
+            stats = {
+                "job": "mobilede",
+                "seen": seen_total,
+                "inserted": inserted_total,
+                "updated": updated_total,
+                "deactivated": deactivated,
+                "skipped": skipped_total,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            os.makedirs(os.path.dirname(args.stats_file), exist_ok=True)
+            with open(args.stats_file, "w", encoding="utf-8") as sf:
+                json.dump(stats, sf, ensure_ascii=False, indent=2)
     except Exception as exc:
         db.rollback()
         print(f"Import failed: {type(exc).__name__}: {exc}")

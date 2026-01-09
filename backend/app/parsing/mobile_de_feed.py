@@ -77,10 +77,16 @@ class MobileDeFeedParser:
                 brand=(row.mark or None),
                 model=(row.model or None),
                 year=row.year,
+                registration_year=int(row.first_registration.split("/")[1]) if row.first_registration and "/" in row.first_registration else None,
+                registration_month=int(row.first_registration.split("/")[0]) if row.first_registration and "/" in row.first_registration else None,
                 mileage=row.km_age,
                 price=float(
                     row.price_eur) if row.price_eur is not None else None,
                 currency="EUR",
+                engine_cc=int(row.displacement * 1000) if row.displacement else None,
+                power_hp=float(row.horse_power) if row.horse_power else None,
+                power_kw=float(row.power_kw) if hasattr(row, "power_kw") and row.power_kw else (float(row.horse_power) /
+                                                                                              1.35962 if row.horse_power else None),
                 body_type=self._normalize_body(row.body_type),
                 engine_type=self._normalize_engine(
                     row.engine_type, row.full_fuel_type),

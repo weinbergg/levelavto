@@ -22,6 +22,12 @@ CONTENT_KEYS = {
     "hero_title": "Заголовок на главной",
     "hero_subtitle": "Подзаголовок на главной",
     "hero_note": "Текст примечания в hero",
+    "contact_phone": "Телефон",
+    "contact_email": "Email",
+    "contact_address": "Адрес",
+    "contact_tg": "Telegram",
+    "contact_wa": "WhatsApp",
+    "contact_ig": "Instagram",
 }
 
 
@@ -69,6 +75,12 @@ def update_content(
     hero_title: str = Form(""),
     hero_subtitle: str = Form(""),
     hero_note: str = Form(""),
+    contact_phone: str = Form(""),
+    contact_email: str = Form(""),
+    contact_address: str = Form(""),
+    contact_tg: str = Form(""),
+    contact_wa: str = Form(""),
+    contact_ig: str = Form(""),
 ):
     admin_svc = AdminService(db)
     admin_svc.set_site_content(
@@ -76,6 +88,12 @@ def update_content(
             "hero_title": hero_title,
             "hero_subtitle": hero_subtitle,
             "hero_note": hero_note,
+            "contact_phone": contact_phone,
+            "contact_email": contact_email,
+            "contact_address": contact_address,
+            "contact_tg": contact_tg,
+            "contact_wa": contact_wa,
+            "contact_ig": contact_ig,
         }
     )
     return RedirectResponse(url="/admin", status_code=302)

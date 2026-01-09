@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import os
+import sys
+import glob
 import subprocess
-from typing import Optional
+import json
+from typing import Optional, Dict, List, Any
+from pathlib import Path
+import datetime as dt
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
@@ -17,7 +22,12 @@ from telegram.ext import (
 from ..db import SessionLocal
 from ..services.parser_control_service import ParserControlService
 from ..services.parsing_data_service import ParsingDataService
+from ..services.admin_service import AdminService
+from ..services.cars_service import CarsService
+from ..services.calculator_config_service import CalculatorConfigService
+from ..services.calculator_extractor import CalculatorExtractor
 import asyncio
+from .telegram_bot_jobs import format_status as format_job_status
 
 STOP_FILE = os.environ.get("EMAVTO_STOP_FILE", "/tmp/emavto_stop")
 CHUNK_PAGES = int(os.environ.get("CHUNK_PAGES", "10"))
@@ -28,35 +38,53 @@ CHUNK_TOTAL_PAGES = int(os.environ.get("CHUNK_TOTAL_PAGES", "0"))
 MODE_FULL = "full"
 MODE_INCREMENTAL = "incremental"
 
+
 def build_chunk_cmd(mode: str = MODE_FULL, start_page: str | None = None) -> list[str]:
     cmd = [
-    "python",
-    "-m",
-    "backend.app.tools.emavto_chunk_runner",
-    "--chunk-pages",
+        "python",
+        "-m",
+        "backend.app.tools.emavto_chunk_runner",
+        "--chunk-pages",
         str(CHUNK_PAGES),
-    "--pause-sec",
+        "--pause-sec",
         str(CHUNK_PAUSE_SEC),
-    "--max-runtime-sec",
+        "--max-runtime-sec",
         str(CHUNK_MAX_RUNTIME_SEC),
-    "--total-pages",
+        "--total-pages",
         str(CHUNK_TOTAL_PAGES),
         "--mode",
         mode,
-]
+    ]
     if start_page:
         cmd.extend(["--start-page", start_page])
     return cmd
+
+
 POLL_INTERVAL = int(os.environ.get("EMAVTO_PROGRESS_POLL_SEC", "60"))
 
 running_proc: Optional[subprocess.Popen] = None
 monitor_task: Optional[asyncio.Task] = None
 subscribers: set[str] = set()
 AWAITING_CHUNKS = "awaiting_chunks"
+AWAITING_CALC = "awaiting_calc_upload"
+CALC_PENDING = "calc_pending"
+AWAITING_FEATURED = "awaiting_featured"
+FEATURED_PLACEMENTS: Dict[str, str] = {
+    "home_popular": "Главная — популярные",
+    "home_recommended": "Главная — рекомендуемые",
+    "catalog_popular": "Каталог — популярные",
+    "catalog_recommended": "Каталог — рекомендуемые",
+}
+MOBILE_DOWNLOAD_DIR = Path(os.environ.get("MOBILE_DOWNLOAD_DIR", "/app/tmp"))
+MOBILE_FILENAME = "mobilede_active_offers.csv"
+MOBILE_SCRIPT = ["bash", "scripts/fetch_mobilede_csv.sh"]
+EMAVTO_SCRIPT = ["bash", "scripts/run_emavto_job.sh"]
+JOBS_DIR = Path("backend/app/runtime/jobs")
 
 
 async def reply(update: Update, text: str) -> None:
-    msg = update.message or (update.callback_query.message if update.callback_query else None)
+    msg = update.message or (
+        update.callback_query.message if update.callback_query else None)
     if msg:
         await msg.reply_text(text)
 
@@ -107,6 +135,163 @@ def format_status() -> str:
         db.close()
 
 
+def load_job_result(job: str) -> Dict[str, Any] | None:
+    path = JOBS_DIR / f"{job}_last.json"
+    if not path.exists():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def summarize_job(job: str) -> str:
+    data = load_job_result(job)
+    return format_job_status(job, data) if data else f"{job}: нет данных"
+
+
+def summarize_errors() -> str:
+    msgs = []
+    for job in ("mobilede", "emavto"):
+        data = load_job_result(job)
+        errs = (data or {}).get("errors") or []
+        if errs:
+            msgs.append(f"{job}:\n" + "\n".join(errs[:10]))
+    return "\n\n".join(msgs) if msgs else "Ошибок не зафиксировано."
+
+
+async def run_job(script: List[str], job: str, update: Update) -> None:
+    await reply(update, f"Запускаю {job}...")
+    try:
+        rc = subprocess.run(script, check=False, capture_output=True, text=True)
+        if rc.returncode != 0:
+            await reply(update, f"{job} завершился с ошибкой rc={rc.returncode}\n{rc.stderr[:4000]}")
+            return
+    except Exception as exc:
+        await reply(update, f"Ошибка запуска {job}: {exc}")
+        return
+    summary = summarize_job(job)
+    await reply(update, f"{job} завершён.\n{summary}")
+
+
+def _fmt_val(val) -> str:
+    if val is None:
+        return "—"
+    if isinstance(val, float):
+        if val.is_integer():
+            return f"{int(val)}"
+        return f"{val:.2f}".rstrip("0").rstrip(".")
+    return str(val)
+
+
+def _diff_map(old: Dict[str, float], new: Dict[str, float], label: str) -> List[str]:
+    changes: List[str] = []
+    keys = set(old.keys()) | set(new.keys())
+    for k in sorted(keys):
+        if old.get(k) != new.get(k):
+            changes.append(f"{label}.{k}: {_fmt_val(old.get(k))} → {_fmt_val(new.get(k))}")
+    return changes
+
+
+def _table_to_map(rows: List[Dict[str, any]], key_fields: List[str], val_field: str) -> Dict[str, any]:
+    res = {}
+    for r in rows or []:
+        key = "|".join(str(r.get(f)) for f in key_fields)
+        res[key] = r.get(val_field)
+    return res
+
+
+def build_calc_diff(old: Dict[str, any] | None, new: Dict[str, any]) -> tuple[list[str], int]:
+    old = old or {}
+    blocks: List[str] = []
+    total = 0
+
+    def add_block(title: str, entries: List[str]):
+        nonlocal total
+        blocks.append(f"\n{title}:")
+        if not entries:
+            blocks.append("• без изменений")
+        else:
+            total += len(entries)
+            blocks.extend([f"• {e}" for e in entries])
+
+    old_scen = old.get("scenarios", {}) if old else {}
+    new_scen = new.get("scenarios", {})
+
+    # under 3
+    add_block(
+        "до 3 лет — расходы",
+        _diff_map(old_scen.get("under_3", {}).get("expenses", {}),
+                  new_scen.get("under_3", {}).get("expenses", {}), "expenses"),
+    )
+    add_block(
+        "до 3 лет — пошлина EUR/cc",
+        _diff_map(
+            _table_to_map(old_scen.get("under_3", {}).get("duty_by_cc", []), ["from", "to"], "eur_per_cc"),
+            _table_to_map(new_scen.get("under_3", {}).get("duty_by_cc", []), ["from", "to"], "eur_per_cc"),
+            "duty",
+        ),
+    )
+
+    # 3-5
+    add_block(
+        "3–5 лет — расходы",
+        _diff_map(old_scen.get("3_5", {}).get("expenses", {}),
+                  new_scen.get("3_5", {}).get("expenses", {}), "expenses"),
+    )
+    add_block(
+        "3–5 лет — пошлина EUR/cc",
+        _diff_map(
+            _table_to_map(old_scen.get("3_5", {}).get("duty_by_cc", []), ["from", "to"], "eur_per_cc"),
+            _table_to_map(new_scen.get("3_5", {}).get("duty_by_cc", []), ["from", "to"], "eur_per_cc"),
+            "duty",
+        ),
+    )
+
+    # electric
+    add_block(
+        "Электро — расходы",
+        _diff_map(old_scen.get("electric", {}).get("expenses", {}),
+                  new_scen.get("electric", {}).get("expenses", {}), "expenses"),
+    )
+    add_block(
+        "Электро — акциз (₽/л.с.)",
+        _diff_map(
+            _table_to_map(old_scen.get("electric", {}).get("excise_by_hp", []), ["from_hp", "to_hp"], "rub_per_hp"),
+            _table_to_map(new_scen.get("electric", {}).get("excise_by_hp", []), ["from_hp", "to_hp"], "rub_per_hp"),
+            "excise",
+        ),
+    )
+    add_block(
+        "Электро — суммы по мощности/возрасту",
+        _diff_map(
+            _table_to_map(old_scen.get("electric", {}).get("power_fee", []), ["from_hp", "to_hp", "age_bucket"], "rub"),
+            _table_to_map(new_scen.get("electric", {}).get("power_fee", []), ["from_hp", "to_hp", "age_bucket"], "rub"),
+            "power_fee",
+        ),
+    )
+    return blocks, total
+
+
+def format_calc_diff_message(old_payload: Dict[str, any] | None, new_payload: Dict[str, any], limit: int = 80) -> tuple[str, int]:
+    blocks, total = build_calc_diff(old_payload, new_payload)
+    shown = 0
+    lines: List[str] = ["Изменения в конфиге калькулятора"]
+    for line in blocks:
+        if line.startswith("\n"):
+            lines.append(line)
+            continue
+        if line.startswith("•"):
+            if shown >= limit:
+                break
+            shown += 1
+        lines.append(line)
+    if total > shown:
+        lines.append(f"• ... ещё {total - shown} изменений")
+    return "\n".join(lines), total
+
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not allowed_user(update):
         return
@@ -118,13 +303,33 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def show_menu(update: Update) -> None:
     keyboard = [
         [InlineKeyboardButton("Статус", callback_data="status")],
-        [InlineKeyboardButton("Запуск (текущие настройки)", callback_data="start_parse")],
+        [InlineKeyboardButton("Запуск (текущие настройки)",
+                              callback_data="start_parse")],
         [
-            InlineKeyboardButton("Полный с начала", callback_data="start_full"),
-            InlineKeyboardButton("Обновление каталога", callback_data="start_incremental"),
+            InlineKeyboardButton(
+                "Полный с начала", callback_data="start_full"),
+            InlineKeyboardButton("Обновление каталога",
+                                 callback_data="start_incremental"),
         ],
         [InlineKeyboardButton("Настроить чанки", callback_data="set_chunks")],
         [InlineKeyboardButton("Стоп (стоп-файл)", callback_data="stop_parse")],
+        [InlineKeyboardButton("Витрина (рекоменд./популярн.)",
+                              callback_data="featured_menu")],
+        [
+            InlineKeyboardButton("mobile.de статус",
+                                 callback_data="mobile_status"),
+            InlineKeyboardButton("mobile.de скачать",
+                                 callback_data="mobile_download"),
+        ],
+        [
+            InlineKeyboardButton("mobile.de импорт", callback_data="mobile_import"),
+            InlineKeyboardButton("M-Auto статус", callback_data="emavto_status"),
+        ],
+        [
+            InlineKeyboardButton("Обновить M-Auto", callback_data="emavto_run"),
+        ],
+        [InlineKeyboardButton("Последние ошибки", callback_data="last_errors")],
+        [InlineKeyboardButton("Калькулятор (Excel)", callback_data="calc_menu")],
     ]
     text = (
         f"Бот готов.\n"
@@ -158,8 +363,8 @@ async def cmd_start_parse(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         running_proc = subprocess.Popen(build_chunk_cmd(MODE_FULL))
         await reply(update,
-            f"Запуск парсинга. PID={running_proc.pid} (pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}s, runtime={CHUNK_MAX_RUNTIME_SEC}s, total={CHUNK_TOTAL_PAGES})"
-        )
+                    f"Запуск парсинга. PID={running_proc.pid} (pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}s, runtime={CHUNK_MAX_RUNTIME_SEC}s, total={CHUNK_TOTAL_PAGES})"
+                    )
         if monitor_task and not monitor_task.done():
             monitor_task.cancel()
         monitor_task = context.application.create_task(
@@ -201,11 +406,12 @@ async def start_with_mode(update: Update, context: ContextTypes.DEFAULT_TYPE, mo
         cmd = build_chunk_cmd(mode=mode, start_page=start_page)
         running_proc = subprocess.Popen(cmd)
         await reply(update,
-            f"Запуск ({mode}) PID={running_proc.pid} pages={CHUNK_PAGES} pause={CHUNK_PAUSE_SEC}s runtime={CHUNK_MAX_RUNTIME_SEC}s total={CHUNK_TOTAL_PAGES} start_page={start_page or 'auto'}"
-        )
+                    f"Запуск ({mode}) PID={running_proc.pid} pages={CHUNK_PAGES} pause={CHUNK_PAUSE_SEC}s runtime={CHUNK_MAX_RUNTIME_SEC}s total={CHUNK_TOTAL_PAGES} start_page={start_page or 'auto'}"
+                    )
         if monitor_task and not monitor_task.done():
             monitor_task.cancel()
-        monitor_task = context.application.create_task(monitor_progress(context))
+        monitor_task = context.application.create_task(
+            monitor_progress(context))
     except Exception as exc:
         await reply(update, f"Ошибка запуска: {exc}")
 
@@ -231,10 +437,10 @@ async def set_chunks_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return 0
     context.user_data[AWAITING_CHUNKS] = True
     await reply(update,
-        f"Введите chunk_pages и опционально pause_sec runtime_sec total_pages через пробел.\n"
-        f"Пример: 12 45 3000 0\n"
-        f"Сейчас: pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}, runtime={CHUNK_MAX_RUNTIME_SEC}, total={CHUNK_TOTAL_PAGES}"
-    )
+                f"Введите chunk_pages и опционально pause_sec runtime_sec total_pages через пробел.\n"
+                f"Пример: 12 45 3000 0\n"
+                f"Сейчас: pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}, runtime={CHUNK_MAX_RUNTIME_SEC}, total={CHUNK_TOTAL_PAGES}"
+                )
     return 0
 
 
@@ -242,6 +448,9 @@ async def set_chunks_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     global CHUNK_PAGES, CHUNK_PAUSE_SEC, CHUNK_MAX_RUNTIME_SEC, CHUNK_TOTAL_PAGES
     if not allowed_user(update):
         return 0
+    # если ждём ввод подборки — не трогаем
+    if context.user_data.get(AWAITING_FEATURED):
+        return await set_featured_apply(update, context)
     if not context.user_data.get(AWAITING_CHUNKS):
         return 0
     parts = (update.message.text or "").strip().split()
@@ -262,6 +471,154 @@ async def set_chunks_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await reply(update, "Не понял формат. Пример: 12 45 3000 0")
     context.user_data[AWAITING_CHUNKS] = False
     return 0
+
+
+async def cb_calc_show(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not allowed_user(update):
+        return
+    db = SessionLocal()
+    try:
+        svc = CalculatorConfigService(db)
+        cfg = svc.latest()
+        if not cfg:
+            await reply(update, "Конфиг калькулятора не найден.")
+            return
+        meta = cfg.payload.get("meta", {})
+        msg = (
+            f"Калькулятор v{cfg.version} (source={cfg.source or '—'})\n"
+            f"EUR по умолчанию: {meta.get('eur_rate_default','?')}\n"
+            f"Дата: {cfg.created_at}"
+        )
+        await reply(update, msg)
+    finally:
+        db.close()
+
+
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not allowed_user(update):
+        return 0
+    if not context.user_data.get(AWAITING_CALC):
+        return 0
+    doc = update.message.document if update.message else None
+    if not doc:
+        await reply(update, "Пришлите файл Excel.")
+        return 0
+    file = await doc.get_file()
+    import tempfile
+    import os
+    path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+            path = tmp.name
+            await file.download_to_drive(path)
+        extractor = CalculatorExtractor(Path(path))
+        payload = extractor.extract()
+        db = SessionLocal()
+        try:
+            svc = CalculatorConfigService(db)
+            old = svc.latest()
+            diff_text, total_changes = format_calc_diff_message(old.payload if old else None, payload)
+            context.user_data[CALC_PENDING] = {
+                "payload": payload,
+                "filename": doc.file_name,
+                "diff_total": total_changes,
+            }
+            kb = InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("✅ Применить", callback_data="calc_apply")],
+                    [InlineKeyboardButton("❌ Отменить", callback_data="calc_cancel")],
+                ]
+            )
+            await reply(update, diff_text)
+            await update.message.reply_text("Сохранить новую версию?", reply_markup=kb)
+        finally:
+            db.close()
+    except ValueError as exc:
+        await reply(update, f"Ошибка в Excel: {exc}")
+    except Exception as exc:
+        await reply(update, f"Не удалось обработать файл: {exc}")
+    finally:
+        context.user_data[AWAITING_CALC] = False
+        if path and os.path.exists(path):
+            os.unlink(path)
+    return 0
+
+
+async def set_featured_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE, placement: str) -> None:
+    context.user_data[AWAITING_FEATURED] = placement
+    db = SessionLocal()
+    try:
+        cars = CarsService(db).recent_with_thumbnails(limit=10)
+        sample = ", ".join(
+            f"#{c.id} {c.brand or ''} {c.model or ''}".strip() for c in cars)
+    finally:
+        db.close()
+    await reply(
+        update,
+        f"Выбрано: {FEATURED_PLACEMENTS.get(placement, placement)}\n"
+        f"Пришлите ID авто через запятую (пример: 12, 45, 78). Порядок сохраняется.\n"
+        f"Последние с фото: {sample or 'нет'}",
+    )
+
+
+async def set_featured_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    placement = context.user_data.get(AWAITING_FEATURED)
+    if not placement:
+        return 0
+    text = (update.message.text or "").strip()
+    ids: List[int] = []
+    for part in text.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            ids.append(int(part))
+        except ValueError:
+            continue
+    db = SessionLocal()
+    try:
+        AdminService(db).set_featured(placement, ids)
+    finally:
+        db.close()
+    context.user_data[AWAITING_FEATURED] = None
+    await reply(update, f"Сохранено для {FEATURED_PLACEMENTS.get(placement, placement)}: {ids or 'пусто'}")
+    return 0
+
+
+def mobile_latest_file() -> Optional[Path]:
+    candidates = list(MOBILE_DOWNLOAD_DIR.glob("mobilede_active_offers_*.csv"))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def mobile_status_summary() -> str:
+    latest = mobile_latest_file()
+    if not latest:
+        return "Файлы mobile.de не найдены."
+    stat = latest.stat()
+    mtime = dt.datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+    size_mb = stat.st_size / (1024 * 1024)
+    try:
+        import subprocess
+        out = subprocess.check_output(["wc", "-l", str(latest)], text=True)
+        lines = out.strip().split()[0]
+    except Exception:
+        lines = "?"
+    return f"Последний: {latest.name} ({size_mb:.1f} MB, ~{lines} строк), сохранён {mtime}"
+
+
+async def cmd_mobile_status(update: Update) -> None:
+    await reply(update, summarize_job("mobilede"))
+
+
+async def cmd_mobile_download(update: Update) -> None:
+    await reply(update, "Скачиваем и импортируем mobile.de CSV...")
+    await run_job(MOBILE_SCRIPT, "mobilede", update)
+
+
+async def cmd_mobile_import(update: Update) -> None:
+    await cmd_mobile_download(update)
 
 
 async def broadcast(context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
@@ -307,12 +664,20 @@ def main() -> None:
     application.add_handler(CommandHandler("status", cmd_status))
     application.add_handler(CommandHandler("start_parse", cmd_start_parse))
     application.add_handler(CommandHandler("start_full", cmd_start_full))
-    application.add_handler(CommandHandler("start_incremental", cmd_start_incremental))
+    application.add_handler(CommandHandler(
+        "start_incremental", cmd_start_incremental))
     application.add_handler(CommandHandler("stop_parse", cmd_stop_parse))
     application.add_handler(CommandHandler("subscribe", cmd_subscribe))
     application.add_handler(CommandHandler("unsubscribe", cmd_unsubscribe))
     application.add_handler(CommandHandler("set_chunks", set_chunks_prompt))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, set_chunks_apply))
+    application.add_handler(CommandHandler("mobile_status", cmd_mobile_status))
+    application.add_handler(CommandHandler("mobile_import", cmd_mobile_import))
+    application.add_handler(CommandHandler("calc_config", lambda u, c: c.application.create_task(cb_calc_show(u, c))))
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND, set_chunks_apply))
+    application.add_handler(MessageHandler(
+        filters.Document.ALL, handle_document))
+
     async def cb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not allowed_user(update):
             await update.callback_query.answer("Нет доступа", show_alert=True)
@@ -338,6 +703,60 @@ def main() -> None:
             await cmd_stop_parse(update, context)
         elif data == "menu":
             await show_menu(update)
+        elif data == "featured_menu":
+            kb = [
+                [InlineKeyboardButton(v, callback_data=f"feat_{k}")]
+                for k, v in FEATURED_PLACEMENTS.items()
+            ]
+            kb.append([InlineKeyboardButton("Назад", callback_data="menu")])
+            await q.message.reply_text("Выберите блок для заполнения:", reply_markup=InlineKeyboardMarkup(kb))
+        elif data.startswith("feat_"):
+            placement = data.split("feat_", 1)[1]
+            await set_featured_prompt(update, context, placement)
+        elif data == "mobile_status":
+            await q.message.reply_text(summarize_job("mobilede"))
+        elif data == "mobile_download":
+            await run_job(MOBILE_SCRIPT, "mobilede", update)
+        elif data == "mobile_import":
+            await run_job(MOBILE_SCRIPT, "mobilede", update)
+        elif data == "emavto_status":
+            await q.message.reply_text(summarize_job("emavto"))
+        elif data == "emavto_run":
+            await run_job(EMAVTO_SCRIPT, "emavto", update)
+        elif data == "last_errors":
+            await q.message.reply_text(summarize_errors())
+        elif data == "calc_menu":
+            kb = [
+                [InlineKeyboardButton("Показать текущие", callback_data="calc_show")],
+                [InlineKeyboardButton("Загрузить Excel", callback_data="calc_upload")],
+                [InlineKeyboardButton("Назад", callback_data="menu")],
+            ]
+            await q.message.reply_text("Калькулятор: выберите действие.", reply_markup=InlineKeyboardMarkup(kb))
+        elif data == "calc_show":
+            await cb_calc_show(update, context)
+        elif data == "calc_upload":
+            context.user_data[AWAITING_CALC] = True
+            await q.message.reply_text("Пришлите Excel (3 листа: до 3-х, 3-5, Электро).")
+        elif data == "calc_apply":
+            pending = context.user_data.get(CALC_PENDING)
+            if not pending:
+                await q.message.reply_text("Нет загруженного файла для применения.")
+                return
+            db = SessionLocal()
+            try:
+                svc = CalculatorConfigService(db)
+                cfg = svc.create(payload=pending["payload"], source="bot_upload", comment=pending.get("filename"))
+                await q.message.reply_text(f"Новая версия сохранена: v{cfg.version} (изменений: {pending.get('diff_total')})")
+            except Exception as exc:
+                await q.message.reply_text(f"Не удалось сохранить: {exc}")
+            finally:
+                db.close()
+            context.user_data[CALC_PENDING] = None
+            context.user_data[AWAITING_CALC] = False
+        elif data == "calc_cancel":
+            context.user_data[CALC_PENDING] = None
+            context.user_data[AWAITING_CALC] = False
+            await q.message.reply_text("Загрузка отменена.")
 
     application.add_handler(CallbackQueryHandler(cb_handler))
 

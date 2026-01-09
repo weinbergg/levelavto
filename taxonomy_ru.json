@@ -1,0 +1,406 @@
+{
+  "meta": {
+    "version": "2026-01-09",
+    "notes": "Мини-словарь/нормализация для каталога Level Avto. Использовать для отображения (RU) и для фильтров."
+  },
+  "sources": {
+    "mobile.de": {
+      "region_ru": "Европа",
+      "region_key": "europe"
+    },
+    "m-auto": {
+      "region_ru": "Корея",
+      "region_key": "korea"
+    }
+  },
+  "country_normalization": {
+    "display_rule": "Если source == mobile.de -> показываем 'Европа'; если source == m-auto -> показываем 'Корея'. Опционально показывать конкретную страну по raw_country_code.",
+    "raw_country_code_to_ru": {
+      "DE": "Германия",
+      "D": "Германия",
+      "GER": "Германия",
+      "Germany": "Германия",
+      "Deutschland": "Германия",
+      "KR": "Южная Корея",
+      "KOR": "Южная Корея",
+      "Korea": "Южная Корея",
+      "South Korea": "Южная Корея"
+    }
+  },
+  "body_types": [
+    {
+      "key": "sedan",
+      "ru": "Седан",
+      "en": [
+        "sedan",
+        "saloon"
+      ],
+      "de": [
+        "limousine"
+      ],
+      "aliases": [
+        "седан"
+      ]
+    },
+    {
+      "key": "hatchback",
+      "ru": "Хэтчбек",
+      "en": [
+        "hatchback"
+      ],
+      "de": [
+        "schrägheck",
+        "kompaktklasse"
+      ],
+      "aliases": [
+        "хэтчбек",
+        "хатчбек"
+      ]
+    },
+    {
+      "key": "wagon",
+      "ru": "Универсал",
+      "en": [
+        "wagon",
+        "estate"
+      ],
+      "de": [
+        "kombi"
+      ],
+      "aliases": [
+        "универсал",
+        "комби"
+      ]
+    },
+    {
+      "key": "suv",
+      "ru": "Внедорожник",
+      "en": [
+        "suv",
+        "crossover",
+        "offroad"
+      ],
+      "de": [
+        "suv",
+        "geländewagen"
+      ],
+      "aliases": [
+        "кроссовер",
+        "внедорожник"
+      ]
+    },
+    {
+      "key": "coupe",
+      "ru": "Купе",
+      "en": [
+        "coupe"
+      ],
+      "de": [
+        "coupé"
+      ],
+      "aliases": [
+        "купе"
+      ]
+    },
+    {
+      "key": "convertible",
+      "ru": "Кабриолет",
+      "en": [
+        "convertible",
+        "cabriolet",
+        "roadster"
+      ],
+      "de": [
+        "cabrio",
+        "cabriolet",
+        "roadster"
+      ],
+      "aliases": [
+        "кабриолет",
+        "родстер"
+      ]
+    },
+    {
+      "key": "pickup",
+      "ru": "Пикап",
+      "en": [
+        "pickup",
+        "pick-up"
+      ],
+      "de": [
+        "pickup"
+      ],
+      "aliases": [
+        "пикап"
+      ]
+    },
+    {
+      "key": "van",
+      "ru": "Минивэн/Фургон",
+      "en": [
+        "van",
+        "minivan",
+        "mpv"
+      ],
+      "de": [
+        "van",
+        "bus",
+        "kastenwagen"
+      ],
+      "aliases": [
+        "минивэн",
+        "фургон",
+        "микроавтобус"
+      ]
+    }
+  ],
+  "drivetrain": [
+    {
+      "key": "fwd",
+      "ru": "Передний",
+      "raw": [
+        "FWD",
+        "front",
+        "Front wheel drive",
+        "Vorderrad"
+      ]
+    },
+    {
+      "key": "rwd",
+      "ru": "Задний",
+      "raw": [
+        "RWD",
+        "rear",
+        "Rear wheel drive",
+        "Hinterrad"
+      ]
+    },
+    {
+      "key": "awd",
+      "ru": "Полный",
+      "raw": [
+        "AWD",
+        "4WD",
+        "4x4",
+        "all",
+        "Allrad",
+        "quattro",
+        "xDrive",
+        "4MATIC"
+      ]
+    }
+  ],
+  "fuel_types": [
+    {
+      "key": "petrol",
+      "ru": "Бензин",
+      "raw": [
+        "Petrol",
+        "Benzin",
+        "Gasoline"
+      ]
+    },
+    {
+      "key": "diesel",
+      "ru": "Дизель",
+      "raw": [
+        "Diesel"
+      ]
+    },
+    {
+      "key": "hybrid",
+      "ru": "Гибрид",
+      "raw": [
+        "Hybrid",
+        "HEV",
+        "Vollhybrid"
+      ]
+    },
+    {
+      "key": "phev",
+      "ru": "Гибрид (PHEV)",
+      "raw": [
+        "Plug-in hybrid",
+        "PHEV",
+        "Plug-in-Hybrid"
+      ]
+    },
+    {
+      "key": "electric",
+      "ru": "Электро",
+      "raw": [
+        "Electric",
+        "EV",
+        "Elektro",
+        "BEV"
+      ]
+    }
+  ],
+  "colors": [
+    {
+      "key": "black",
+      "ru": "Чёрный",
+      "en": [
+        "black",
+        "black metallic"
+      ],
+      "de": [
+        "schwarz",
+        "obsidian-schwarz",
+        "diamantschwarz",
+        "onyxschwarz"
+      ]
+    },
+    {
+      "key": "white",
+      "ru": "Белый",
+      "en": [
+        "white",
+        "pure white",
+        "pearl white",
+        "weiss (pastell)"
+      ],
+      "de": [
+        "weiß",
+        "weiss",
+        "perlmutt weiss",
+        "perlmuttweiß"
+      ]
+    },
+    {
+      "key": "gray",
+      "ru": "Серый",
+      "en": [
+        "gray",
+        "grey",
+        "mineralgrau metallic",
+        "graphite"
+      ],
+      "de": [
+        "grau",
+        "mineralgrau",
+        "graphitgrau",
+        "anthrazit"
+      ]
+    },
+    {
+      "key": "silver",
+      "ru": "Серебристый",
+      "en": [
+        "silver"
+      ],
+      "de": [
+        "silber",
+        "silber metallic"
+      ]
+    },
+    {
+      "key": "blue",
+      "ru": "Синий",
+      "en": [
+        "blue",
+        "navy"
+      ],
+      "de": [
+        "blau",
+        "dunkelblau"
+      ]
+    },
+    {
+      "key": "red",
+      "ru": "Красный",
+      "en": [
+        "red"
+      ],
+      "de": [
+        "rot"
+      ]
+    },
+    {
+      "key": "green",
+      "ru": "Зелёный",
+      "en": [
+        "green"
+      ],
+      "de": [
+        "grün",
+        "gruen"
+      ]
+    },
+    {
+      "key": "brown",
+      "ru": "Коричневый",
+      "en": [
+        "brown"
+      ],
+      "de": [
+        "braun"
+      ]
+    },
+    {
+      "key": "beige",
+      "ru": "Бежевый",
+      "en": [
+        "beige"
+      ],
+      "de": [
+        "beige",
+        "sand",
+        "champagner"
+      ]
+    },
+    {
+      "key": "yellow",
+      "ru": "Жёлтый",
+      "en": [
+        "yellow"
+      ],
+      "de": [
+        "gelb"
+      ]
+    },
+    {
+      "key": "orange",
+      "ru": "Оранжевый",
+      "en": [
+        "orange"
+      ],
+      "de": [
+        "orange"
+      ]
+    },
+    {
+      "key": "purple",
+      "ru": "Фиолетовый",
+      "en": [
+        "purple",
+        "violet"
+      ],
+      "de": [
+        "lila",
+        "violett"
+      ]
+    }
+  ],
+  "ui_labels_ru": {
+    "bank": "Банк (перевод)",
+    "purchase": "Покупка по нетто",
+    "inspection": "Осмотр",
+    "delivery_eu_msk": "Доставка Европа–Москва",
+    "delivery_eu_minsk": "Доставка Европа–Минск",
+    "customs_rb": "Таможня РБ",
+    "transfer_customs_minsk": "Комиссия за перевод денег за таможню",
+    "delivery_minsk_msk": "Доставка Минск–Москва",
+    "elpts": "ЭлПТС",
+    "insurance": "Страхование/брокер/документы",
+    "investor": "Инвестор",
+    "without_rf": "Без платежей в РФ",
+    "broker_elpts": "Брокер и ЭлПТС",
+    "customs_fee": "Таможенный сбор",
+    "duty": "Пошлина",
+    "excise": "Акциз",
+    "vat": "НДС",
+    "util": "Утилизационный сбор",
+    "total": "Итого"
+  }
+}

@@ -145,7 +145,7 @@ def _parse_options(raw: str | None) -> List[str]:
             return [str(x).strip() for x in data if isinstance(x, (str, int, float))]
     except Exception as exc:
         logger.warning("Failed to parse options JSON: %r (%s)", raw[:200], exc)
-    return []
+        return []
 
 
 def iter_mobilede_csv_rows(file_path: str) -> Iterator[MobileDeCsvRow]:

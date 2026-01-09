@@ -6,95 +6,142 @@
     <aside class="filters-panel" id="filtersPanel">
       <form id="filters" onsubmit="return false;">
         {% set params = request.query_params %}
-        <div class="filter-block">
-          <h3>Основное</h3>
-          <label>Страна
-            <select name="country" id="country">
-              <option value="">Все</option>
-              {% for c in countries %}
-              <option value="{{ c }}" {% if params.get('country') == c %}selected{% endif %}>{{ c }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label>Марка
-            <select name="brand" id="brand">
-              <option value="">Все</option>
-              {% for b in brands|sort %}
-              <option value="{{ b }}" {% if params.get('brand') == b %}selected{% endif %}>{{ b }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label>Модель
-            <select name="model" id="model-select">
-              <option value="">{{ params.get('model','') or 'Все' }}</option>
-            </select>
-          </label>
+        <div class="filters-primary">
+          <h3>Основные фильтры</h3>
+          <div class="filters-primary-grid">
+            <label>Страна
+              <select name="country" id="country">
+                <option value="">Все</option>
+                <option value="EU" {% if params.get('country') == 'EU' %}selected{% endif %}>Европа</option>
+                <option value="KR" {% if params.get('country') == 'KR' %}selected{% endif %}>Корея</option>
+              </select>
+            </label>
+            <label>Марка
+              <select name="brand" id="brand">
+                <option value="">Все</option>
+                {% for b in brands|sort %}
+                <option value="{{ b }}" {% if params.get('brand') == b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Модель
+              <select name="model" id="model-select">
+                <option value="">{{ params.get('model','') or 'Все' }}</option>
+              </select>
+            </label>
+            <label>Поколение
+              <input type="text" name="generation" placeholder="F25, G01, E83" value="{{ params.get('generation','') }}" />
+            </label>
+            <label>Цена от, ₽ <input type="number" name="price_min" step="1000" placeholder="1500000" value="{{ params.get('price_min','') }}" /></label>
+            <label>Цена до, ₽ <input type="number" name="price_max" step="1000" placeholder="3000000" value="{{ params.get('price_max','') }}" /></label>
+            <label>Год от <input type="number" name="year_min" value="{{ params.get('year_min','') }}" /></label>
+            <label>Год до <input type="number" name="year_max" value="{{ params.get('year_max','') }}" /></label>
+            <label>Пробег от <input type="number" name="mileage_min" step="1000" value="{{ params.get('mileage_min','') }}" /></label>
+            <label>Пробег до <input type="number" name="mileage_max" step="1000" value="{{ params.get('mileage_max','') }}" /></label>
+            <label>Топливо
+              <select name="engine_type">
+                <option value="">Любое</option>
+                <option value="Petrol" {% if params.get('engine_type') == 'Petrol' %}selected{% endif %}>Бензин</option>
+                <option value="Diesel" {% if params.get('engine_type') == 'Diesel' %}selected{% endif %}>Дизель</option>
+                <option value="Hybrid" {% if params.get('engine_type') == 'Hybrid' %}selected{% endif %}>Гибрид</option>
+                <option value="Electric" {% if params.get('engine_type') == 'Electric' %}selected{% endif %}>Электро</option>
+              </select>
+            </label>
+            <label>КПП
+              <select name="transmission">
+                <option value="">Любая</option>
+                <option value="Automatic" {% if params.get('transmission') == 'Automatic' %}selected{% endif %}>Автомат</option>
+                <option value="Manual" {% if params.get('transmission') == 'Manual' %}selected{% endif %}>Механика</option>
+              </select>
+            </label>
+            <label>Сортировать по
+              <select name="sort">
+                <option value="price_asc" {% if params.get('sort','price_asc') == 'price_asc' %}selected{% endif %}>Цена (сначала дешевые)</option>
+                <option value="price_desc" {% if params.get('sort') == 'price_desc' %}selected{% endif %}>Цена (дорогие сначала)</option>
+                <option value="year_desc" {% if params.get('sort') == 'year_desc' %}selected{% endif %}>Год (новые)</option>
+                <option value="year_asc" {% if params.get('sort') == 'year_asc' %}selected{% endif %}>Год (старые)</option>
+                <option value="mileage_asc" {% if params.get('sort') == 'mileage_asc' %}selected{% endif %}>Пробег (меньше)</option>
+                <option value="mileage_desc" {% if params.get('sort') == 'mileage_desc' %}selected{% endif %}>Пробег (больше)</option>
+              </select>
+            </label>
+          </div>
         </div>
-        <div class="filter-block">
-          <h3>Цена и год</h3>
-          <label>Цена от, ₽ <input type="number" name="price_min" step="1000" placeholder="1500000" value="{{ params.get('price_min','') }}" /></label>
-          <label>Цена до, ₽ <input type="number" name="price_max" step="1000" placeholder="3000000" value="{{ params.get('price_max','') }}" /></label>
-          <label>Цена до <input type="number" name="price_max" step="1000" value="{{ params.get('price_max','') }}" /></label>
-          <label>Год от <input type="number" name="year_min" value="{{ params.get('year_min','') }}" /></label>
-          <label>Год до <input type="number" name="year_max" value="{{ params.get('year_max','') }}" /></label>
-        </div>
-        <div class="filter-block">
-          <h3>Характеристики</h3>
-          <label>Пробег до <input type="number" name="mileage_max" step="1000" value="{{ params.get('mileage_max','') }}" /></label>
-          <label>Кузов
-            <select name="body_type">
-              <option value="">Любой</option>
-              <option value="sedan" {% if params.get('body_type') == 'sedan' %}selected{% endif %}>Седан</option>
-              <option value="wagon" {% if params.get('body_type') == 'wagon' %}selected{% endif %}>Универсал</option>
-              <option value="suv" {% if params.get('body_type') == 'suv' %}selected{% endif %}>SUV</option>
-              <option value="hatchback" {% if params.get('body_type') == 'hatchback' %}selected{% endif %}>Хэтчбек</option>
-              <option value="coupe" {% if params.get('body_type') == 'coupe' %}selected{% endif %}>Купе</option>
-              <option value="cabrio" {% if params.get('body_type') == 'cabrio' %}selected{% endif %}>Кабриолет</option>
-            </select>
-          </label>
-          <label>Топливо
-            <select name="engine_type">
-              <option value="">Любое</option>
-              <option value="Petrol" {% if params.get('engine_type') == 'Petrol' %}selected{% endif %}>Бензин</option>
-              <option value="Diesel" {% if params.get('engine_type') == 'Diesel' %}selected{% endif %}>Дизель</option>
-              <option value="Hybrid" {% if params.get('engine_type') == 'Hybrid' %}selected{% endif %}>Гибрид</option>
-              <option value="Electric" {% if params.get('engine_type') == 'Electric' %}selected{% endif %}>Электро</option>
-            </select>
-          </label>
-          <label>КПП
-            <select name="transmission">
-              <option value="">Любая</option>
-              <option value="Automatic" {% if params.get('transmission') == 'Automatic' %}selected{% endif %}>Автомат</option>
-              <option value="Manual" {% if params.get('transmission') == 'Manual' %}selected{% endif %}>Механика</option>
-            </select>
-          </label>
-          <label>Источник
-            <select name="source">
-              <option value="">Все</option>
-              <option value="mobile_de" {% if params.get('source') == 'mobile_de' %}selected{% endif %}>Партнёр 1</option>
-              <option value="encar" {% if params.get('source') == 'encar' %}selected{% endif %}>Партнёр 2</option>
-              <option value="emavto_klg" {% if params.get('source') == 'emavto_klg' %}selected{% endif %}>Партнёр 3</option>
-            </select>
-          </label>
-          <label>Цвет
-            <select name="color" id="colorSelect" class="sr-only">
-              <option value="">Любой</option>
-              {% for c in colors %}
-               <option value="{{ c.value }}" {% if params.get('color') == c.value %}selected{% endif %}>{{ c.label }}</option>
-              {% endfor %}
-            </select>
-            <div class="color-swatches" id="colorSwatches">
-               <button type="button" class="color-chip" data-value="" data-color="" data-label="Все" data-hex="#0f1014" title="Все"></button>
-               {% for c in colors %}
-              {% set val = c.value if c is mapping else c %}
-              {% set key = c.key if c is mapping else c %}
-              {% set label = c.label if c is mapping else c %}
-              {% set hex = c.hex if c is mapping else '' %}
-              <button type="button" class="color-chip" data-value="{{ val }}" data-color="{{ key }}" data-label="{{ label }}" data-hex="{{ hex }}" title="{{ label }}"></button>
-              {% endfor %}
+
+        <div class="filters-advanced">
+          <div class="filters-advanced__toggle" id="advancedToggle">
+            <span>Дополнительные фильтры</span>
+            <button class="btn btn-ghost" type="button">Показать / скрыть</button>
+          </div>
+          <div class="filters-advanced__body" id="advancedBody">
+            <div class="filter-block">
+              <h3>Регистрация</h3>
+              <label>Пост. на учёт: год от <input type="number" name="reg_year_min" value="{{ params.get('reg_year_min','') }}" /></label>
+              <label>Пост. на учёт: мес. от <input type="number" name="reg_month_min" value="{{ params.get('reg_month_min','') }}" /></label>
+              <label>Пост. на учёт: год до <input type="number" name="reg_year_max" value="{{ params.get('reg_year_max','') }}" /></label>
+              <label>Пост. на учёт: мес. до <input type="number" name="reg_month_max" value="{{ params.get('reg_month_max','') }}" /></label>
             </div>
-          </label>
+            <div class="filter-block">
+              <h3>Кузов и источник</h3>
+              <label>Кузов
+                <select name="body_type">
+                  <option value="">Любой</option>
+                  <option value="sedan" {% if params.get('body_type') == 'sedan' %}selected{% endif %}>Седан</option>
+                  <option value="wagon" {% if params.get('body_type') == 'wagon' %}selected{% endif %}>Универсал</option>
+                  <option value="suv" {% if params.get('body_type') == 'suv' %}selected{% endif %}>SUV</option>
+                  <option value="hatchback" {% if params.get('body_type') == 'hatchback' %}selected{% endif %}>Хэтчбек</option>
+                  <option value="coupe" {% if params.get('body_type') == 'coupe' %}selected{% endif %}>Купе</option>
+                  <option value="cabrio" {% if params.get('body_type') == 'cabrio' %}selected{% endif %}>Кабриолет</option>
+                </select>
+              </label>
+              <label>Источник
+                <select name="source">
+                  <option value="">Все</option>
+                  <option value="mobile_de" {% if params.get('source') == 'mobile_de' %}selected{% endif %}>Партнёр 1</option>
+                  <option value="encar" {% if params.get('source') == 'encar' %}selected{% endif %}>Партнёр 2</option>
+                  <option value="emavto_klg" {% if params.get('source') == 'emavto_klg' %}selected{% endif %}>Партнёр 3</option>
+                </select>
+              </label>
+            </div>
+            <div class="filter-block">
+              <h3>Цвет</h3>
+              <label class="sr-only">Цвет</label>
+              <select name="color" id="colorSelect" class="sr-only">
+                <option value="">Любой</option>
+                {% for c in colors if c.count > 0 %}
+                 <option value="{{ c.value }}" {% if params.get('color') == c.value %}selected{% endif %}>{{ c.label }}</option>
+                {% endfor %}
+              </select>
+              {% set palette = {
+                'white':'#f5f5f5','black':'#0d0f14','gray':'#6f7683','grey':'#6f7683','silver':'#c0c0c0',
+                'red':'#d13b3b','blue':'#2f6bd1','green':'#3b8d4c','yellow':'#f0c63c','orange':'#f28f3b',
+                'brown':'#7a5234','beige':'#d7c4a5','purple':'#7a4bd8'
+              } %}
+              {% set colors_nonempty = colors | selectattr('count','gt',0) | list %}
+              {% set base_colors = colors_nonempty[:12] %}
+              {% set extra_colors = colors_nonempty[12:] %}
+              <div class="color-swatches" id="colorSwatchesBase">
+                {% for c in base_colors %}
+                {% set hex = palette.get(c.value, '#6f7683') %}
+                <button type="button" class="color-chip" data-value="{{ c.value }}" data-color="{{ c.value }}" data-label="{{ c.label }}" data-hex="{{ hex }}" aria-label="{{ c.label }}"></button>
+                {% endfor %}
+              </div>
+              {% if extra_colors %}
+              <button type="button" class="btn btn-ghost btn-small" id="toggleExtraColors">Показать больше цветов</button>
+              <div class="color-swatches color-swatches-extra is-collapsed" id="colorSwatchesExtra">
+                {% for c in extra_colors %}
+                {% set hex = palette.get(c.value, '#6f7683') %}
+                <button type="button" class="color-chip" data-value="{{ c.value }}" data-color="{{ c.value }}" data-label="{{ c.label }}" data-hex="{{ hex }}" aria-label="{{ c.label }}"></button>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% set active_color = (colors | selectattr('value','equalto', params.get('color')) | list | first) %}
+              <div class="color-label" id="colorLabel">
+                {{ active_color.label if active_color else 'Все цвета' }}
+              </div>
+            </div>
+          </div>
         </div>
+
         <div class="filters-actions">
           <button class="btn btn-ghost" id="resetFilters" type="button">Сбросить</button>
           <button class="btn btn-primary" id="applyFilters">Применить</button>
@@ -119,9 +166,22 @@
         <div id="resultCount" class="muted"></div>
         <div id="activeFilters" class="active-filters"></div>
       </div>
-      <div class="catalog-search">
-        <input id="catalog-search" type="text" placeholder="Поиск по марке или модели (например, X5, Golf)" value="{{ params.get('model','') }}"/>
-        <button class="btn btn-primary" id="catalogSearchBtn" type="button">Искать</button>
+      <div class="catalog-topbar">
+        <div class="catalog-search">
+          <input id="catalog-search" type="text" placeholder="Поиск по марке или модели (например, X5, Golf)" value="{{ params.get('model','') }}"/>
+          <button class="btn btn-primary" id="catalogSearchBtn" type="button">Искать</button>
+        </div>
+        <div class="catalog-sort">
+          <label for="sort-select">Сортировать по:</label>
+          <select name="sort" id="sort-select">
+            <option value="price_asc" {% if params.get('sort','price_asc') == 'price_asc' %}selected{% endif %}>Цена (сначала дешевые)</option>
+            <option value="price_desc" {% if params.get('sort') == 'price_desc' %}selected{% endif %}>Цена (дорогие сначала)</option>
+            <option value="year_desc" {% if params.get('sort') == 'year_desc' %}selected{% endif %}>Год (новые)</option>
+            <option value="year_asc" {% if params.get('sort') == 'year_asc' %}selected{% endif %}>Год (старые)</option>
+            <option value="mileage_asc" {% if params.get('sort') == 'mileage_asc' %}selected{% endif %}>Пробег (меньше)</option>
+            <option value="mileage_desc" {% if params.get('sort') == 'mileage_desc' %}selected{% endif %}>Пробег (больше)</option>
+          </select>
+        </div>
       </div>
       {% if (featured_popular or featured_recommended) and not has_filters %}
       <div id="featuredBlock" class="featured-rail">
@@ -133,7 +193,7 @@
         </div>
         <div class="cards cards-highlights">
           {% for car in featured_popular %}
-          <a class="card car-card" href="/car/{{ car.id }}">
+            <a class="card car-card" href="/car/{{ car.id }}">
             <div class="thumb-wrap">
               <span class="badge-tag">Популярное</span>
               <img class="thumb" src="{{ car.thumbnail_url or '' }}" alt="" loading="lazy" />

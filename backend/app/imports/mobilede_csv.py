@@ -33,6 +33,7 @@ class MobileDeCsvRow:
     engine_type: Optional[str]
     displacement: Optional[Decimal]
     horse_power: Optional[int]
+    power_kw: Optional[Decimal] = None
     body_type: Optional[str]
     transmission: Optional[str]
     full_fuel_type: Optional[str]
@@ -191,6 +192,7 @@ def iter_mobilede_csv_rows(file_path: str) -> Iterator[MobileDeCsvRow]:
                 engine_type=_to_str(get("engine_type")),
                 displacement=_to_decimal(get("displacement")),
                 horse_power=_to_int(get("horse_power")),
+                power_kw=_to_decimal(get("power_kw")),
                 body_type=_to_str(get("body_type")),
                 transmission=_to_str(get("transmission")),
                 full_fuel_type=_to_str(get("full_fuel_type")),

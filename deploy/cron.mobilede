@@ -1,0 +1,1 @@
+15 9 * * * cd /opt/levelavto && /bin/bash scripts/fetch_mobilede_csv.sh >> /var/log/mobilede_fetch.log 2>&1

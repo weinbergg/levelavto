@@ -16,3 +16,5 @@ encar==0.1.4
 python-telegram-bot==21.6
 
 
+pandas==2.2.3
+openpyxl==3.1.5

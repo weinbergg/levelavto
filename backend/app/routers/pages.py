@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, exists
 from ..models import Car, Source, CarImage
 from ..auth import get_current_user
+from urllib.parse import quote
+from ..utils.localization import display_region, display_body, display_color
+from ..utils.taxonomy import ru_body, ru_color
 
 
 router = APIRouter()
@@ -26,8 +29,63 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
     recommended = service.featured_for(
         "home_recommended", limit=8, fallback_limit=4)
     content = ContentService(db).content_map(
-        ["hero_title", "hero_subtitle", "hero_note"])
+        [
+            "hero_title",
+            "hero_subtitle",
+            "hero_note",
+            "contact_phone",
+            "contact_email",
+            "contact_address",
+            "contact_tg",
+            "contact_wa",
+            "contact_ig",
+        ])
     fx_rates = service.get_fx_rates() or {}
+    # медиа лежат рядом с корнем проекта: /code/фото-видео
+    media_root = Path(__file__).resolve().parents[3] / "фото-видео"
+    video_dir = media_root / "видео"
+    car_photos_dir = media_root / "машины"
+
+    hero_videos = []
+    if video_dir.exists():
+        prefix = video_dir.name
+        for p in sorted(video_dir.iterdir()):
+            if p.suffix.lower() in {".mp4", ".mov", ".webm"}:
+                hero_videos.append(f"/media/{prefix}/{p.name}")
+
+    collage_images = []
+    thumb_dir = media_root / "машины_thumbs"
+    if car_photos_dir.exists():
+        thumb_prefix = thumb_dir.name
+        orig_prefix = car_photos_dir.name
+
+        def build_url(prefix: str, name: str) -> str:
+            safe_name = name.replace("\u00a0", " ")
+            return f"/media/{prefix}/{quote(safe_name)}"
+
+        for p in sorted(car_photos_dir.iterdir()):
+            if p.name.startswith("."):
+                continue
+            if p.suffix.lower() not in {".jpg", ".jpeg", ".webp", ".png"}:
+                continue
+            base = p.stem
+            t320 = thumb_dir / f"{base}__w320.webp"
+            t640 = thumb_dir / f"{base}__w640.webp"
+            has_thumb = t320.exists()
+            src = build_url(thumb_prefix if has_thumb else orig_prefix,
+                            t320.name if has_thumb else p.name)
+            srcset_parts = []
+            if has_thumb:
+                srcset_parts.append(f"{build_url(thumb_prefix, t320.name)} 320w")
+                if t640.exists():
+                    srcset_parts.append(f"{build_url(thumb_prefix, t640.name)} 640w")
+            collage_images.append({
+                "src": src,
+                "srcset": ", ".join(srcset_parts),
+                "width": 320,
+                "height": 240,
+                "fallback": build_url(orig_prefix, p.name),
+            })
 
     # brand logos: map brands that have logo files in static/img/brand-logos
     static_root = Path(__file__).resolve().parent.parent / \
@@ -84,6 +142,8 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
         "recommended_cars": recommended,
         "content": content,
         "fx_rates": fx_rates,
+        "hero_videos": hero_videos,
+        "collage_images": collage_images,
     }
     if extra:
         context.update(extra)
@@ -123,7 +183,8 @@ def submit_lead(
     else:
         # send email if configured
         content_service = ContentService(db)
-        lead_email = content_service.content_map().get("lead_email") or "info@levelavto.ru"
+        lead_email = content_service.content_map().get(
+            "lead_email") or "info@levelavto.ru"
         body = (
             f"Заявка с сайта\n"
             f"Имя: {name}\n"
@@ -153,7 +214,8 @@ def submit_lead(
         except Exception as e:
             print("[LEAD][email_failed]", e)
         # always log to stdout
-        print("[LEAD]", {"name": name, "phone": phone, "email": email, "preferred": preferred, "price_range": price_range, "comment": comment, "sent": sent})
+        print("[LEAD]", {"name": name, "phone": phone, "email": email, "preferred": preferred,
+              "price_range": price_range, "comment": comment, "sent": sent})
         status["success"] = True
         status["message"] = "Спасибо! Мы свяжемся с вами в ближайшее время."
     extra = {"lead_status": status}
@@ -167,15 +229,28 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     brands = service.brands()
     countries = ["DE", "KR", "RU"]
     raw_colors = service.colors()
+    contact_content = ContentService(db).content_map(
+        [
+            "contact_phone",
+            "contact_email",
+            "contact_address",
+            "contact_tg",
+            "contact_wa",
+            "contact_ig",
+        ])
 
     palette = {
         "black": "#1d1d1f",
         "white": "#f8f8f8",
         "gray": "#888888",
+        "dark_gray": "#5f6570",
+        "graphite": "#4b4f56",
         "silver": "#c0c0c0",
         "red": "#e03a3a",
         "blue": "#2d7dd2",
+        "navy": "#1f3b73",
         "green": "#4caf50",
+        "teal": "#14b8a6",
         "yellow": "#f4c430",
         "orange": "#f97316",
         "brown": "#8b5a2b",
@@ -184,15 +259,22 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         "violet": "#7c3aed",
         "gold": "#d4af37",
         "pink": "#f472b6",
+        "light_blue": "#6ab8ff",
+        "champagne": "#e6d4b3",
+        "ivory": "#f6efe2",
     }
     labels_ru = {
         "black": "Чёрный",
         "white": "Белый",
         "gray": "Серый",
+        "dark_gray": "Тёмно-серый",
+        "graphite": "Графит",
         "silver": "Серебристый",
         "red": "Красный",
         "blue": "Синий",
+        "light_blue": "Голубой",
         "green": "Зелёный",
+        "teal": "Бирюзовый",
         "yellow": "Жёлтый",
         "orange": "Оранжевый",
         "brown": "Коричневый",
@@ -201,66 +283,26 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         "violet": "Фиолетовый",
         "gold": "Золотой",
         "pink": "Розовый",
+        "champagne": "Шампань",
+        "ivory": "Айвори",
     }
-
-    def normalize_color(val: str) -> str:
-        if not val:
-            return ""
-        t = val.lower().strip()
-        mapping = {
-            "weiss": "white",
-            "weiß": "white",
-            "white": "white",
-            "blanc": "white",
-            "black": "black",
-            "schwarz": "black",
-            "gray": "gray",
-            "grey": "gray",
-            "grau": "gray",
-            "сер": "gray",
-            "silver": "silver",
-            "silber": "silver",
-            "red": "red",
-            "rot": "red",
-            "blau": "blue",
-            "blue": "blue",
-            "navy": "blue",
-            "gruen": "green",
-            "grün": "green",
-            "green": "green",
-            "gelb": "yellow",
-            "yellow": "yellow",
-            "orange": "orange",
-            "braun": "brown",
-            "brown": "brown",
-            "beige": "beige",
-            "violett": "violet",
-            "violet": "violet",
-            "purple": "purple",
-            "gold": "gold",
-            "golden": "gold",
-            "pink": "pink",
-            "rosa": "pink",
-        }
-        for key, norm in mapping.items():
-            if key in t:
-                return norm
-        simple = "".join(ch for ch in t if ch.isalpha())
-        return simple or t
 
     seen_colors = set()
     color_options = []
     for raw in raw_colors:
-        key = normalize_color(raw)
-        if not key or key in seen_colors:
+        key = raw.get("value") if isinstance(raw, dict) else None
+        label = raw.get("label") if isinstance(raw, dict) else None
+        cnt = raw.get("count", 0) if isinstance(raw, dict) else 0
+        if not key or key in seen_colors or cnt <= 0:
             continue
         seen_colors.add(key)
         color_options.append(
             {
                 "value": key,
                 "key": key,
-                "label": labels_ru.get(key, raw or key.title()),
+                "label": label or key.title(),
                 "hex": palette.get(key, ""),
+                "count": cnt,
             }
         )
 
@@ -286,6 +328,13 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "featured_popular": featured_popular,
             "featured_recommended": featured_recommended,
             "fx_rates": service.get_fx_rates() or {},
+            "content": contact_content,
+            "contact_phone": contact_content.get("contact_phone"),
+            "contact_email": contact_content.get("contact_email"),
+            "contact_address": contact_content.get("contact_address"),
+            "contact_tg": contact_content.get("contact_tg"),
+            "contact_wa": contact_content.get("contact_wa"),
+            "contact_ig": contact_content.get("contact_ig"),
         },
     )
 
@@ -295,7 +344,25 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     templates = request.app.state.templates
     service = CarsService(db)
     car = service.get_car(car_id)
+    if car and car.source:
+        src_key = car.source.key or ""
+        car.display_region = display_region(src_key) or car.country
+    if car:
+        car.display_body_type = ru_body(getattr(car, "body_type", None)) or display_body(getattr(car, "body_type", None)) or car.body_type
+        car.display_color = ru_color(getattr(car, "color", None)) or display_color(getattr(car, "color", None)) or car.color
     return templates.TemplateResponse("car_detail.html", {"request": request, "car": car, "user": getattr(request.state, "user", None)})
+
+
+@router.get("/privacy")
+def privacy_page(request: Request):
+    templates = request.app.state.templates
+    return templates.TemplateResponse("privacy.html", {"request": request})
+
+
+@router.get("/calculator")
+def calculator_page():
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="not found")
 
 
 @router.get("/debug/parsing/{source_key}")

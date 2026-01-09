@@ -5,6 +5,9 @@
     {% if not car %}
     <div class="card">Автомобиль не найден.</div>
     {% else %}
+    <div style="margin-bottom:12px;">
+      <a id="back-to-catalog" class="btn btn-ghost btn-small" href="/catalog" style="display:none;">← Назад в каталог</a>
+    </div>
     <div class="detail-hero">
       <div class="detail-gallery card">
         {% set primary = car.images[0].url if car.images and car.images|length >
@@ -15,6 +18,10 @@
             id="primaryImage"
             src="{{ primary }}"
             alt="{{ car.brand }} {{ car.model }}"
+            loading="eager"
+            decoding="async"
+            width="960"
+            height="640"
           />
           {% else %}
           <div class="empty-placeholder">Нет фотографий</div>
@@ -32,6 +39,9 @@
               src="{{ im.url }}"
               alt="thumb {{ loop.index }}"
               loading="lazy"
+              decoding="async"
+              width="180"
+              height="120"
             />
           </button>
           {% endfor %}
@@ -47,7 +57,7 @@
             <p class="muted">{{ meta|join(' · ') }}</p>
             {% endif %}
             <p class="muted">
-              Источник: надёжный партнёр · {% if car.country %}Страна: {{ car.country }} · {% endif %} Фото:
+              Источник: надёжный партнёр · {% if car.country %}Страна: {{ car.display_region or car.country }} · {% endif %} Фото:
               {{ car.images|length if car.images else 0 }}
             </p>
           </div>
@@ -68,36 +78,245 @@
           {% if car.mileage %}
           <div class="chip">Пробег: {{ car.mileage }}</div>
           {% endif %} {% if car.body_type %}
-          <div class="chip">Кузов: {{ car.body_type }}</div>
+          <div class="chip">Кузов: {{ car.display_body_type or car.body_type }}</div>
           {% endif %} {% if car.drive_type %}
           <div class="chip">Привод: {{ car.drive_type }}</div>
           {% endif %} {% if car.color %}
-          <div class="chip">Цвет: {{ car.color }}</div>
+          <div class="chip">Цвет: {{ car.display_color or car.color }}</div>
           {% endif %} {% if car.country %}
-          <div class="chip">Страна: {{ car.country }}</div>
+          <div class="chip">Страна: {{ car.display_region or car.country }}</div>
           {% endif %} {% if car.vin %}
           <div class="chip">VIN: {{ car.vin }}</div>
           {% endif %}
         </div>
         <div class="detail-actions">
-          <a
-            class="btn cta-lead"
-            data-lead-cta
-            data-car-title="{{ car.brand or '' }} {{ car.model or '' }}"
-            data-car-price="{% if car.price %}{{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}{% endif %}"
-            data-car-link="/car/{{ car.id }}"
-            {% if user %}
-            data-user-name="{{ user.full_name or user.email }}"
-            data-user-email="{{ user.email }}"
-            {% endif %}
-            href="/#lead-form"
-          >
-            Оставить заявку
-          </a>
+          <div class="detail-actions__lead">
+            <button class="btn cta-lead" id="detail-lead-btn">
+              Связаться
+            </button>
+          </div>
+          <div class="detail-actions__calc">
+            <button
+              class="btn btn-secondary"
+              id="detail-calc-btn"
+              style="display:none;"
+              data-price="{{ car.price }}"
+              data-currency="{{ car.currency }}"
+              data-reg-year="{{ car.registration_year }}"
+              data-reg-month="{{ car.registration_month }}"
+              data-engine-type="{{ car.engine_type or '' }}"
+              data-engine-cc="{{ car.engine_cc if car.engine_cc is defined else '' }}"
+              data-power-hp="{{ car.power_hp if car.power_hp is defined else '' }}"
+              data-is-electric="{{ '1' if car.engine_type and 'electric' in car.engine_type.lower() else '' }}"
+            >
+              Рассчитать стоимость
+            </button>
+          </div>
+        </div>
+        <div id="detail-lead-form" class="card" style="margin-top:12px; display:none;">
+          <form method="post" action="/lead" class="form-grid form-grid--12">
+            <input type="hidden" name="preferred" value="{{ car.brand or '' }} {{ car.model or '' }} {% if car.year %}{{ car.year }}{% endif %} /car/{{ car.id }}">
+            <input type="hidden" name="comment" value="Авто: {{ car.brand or '' }} {{ car.model or '' }} {% if car.year %}{{ car.year }}{% endif %} /car/{{ car.id }}">
+            <input type="hidden" name="car_id" value="{{ car.id }}">
+            <div class="field span-6">
+              <label for="lead-name">Имя</label>
+              <input id="lead-name" name="name" type="text" required />
+            </div>
+            <div class="field span-6">
+              <label for="lead-phone">Телефон</label>
+              <input id="lead-phone" name="phone" type="tel" required />
+            </div>
+            <div class="field span-6">
+              <label for="lead-email">Email (опционально)</label>
+              <input id="lead-email" name="email" type="email" />
+            </div>
+            <div class="form-actions span-12">
+              <button type="submit" class="btn btn-primary">Отправить</button>
+            </div>
+          </form>
+        </div>
+        <div id="detail-calc-result" class="calc-result" style="display:none;">
+          <div class="calc-total">
+            <div class="muted">Итого (RUB)</div>
+            <div id="detail-calc-total" class="calc-total__value"></div>
+          </div>
+          <div class="calc-breakdown" id="detail-calc-breakdown"></div>
         </div>
       </div>
     </div>
     {% endif %}
   </div>
 </section>
+{% block scripts_extra %}
+<script>
+  (() => {
+    const btn = document.getElementById('detail-calc-btn')
+    const leadBtn = document.getElementById('detail-lead-btn')
+    const leadForm = document.getElementById('detail-lead-form')
+    const backLink = document.getElementById('back-to-catalog')
+    if (backLink) {
+      const ref = document.referrer || ''
+      const fromCatalog = ref.includes('/catalog')
+      if (fromCatalog) {
+        const url = new URL(ref)
+        sessionStorage.setItem('catalogScroll', String(window.scrollY))
+        backLink.href = url.toString()
+      } else {
+        backLink.href = '/catalog'
+      }
+      backLink.style.display = ''
+    }
+    if (leadBtn) {
+      leadBtn.addEventListener('click', (e) => {
+        e.preventDefault()
+        if (leadForm) leadForm.style.display = leadForm.style.display === 'none' ? '' : 'none'
+      })
+    }
+    if (!btn) return
+    const resultWrap = document.getElementById('detail-calc-result')
+    const totalEl = document.getElementById('detail-calc-total')
+    const listEl = document.getElementById('detail-calc-breakdown')
+    const fmt = (num) => Number(num || 0).toLocaleString('ru-RU', {minimumFractionDigits: 0, maximumFractionDigits: 0})
+
+    const fxCache = { loaded: false, rates: {} }
+    async function getFx() {
+      if (fxCache.loaded) return fxCache
+      try {
+        const res = await fetch('https://www.cbr-xml-daily.ru/daily_json.js', { cache: 'no-cache' })
+        const data = await res.json()
+        fxCache.loaded = true
+        fxCache.rates = {
+          EUR: data?.Valute?.EUR?.Value,
+          USD: data?.Valute?.USD?.Value,
+        }
+      } catch (e) {
+        fxCache.loaded = true
+        fxCache.rates = {}
+      }
+      return fxCache
+    }
+
+    async function priceToEur(price, currency) {
+      if (price == null) return null
+      const cur = (currency || 'EUR').toString().trim().toUpperCase()
+      if (cur === 'EUR') return Number(price)
+      const fx = await getFx()
+      const eurRate = Number(fx.rates.EUR || 0)
+      if (!eurRate) return null
+      if (cur === 'RUB' || cur === '₽') return Number(price) / eurRate
+      if (cur === 'USD') {
+        const usdRate = Number(fx.rates.USD || 0)
+        if (!usdRate) return null
+        return Number(price) * (usdRate / eurRate)
+      }
+      return null
+    }
+
+    const ageBucket = (y, m) => {
+      if (!y || !m) return null
+      const d = new Date(y, m - 1, 1)
+      const now = new Date()
+      const months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
+      if (months < 36) return 'under_3'
+      if (months <= 60) return '3_5'
+      return 'too_old'
+    }
+
+    function ensureVisibility() {
+      const price = Number(btn.dataset.price || 0)
+      const currency = (btn.dataset.currency || '').trim()
+      const regY = Number(btn.dataset.regYear || 0)
+      const regM = Number(btn.dataset.regMonth || 0)
+      const engineType = (btn.dataset.engineType || '').toLowerCase()
+      const isElectric = btn.dataset.isElectric === '1' || engineType.includes('electric') || engineType.includes('ev')
+      const cc = Number(btn.dataset.engineCc || 0)
+      const hp = Number(btn.dataset.powerHp || 0)
+      const bucket = ageBucket(regY, regM)
+      const tooOld = bucket === 'too_old'
+      const hasData = price > 0 && regY && regM && (isElectric ? hp > 0 : cc > 0) && !tooOld
+      btn.style.display = hasData ? '' : 'none'
+      if (!hasData) return
+      btn.dataset.isElectric = isElectric ? '1' : ''
+      btn.dataset.bucket = bucket || ''
+      btn.dataset.price = price
+      btn.dataset.currency = currency
+      btn.dataset.engineCc = isElectric ? '' : cc
+      btn.dataset.powerHp = isElectric ? hp : ''
+    }
+
+    ensureVisibility()
+
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault()
+      const price = Number(btn.dataset.price || 0)
+      const regY = Number(btn.dataset.regYear || 0)
+      const regM = Number(btn.dataset.regMonth || 0)
+      const engineType = (btn.dataset.engineType || '').toLowerCase()
+      const isElectric = btn.dataset.isElectric === '1' || engineType.includes('electric') || engineType.includes('ev')
+      const cc = Number(btn.dataset.engineCc || 0)
+      const hp = Number(btn.dataset.powerHp || 0)
+      const currency = (btn.dataset.currency || '').trim()
+      const bucket = ageBucket(regY, regM)
+      if (bucket === 'too_old') {
+        alert('Авто старше 5 лет — расчёт недоступен.')
+        return
+      }
+      if (!price || !regY || !regM || (isElectric ? !hp : !cc)) {
+        alert('Недостаточно данных для расчёта.')
+        return
+      }
+      const priceNetEur = await priceToEur(price, currency)
+      if (!priceNetEur) {
+        alert('Нет данных о курсе для расчёта.')
+        return
+      }
+      const payload = {
+        price_net_eur: priceNetEur,
+        is_electric: isElectric,
+        engine_cc: isElectric ? undefined : cc || undefined,
+        power_hp: isElectric ? (hp || undefined) : undefined,
+        first_registration_year: regY,
+        first_registration_month: regM,
+        scenario: isElectric ? 'electric' : bucket || undefined,
+      }
+      try {
+        const resp = await fetch('/api/calc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}))
+          alert(err.detail || 'Ошибка расчёта')
+          return
+        }
+        const res = await resp.json()
+        totalEl.textContent = fmt(res.total_rub) + ' ₽'
+        listEl.innerHTML = ''
+        const meta = []
+        if (res.price_net_eur_used) meta.push(`Цена авто (net): ${fmt(res.price_net_eur_used)} EUR`)
+        if (res.eur_rate_used) meta.push(`Курс EUR/RUB: ${fmt(res.eur_rate_used)} ₽`)
+        if (res.usd_rate_used) meta.push(`Курс USD/RUB: ${fmt(res.usd_rate_used)} ₽`)
+        meta.forEach((m) => {
+          const row = document.createElement('div')
+          row.className = 'calc-row'
+          row.innerHTML = `<div>${m}</div><div></div>`
+          listEl.appendChild(row)
+        })
+        const breakdown = res.display_breakdown || res.breakdown || []
+        breakdown.forEach((item) => {
+          const row = document.createElement('div')
+          row.className = 'calc-row'
+          const rub = item.amount_rub != null ? item.amount_rub : item.amount
+          row.innerHTML = `<div>${item.title || item.title_ru || item.title_en || ''}</div><div>${fmt(rub)} ₽</div>`
+          listEl.appendChild(row)
+        })
+        resultWrap.style.display = ''
+      } catch (err) {
+        alert('Ошибка расчёта')
+      }
+    })
+  })()
+</script>
+{% endblock %}
 {% endblock %}

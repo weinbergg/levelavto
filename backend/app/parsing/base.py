@@ -34,11 +34,16 @@ class CarParsed:
     model: Optional[str] = None
     generation: Optional[str] = None
     year: Optional[int] = None
+    registration_year: Optional[int] = None
+    registration_month: Optional[int] = None
     mileage: Optional[int] = None
     price: Optional[float] = None
     currency: Optional[str] = None
     body_type: Optional[str] = None
     engine_type: Optional[str] = None
+    engine_cc: Optional[int] = None
+    power_hp: Optional[float] = None
+    power_kw: Optional[float] = None
     transmission: Optional[str] = None
     drive_type: Optional[str] = None
     color: Optional[str] = None

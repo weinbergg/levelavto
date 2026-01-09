@@ -13,9 +13,11 @@ pars/
 # local data / logs / tmp
 logs/
 tmp/
-imports/mobilede_active_offers.csv
-imports/mobilede_active_offers.csv/
-imports/**/*.csv
+backend/app/runtime/**/*.json
+backend/app/runtime/**/*.log
+backend/app/imports/**/*.csv
+backend/app/imports/**/*.log
+backend/app/imports/mobilede_active_offers.csv
 
 # local ops notes
 ops_cheatsheet.md
@@ -31,5 +33,10 @@ htmlcov/
 
 # docker artifacts
 *.pid
+
+# tooling / workspace
+.cursor/
+.env.local
+*.dump
 
 

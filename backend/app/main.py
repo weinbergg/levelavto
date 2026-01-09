@@ -9,6 +9,7 @@ from .routers.auth import router as auth_router
 from .routers.admin import router as admin_router
 from .routers.account import router as account_router
 from .routers.favorites import router as favorites_router
+from .routers.calculator import router as calc_router
 from pathlib import Path
 
 
@@ -17,8 +18,11 @@ def create_app() -> FastAPI:
 
     static_dir = Path(__file__).resolve().parent / "static"
     templates_dir = Path(__file__).resolve().parent / "templates"
+    media_dir = Path(__file__).resolve().parents[2] / "фото-видео"
 
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    if media_dir.exists():
+        app.mount("/media", StaticFiles(directory=str(media_dir)), name="media")
     app.state.templates = Jinja2Templates(directory=str(templates_dir))
     app.add_middleware(SessionMiddleware, secret_key=settings.APP_SECRET)
 
@@ -28,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(favorites_router)
     app.include_router(catalog_router, prefix="/api", tags=["catalog"])
+    app.include_router(calc_router)
     return app
 
 

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Автокаталог{% endblock %}</title>
     <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/css/styles.css?v=11" />
+    <link rel="stylesheet" href="/static/css/styles.css?v=20" />
     {% block head_extra %}{% endblock %}
   </head>
   <body>
@@ -15,44 +15,74 @@
           <div class="header__shell">
             <div class="header__brand">
               <a class="header__logo" href="/" aria-label="Level Avto">
-          <img
-            src="/static/img/logo.svg"
-            alt="Level Avto"
-            class="header__logo-img"
-          />
-        </a>
+                <img
+                  src="/static/img/logo.svg"
+                  alt="Level Avto"
+                  class="header__logo-img"
+                />
+              </a>
             </div>
             <nav class="header__nav" aria-label="Главная навигация">
               <ul class="header__menu">
-                <li><a class="header__link" href="/catalog">Каталог</a></li>
-                <li><a class="header__link" href="/#how-it-works">Как мы работаем</a></li>
-                <li><a class="header__link" href="/#advantages">Преимущества</a></li>
+                <li><a class="header__link" href="/">Главная</a></li>
+                <li><a class="header__link" href="/#about">О нас</a></li>
+                <li>
+                  <a class="header__link" href="/#how-it-works"
+                    >Как мы работаем</a
+                  >
+                </li>
                 <li><a class="header__link" href="/#contacts">Контакты</a></li>
               </ul>
             </nav>
             <div class="header__actions">
-              <a class="header__icon-btn" aria-label="Избранное" href="/account#favorites">
+              <a
+                class="header__icon-btn"
+                aria-label="Избранное"
+                href="/account#favorites"
+              >
                 ★
               </a>
               <div class="header__profile">
-                <button class="header__icon-btn" id="profileToggle" aria-haspopup="true" aria-expanded="false" aria-label="Профиль">
+                <button
+                  class="header__icon-btn"
+                  id="profileToggle"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                  aria-label="Профиль"
+                >
                   ☺
                 </button>
                 <div class="header__profile-menu" id="profileMenu" role="menu">
                   {% if user %}
-                  <a class="header__link" role="menuitem" href="/account">Кабинет</a>
-                  {% if user.is_admin %}<a class="header__link" role="menuitem" href="/admin">Админка</a>{% endif %}
-                  <a class="header__link" role="menuitem" href="/logout">Выход</a>
+                  <a class="header__link" role="menuitem" href="/account"
+                    >Кабинет</a
+                  >
+                  {% if user.is_admin %}<a
+                    class="header__link"
+                    role="menuitem"
+                    href="/admin"
+                    >Админка</a
+                  >{% endif %}
+                  <a class="header__link" role="menuitem" href="/logout"
+                    >Выход</a
+                  >
                   {% else %}
                   <a class="header__link" role="menuitem" href="/login">Вход</a>
-                  <a class="header__link" role="menuitem" href="/register">Регистрация</a>
+                  <a class="header__link" role="menuitem" href="/register"
+                    >Регистрация</a
+                  >
                   {% endif %}
                 </div>
               </div>
-              <a class="btn btn-primary btn-cta header__cta" href="/#lead-form">Связаться</a>
-              <button class="header__burger header__burger--main" aria-label="Открыть меню">
-          <span></span><span></span><span></span>
-        </button>
+              <a class="btn btn-primary btn-cta header__cta" href="/#lead-form"
+                >Связаться</a
+              >
+              <button
+                class="header__burger header__burger--main"
+                aria-label="Открыть меню"
+              >
+                <span></span><span></span><span></span>
+              </button>
             </div>
           </div>
         </div>
@@ -61,25 +91,33 @@
         <div class="header__drawer-inner">
           <div class="header__drawer-top">
             <a class="header__logo" href="/">
-              <img src="/static/img/logo.svg" alt="Level Avto" class="header__logo-img" />
+              <img
+                src="/static/img/logo.svg"
+                alt="Level Avto"
+                class="header__logo-img"
+              />
             </a>
-            <button class="header__drawer-close" aria-label="Закрыть меню">×</button>
+            <button class="header__drawer-close" aria-label="Закрыть меню">
+              ×
+            </button>
           </div>
           <nav class="header__drawer-nav" aria-label="Меню">
-            <a class="header__link" href="/catalog">Каталог</a>
-          <a class="header__link" href="/#how-it-works">Как мы работаем</a>
-          <a class="header__link" href="/#advantages">Преимущества</a>
-          <a class="header__link" href="/#contacts">Контакты</a>
+            <a class="header__link" href="/">Главная</a>
+            <a class="header__link" href="/#about">О нас</a>
+            <a class="header__link" href="/#how-it-works">Как мы работаем</a>
+            <a class="header__link" href="/#contacts">Контакты</a>
             {% if user %}
             <a class="header__link" href="/account">Кабинет</a>
-            {% if user.is_admin %}<a class="header__link" href="/admin">Админка</a>{% endif %}
+            {% if user.is_admin %}<a class="header__link" href="/admin"
+              >Админка</a
+            >{% endif %}
             <a class="header__link" href="/logout">Выход</a>
             {% else %}
             <a class="header__link" href="/login">Вход</a>
             <a class="header__link" href="/register">Регистрация</a>
             {% endif %}
             <a class="btn btn-primary btn-cta" href="/#lead-form">Связаться</a>
-        </nav>
+          </nav>
         </div>
       </div>
     </header>
@@ -96,17 +134,29 @@
           <a href="/privacy">Политика конфиденциальности</a>
           <a href="/terms">Пользовательское соглашение</a>
         </div>
+        {% set phone = contact_phone or content.get('contact_phone') if content is defined else contact_phone %}
+        {% set email = contact_email or content.get('contact_email') if content is defined else contact_email %}
+        {% set address = contact_address or content.get('contact_address') if content is defined else contact_address %}
+        {% set tg = contact_tg or content.get('contact_tg') if content is defined else contact_tg %}
+        {% set wa = contact_wa or content.get('contact_wa') if content is defined else contact_wa %}
+        {% set ig = contact_ig or content.get('contact_ig') if content is defined else contact_ig %}
         <div class="footer-meta">
-          <div>Тел.: <a href="tel:+79110707500">+7 (911) 070-75-00</a></div>
+          <div>Тел.: <a href="tel:{{ (phone or '+7 (911) 070-75-00')|replace(' ','') }}">{{ phone or '+7 (911) 070-75-00' }}</a></div>
           <div>
-            Email: <a href="mailto:info@levelavto.ru">info@levelavto.ru</a>
+            Email: <a href="mailto:{{ email or 'info@levelavto.ru' }}">{{ email or 'info@levelavto.ru' }}</a>
           </div>
-          <div class="footer-social">Telegram · WhatsApp</div>
+          <div class="footer-social">
+            {% if tg %}<a href="{{ tg }}" target="_blank" rel="noopener">Telegram</a>{% endif %}
+            {% if wa %}{% if tg %} · {% endif %}<a href="{{ wa }}" target="_blank" rel="noopener">WhatsApp</a>{% endif %}
+            {% if ig %}{% if tg or wa %} · {% endif %}<a href="{{ ig }}" target="_blank" rel="noopener">Instagram</a>{% endif %}
+            {% if not tg and not wa and not ig %}Telegram · WhatsApp{% endif %}
+          </div>
           <div>© {{ 2025 }} Level Avto</div>
         </div>
       </div>
     </footer>
-    <script src="/static/js/app.js?v=11"></script>
+    <button id="backToTop" class="back-to-top" type="button" aria-label="Наверх">↑</button>
+    <script src="/static/js/app.js?v=14"></script>
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>

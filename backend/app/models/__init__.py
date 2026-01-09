@@ -7,6 +7,7 @@ from .user import User
 from .site_content import SiteContent
 from .featured_car import FeaturedCar
 from .progress_kv import ProgressKV
+from .calculator_config import CalculatorConfig
 from .favorite import Favorite
 
 __all__ = [

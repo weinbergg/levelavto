@@ -104,6 +104,7 @@
       country: 'Страна',
       brand: 'Марка',
       model: 'Модель',
+      generation: 'Поколение',
       color: 'Цвет',
       body_type: 'Кузов',
       engine_type: 'Топливо',
@@ -112,14 +113,29 @@
       price_max: 'Цена до',
       year_min: 'Год от',
       year_max: 'Год до',
+      mileage_min: 'Пробег от',
       mileage_max: 'Пробег до',
       source: 'Источник',
+      sort: null,
+      reg_year_min: 'Учёт год от',
+      reg_month_min: 'Учёт мес. от',
+      reg_year_max: 'Учёт год до',
+      reg_month_max: 'Учёт мес. до',
     }
     const chips = []
     params.forEach((value, key) => {
       if (!value || ['page', 'page_size'].includes(key)) return
+      // skip sort in active chips to avoid debug-look
+      if (key === 'sort') return
       const label = labels[key] || key
-      chips.push({ key, label, value })
+      if (label === null) return
+      let displayValue = value
+      if (key === 'country') {
+        const val = value.toUpperCase()
+        if (val === 'EU') displayValue = 'Европа'
+        else if (val === 'KR') displayValue = 'Корея'
+      }
+      chips.push({ key, label, value: displayValue })
     })
     if (!chips.length) {
       container.innerHTML = '<span class="muted">Фильтры не выбраны</span>'
@@ -235,7 +251,7 @@
     const spinner = qs('#spinner')
     const cards = qs('#cards')
     const pageInfo = qs('#pageInfo')
-    const featuredBlock = qs('#featuredBlock')
+      const featuredBlock = qs('#featuredBlock')
     const resultCount = qs('#resultCount')
     if (!spinner || !cards) return
     spinner.style.display = 'block'
@@ -251,13 +267,19 @@
       renderActiveFilters(params)
       // hide featured block if any filters applied
       if (featuredBlock) {
-        const hasFilters = Array.from(params.entries()).some(
-          ([k, v]) => v && !['page', 'page_size'].includes(k)
-        )
+        const defaultSource = 'mobile_de'
+        const defaultSort = 'price_asc'
+        const whitelist = ['page', 'page_size']
+        const hasFilters = Array.from(params.entries()).some(([k, v]) => {
+          if (!v || whitelist.includes(k)) return false
+          if (k === 'source' && (v === defaultSource || v === '')) return false
+          if (k === 'sort' && v === defaultSort) return false
+          return true
+        })
         featuredBlock.style.display = hasFilters ? 'none' : ''
       }
       if (pageInfo) {
-        pageInfo.textContent = `Страница ${data.page} из ${Math.max(1, Math.ceil(data.total / data.page_size))}`
+      pageInfo.textContent = `Страница ${data.page} из ${Math.max(1, Math.ceil(data.total / data.page_size))}`
       }
       const pageNumbers = qs('#pageNumbers')
       const totalPages = Math.max(1, Math.ceil(data.total / data.page_size))
@@ -313,28 +335,106 @@
         const more = (car.images_count && car.images_count > 1 && car.thumbnail_url) ? `<span class="more-badge">+${car.images_count - 1} фото</span>` : ''
         const price = car.price != null ? formatPrice(car.price, car.currency, fx) : ''
         const metaLine = [car.year, car.engine_type].filter(Boolean).join(' · ')
+        const normalizeColor = (clr) => {
+          if (!clr) return ''
+          const t = clr.toLowerCase()
+          const map = [
+            ['серебрист', 'silver'],
+            ['серебро', 'silver'],
+            ['серебр', 'silver'],
+            ['серо', 'gray'],
+            ['темно-сер', 'dark_gray'],
+            ['graphite', 'graphite'],
+            ['графит', 'graphite'],
+            ['grey', 'gray'],
+            ['gray', 'gray'],
+            ['платин', 'silver'],
+            ['черн', 'black'],
+            ['black', 'black'],
+            ['бел', 'white'],
+            ['white', 'white'],
+            ['ivory', 'ivory'],
+            ['слон', 'ivory'],
+            ['голуб', 'light_blue'],
+            ['син', 'blue'],
+            ['navy', 'blue'],
+            ['blue', 'blue'],
+            ['зелен', 'green'],
+            ['green', 'green'],
+            ['бирюз', 'teal'],
+            ['teal', 'teal'],
+            ['желт', 'yellow'],
+            ['yellow', 'yellow'],
+            ['оранж', 'orange'],
+            ['orange', 'orange'],
+            ['красн', 'red'],
+            ['red', 'red'],
+            ['коричн', 'brown'],
+            ['brown', 'brown'],
+            ['беж', 'beige'],
+            ['капуч', 'beige'],
+            ['latte', 'beige'],
+            ['champagne', 'champagne'],
+            ['шамп', 'champagne'],
+            ['beige', 'beige'],
+            ['фиол', 'purple'],
+            ['пурпур', 'purple'],
+            ['violet', 'purple'],
+            ['purple', 'purple'],
+            ['зол', 'gold'],
+            ['gold', 'gold'],
+            ['роз', 'pink'],
+            ['pink', 'pink'],
+          ]
+          for (const [key, norm] of map) {
+            if (t.includes(key)) return norm
+          }
+          return clr
+        }
+        const colorLabels = {
+          black: 'Чёрный',
+          white: 'Белый',
+          gray: 'Серый',
+          silver: 'Серебристый',
+          red: 'Красный',
+          blue: 'Синий',
+          light_blue: 'Голубой',
+          green: 'Зелёный',
+          teal: 'Бирюзовый',
+          yellow: 'Жёлтый',
+          orange: 'Оранжевый',
+          brown: 'Коричневый',
+          beige: 'Бежевый',
+          purple: 'Фиолетовый',
+          gold: 'Золотой',
+          pink: 'Розовый',
+        }
         const colorDot = (clr) => {
           if (!clr) return ''
-          const safe = clr.toLowerCase()
+          const norm = normalizeColor(clr)
           const palette = {
             black: '#111',
             white: '#f5f5f5',
             gray: '#888',
-            grey: '#888',
+            dark_gray: '#5f6570',
+            graphite: '#4b4f56',
             silver: '#c0c0c0',
             red: '#d82424',
             blue: '#2d7dd2',
+            light_blue: '#6ab8ff',
             green: '#1f9d55',
+            teal: '#14b8a6',
             yellow: '#f9c846',
             orange: '#f97316',
             brown: '#9c6b3c',
             beige: '#d9c6a5',
             purple: '#8b5cf6',
-            violet: '#7c3aed',
             gold: '#d4af37',
+            pink: '#f472b6',
+            champagne: '#e6d4b3',
+            ivory: '#f6efe2',
           }
-          const key = Object.keys(palette).find((k) => safe.includes(k))
-          const val = key ? palette[key] : clr
+          const val = palette[norm] || clr
           return `<span class="spec-dot" style="background:${val}"></span>`
         }
         const specLines = []
@@ -344,15 +444,27 @@
         if (car.engine_type) {
           specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/fuel.svg" alt="">${car.engine_type}</span>`)
         }
-        if (car.color) {
-          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt="">${colorDot(car.color)}${car.color}</span>`)
+        if (car.display_color || car.color) {
+          const label = car.display_color || car.color
+          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt="">${colorDot(car.color)}${label}</span>`)
         }
-        if (car.country) {
-          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt="">${car.country}</span>`)
+        if (car.display_region || car.country) {
+          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt="">${car.display_region || car.country}</span>`)
         }
         card.innerHTML = `
           <div class="thumb-wrap">
-            <img class="thumb" src="${car.thumbnail_url || ''}" alt="" loading="lazy"/>
+            <img
+              class="thumb"
+              src="${car.thumbnail_url || ''}"
+              srcset="${car.thumbnail_url || ''} 1x"
+              sizes="(max-width: 768px) 50vw, 320px"
+              alt=""
+              loading="lazy"
+              decoding="async"
+              fetchpriority="low"
+              width="320"
+              height="200"
+            />
             ${more}
             <button class="fav-btn" data-fav-button data-car-id="${car.id}" aria-label="Добавить в избранное">★</button>
           </div>
@@ -365,6 +477,20 @@
             <div class="car-card__price">${price}</div>
           </div>
         `
+        const img = card.querySelector('img.thumb')
+        const wrap = card.querySelector('.thumb-wrap')
+        if (wrap) wrap.classList.add('thumb-loading')
+        if (img) {
+          img.style.opacity = '0'
+          img.addEventListener('load', () => {
+            img.style.opacity = '1'
+            if (wrap) wrap.classList.remove('thumb-loading')
+          })
+          img.addEventListener('error', () => {
+            img.style.opacity = '1'
+            if (wrap) wrap.classList.remove('thumb-loading')
+          })
+        }
         cards.appendChild(card)
       }
       bindFavoriteButtons(cards)
@@ -382,17 +508,35 @@
 
   function initCatalog() {
     if (!qs('#cards')) return
+    // restore scroll position when coming back from detail
+    const saved = sessionStorage.getItem('catalogScroll')
+    if (saved) {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: Number(saved) || 0, behavior: 'instant' })
+      })
+      sessionStorage.removeItem('catalogScroll')
+    }
     applyQueryToFilters()
     const urlParams = new URLSearchParams(window.location.search)
     const initialPage = Number(urlParams.get('page') || 1)
     const initialModelParam = urlParams.get('model') || ''
+    const initialGeneration = urlParams.get('generation') || ''
+    const initialSort = urlParams.get('sort') || 'price_asc'
     const searchField = qs('#catalog-search')
     const modelSelect = qs('#model-select')
     const brandSelect = qs('#brand')
     const colorSelect = qs('#colorSelect')
-    const colorChips = qsa('#colorSwatches .color-chip')
+    const colorChipsBase = qsa('#colorSwatchesBase .color-chip')
+    const colorChipsExtra = qsa('#colorSwatchesExtra .color-chip')
+    const colorChips = [...colorChipsBase, ...colorChipsExtra]
+    const colorLabel = qs('#colorLabel')
+    const colorToggle = qs('#toggleExtraColors')
+    const colorExtra = qs('#colorSwatchesExtra')
+    const advancedToggle = qs('#advancedToggle')
+    const advancedBody = qs('#advancedBody')
     qs('#applyFilters')?.addEventListener('click', (e) => {
       e.preventDefault()
+      sessionStorage.setItem('catalogScroll', String(window.scrollY))
       loadCars(1)
     })
     searchField?.addEventListener('keydown', (e) => {
@@ -410,8 +554,20 @@
       form?.reset()
       if (searchField) searchField.value = ''
       colorChips.forEach((chip) => chip.classList.remove('active'))
+      if (colorLabel) colorLabel.textContent = 'Все цвета'
+      sessionStorage.setItem('catalogScroll', String(0))
       loadCars(1)
     })
+    if (advancedToggle && advancedBody) {
+      let collapsed = false
+      const setState = (v) => {
+        collapsed = v
+        advancedBody.classList.toggle('is-collapsed', collapsed)
+      }
+      setState(false)
+      advancedToggle.addEventListener('click', () => setState(!collapsed))
+    }
+
     qs('#prevPage')?.addEventListener('click', () => {
       const p = Math.max(1, (window.__page || 1) - 1)
       loadCars(p)
@@ -436,6 +592,20 @@
         el.addEventListener('change', trigger)
         el.addEventListener('input', trigger)
       })
+      // apply initial sort/generation if present
+      const sortSelect = qs('select[name="sort"]', filtersForm)
+      if (sortSelect && initialSort) sortSelect.value = initialSort
+      const generationInput = qs('input[name="generation"]', filtersForm)
+      if (generationInput && initialGeneration) generationInput.value = initialGeneration
+      const sortTopbar = qs('#sort-select')
+      if (sortTopbar && initialSort) sortTopbar.value = initialSort
+      if (sortTopbar) {
+        sortTopbar.addEventListener('change', () => {
+          const val = sortTopbar.value
+          if (sortSelect) sortSelect.value = val
+          loadCars(1)
+        })
+      }
     }
     const toggle = qs('#filtersToggle')
     const panel = qs('#filtersPanel')
@@ -445,26 +615,72 @@
 
     // color chips: sync with select and query
     if (colorChips.length && colorSelect) {
+      const stringToColor = (str) => {
+        if (!str) return '#666'
+        let hash = 0
+        for (let i = 0; i < str.length; i += 1) {
+          hash = str.charCodeAt(i) + ((hash << 5) - hash)
+        }
+        const h = Math.abs(hash) % 360
+        return `hsl(${h}, 55%, 55%)`
+      }
+      const setLabel = (val) => {
+        if (!colorLabel) return
+        const active = colorChips.find((c) => c.dataset.value === val)
+        colorLabel.textContent = active?.dataset.label || 'Все цвета'
+      }
       colorChips.forEach((chip) => {
         const hex = chip.dataset.hex
         if (hex) chip.style.background = hex
-        if (chip.dataset.label) chip.title = chip.dataset.label
+        else chip.style.background = stringToColor(chip.dataset.label || chip.dataset.value)
+        if (chip.hasAttribute('title')) {
+          chip.removeAttribute('title')
+        }
       })
-      const setActive = (val) => {
+      const setActive = (vals) => {
+        const set = new Set(vals)
         colorChips.forEach((chip) => {
-          chip.classList.toggle('active', chip.dataset.value === val)
+          chip.classList.toggle('active', set.has(chip.dataset.value))
         })
+        const labelVal = vals[vals.length - 1] || ''
+        setLabel(labelVal)
       }
-      setActive(colorSelect.value || '')
+      const getValues = () => {
+        const raw = colorSelect.value || ''
+        if (!raw) return []
+        return raw.split(',').filter(Boolean)
+      }
+      setActive(getValues())
+      const updateSelect = (vals) => {
+        colorSelect.value = vals.join(',')
+      }
       colorChips.forEach((chip) => {
         chip.addEventListener('click', () => {
           const val = chip.dataset.value || ''
-          colorSelect.value = val
-          setActive(val)
-          loadCars(1)
+          let vals = getValues()
+          if (vals.includes(val)) {
+            vals = vals.filter((v) => v !== val)
+          } else {
+            vals.push(val)
+          }
+          updateSelect(vals)
+          setActive(vals)
+    loadCars(1)
         })
       })
-      colorSelect.addEventListener('change', () => setActive(colorSelect.value || ''))
+      colorSelect.addEventListener('change', () => setActive(getValues()))
+      if (colorToggle && colorExtra) {
+        let collapsed = true
+        const updateToggle = () => {
+          colorExtra.classList.toggle('is-collapsed', collapsed)
+          colorToggle.textContent = collapsed ? 'Показать больше цветов' : 'Скрыть дополнительные цвета'
+        }
+        updateToggle()
+        colorToggle.addEventListener('click', () => {
+          collapsed = !collapsed
+          updateToggle()
+        })
+      }
     }
     async function updateCatalogModels() {
       if (!brandSelect || !modelSelect) return
@@ -633,68 +849,14 @@
   function initHome() {
     const form = qs('#home-search')
     if (!form) return
-    const brandSelect = qs('#home-brand')
-    const modelSelect = qs('#home-model')
     const resetBtn = qs('#home-reset')
-
-    async function updateModels() {
-      if (!brandSelect || !modelSelect) return
-      const brand = brandSelect.value
-      modelSelect.innerHTML = ''
-      if (!brand) {
-        modelSelect.disabled = true
-        modelSelect.innerHTML = '<option value=\"\">Сначала выберите марку</option>'
-        return
-      }
-      modelSelect.disabled = true
-      modelSelect.innerHTML = '<option value=\"\">Загрузка…</option>'
-      const models = await fetchModels(brand)
-      modelSelect.innerHTML = '<option value=\"\">Любая</option>'
-      models.forEach(({ model }) => {
-        const opt = document.createElement('option')
-        opt.value = model
-        opt.textContent = model
-        modelSelect.appendChild(opt)
-      })
-      modelSelect.disabled = false
-    }
-
-    async function loadBrands() {
-      const brands = await fetchBrands()
-      if (!brandSelect) return
-      if (brands && Array.isArray(brands) && brands.length) {
-        brandSelect.innerHTML = '<option value=\"\">Любая</option>'
-        const names = brands
-          .map((b) => b.brand || b)
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b))
-        names.forEach((name) => {
-          const opt = document.createElement('option')
-          opt.value = name
-          opt.textContent = name
-          brandSelect.appendChild(opt)
-        })
-      }
-    }
-
-    brandSelect?.addEventListener('change', updateModels)
 
     if (resetBtn) {
       resetBtn.addEventListener('click', (e) => {
         e.preventDefault()
         form.reset()
-        if (modelSelect) {
-          modelSelect.innerHTML = '<option value=\"\">Сначала выберите марку</option>'
-          modelSelect.disabled = true
-        }
       })
     }
-
-    loadBrands().then(() => {
-      if (brandSelect && brandSelect.value) {
-        updateModels()
-      }
-    })
   }
 
   async function convertInlinePrices() {
@@ -711,6 +873,25 @@
     })
   }
 
+  function initBackToTop() {
+    const btn = qs('#backToTop')
+    if (!btn) return
+    const prefersReduce = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const toggle = () => {
+      const show = window.scrollY > 600
+      btn.classList.toggle('is-visible', show)
+    }
+    window.addEventListener('scroll', toggle, { passive: true })
+    toggle()
+    btn.addEventListener('click', (e) => {
+      e.preventDefault()
+      window.scrollTo({
+        top: 0,
+        behavior: prefersReduce.matches ? 'auto' : 'smooth',
+      })
+    })
+  }
+
   function initAll() {
     initNav()
     loadFavoritesState()
@@ -718,6 +899,7 @@
     initHome()
     applyLeadPrefill()
     initLeadFromDetail()
+    initBackToTop()
     convertInlinePrices()
   }
 

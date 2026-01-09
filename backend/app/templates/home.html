@@ -2,135 +2,25 @@
 заказ{% endblock %} {% block head_extra %}
 <link rel="stylesheet" href="/static/css/home.css?v=6" />
 {% endblock %} {% block content %}
-<section class="search-block" id="pricing">
-  <div class="la-container">
-    <div class="search-card">
-      <div class="search-head">
-        <h3>Быстрый поиск по каталогу</h3>
-        <span class="badge" style="color: var(--muted)">
-          Доступны предложения от проверенных партнёров
-        </span>
-      </div>
-      <form class="search-form" id="home-search" method="get" action="/catalog">
-        <input type="hidden" name="source" value="mobile_de,emavto_klg" />
-        <div class="filter-grid">
-          <div class="field">
-            <label for="home-query">Поиск (марка/модель)</label>
-            <input
-              id="home-query"
-              type="text"
-              name="model"
-              placeholder="например, BMW X5 или Golf"
-            />
-          </div>
-          <div class="field">
-            <label for="home-brand">Марка</label>
-            <select id="home-brand" name="brand">
-              <option value="">Любая</option>
-              {% for b in brands|sort %}
-              <option value="{{ b }}">{{ b }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="field">
-            <label for="home-model">Модель</label>
-            <select id="home-model" name="model" disabled>
-              <option value="">Сначала выберите марку</option>
-            </select>
-          </div>
-          <div class="field">
-                <label for="home-price">Цена до, ₽</label>
-            <input
-              id="home-price"
-              type="number"
-              name="price_max"
-              step="1000"
-              placeholder="1500000"
-            />
-          </div>
-          <div class="field">
-            <label for="home-year">Поставлено на учёт с</label>
-            <input
-              id="home-year"
-              type="number"
-              name="year_min"
-              placeholder="2018"
-            />
-          </div>
-          <div class="field">
-            <label for="home-mileage">Пробег до, км</label>
-            <input
-              id="home-mileage"
-              type="number"
-              name="mileage_max"
-              step="5000"
-              placeholder="150000"
-            />
-          </div>
-          <div class="field">
-            <label for="home-trans">Трансмиссия</label>
-            <select id="home-trans" name="transmission">
-              <option value="">Неважно</option>
-              <option value="Automatic">Автомат</option>
-              <option value="Manual">Механика</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="home-color">Цвет</label>
-            <select id="home-color" name="color">
-              <option value="">Любой</option>
-              {% for c in colors %}
-              <option value="{{ c }}">{{ c }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="field">
-            <label for="home-country">Страна</label>
-            <select id="home-country" name="country">
-              <option value="">Любая</option>
-              <option value="DE">Германия</option>
-              <option value="KR">Корея</option>
-              <option value="NL">Нидерланды</option>
-              <option value="BE">Бельгия</option>
-              <option value="PL">Польша</option>
-              <option value="LT">Литва</option>
-            </select>
-          </div>
-          <div class="field">
-            <label class="checkbox">
-              <input
-                type="checkbox"
-                id="home-electric"
-                name="engine_type"
-                value="Electric"
-              />
-              Только электромобили
-            </label>
-          </div>
-        </div>
-        <div class="inline-actions">
-          <button type="submit" class="btn btn-primary">
-            Найти · {{ total_cars }} объявлений
-          </button>
-          <div class="links">
-            <a href="#" id="home-reset">Сбросить</a>
-            <a href="/catalog">Другие фильтры</a>
-          </div>
-        </div>
-      </form>
-    </div>
+<section class="hero hero-with-video" id="hero">
+  {% if hero_videos %}
+  <div class="hero-video" id="hero-video">
+    <video id="hero-video-el" class="hero-video__el" playsinline muted preload="metadata"></video>
+    <div class="hero-video__overlay"></div>
+    <button class="hero-video__control hero-video__control--prev" aria-label="Предыдущее видео"></button>
+    <button class="hero-video__control hero-video__control--next" aria-label="Следующее видео"></button>
   </div>
-</section>
-<section class="hero" id="about">
+  {% endif %}
   <div class="la-container hero-grid">
     <div class="hero-text">
       <div class="stats-badge">{{ total_cars }} авто в наличии</div>
       <h1>
-        {{ content.get('hero_title') or "Импорт и подбор автомобилей из Европы,
-        Кореи и России" }}
+        {{ content.get('hero_title') or "Импорт и подбор автомобилей из Европы и
+        Кореи" }}
       </h1>
       <p class="subtitle">
-        {{ content.get('hero_subtitle') or "Актуальные предложения от проверенных европейских и локальных партнёров — в одном каталоге." }}
+        {{ content.get('hero_subtitle') or "Актуальные предложения от
+        проверенных европейских и локальных партнёров — в одном каталоге." }}
       </p>
       <div class="benefits">
         <div class="benefit">
@@ -168,6 +58,181 @@
   </div>
 </section>
 
+<section class="search-block" id="pricing">
+  <div class="la-container">
+    <div class="search-card">
+      <div class="search-head">
+        <h3 style="margin: 0">Найти машину</h3>
+      </div>
+      <form class="search-form" id="home-search" method="get" action="/catalog">
+        <input type="hidden" name="source" value="mobile_de,emavto_klg" />
+        <div class="filter-grid filter-grid--12">
+          <div class="field">
+            <label for="home-query">Поиск (марка/модель)</label>
+            <input
+              id="home-query"
+              type="text"
+              name="model"
+              placeholder="например, BMW X5 или Golf"
+            />
+          </div>
+          <div class="field">
+            <label for="home-price-min">Цена от, ₽</label>
+            <input
+              id="home-price-min"
+              type="number"
+              name="price_min"
+              step="1000"
+              placeholder="1500000"
+            />
+          </div>
+          <div class="field">
+            <label for="home-price">Цена до, ₽</label>
+            <input
+              id="home-price"
+              type="number"
+              name="price_max"
+              step="1000"
+              placeholder="3000000"
+            />
+          </div>
+          <div class="field">
+            <label for="home-country">Страна</label>
+            <select id="home-country" name="country">
+              <option value="">Все</option>
+              <option value="EU">Европа</option>
+              <option value="KR">Корея</option>
+            </select>
+          </div>
+        </div>
+        <div class="inline-actions">
+          <button type="submit" class="btn btn-primary">
+            Найти · {{ total_cars }} объявлений
+          </button>
+          <div class="links">
+            <a href="#" id="home-reset">Сбросить</a>
+            <a href="/catalog?advanced=1">Расширенный поиск</a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+<section class="section" id="cases">
+  <div class="la-container">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">За 8 лет привезли более 1000 автомобилей под заказ из Европы</h2>
+        <p class="section-sub">Реальные кейсы клиентов</p>
+      </div>
+    </div>
+  </div>
+  <div class="collage-wrap">
+    {% set visible = collage_images[:36] %}
+    {% set hidden = collage_images[36:] %}
+    <div class="collage-track" id="collage-track">
+      {% for img in visible %}
+      <div class="collage-item">
+        <img
+          src="{{ img.src }}"
+          srcset="{{ img.srcset }}"
+          sizes="(max-width: 768px) 45vw, 240px"
+          alt="Авто кейс"
+          loading="lazy"
+          decoding="async"
+          fetchpriority="low"
+          width="{{ img.width }}"
+          height="{{ img.height }}"
+          onerror="this.onerror=null; this.src='{{ img.fallback }}'; this.srcset='';"
+        />
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section section--about" id="about">
+  <div class="la-container">
+    <div class="about-header">
+      <p class="eyebrow">О нас</p>
+      <h2 class="section-title">
+        Меня зовут Дмитрий, я руководитель компании Level Avto
+      </h2>
+      <p class="section-sub">
+        С 2017г. профессионально занимаемся доставкой авто из-за границы.
+      </p>
+    </div>
+    <div class="about-cards">
+      <div class="about-card">
+        <h3 class="about-subtitle">
+          Почему именно мы привезем Вам авто под заказ?
+        </h3>
+        <ul class="specs">
+          <li>
+            Большинство завершенных объявлений в Авито привезены из Европы и
+            Кореи
+          </li>
+          <li>В Instagram и Telegram — фото и видео отчёты сотен машин</li>
+          <li>
+            Мы на Яндекс Картах: “Level Avto”, Шелепихинская наб., 34к4зд8,
+            Москва
+          </li>
+        </ul>
+      </div>
+      <div class="about-card">
+        <h3 class="about-subtitle">Как мы работаем</h3>
+        <ul class="specs">
+          <li>Оплата после получения авто с предоплатой от 10%</li>
+          <li>
+            Оплата через СБЕР (ячейка) или поэтапно: инвойс, логистика, таможня
+          </li>
+          <li>Фиксируем в договоре стоимость под ключ и сроки поставки</li>
+          <li>Любые формы оплаты: нал/безнал/кредит/лизинг/НДС</li>
+          <li>
+            Партнёры: Европлан, Газпромбанк лизинг, Carcade, Совкомбанк лизинг,
+            Балтийский лизинг
+          </li>
+        </ul>
+      </div>
+      <div class="about-card">
+        <h3 class="about-subtitle">Ваши преимущества</h3>
+        <ul class="specs">
+          <li>Экономия 20–30% от рынка РФ</li>
+          <li>
+            100% оригинальный пробег, история обслуживания и качественное ТО
+          </li>
+          <li>
+            Отличное ЛКП (без реагентов), качественная сборка, больше цветов и
+            комплектаций
+          </li>
+          <li>Новый авто любой марки — соберём на конфигураторе дилера</li>
+          <li>Доставка в любой регион РФ</li>
+        </ul>
+      </div>
+      <div class="about-card">
+        <h3 class="about-subtitle">Сроки доставки</h3>
+        <ul class="specs">
+          <li>Европа: 10–45 дней (10 дней если объём двигателя до 1.9л)</li>
+          <li>Корея: 30–45 дней</li>
+          <li>Китай: 30–60 дней</li>
+          <li>ОАЭ: 30–45 дней</li>
+        </ul>
+        <p>
+          Поможем без посредников организовать покупку авто с пробегом или
+          нового: диагностика, оплата, таможенная очистка, доставка, СБКТС и
+          ЭлПТС, льготный утиль при возможности.
+        </p>
+        <p>
+          <strong
+            >Напишите или позвоните — сделаем бесплатный подбор и расчёт
+            автомобиля вашей мечты.</strong
+          >
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="section" id="models">
   <div class="la-container">
     <div class="section-header">
@@ -181,7 +246,15 @@
       <a class="card car-card" href="/car/{{ car.id }}">
         <div class="thumb-wrap">
           <span class="badge-tag">Популярное</span>
-          <img class="thumb" src="{{ car.thumbnail_url or '' }}" alt="" loading="lazy" />
+          <img
+            class="thumb"
+            src="{{ car.thumbnail_url or '' }}"
+            width="320"
+            height="200"
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
         </div>
         <div class="car-card__body">
           <div>
@@ -198,18 +271,19 @@
               <li>Страна: {{ car.country or '—' }}</li>
             </ul>
           </div>
-        <div class="car-card__price">
-          {% if car.price %}
-          {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) | float %}
-          {% set rub = (car.price | float * rate) | round(0, 'ceil') | int %}
-          <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
-          {% endif %}
-        </div>
+          <div class="car-card__price">
+            {% if car.price %} {% set rate = fx_rates.get((car.currency or
+            'EUR').upper(), 1) | float %} {% set rub = (car.price | float *
+            rate) | round(0, 'ceil') | int %}
+            <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
+            {% endif %}
+          </div>
         </div>
       </a>
       {% else %}
       <p class="hero-note">
-        Пока нет объявлений с фото. Импортируйте CSV или запустите парсер источников.
+        Пока нет объявлений с фото. Импортируйте CSV или запустите парсер
+        источников.
       </p>
       {% endfor %}
     </div>
@@ -229,7 +303,15 @@
       <a class="card car-card" href="/car/{{ car.id }}">
         <div class="thumb-wrap">
           <span class="badge-tag badge-tag--alt">Рекомендуем</span>
-          <img class="thumb" src="{{ car.thumbnail_url or '' }}" alt="" loading="lazy" />
+          <img
+            class="thumb"
+            src="{{ car.thumbnail_url or '' }}"
+            width="320"
+            height="200"
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
         </div>
         <div class="car-card__body">
           <div>
@@ -246,13 +328,13 @@
               <li>Страна: {{ car.country or '—' }}</li>
             </ul>
           </div>
-        <div class="car-card__price">
-          {% if car.price %}
-          {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) | float %}
-          {% set rub = (car.price | float * rate) | round(0, 'ceil') | int %}
-          <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
-          {% endif %}
-        </div>
+          <div class="car-card__price">
+            {% if car.price %} {% set rate = fx_rates.get((car.currency or
+            'EUR').upper(), 1) | float %} {% set rub = (car.price | float *
+            rate) | round(0, 'ceil') | int %}
+            <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
+            {% endif %}
+          </div>
         </div>
       </a>
       {% else %}
@@ -328,6 +410,49 @@
   </div>
 </section>
 
+<section class="section" id="vehicle-types">
+  <div class="la-container">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Типы кузова</h2>
+        <p class="section-sub">Быстрый переход по кузовам</p>
+      </div>
+    </div>
+    {% set labels = {
+      'wagon':'Универсал',
+      'sedan':'Седан',
+      'cabrio':'Кабриолет',
+      'convertible':'Кабриолет',
+      'suv':'Внедорожник',
+      'hatchback':'Хэтчбек',
+      'coupe':'Купе',
+      'van':'Минивэн',
+      'pickup':'Пикап'
+    } %}
+    {% set icons = {
+      'sedan':'<svg viewBox="0 0 28 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="3" y="7" width="16" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M7 7L9 4.5C9.2 4.2 9.6 4 10 4h6c0.4 0 0.8 0.2 1 0.5L18 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="17" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/></svg>',
+      'hatchback':'<svg viewBox="0 0 28 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="3" y="7" width="16" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M6 7L10 4.5C10.3 4.3 10.6 4.2 11 4.2H16L18 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="17" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/></svg>',
+      'wagon':'<svg viewBox="0 0 28 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="2.5" y="7" width="18" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M6 7L9 4.5C9.3 4.2 9.7 4 10.1 4H16.5L18.5 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.5" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="17" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/></svg>',
+      'suv':'<svg viewBox="0 0 28 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="3" y="8" width="16" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 8L9 5.5C9.4 5.1 9.9 5 10.4 5h6.2c0.4 0 0.9 0.2 1.1 0.5L19 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="14.5" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="17" cy="14.5" r="2" stroke="currentColor" stroke-width="1.5"/></svg>',
+      'coupe':'<svg viewBox="0 0 28 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="4" y="8" width="15" height="5" rx="1.3" stroke="currentColor" stroke-width="1.5"/><path d="M8 8L12 5.5C12.3 5.3 12.6 5.2 13 5.2H16.5L18.5 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="17" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/></svg>',
+      'convertible':'<svg viewBox="0 0 28 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="4" y="9" width="15" height="4" rx="1.2" stroke="currentColor" stroke-width="1.5"/><path d="M7 9L11 6.5C11.4 6.2 11.8 6 12.2 6H15.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="9" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="17" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/></svg>',
+      'pickup':'<svg viewBox=\"0 0 28 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\"><rect x=\"2.5\" y=\"9\" width=\"12\" height=\"4\" rx=\"1\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"M14.5 9H20c0.6 0 1 0.4 1 1v3H14.5\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M6.5 9L10 6.5C10.3 6.2 10.7 6 11.1 6H13.5\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><circle cx=\"7.5\" cy=\"14\" r=\"2\" stroke=\"currentColor\" stroke-width=\"1.5\"/><circle cx=\"17.5\" cy=\"14\" r=\"2\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',
+      'van':'<svg viewBox=\"0 0 28 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\"><rect x=\"3\" y=\"8\" width=\"17\" height=\"5.5\" rx=\"1.5\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"M6 8L12 5.5C12.4 5.3 12.8 5.2 13.2 5.2H17.5L19.5 8\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"8\" cy=\"14.5\" r=\"2\" stroke=\"currentColor\" stroke-width=\"1.5\"/><circle cx=\"17.5\" cy=\"14.5\" r=\"2\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',
+      'default':'<svg viewBox=\"0 0 28 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\"><rect x=\"3\" y=\"7\" width=\"16\" height=\"6\" rx=\"1.5\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"M7 7L9 4.5C9.2 4.2 9.6 4 10 4h6c0.4 0 0.8 0.2 1 0.5L18 7\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"8\" cy=\"14\" r=\"2\" stroke=\"currentColor\" stroke-width=\"1.5\"/><circle cx=\"17\" cy=\"14\" r=\"2\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>'
+    } %}
+    <div class="vehicle-grid">
+      {% for item in body_type_stats[:8] %}
+      <a class="vehicle-card" href="/catalog?body_type={{ item.body_type }}">
+        <div class="vehicle-title">{{ labels.get(item.body_type, item.body_type) }}</div>
+        <div class="muted small">Объявлений: {{ item.count }}</div>
+      </a>
+      {% else %}
+      <p class="hero-note">Добавьте автомобили, чтобы показать статистику по кузовам.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
 <section class="section" id="advantages">
   <div class="la-container">
     <div class="section-header">
@@ -361,266 +486,531 @@
     </div>
   </div>
 
-
-<section class="section" id="brands">
-  <div class="la-container">
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Популярные марки автомобилей</h2>
-        <p class="section-sub">Часто выбирают наши клиенты</p>
-      </div>
-    </div>
-    {% set primary = brand_logos[:16] %} {% set primary_names = primary |
-    map(attribute='brand') | list %} {% set others = brand_stats[0:40] %}
-    <div class="brand-logo-grid">
-      {% for item in primary %}
-      <a class="brand-logo-tile" href="/catalog?brand={{ item.brand }}">
-        <div class="brand-logo-thumb">
-          <img src="{{ item.logo }}" alt="{{ item.brand }}" loading="lazy" />
+  <section class="section" id="brands">
+    <div class="la-container">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Популярные марки</h2>
+          <p class="section-sub">
+            Показываем только бренды, которые есть в каталоге
+          </p>
         </div>
-        <div class="brand-logo-meta">
+      </div>
+      {% set primary = brand_logos[:12] %} {% set primary_names = primary |
+      map(attribute='brand') | list %} {% set others = brand_stats[0:60] %}
+      <div class="brand-logo-grid">
+        {% for item in primary %}
+        <a class="brand-logo-tile" href="/catalog?brand={{ item.brand }}">
+          <div class="brand-logo-thumb">
+            <img src="{{ item.logo }}" alt="{{ item.brand }}" loading="lazy" />
+          </div>
+          <div class="brand-logo-meta">
+            <strong>{{ item.brand }}</strong>
+            <span class="small">{{ item.count }} авто</span>
+          </div>
+        </a>
+        {% else %}
+        <p class="hero-note">
+          Добавьте логотипы в static/img/brand-logos, чтобы они появились.
+        </p>
+        {% endfor %}
+      </div>
+      {% if others %}
+      <div class="section-header" style="margin-top: 24px">
+        <div>
+          <h3 class="section-title" style="font-size: 22px">
+            Другие марки автомобилей
+          </h3>
+        </div>
+      </div>
+      <div class="brand-grid">
+        {% for item in others if item.brand not in primary_names %}
+        <a class="brand-tile" href="/catalog?brand={{ item.brand }}">
           <strong>{{ item.brand }}</strong>
           <span class="small">{{ item.count }} авто</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+
+  <section class="section" id="models">
+    <div class="la-container">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Модели по брендам</h2>
+          <p class="section-sub">Подборки моделей без прокрутки</p>
         </div>
-      </a>
-      {% else %}
-      <p class="hero-note">
-        Добавьте логотипы в static/img/brand-logos, чтобы они появились.
-      </p>
-      {% endfor %}
-    </div>
-    {% if others %}
-    <div class="section-header" style="margin-top: 28px">
-      <div>
-        <h3 class="section-title" style="font-size: 22px">
-          Другие марки автомобилей
-        </h3>
+      </div>
+      <div class="models-grid">
+        {% for brand, models in top_models.items() %}
+        <div class="model-column">
+          <h4>{{ brand }}</h4>
+          <ul>
+            {% for item in models[:6] %}
+            <li>
+              <a href="/catalog?brand={{ brand }}&model={{ item.model }}"
+                >{{ item.model }} ({{ item.count }})</a
+              >
+            </li>
+            {% endfor %} {% if models|length > 6 %}
+            <li class="muted">… и ещё {{ models|length - 6 }}</li>
+            {% endif %}
+          </ul>
+        </div>
+        {% endfor %}
       </div>
     </div>
-    <div class="brand-grid">
-      {% for item in others if item.brand not in primary_names %}
-      <a class="brand-tile" href="/catalog?brand={{ item.brand }}">
-        <strong>{{ item.brand }}</strong>
-        <span class="small">{{ item.count }} авто</span>
-      </a>
-      {% endfor %}
-    </div>
-    {% endif %}
-  </div>
-</section>
+  </section>
 
-<section class="section" id="models">
-  <div class="la-container">
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Популярные модели</h2>
-        <p class="section-sub">Самые частые запросы в каталоге</p>
+  <section class="section" id="how-it-works">
+    <div class="la-container">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Как мы работаем</h2>
+          <p class="section-sub">Прозрачно сопровождаем на каждом этапе</p>
+        </div>
       </div>
-    </div>
-    <div class="models-grid">
-      {% for brand, models in top_models.items() %}
-      <div class="model-column">
-        <h4>{{ brand }}</h4>
-        <ul>
-          {% for item in models %}
-          <li>
-            <a href="/catalog?brand={{ brand }}&model={{ item.model }}"
-              >{{ item.model }} ({{ item.count }})</a
-            >
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
-<section class="section" id="how-it-works">
-  <div class="la-container">
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Как мы работаем</h2>
-        <p class="section-sub">Прозрачно сопровождаем на каждом этапе</p>
-      </div>
-    </div>
-    <div class="category-grid">
-      <div class="card">
-        <strong>1. Подбор</strong>
-        <p>
-          Уточняем бюджет и критерии, подбираем 5–10 вариантов из Europe и
-          партнерских площадок.
-        </p>
-      </div>
-      <div class="card">
-        <strong>2. Проверка</strong>
-        <p>
-          Диагностика, проверка истории, фото- и видеоотчёт. Гарантируем
-          отсутствие скрытых проблем.
-        </p>
-      </div>
-      <div class="card">
-        <strong>3. Логистика</strong>
-        <p>
-          Организуем выкуп, доставку, таможенное оформление и постановку на
-          учёт.
-        </p>
-      </div>
-      <div class="card">
-        <strong>4. Выдача</strong>
-        <p>
-          Передаём автомобиль, помогаем с лизингом/кредитом, страховкой и
-          сервисом.
-        </p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="section" id="seo">
-  <div class="la-container">
-    <div class="seo-block">
-      <h3 style="margin: 0 0 12px; color: var(--text)">
-        Привозим автомобили из Европы под ваши задачи
-      </h3>
-      <p>
-        Level Avto — команда, которая специализируется на поставке автомобилей
-        из Германии, Нидерландов, Бельгии и других стран ЕС. Мы работаем с
-        проверенными дилерами, проверяем историю и техническое состояние, чтобы
-        вы получали только честные предложения.
-      </p>
-      <p>
-        Собираем подбор под бюджет и цели: семейные универсалы, первые
-        автомобили, премиальные модели, электрокары. Помогаем с лизингом,
-        кредитом и возвратом НДС для бизнеса.
-      </p>
-      <p>
-        Мы берем на себя логистику, таможенное оформление, регистрацию и выдачу
-        в вашем городе. Минимальная предоплата — основная часть оплачивается по
-        факту поставки. Оставьте заявку, и мы предложим варианты в течение 1–2
-        дней.
-      </p>
-    </div>
-  </div>
-</section>
-
-<section class="lead-section" id="lead-form">
-  <div class="la-container">
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Заявка на расчёт</h2>
-        <p class="section-sub">
-          Оставьте контакты — подберём предложения и озвучим бюджет
-        </p>
-      </div>
-    </div>
-    <div class="lead-card">
-      <form method="post" action="/lead" class="form">
-        <div class="form-grid">
-          <div class="field">
-            <label for="lead-name">Имя*</label>
-            <input id="lead-name" name="name" required placeholder="Алексей" value="{{ user.full_name if user else '' }}" />
-          </div>
-          <div class="field">
-            <label for="lead-phone">Телефон*</label>
-            <input
-              id="lead-phone"
-              name="phone"
-              required
-              placeholder="+7 (911) 070-75-00"
-              value="{{ user.phone if user and user.phone is defined else '' }}"
-            />
-          </div>
-          <div class="field">
-            <label for="lead-email">Email</label>
-            <input
-              id="lead-email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              value="{{ user.email if user else '' }}"
-            />
-          </div>
-          <div class="field">
-            <label for="lead-preferred">Предпочтительная марка/модель</label>
-            <input
-              id="lead-preferred"
-              name="preferred"
-              placeholder="BMW 5, Audi Q5"
-            />
-          </div>
-          <div class="field">
-            <label for="lead-price">Диапазон бюджета</label>
-            <input
-              id="lead-price"
-              name="price_range"
-              placeholder="от 2 млн ₽"
-            />
+      <div class="how-steps">
+        <div class="how-step">
+          <div class="how-step__badge">1</div>
+          <div>
+            <strong>Подбор</strong>
+            <p>
+              Уточняем бюджет и критерии, подбираем 5–10 вариантов из Europe и
+              партнерских площадок.
+            </p>
           </div>
         </div>
-        <div class="field" style="margin-top: 12px">
-          <label for="lead-comment">Комментарий</label>
-          <textarea
-            id="lead-comment"
-            name="comment"
-            placeholder="Расскажите, какой автомобиль нужен и когда готовы покупать"
-          ></textarea>
+        <div class="how-step">
+          <div class="how-step__badge">2</div>
+          <div>
+            <strong>Проверка</strong>
+            <p>
+              Диагностика, проверка истории, фото- и видеоотчёт. Гарантируем
+              отсутствие скрытых проблем.
+            </p>
+          </div>
         </div>
-        <div class="inline-actions" style="margin-top: 14px">
-          <button type="submit" class="btn btn-primary">
-            Отправить заявку
-          </button>
-          <span class="hero-note"
-            >Заполните форму — свяжемся в течение рабочего дня</span
+        <div class="how-step">
+          <div class="how-step__badge">3</div>
+          <div>
+            <strong>Логистика</strong>
+            <p>
+              Организуем выкуп, доставку, таможенное оформление и постановку на
+              учёт.
+            </p>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="how-step__badge">4</div>
+          <div>
+            <strong>Выдача</strong>
+            <p>
+              Передаём автомобиль, помогаем с лизингом/кредитом, страховкой и
+              сервисом.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="seo">
+    <div class="la-container">
+      <div class="seo-block">
+        <h2 class="section-title" style="margin: 0">
+          Привозим автомобили из Европы под ваши задачи
+        </h2>
+        <p>
+          Level Avto — команда, которая специализируется на поставке автомобилей
+          из Германии, Нидерландов, Бельгии и других стран ЕС. Мы работаем с
+          проверенными дилерами, проверяем историю и техническое состояние,
+          чтобы вы получали только честные предложения.
+        </p>
+        <p>
+          Собираем подбор под бюджет и цели: семейные универсалы, первые
+          автомобили, премиальные модели, электрокары. Помогаем с лизингом,
+          кредитом и возвратом НДС для бизнеса.
+        </p>
+        <p>
+          Мы берем на себя логистику, таможенное оформление, регистрацию и
+          выдачу в вашем городе. Минимальная предоплата — основная часть
+          оплачивается по факту поставки. Оставьте заявку, и мы предложим
+          варианты в течение 1–2 дней.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="lead-section" id="lead-form">
+    <div class="la-container">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Заявка на расчёт</h2>
+          <p class="section-sub">
+            Оставьте контакты — подберём предложения и озвучим бюджет
+          </p>
+        </div>
+      </div>
+      <div class="lead-card">
+        <form method="post" action="/lead" class="form lead-form-grid">
+          <div class="form-grid form-grid--12">
+            <div class="field span-4">
+              <label for="lead-name">Имя*</label>
+              <input
+                id="lead-name"
+                name="name"
+                required
+                placeholder="Алексей"
+                value="{{ user.full_name if user else '' }}"
+              />
+            </div>
+            <div class="field span-4">
+              <label for="lead-phone">Телефон*</label>
+              <input
+                id="lead-phone"
+                name="phone"
+                required
+                placeholder="+7 (911) 070-75-00"
+                value="{{ user.phone if user and user.phone is defined else '' }}"
+              />
+            </div>
+            <div class="field span-4">
+              <label for="lead-email">Email</label>
+              <input
+                id="lead-email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                value="{{ user.email if user else '' }}"
+              />
+            </div>
+            <div class="field span-6">
+              <label for="lead-preferred"
+                >Предпочтительная марка/модель</label
+              >
+              <input
+                id="lead-preferred"
+                name="preferred"
+                placeholder="BMW 5, Audi Q5"
+              />
+            </div>
+            <div class="field span-6">
+              <label for="lead-price">Диапазон бюджета</label>
+              <input
+                id="lead-price"
+                name="price_range"
+                placeholder="от 2 млн ₽"
+              />
+            </div>
+            <div class="field span-12">
+              <label for="lead-comment">Комментарий</label>
+              <textarea
+                id="lead-comment"
+                name="comment"
+                placeholder="Расскажите, какой автомобиль нужен и когда готовы покупать"
+              ></textarea>
+            </div>
+            <div class="field span-12 consent-field">
+              <label class="checkbox">
+                <input type="checkbox" name="privacy" required />
+                <span>
+                  Я согласен с
+                  <a href="/privacy" target="_blank" rel="noopener"
+                    >политикой конфиденциальности</a
+                  >
+                </span>
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">
+                Отправить заявку
+              </button>
+              <span class="hero-note"
+                >Заполните форму — свяжемся в течение рабочего дня</span
+              >
+            </div>
+          </div>
+          {% if lead_status %}
+          <div
+            class="form-status {{ 'success' if lead_status.success else 'error' }}"
           >
-        </div>
-        {% if lead_status %}
-        <div
-          class="form-status {{ 'success' if lead_status.success else 'error' }}"
-        >
-          {{ lead_status.message }}
-        </div>
-        {% endif %}
-      </form>
+            {{ lead_status.message }}
+          </div>
+          {% endif %}
+        </form>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section class="section" id="contacts">
-  <div class="la-container">
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Свяжитесь с нами</h2>
-        <p class="section-sub">
-          Шелепихинская набережная, 34к4 стр.8, Москва. Ежедневно 9:00–21:00
-        </p>
-      </div>
-      <a class="btn btn-primary" href="tel:+79110707500">Позвонить</a>
-    </div>
-    <div class="contact-map">
-      <div class="contact-card">
-        <h3>+7 (911) 070-75-00</h3>
-        <p class="hero-note">Обратный звонок · Telegram · WhatsApp</p>
-        <p class="muted">
-          Шелепихинская набережная, 34 к.4 стр.8, Москва, м. Шелепиха
-        </p>
-        <p class="muted">Каждый день 9:00–21:00</p>
-        <div class="inline-actions" style="margin-top: 10px">
-          <a class="btn btn-secondary" href="mailto:info@levelavto.ru"
-            >Написать на email</a
-          >
-          <a class="btn btn-primary" href="#lead-form">Оставить заявку</a>
+  <section class="section" id="contacts">
+    <div class="la-container">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Свяжитесь с нами</h2>
+          {% set phone = contact_phone or content.get('contact_phone','+7 (911) 070-75-00') %}
+          {% set email = contact_email or content.get('contact_email','info@levelavto.ru') %}
+          {% set address = contact_address or content.get('contact_address','Шелепихинская набережная, 34к4 стр.8, Москва') %}
+          <p class="section-sub">{{ address }}. Ежедневно 9:00–21:00</p>
         </div>
       </div>
-      <iframe
-        src="https://yandex.ru/map-widget/v1/?ll=37.5209%2C55.7540&z=15&pt=37.5209,55.7540,pm2rdl"
-        width="100%"
-        height="380"
-        frameborder="0"
-        style="border: 0; border-radius: 16px; overflow: hidden"
-        allowfullscreen
-      ></iframe>
+      <div class="contact-map">
+        <div class="contact-card">
+          <h3><a href="tel:{{ phone|replace(' ','') }}">{{ phone }}</a></h3>
+          <p class="hero-note">
+            Обратный звонок ·
+            {% if contact_tg or content.get('contact_tg') %}
+            <a href="{{ contact_tg or content.get('contact_tg') }}" target="_blank" rel="noopener">Telegram</a>
+            {% endif %}
+            {% if contact_wa or content.get('contact_wa') %}
+            · <a href="{{ contact_wa or content.get('contact_wa') }}" target="_blank" rel="noopener">WhatsApp</a>
+            {% endif %}
+            {% if contact_ig or content.get('contact_ig') %}
+            · <a href="{{ contact_ig or content.get('contact_ig') }}" target="_blank" rel="noopener">Instagram</a>
+            {% endif %}
+          </p>
+          <p class="muted">{{ address }}</p>
+          <p class="muted">Каждый день 9:00–21:00</p>
+          <div class="inline-actions" style="margin-top: 10px">
+            <a class="btn btn-primary" href="tel:{{ phone|replace(' ','') }}">Позвонить</a>
+            <a class="btn btn-secondary" href="mailto:{{ email }}">Написать на email</a>
+          </div>
+        </div>
+        <iframe
+          src="https://yandex.ru/map-widget/v1/?ll=37.5209%2C55.7540&z=15&pt=37.5209,55.7540,pm2rdl"
+          width="100%"
+          height="380"
+          frameborder="0"
+          style="border: 0; border-radius: 16px; overflow: hidden"
+          allowfullscreen
+        ></iframe>
+      </div>
     </div>
-  </div>
-</section>
-{% endblock %}
+  </section>
+  <script>
+    (() => {
+      const heroVideos = {{ hero_videos | tojson }};
+      const videoEl = document.getElementById("hero-video-el");
+      const prevBtn = document.querySelector(".hero-video__control--prev");
+      const nextBtn = document.querySelector(".hero-video__control--next");
+      let idx = 0;
+      let timer;
+      let loaded = false;
+      function setSrc() {
+        if (!loaded && heroVideos.length) {
+          videoEl.src = heroVideos[idx];
+          loaded = true;
+        }
+      }
+      function applyVideo() {
+        if (!videoEl || !heroVideos.length) return;
+        setSrc();
+        videoEl.currentTime = 0;
+        videoEl.playbackRate = 0.8;
+        videoEl.muted = true;
+        videoEl.play().catch(() => {});
+        resetTimer();
+      }
+      function resetTimer() {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(next, 5 * 60 * 1000);
+      }
+      function next() {
+        if (!heroVideos.length) return;
+        idx = (idx + 1) % heroVideos.length;
+        videoEl.src = heroVideos[idx];
+        applyVideo();
+      }
+      function prev() {
+        if (!heroVideos.length) return;
+        idx = (idx - 1 + heroVideos.length) % heroVideos.length;
+        videoEl.src = heroVideos[idx];
+        applyVideo();
+      }
+      if (videoEl && heroVideos.length) {
+        videoEl.addEventListener("ended", next);
+        nextBtn?.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          next();
+        });
+        prevBtn?.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          prev();
+        });
+        const obs = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting && !document.hidden) {
+                applyVideo();
+              } else {
+                videoEl.pause();
+              }
+            });
+          },
+          { threshold: 0.25 }
+        );
+        obs.observe(videoEl);
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) {
+            videoEl.pause();
+          } else {
+            const rect = videoEl.getBoundingClientRect();
+            const inView = rect.top < window.innerHeight * 0.75 && rect.bottom > 0;
+            if (inView) applyVideo();
+          }
+        });
+      }
+
+      const form = document.getElementById("mini-calc-form");
+      if (!form) return;
+      const modeSelect = document.getElementById("mini-mode");
+      const scenarioSelect = document.getElementById("mini-scenario");
+    const blockEngine = form.querySelector('[data-block="engine"]');
+    const blockPower = form.querySelector('[data-block="power"]');
+      const resultWrap = document.getElementById("mini-calc-result");
+      const resultTotal = document.getElementById("mini-calc-total");
+      const resultList = document.getElementById("mini-calc-breakdown");
+      const warn = document.getElementById("mini-warn");
+      const submitBtn = form.querySelector("button[type='submit']");
+
+      const fmt = (num) =>
+        Number(num).toLocaleString("ru-RU", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      const ageBucket = (y, m) => {
+        if (!y || !m) return null;
+        const d = new Date(y, m - 1, 1);
+        const now = new Date();
+        const months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+        if (months < 36) return "under_3";
+        if (months <= 60) return "3_5";
+        return "too_old";
+      };
+
+      const updateVisibility = () => {
+        const mode = modeSelect.value;
+        const s = scenarioSelect.value;
+        if (mode === "manual") {
+          scenarioSelect.disabled = false;
+          blockEngine.style.display = s === "electric" ? "none" : "";
+          blockPower.style.display = s === "electric" ? "" : "none";
+          warn.style.display = "none";
+          submitBtn.disabled = false;
+          return;
+        }
+        // auto mode
+        scenarioSelect.disabled = true;
+        const regY = Number(document.getElementById("mini-reg-year").value) || null;
+        const regM = Number(document.getElementById("mini-reg-month").value) || null;
+        const isElectric = document.getElementById("mini-is-electric").value === "1";
+        const cc = Number(document.getElementById("mini-engine").value) || null;
+        const hp = Number(document.getElementById("mini-power").value) || null;
+        const price = Number(document.getElementById("mini-price").value) || null;
+        const bucket = ageBucket(regY, regM);
+        let autoScenario = "";
+        if (bucket === "too_old") {
+          warn.style.display = "";
+          warn.querySelector(".hero-note").textContent = "Авто старше 5 лет — расчёт недоступен, оставьте заявку.";
+          submitBtn.disabled = true;
+        } else {
+          warn.style.display = "none";
+          submitBtn.disabled = false;
+        }
+        if (isElectric) {
+          autoScenario = "electric";
+        } else if (bucket === "under_3") {
+          autoScenario = "under_3";
+        } else if (bucket === "3_5") {
+          autoScenario = "3_5";
+        }
+        scenarioSelect.value = autoScenario;
+        blockEngine.style.display = isElectric ? "none" : "";
+        blockPower.style.display = isElectric ? "" : "none";
+        const hasData =
+          price &&
+          regY &&
+          regM &&
+          (isElectric ? hp : cc) &&
+          bucket !== "too_old" &&
+          autoScenario;
+        if (!hasData) {
+          submitBtn.disabled = true;
+          warn.style.display = "";
+          warn.querySelector(".hero-note").textContent =
+            "Недостаточно данных для автоподстановки. Оставьте заявку.";
+        }
+      };
+      scenarioSelect.addEventListener("change", updateVisibility);
+      updateVisibility();
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (submitBtn.disabled) return;
+        const payload = {
+          scenario: modeSelect.value === "manual" ? scenarioSelect.value : scenarioSelect.value,
+          price_net_eur: Number(document.getElementById("mini-price").value),
+          engine_cc:
+            Number(document.getElementById("mini-engine").value) || undefined,
+          power_hp:
+            Number(document.getElementById("mini-power").value) || undefined,
+        first_registration_year:
+          Number(document.getElementById("mini-reg-year").value) || undefined,
+        first_registration_month:
+          Number(document.getElementById("mini-reg-month").value) || undefined,
+        is_electric: document.getElementById("mini-is-electric").value === "1",
+        };
+        const resp = await fetch("/api/calc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          alert(err.detail || "Ошибка расчёта");
+          return;
+        }
+        const res = await resp.json();
+        resultTotal.textContent = fmt(res.total_rub) + " ₽";
+        resultList.innerHTML = "";
+        (res.breakdown || []).slice(0, 8).forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "calc-row";
+          row.innerHTML = `<div>${item.title}</div><div>${fmt(item.amount)} ${
+            item.currency
+          }</div>`;
+          resultList.appendChild(row);
+        });
+        resultWrap.style.display = "";
+      });
+
+      // Prefill from query params
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        const setVal = (id, key) => {
+          const el = document.getElementById(id);
+          if (el && params.get(key)) el.value = params.get(key);
+        };
+        setVal("mini-price", "price");
+        setVal("mini-engine", "engine_cc");
+        setVal("mini-power", "power_hp");
+        setVal("mini-reg-year", "reg_year");
+        setVal("mini-reg-month", "reg_month");
+        if (params.get("is_electric") === "1") {
+          document.getElementById("mini-is-electric").value = "1";
+          scenarioSelect.value = "electric";
+          modeSelect.value = "auto";
+        }
+        updateVisibility();
+      })();
+
+      // Collage animation only when visible
+      // collage now static (no autoscroll)
+    })();
+  </script>
+  {% endblock %}

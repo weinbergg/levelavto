@@ -22,9 +22,11 @@ content %}
             value="{{ content.get('hero_title','Импорт и подбор автомобилей из Европы, Кореи и России') }}"
           />
         </label>
-        <label>Подзаголовок
+        <label
+          >Подзаголовок
           <textarea name="hero_subtitle" rows="2">
-{{ content.get('hero_subtitle','Актуальные предложения от проверенных партнёров — в одном каталоге.') }}</textarea>
+{{ content.get('hero_subtitle','Актуальные предложения от проверенных партнёров — в одном каталоге.') }}</textarea
+          >
         </label>
         <label
           >Примечание
@@ -32,7 +34,8 @@ content %}
 {{ content.get('hero_note','Возим проверенные авто из Европы, Кореи и РФ. Минимальная предоплата — основная часть по факту поставки.') }}</textarea
           >
         </label>
-        <label>email для заявок
+        <label
+          >email для заявок
           <input
             type="email"
             name="lead_email"
@@ -40,6 +43,62 @@ content %}
           />
           <span class="small muted">Сюда будут уходить заявки с формы</span>
         </label>
+        <div class="admin-grid-2">
+          <label
+            >Телефон
+            <input
+              type="text"
+              name="contact_phone"
+              placeholder="+7 (911) 070-75-00"
+              value="{{ content.get('contact_phone','+7 (911) 070-75-00') }}"
+            />
+          </label>
+          <label
+            >Email
+            <input
+              type="email"
+              name="contact_email"
+              placeholder="info@levelavto.ru"
+              value="{{ content.get('contact_email','info@levelavto.ru') }}"
+            />
+          </label>
+          <label
+            >Адрес
+            <input
+              type="text"
+              name="contact_address"
+              placeholder="Шелепихинская наб. 34к4, Москва"
+              value="{{ content.get('contact_address','Шелепихинская набережная, 34к4 стр.8, Москва') }}"
+            />
+          </label>
+          <label
+            >Telegram (ссылка)
+            <input
+              type="text"
+              name="contact_tg"
+              placeholder="https://t.me/levelavto"
+              value="{{ content.get('contact_tg','') }}"
+            />
+          </label>
+          <label
+            >WhatsApp (ссылка)
+            <input
+              type="text"
+              name="contact_wa"
+              placeholder="https://wa.me/79110707500"
+              value="{{ content.get('contact_wa','') }}"
+            />
+          </label>
+          <label
+            >Instagram (ссылка)
+            <input
+              type="text"
+              name="contact_ig"
+              placeholder="https://instagram.com/..."
+              value="{{ content.get('contact_ig','') }}"
+            />
+          </label>
+        </div>
         <button type="submit" class="btn btn-primary">Сохранить тексты</button>
       </form>
     </div>
@@ -78,6 +137,23 @@ content %}
         </span>
         {% endif %}
       </form>
+      <div class="admin-quicklist">
+        <div class="small muted" style="margin-bottom: 6px">
+          Быстрый выбор (последние с фото): нажмите, чтобы добавить в поле
+        </div>
+        <div class="admin-quicklist__items">
+          {% for car in recent_cars %}
+          <button
+            type="button"
+            class="btn btn-secondary btn-small admin-quicklist__item"
+            data-car-id="{{ car.id }}"
+          >
+            #{{ car.id }} {{ car.brand or '' }} {{ car.model or '' }} {{
+            car.year or '' }}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
       {% endfor %}
       <datalist id="recent-cars">
         {% for car in recent_cars %}
@@ -90,4 +166,18 @@ content %}
     </div>
   </div>
 </section>
+<script>
+  document.querySelectorAll(".admin-quicklist__item").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.carId;
+      const input = btn.closest("form").querySelector('input[name="car_ids"]');
+      const current = input.value
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
+      if (!current.includes(id)) current.push(id);
+      input.value = current.join(", ");
+    });
+  });
+</script>
 {% endblock %}
