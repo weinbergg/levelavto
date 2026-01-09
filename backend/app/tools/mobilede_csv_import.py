@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from typing import List
 from sqlalchemy import select
 from datetime import datetime
@@ -115,7 +116,6 @@ def main() -> None:
             f"Import finished: seen={seen_total}, inserted={inserted_total}, updated={updated_total}, deactivated={deactivated}"
         )
         if args.stats_file:
-            import json, os
             stats = {
                 "job": "mobilede",
                 "seen": seen_total,
