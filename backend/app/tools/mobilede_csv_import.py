@@ -63,9 +63,9 @@ def main() -> None:
         db.commit()
         db.refresh(run)
 
-    inserted_total = updated_total = seen_total = skipped_total = 0
-    seen_external_ids: List[str] = []
-    batch: List[dict] = []
+        inserted_total = updated_total = seen_total = skipped_total = 0
+        seen_external_ids: List[str] = []
+        batch: List[dict] = []
         BATCH_SIZE = 500
 
         row_iter = feed_parser.iter_parsed_from_csv(
