@@ -84,8 +84,10 @@ class CarsService:
                 if src_ids:
                     conditions.append(Car.source_id.in_(src_ids))
         if brand:
-            # case-insensitive equality
-            conditions.append(func.lower(Car.brand) == brand.lower())
+            # case-insensitive contains (brand may have variants/extra symbols)
+            b = brand.strip().strip(".,;")
+            if b:
+                conditions.append(func.lower(Car.brand).like(func.lower(f"%{b}%")))
         if q:
             like = f"%{q.strip()}%"
             conditions.append(
