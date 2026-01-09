@@ -27,8 +27,9 @@
 .hero-video__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,0.70) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.75) 100%);
-  backdrop-filter: blur(2px);
+  background: linear-gradient(180deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.62) 60%, rgba(0,0,0,0.82) 100%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 .hero-video__control {
   position: absolute;
