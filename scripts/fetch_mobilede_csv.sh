@@ -37,7 +37,7 @@ download() {
   if [[ "$code" == "200" ]]; then
     size=$(stat -c%s "${dest}" 2>/dev/null || stat -f%z "${dest}")
     echo "[fetch-mobilede] ok ${d} size=${size}"
-    ln -sf "$(basename "${dest}")" backend/app/imports/mobilede_active_offers.csv
+    ln -sf "${dest}" backend/app/imports/mobilede_active_offers.csv
     return 0
   else
     echo "[fetch-mobilede] failed ${d} code=${code}"
