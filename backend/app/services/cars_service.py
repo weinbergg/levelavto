@@ -43,6 +43,7 @@ class CarsService:
         country: Optional[str] = None,
         brand: Optional[str] = None,
         source_key: Optional[str | List[str]] = None,
+        q: Optional[str] = None,
         model: Optional[str] = None,
         generation: Optional[str] = None,
         color: Optional[str] = None,
@@ -85,6 +86,15 @@ class CarsService:
         if brand:
             # case-insensitive equality
             conditions.append(func.lower(Car.brand) == brand.lower())
+        if q:
+            like = f"%{q.strip()}%"
+            conditions.append(
+                or_(
+                    func.lower(Car.brand).like(func.lower(like)),
+                    func.lower(Car.model).like(func.lower(like)),
+                    func.lower(func.concat(Car.brand, " ", Car.model)).like(func.lower(like)),
+                )
+            )
         if model:
             like = f"%{model.strip()}%"
             # match by model field; if brand is not specified, also try brand+model text

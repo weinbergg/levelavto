@@ -70,6 +70,9 @@
         field.value = value
       }
     })
+    const searchField = qs('#catalog-search')
+    const qVal = params.get('q') || params.get('model')
+    if (searchField && qVal) searchField.value = qVal
   }
 
   function renderSkeleton(cards, count = 6) {
@@ -103,6 +106,7 @@
     const labels = {
       country: 'Страна',
       brand: 'Марка',
+      q: 'Поиск',
       model: 'Модель',
       generation: 'Поколение',
       color: 'Цвет',
@@ -150,7 +154,7 @@
       chip.addEventListener('click', () => {
         const el = form.elements[key]
         if (el) el.value = ''
-        if (key === 'model') qs('#catalog-search') && (qs('#catalog-search').value = '')
+        if (key === 'model' || key === 'q') qs('#catalog-search') && (qs('#catalog-search').value = '')
         loadCars(1)
       })
       container.appendChild(chip)
@@ -176,8 +180,10 @@
       params.append(k, v)
     }
     if (searchValue) {
+      params.set('q', searchValue)
       params.set('model', searchValue)
     } else {
+      params.delete('q')
       params.delete('model')
     }
     params.set('page', String(page || 1))

@@ -17,6 +17,7 @@ def list_cars(
     brand: Optional[str] = Query(default=None),
     source: Optional[str | List[str]] = Query(
         default=None, description="Source key, e.g., mobile_de or emavto_klg"),
+    q: Optional[str] = Query(default=None, description="Free-text brand/model search"),
     model: Optional[str] = Query(default=None),
     generation: Optional[str] = Query(default=None),
     color: Optional[str] = Query(default=None),
@@ -39,6 +40,7 @@ def list_cars(
         country=country,
         brand=brand,
         source_key=source,
+        q=q,
         model=model,
         generation=generation,
         color=color,
