@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Form, Request, Query
 from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from ..auth import require_admin
@@ -30,7 +31,6 @@ CONTENT_KEYS = {
 @router.get("/admin")
 def admin_dashboard(
     request: Request,
-    q: str | None = Query(default=None),
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -61,8 +61,6 @@ def admin_dashboard(
     ]
     total_cars = cars_svc.total_cars()
     recent_cars = cars_svc.recent_with_thumbnails(limit=40)
-    search_results = cars_svc.search_featured_candidates(
-        q, limit=20) if q else []
     return templates.TemplateResponse(
         "admin/dashboard.html",
         {
@@ -73,8 +71,6 @@ def admin_dashboard(
             "featured_cards": featured_cards,
             "total_cars": total_cars,
             "recent_cars": recent_cars,
-            "search_query": q or "",
-            "search_results": search_results,
         },
     )
 
@@ -131,3 +127,21 @@ def update_featured(
             continue
     admin_svc.set_featured(placement, ids_clean)
     return RedirectResponse(url="/admin", status_code=302)
+
+
+@router.get("/admin/featured/search")
+def search_featured(
+    q: str = Query(default=None),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cars_svc = CarsService(db)
+    results = cars_svc.search_featured_candidates(q or "", limit=20) if q else []
+    payload = [
+        {
+            "id": c.id,
+            "title": f"{c.brand or ''} {c.model or ''} {c.year or ''}".strip(),
+        }
+        for c in results
+    ]
+    return JSONResponse(payload)

@@ -11,6 +11,22 @@ content %}
       </div>
     </div>
 
+    <style>
+      .admin-block { margin-bottom: 24px; padding: 16px; border-radius: 12px; background: #11151e; border: 1px solid #1c2330; }
+      .admin-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+      .form-inline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .admin-quicklist__items { display: flex; flex-wrap: wrap; gap: 8px; max-height: 260px; overflow-y: auto; }
+      .admin-quicklist { margin-top: 10px; }
+      .text-input { padding: 8px 10px; border-radius: 8px; border: 1px solid #2a3242; background: #0c1018; color: #fff; }
+      .btn { white-space: nowrap; }
+      .current-featured { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+      .chip-selected { padding: 6px 10px; background: #1f2633; border-radius: 10px; border: 1px solid #2f3848; }
+      .suggest-box { position: relative; max-width: 340px; }
+      .suggest-list { position: absolute; z-index: 5; left: 0; right: 0; background: #0f141d; border: 1px solid #2a3242; border-radius: 10px; max-height: 240px; overflow-y: auto; margin-top: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+      .suggest-item { padding: 8px 10px; cursor: pointer; }
+      .suggest-item:hover { background: #1b2230; }
+    </style>
+
     <div class="admin-block">
       <h3>Тексты на главной</h3>
       <form method="post" action="/admin/content" class="form-vertical">
@@ -125,24 +141,11 @@ content %}
         <span class="small muted" style="margin-left:8px;">Сейчас выбрано: {{ selected_ids|length }}</span>
       </form>
       <div class="admin-quicklist" style="margin-top:12px;">
-        <div class="small muted" style="margin-bottom: 6px">
-          Быстрый поиск (бренд/модель/ID):
+        <div class="small muted" style="margin-bottom: 6px">Быстрый поиск (бренд/модель/ID):</div>
+        <div class="suggest-box">
+          <input type="text" id="featuredSearch" placeholder="BMW, Q7 или ID" class="text-input" style="width:100%;" autocomplete="off" />
+          <div id="suggestList" class="suggest-list" style="display:none;"></div>
         </div>
-        <form method="get" action="/admin" class="form-inline" style="gap:8px; margin-bottom:8px;">
-          <input type="text" name="q" value="{{ search_query }}" placeholder="BMW, Q7 или ID" class="text-input" style="min-width:220px;" />
-          <button class="btn btn-secondary" type="submit">Искать</button>
-        </form>
-        {% if search_results %}
-        <div class="admin-quicklist__items">
-          {% for car in search_results %}
-          <button type="button" class="btn btn-secondary btn-small admin-quicklist__item" data-car-id="{{ car.id }}">
-            #{{ car.id }} {{ car.brand or '' }} {{ car.model or '' }} {{ car.year or '' }}
-          </button>
-          {% endfor %}
-        </div>
-        {% elif search_query %}
-        <div class="muted small">Ничего не найдено.</div>
-        {% endif %}
         <div class="small muted" style="margin:10px 0 6px;">
           Последние с фото (до 40):
         </div>
@@ -152,6 +155,7 @@ content %}
             type="button"
             class="btn btn-secondary btn-small admin-quicklist__item"
             data-car-id="{{ car.id }}"
+            data-title="{{ (car.brand or '') ~ ' ' ~ (car.model or '') ~ ' ' ~ (car.year or '') }}"
           >
             #{{ car.id }} {{ car.brand or '' }} {{ car.model or '' }} {{ car.year or '' }}
           </button>
@@ -161,28 +165,71 @@ content %}
       {% if featured_cards %}
       <div class="admin-quicklist" style="margin-top:12px;">
         <div class="small muted">Текущий порядок:</div>
-        <ol>
+        <div class="current-featured">
           {% for card in featured_cards %}
-          <li>#{{ card.id }} {{ card.title }}</li>
+          <span class="chip-selected">{{ card.title }} (#{{ card.id }})</span>
           {% endfor %}
-        </ol>
+        </div>
       </div>
       {% endif %}
     </div>
   </div>
 </section>
 <script>
-  document.querySelectorAll(".admin-quicklist__item").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.carId;
-      const input = document.querySelector('#featuredInput');
-      const current = input.value
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
-      if (!current.includes(id)) current.push(id);
-      input.value = current.join(", ");
+  (function() {
+    const input = document.querySelector('#featuredInput');
+    const search = document.querySelector('#featuredSearch');
+    const suggestBox = document.querySelector('#suggestList');
+
+    function addId(id) {
+      if (!input) return;
+      const current = input.value.split(',').map(x => x.trim()).filter(Boolean);
+      if (!current.includes(String(id))) {
+        current.push(String(id));
+        input.value = current.join(', ');
+      }
+    }
+
+    document.querySelectorAll(".admin-quicklist__item").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.carId;
+        addId(id);
+      });
     });
-  });
+
+    let debounce;
+    async function searchSuggest(q) {
+      if (!q) { suggestBox.style.display = 'none'; suggestBox.innerHTML=''; return; }
+      const res = await fetch(`/admin/featured/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.length) { suggestBox.style.display='none'; suggestBox.innerHTML=''; return; }
+      suggestBox.innerHTML = data
+        .sort((a,b) => (a.title||'').localeCompare(b.title||''))
+        .map(item => `<div class="suggest-item" data-id="${item.id}">${item.title} (#${item.id})</div>`)
+        .join('');
+      suggestBox.style.display = 'block';
+      suggestBox.querySelectorAll('.suggest-item').forEach((el) => {
+        el.addEventListener('click', () => {
+          addId(el.dataset.id);
+          suggestBox.style.display = 'none';
+          suggestBox.innerHTML = '';
+          search.value = '';
+        });
+      });
+    }
+
+    search?.addEventListener('input', (e) => {
+      clearTimeout(debounce);
+      const q = e.target.value.trim();
+      debounce = setTimeout(() => searchSuggest(q), 200);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!suggestBox.contains(e.target) && e.target !== search) {
+        suggestBox.style.display = 'none';
+      }
+    });
+  })();
 </script>
 {% endblock %}

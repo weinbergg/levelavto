@@ -5,7 +5,7 @@
 <section class="hero hero-with-video" id="hero">
   {% if hero_videos %}
   <div class="hero-video" id="hero-video">
-    <video id="hero-video-el" class="hero-video__el" playsinline muted preload="metadata"></video>
+    <video id="hero-video-el" class="hero-video__el" playsinline muted loop preload="auto" autoplay></video>
     <div class="hero-video__overlay"></div>
     <button class="hero-video__control hero-video__control--prev" aria-label="Предыдущее видео"></button>
     <button class="hero-video__control hero-video__control--next" aria-label="Следующее видео"></button>
@@ -798,6 +798,7 @@
           { threshold: 0.25 }
         );
         obs.observe(videoEl);
+        applyVideo();
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) {
             videoEl.pause();
