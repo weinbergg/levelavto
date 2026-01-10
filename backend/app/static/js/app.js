@@ -38,6 +38,15 @@
     return `${rounded.toLocaleString('ru-RU')} ₽`
   }
 
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
   function formatPrice(price, currency, fx) {
     const rub = priceToRub(price, currency, fx)
     if (rub != null) return formatRub(rub)
@@ -492,21 +501,22 @@
         card.className = 'car-card'
         const more = (car.images_count && car.images_count > 1 && car.thumbnail_url) ? `<span class="more-badge">+${car.images_count - 1} фото</span>` : ''
         const price = car.price != null ? formatPrice(car.price, car.currency, fx) : ''
-        const metaLine = [car.year, car.engine_type].filter(Boolean).join(' · ')
-        const colorDot = (hex) => {
+        const metaLine = [car.year, car.display_engine_type || car.engine_type].filter(Boolean).join(' · ')
+        const colorDot = (hex, raw) => {
           if (!hex) return ''
-          return `<span class="spec-dot" style="background:${hex}"></span>`
+          const title = raw ? ` title="${escapeHtml(raw)}"` : ''
+          return `<span class="spec-dot" style="background:${hex}"${title}></span>`
         }
         const specLines = []
         if (car.mileage != null) {
           specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/mileage.svg" alt="">${Number(car.mileage).toLocaleString('ru-RU')} км</span>`)
         }
         if (car.engine_type) {
-          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/fuel.svg" alt="">${car.engine_type}</span>`)
+          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/fuel.svg" alt="">${car.display_engine_type || car.engine_type}</span>`)
         }
         if (car.display_color || car.color) {
           const label = car.display_color || car.color
-          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt="">${colorDot(car.color_hex)}${label}</span>`)
+          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt="">${colorDot(car.color_hex, car.color)}${label}</span>`)
         }
         if (car.display_country_label || car.country) {
           specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt="">${car.display_country_label || car.country}</span>`)

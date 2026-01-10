@@ -44,6 +44,8 @@ class CarOut(CarBase):
     images_count: Optional[int] = None
     display_country_code: Optional[str] = None
     display_country_label: Optional[str] = None
+    display_engine_type: Optional[str] = None
+    display_transmission: Optional[str] = None
 
 
 class CarDetailOut(CarBase):
@@ -51,4 +53,5 @@ class CarDetailOut(CarBase):
     source_country: Optional[str] = None
     display_country_code: Optional[str] = None
     display_country_label: Optional[str] = None
-
+    display_engine_type: Optional[str] = None
+    display_transmission: Optional[str] = None

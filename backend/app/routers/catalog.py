@@ -8,7 +8,7 @@ from ..models import Car, CarImage, Source
 from sqlalchemy import select, func
 from ..utils.localization import display_body, display_color
 from ..utils.country_map import resolve_display_country
-from ..utils.taxonomy import ru_color, normalize_color, color_hex
+from ..utils.taxonomy import ru_color, normalize_color, color_hex, normalize_fuel, ru_fuel, ru_transmission
 
 router = APIRouter()
 
@@ -90,11 +90,16 @@ def list_cars(
         co["display_country_code"] = display_code
         co["display_country_label"] = display_label
         co["display_body_type"] = display_body(co.get("body_type")) or co.get("body_type")
+        engine_raw = co.get("engine_type")
+        engine_norm = normalize_fuel(engine_raw)
+        co["display_engine_type"] = ru_fuel(engine_raw) or ru_fuel(engine_norm) or engine_raw
+        trans_raw = co.get("transmission")
+        co["display_transmission"] = ru_transmission(trans_raw) or trans_raw
         raw_color = co.get("color")
         norm_color = normalize_color(raw_color)
         co["display_color"] = ru_color(raw_color) or ru_color(norm_color) or display_color(raw_color) or raw_color
         if raw_color:
-            co["color_hex"] = color_hex(norm_color) or "#444"
+            co["color_hex"] = color_hex(norm_color)
         co["images_count"] = counts_map.get(c.id, 0)
         payload_items.append(co)
     return {
@@ -118,6 +123,8 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     display_code, display_label = resolve_display_country(car)
     detail.display_country_code = display_code
     detail.display_country_label = display_label
+    detail.display_engine_type = ru_fuel(car.engine_type) or ru_fuel(normalize_fuel(car.engine_type)) or car.engine_type
+    detail.display_transmission = ru_transmission(car.transmission) or car.transmission
     return detail.model_dump()
 
 

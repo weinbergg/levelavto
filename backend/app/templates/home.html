@@ -26,8 +26,8 @@
   <div class="la-container hero-search">
     <div class="search-card search-card--overlay">
       <div class="search-head">
-        <h3 style="margin: 0">Найти машину</h3>
-        <p class="muted" style="margin:0;">{{ total_cars }} актуальных объявлений</p>
+        <h3 style="margin: 0">{{ home.search.title }}</h3>
+        <p class="muted" style="margin:0;">{{ total_cars }} {{ home.search.subtitle_suffix }}</p>
       </div>
       <form class="search-form" id="home-search" method="get" action="/catalog">
         <div class="filter-grid filter-grid--overlay">
@@ -56,13 +56,28 @@
             </select>
           </div>
           <div class="field">
-            <label for="home-price">Цена до, ₽</label>
-            <select id="home-price" name="price_max">
-              <option value="">Любая</option>
-              {% for p in price_options %}
-              <option value="{{ p }}">{{ '{:,.0f}'.format(p).replace(',', ' ') }}</option>
-              {% endfor %}
-            </select>
+            <label for="home-price-min">Цена от, ₽</label>
+            <input
+              id="home-price-min"
+              name="price_min"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1000"
+              list="home-price-options"
+            />
+          </div>
+          <div class="field">
+            <label for="home-price-max">Цена до, ₽</label>
+            <input
+              id="home-price-max"
+              name="price_max"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1000"
+              list="home-price-options"
+            />
           </div>
           {% if reg_years %}
           <div class="field">
@@ -85,13 +100,28 @@
           </div>
           {% endif %}
           <div class="field">
-            <label for="home-mileage">Пробег до, км</label>
-            <select id="home-mileage" name="mileage_max">
-              <option value="">Любой</option>
-              {% for m in mileage_options %}
-              <option value="{{ m }}">{{ '{:,.0f}'.format(m).replace(',', ' ') }}</option>
-              {% endfor %}
-            </select>
+            <label for="home-mileage-min">Пробег от, км</label>
+            <input
+              id="home-mileage-min"
+              name="mileage_min"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1000"
+              list="home-mileage-options"
+            />
+          </div>
+          <div class="field">
+            <label for="home-mileage-max">Пробег до, км</label>
+            <input
+              id="home-mileage-max"
+              name="mileage_max"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1000"
+              list="home-mileage-options"
+            />
           </div>
           {% if transmissions and transmissions|length > 0 %}
           <div class="field">
@@ -107,56 +137,53 @@
         </div>
         <div class="inline-actions">
           <button type="submit" class="btn btn-primary">
-            Найти · {{ total_cars }} объявлений
+            {{ home.search.submit_label }} · {{ total_cars }} {{ home.search.submit_suffix }}
           </button>
           <div class="links">
-            <a href="#" id="home-reset">Сбросить</a>
-            <a href="/catalog">К каталогу</a>
+            <a href="#" id="home-reset">{{ home.search.reset_label }}</a>
+            <a href="/catalog">{{ home.search.catalog_label }}</a>
           </div>
         </div>
       </form>
+      <datalist id="home-price-options">
+        {% for p in price_options %}
+        <option value="{{ p }}"></option>
+        {% endfor %}
+      </datalist>
+      <datalist id="home-mileage-options">
+        {% for m in mileage_options %}
+        <option value="{{ m }}"></option>
+        {% endfor %}
+      </datalist>
     </div>
   </div>
 
   <div class="la-container hero-grid">
     <div class="hero-text">
-      <div class="stats-badge">{{ total_cars }} авто в наличии</div>
-      <h1>
-        {{ content.get('hero_title') or "Импорт и подбор автомобилей из Европы и
-        Кореи" }}
-      </h1>
-      <p class="subtitle">
-        {{ content.get('hero_subtitle') or "Актуальные предложения от
-        проверенных европейских и локальных партнёров — в одном каталоге." }}
-      </p>
+      <div class="stats-badge">{{ total_cars }} {{ home.hero.stats_suffix }}</div>
+      <h1>{{ home.hero.title }}</h1>
+      <p class="subtitle">{{ home.hero.subtitle }}</p>
       <div class="benefits">
+        {% set benefit_icons = ["💳", "⏱️", "📑"] %}
+        {% for item in home.hero.benefits %}
         <div class="benefit">
-          <span class="icon">💳</span>Любые формы оплаты
+          <span class="icon">{{ benefit_icons[loop.index0] }}</span>{{ item }}
         </div>
-        <div class="benefit">
-          <span class="icon">⏱️</span>Срок поставки от 30 дней
-        </div>
-        <div class="benefit">
-          <span class="icon">📑</span>Лизинг, кредит, НДС
-        </div>
+        {% endfor %}
       </div>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="/catalog">Привезённые авто</a>
-        <a class="btn btn-secondary" href="#lead-form">Заявка на расчёт</a>
+        <a class="btn btn-primary" href="/catalog">{{ home.hero.actions.primary_label }}</a>
+        <a class="btn btn-secondary" href="#lead-form">{{ home.hero.actions.secondary_label }}</a>
       </div>
-      <div class="hero-note">
-        {{ content.get('hero_note') or "Возим проверенные авто из Европы, Кореи
-        и РФ. Минимальная предоплата — основная часть по факту поставки." }}
-      </div>
+      <div class="hero-note">{{ home.hero.note }}</div>
     </div>
     <div class="hero-visual">
       <div class="card" style="padding: 18px">
-        <h3 style="margin-top: 0">Почему мы</h3>
+        <h3 style="margin-top: 0">{{ home.hero.why_title }}</h3>
         <ul class="specs">
-          <li>Доступ к объявлениям проверенных площадок</li>
-          <li>Проверка истории, диагностика и фотоотчёт перед оплатой</li>
-          <li>Логистика, таможня и постановка на учёт под ключ</li>
-          <li>Поддержка после выдачи: сервис, запчасти, страхование</li>
+          {% for item in home.hero.why_items %}
+          <li>{{ item }}</li>
+          {% endfor %}
         </ul>
       </div>
     </div>
@@ -166,8 +193,8 @@
   <div class="la-container">
     <div class="section-header">
       <div>
-        <h2 class="section-title">За 8 лет привезли более 1000 автомобилей под заказ из Европы</h2>
-        <p class="section-sub">Реальные кейсы клиентов</p>
+        <h2 class="section-title">{{ home.cases.title }}</h2>
+        <p class="section-sub">{{ home.cases.subtitle }}</p>
       </div>
     </div>
   </div>
@@ -198,80 +225,45 @@
 <section class="section section--about" id="about">
   <div class="la-container">
     <div class="about-header">
-      <p class="eyebrow">О нас</p>
-      <h2 class="section-title">
-        Меня зовут Дмитрий, я руководитель компании Level Avto
-      </h2>
-      <p class="section-sub">
-        С 2017г. профессионально занимаемся доставкой авто из-за границы.
-      </p>
+      <p class="eyebrow">{{ home.about.eyebrow }}</p>
+      <h2 class="section-title">{{ home.about.title }}</h2>
+      <p class="section-sub">{{ home.about.subtitle }}</p>
     </div>
+    {% set about_cards = home.about.cards %}
     <div class="about-cards">
       <div class="about-card">
-        <h3 class="about-subtitle">
-          Почему именно мы привезем Вам авто под заказ?
-        </h3>
+        <h3 class="about-subtitle">{{ about_cards[0].title }}</h3>
         <ul class="specs">
-          <li>
-            Большинство завершенных объявлений в Авито привезены из Европы и
-            Кореи
-          </li>
-          <li>В Instagram и Telegram — фото и видео отчёты сотен машин</li>
-          <li>
-            Мы на Яндекс Картах: “Level Avto”, Шелепихинская наб., 34к4зд8,
-            Москва
-          </li>
+          {% for item in about_cards[0]['items'] %}
+          <li>{{ item }}</li>
+          {% endfor %}
         </ul>
       </div>
       <div class="about-card">
-        <h3 class="about-subtitle">Как мы работаем</h3>
+        <h3 class="about-subtitle">{{ about_cards[1].title }}</h3>
         <ul class="specs">
-          <li>Оплата после получения авто с предоплатой от 10%</li>
-          <li>
-            Оплата через СБЕР (ячейка) или поэтапно: инвойс, логистика, таможня
-          </li>
-          <li>Фиксируем в договоре стоимость под ключ и сроки поставки</li>
-          <li>Любые формы оплаты: нал/безнал/кредит/лизинг/НДС</li>
-          <li>
-            Партнёры: Европлан, Газпромбанк лизинг, Carcade, Совкомбанк лизинг,
-            Балтийский лизинг
-          </li>
+          {% for item in about_cards[1]['items'] %}
+          <li>{{ item }}</li>
+          {% endfor %}
         </ul>
       </div>
       <div class="about-card">
-        <h3 class="about-subtitle">Ваши преимущества</h3>
+        <h3 class="about-subtitle">{{ about_cards[2].title }}</h3>
         <ul class="specs">
-          <li>Экономия 20–30% от рынка РФ</li>
-          <li>
-            100% оригинальный пробег, история обслуживания и качественное ТО
-          </li>
-          <li>
-            Отличное ЛКП (без реагентов), качественная сборка, больше цветов и
-            комплектаций
-          </li>
-          <li>Новый авто любой марки — соберём на конфигураторе дилера</li>
-          <li>Доставка в любой регион РФ</li>
+          {% for item in about_cards[2]['items'] %}
+          <li>{{ item }}</li>
+          {% endfor %}
         </ul>
       </div>
       <div class="about-card">
-        <h3 class="about-subtitle">Сроки доставки</h3>
+        <h3 class="about-subtitle">{{ about_cards[3].title }}</h3>
         <ul class="specs">
-          <li>Европа: 10–45 дней (10 дней если объём двигателя до 1.9л)</li>
-          <li>Корея: 30–45 дней</li>
-          <li>Китай: 30–60 дней</li>
-          <li>ОАЭ: 30–45 дней</li>
+          {% for item in about_cards[3]['items'] %}
+          <li>{{ item }}</li>
+          {% endfor %}
         </ul>
-        <p>
-          Поможем без посредников организовать покупку авто с пробегом или
-          нового: диагностика, оплата, таможенная очистка, доставка, СБКТС и
-          ЭлПТС, льготный утиль при возможности.
-        </p>
-        <p>
-          <strong
-            >Напишите или позвоните — сделаем бесплатный подбор и расчёт
-            автомобиля вашей мечты.</strong
-          >
-        </p>
+        <p>{{ about_cards[3].paragraph }}</p>
+        <p><strong>{{ about_cards[3].emphasis }}</strong></p>
       </div>
     </div>
   </div>
@@ -281,15 +273,15 @@
   <div class="la-container">
     <div class="section-header">
       <div>
-        <h2 class="section-title">Рекомендуем</h2>
-        <p class="section-sub">Отобранные предложения</p>
+        <h2 class="section-title">{{ home.recommended.title }}</h2>
+        <p class="section-sub">{{ home.recommended.subtitle }}</p>
       </div>
     </div>
     <div class="cards cards-highlights">
       {% for car in recommended_cars %}
       <a class="card car-card" href="/car/{{ car.id }}">
         <div class="thumb-wrap">
-          <span class="badge-tag badge-tag--alt">Рекомендуем</span>
+          <span class="badge-tag badge-tag--alt">{{ home.recommended.badge_label }}</span>
           <img
             class="thumb"
             src="{{ car.thumbnail_url or '' }}"
@@ -306,8 +298,8 @@
               {{ car.brand or '' }} {{ car.model or '' }}
             </div>
             <div class="car-card__meta">
-              {{ car.year or '' }} · {{ car.engine_type or '' }} · {{
-              car.transmission or '' }}
+              {{ car.year or '' }} · {{ car.display_engine_type or car.engine_type or '' }} · {{
+              car.display_transmission or car.transmission or '' }}
             </div>
             <ul class="specs">
               <li>Пробег: {{ car.mileage or '—' }}</li>
@@ -325,7 +317,7 @@
         </div>
       </a>
       {% else %}
-      <p class="hero-note">Подборка появится автоматически при наличии подходящих авто.</p>
+      <p class="hero-note">{{ home.recommended.empty_note }}</p>
       {% endfor %}
     </div>
   </div>
@@ -335,8 +327,8 @@
   <div class="la-container">
     <div class="section-header">
       <div>
-        <h2 class="section-title">Типы кузова</h2>
-        <p class="section-sub">Быстрый переход по кузовам</p>
+        <h2 class="section-title">{{ home.vehicle_types.title }}</h2>
+        <p class="section-sub">{{ home.vehicle_types.subtitle }}</p>
       </div>
     </div>
     {% set labels = {
@@ -368,7 +360,7 @@
         <div class="muted small">Объявлений: {{ item.count }}</div>
       </a>
       {% else %}
-      <p class="hero-note">Добавьте автомобили, чтобы показать статистику по кузовам.</p>
+      <p class="hero-note">{{ home.vehicle_types.empty_note }}</p>
       {% endfor %}
     </div>
   </div>
@@ -378,31 +370,22 @@
   <div class="la-container">
     <div class="section-header">
       <div>
-        <h2 class="section-title">Преимущества Level Avto</h2>
-        <p class="section-sub">
-          Сопровождаем подбор и поставку от поиска до выдачи
-        </p>
+        <h2 class="section-title">{{ home.advantages.title }}</h2>
+        <p class="section-sub">{{ home.advantages.subtitle }}</p>
       </div>
     </div>
     <div class="category-grid">
       <div class="card">
-        <strong>Честные источники</strong>
-        <p class="hero-note">
-          Собственный подбор, проверка, диагностика, логистика и выдача.
-        </p>
+        <strong>{{ home.advantages.cards[0].title }}</strong>
+        <p class="hero-note">{{ home.advantages.cards[0].text }}</p>
       </div>
       <div class="card">
-        <strong>Финансовая гибкость</strong>
-        <p class="hero-note">
-          10% предоплата, помощь с лизингом, кредитом и НДС для бизнеса.
-        </p>
+        <strong>{{ home.advantages.cards[1].title }}</strong>
+        <p class="hero-note">{{ home.advantages.cards[1].text }}</p>
       </div>
       <div class="card">
-        <strong>Под ключ</strong>
-        <p class="hero-note">
-          Проверка истории, диагностика, логистика, таможня и постановка на
-          учёт.
-        </p>
+        <strong>{{ home.advantages.cards[2].title }}</strong>
+        <p class="hero-note">{{ home.advantages.cards[2].text }}</p>
       </div>
     </div>
   </div>
@@ -411,10 +394,8 @@
     <div class="la-container">
       <div class="section-header">
         <div>
-          <h2 class="section-title">Популярные марки</h2>
-          <p class="section-sub">
-            Показываем только бренды, которые есть в каталоге
-          </p>
+          <h2 class="section-title">{{ home.brands.title }}</h2>
+          <p class="section-sub">{{ home.brands.subtitle }}</p>
         </div>
       </div>
       {% set primary = brand_logos[:12] %} {% set primary_names = primary |
@@ -431,9 +412,7 @@
           </div>
         </a>
         {% else %}
-        <p class="hero-note">
-          Добавьте логотипы в static/img/brand-logos, чтобы они появились.
-        </p>
+        <p class="hero-note">{{ home.brands.empty_note }}</p>
         {% endfor %}
       </div>
     </div>
@@ -444,49 +423,37 @@
     <div class="la-container">
       <div class="section-header">
         <div>
-          <h2 class="section-title">Как мы работаем</h2>
-          <p class="section-sub">Прозрачно сопровождаем на каждом этапе</p>
+          <h2 class="section-title">{{ home.how_it_works.title }}</h2>
+          <p class="section-sub">{{ home.how_it_works.subtitle }}</p>
         </div>
       </div>
       <div class="how-steps">
         <div class="how-step">
           <div class="how-step__badge">1</div>
           <div>
-            <strong>Подбор</strong>
-            <p>
-              Уточняем бюджет и критерии, подбираем 5–10 вариантов из Europe и
-              партнерских площадок.
-            </p>
+            <strong>{{ home.how_it_works.steps[0].title }}</strong>
+            <p>{{ home.how_it_works.steps[0].text }}</p>
           </div>
         </div>
         <div class="how-step">
           <div class="how-step__badge">2</div>
           <div>
-            <strong>Проверка</strong>
-            <p>
-              Диагностика, проверка истории, фото- и видеоотчёт. Гарантируем
-              отсутствие скрытых проблем.
-            </p>
+            <strong>{{ home.how_it_works.steps[1].title }}</strong>
+            <p>{{ home.how_it_works.steps[1].text }}</p>
           </div>
         </div>
         <div class="how-step">
           <div class="how-step__badge">3</div>
           <div>
-            <strong>Логистика</strong>
-            <p>
-              Организуем выкуп, доставку, таможенное оформление и постановку на
-              учёт.
-            </p>
+            <strong>{{ home.how_it_works.steps[2].title }}</strong>
+            <p>{{ home.how_it_works.steps[2].text }}</p>
           </div>
         </div>
         <div class="how-step">
           <div class="how-step__badge">4</div>
           <div>
-            <strong>Выдача</strong>
-            <p>
-              Передаём автомобиль, помогаем с лизингом/кредитом, страховкой и
-              сервисом.
-            </p>
+            <strong>{{ home.how_it_works.steps[3].title }}</strong>
+            <p>{{ home.how_it_works.steps[3].text }}</p>
           </div>
         </div>
       </div>
@@ -497,25 +464,11 @@
     <div class="la-container">
       <div class="seo-block">
         <h2 class="section-title" style="margin: 0">
-          Привозим автомобили из Европы под ваши задачи
+          {{ home.seo.title }}
         </h2>
-        <p>
-          Level Avto — команда, которая специализируется на поставке автомобилей
-          из Германии, Нидерландов, Бельгии и других стран ЕС. Мы работаем с
-          проверенными дилерами, проверяем историю и техническое состояние,
-          чтобы вы получали только честные предложения.
-        </p>
-        <p>
-          Собираем подбор под бюджет и цели: семейные универсалы, первые
-          автомобили, премиальные модели, электрокары. Помогаем с лизингом,
-          кредитом и возвратом НДС для бизнеса.
-        </p>
-        <p>
-          Мы берем на себя логистику, таможенное оформление, регистрацию и
-          выдачу в вашем городе. Минимальная предоплата — основная часть
-          оплачивается по факту поставки. Оставьте заявку, и мы предложим
-          варианты в течение 1–2 дней.
-        </p>
+        <p>{{ home.seo.paragraphs[0] }}</p>
+        <p>{{ home.seo.paragraphs[1] }}</p>
+        <p>{{ home.seo.paragraphs[2] }}</p>
       </div>
     </div>
   </section>
@@ -524,10 +477,8 @@
     <div class="la-container">
       <div class="section-header">
         <div>
-          <h2 class="section-title">Заявка на расчёт</h2>
-          <p class="section-sub">
-            Оставьте контакты — подберём предложения и озвучим бюджет
-          </p>
+          <h2 class="section-title">{{ home.lead.title }}</h2>
+          <p class="section-sub">{{ home.lead.subtitle }}</p>
         </div>
       </div>
       <div class="lead-card">
@@ -593,19 +544,19 @@
               <label class="checkbox">
                 <input type="checkbox" name="privacy" required />
                 <span>
-                  Я согласен с
+                  {{ home.lead.privacy_prefix }}
                   <a href="/privacy" target="_blank" rel="noopener"
-                    >политикой конфиденциальности</a
+                    >{{ home.lead.privacy_link_text }}</a
                   >
                 </span>
               </label>
             </div>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary">
-                Отправить заявку
+                {{ home.lead.submit_label }}
               </button>
               <span class="hero-note"
-                >Заполните форму — свяжемся в течение рабочего дня</span
+                >{{ home.lead.note }}</span
               >
             </div>
           </div>
@@ -625,18 +576,18 @@
     <div class="la-container">
       <div class="section-header">
         <div>
-          <h2 class="section-title">Свяжитесь с нами</h2>
+          <h2 class="section-title">{{ home.contacts.title }}</h2>
           {% set phone = contact_phone or content.get('contact_phone','+7 (911) 070-75-00') %}
           {% set email = contact_email or content.get('contact_email','info@levelavto.ru') %}
           {% set address = contact_address or content.get('contact_address','Шелепихинская набережная, 34к4 стр.8, Москва') %}
-          <p class="section-sub">{{ address }}. Ежедневно 9:00–21:00</p>
+          <p class="section-sub">{{ address }}. {{ home.contacts.subtitle_suffix }}</p>
         </div>
       </div>
       <div class="contact-map">
         <div class="contact-card">
           <h3><a href="tel:{{ phone|replace(' ','') }}">{{ phone }}</a></h3>
           <p class="hero-note">
-            Обратный звонок ·
+            {{ home.contacts.callback_label }} ·
             {% if contact_tg or content.get('contact_tg') %}
             <a href="{{ contact_tg or content.get('contact_tg') }}" target="_blank" rel="noopener">Telegram</a>
             {% endif %}
@@ -648,10 +599,10 @@
             {% endif %}
           </p>
           <p class="muted">{{ address }}</p>
-          <p class="muted">Каждый день 9:00–21:00</p>
+          <p class="muted">{{ home.contacts.hours_note }}</p>
           <div class="inline-actions" style="margin-top: 10px">
-            <a class="btn btn-primary" href="tel:{{ phone|replace(' ','') }}">Позвонить</a>
-            <a class="btn btn-secondary" href="mailto:{{ email }}">Написать на email</a>
+            <a class="btn btn-primary" href="tel:{{ phone|replace(' ','') }}">{{ home.contacts.call_button }}</a>
+            <a class="btn btn-secondary" href="mailto:{{ email }}">{{ home.contacts.email_button }}</a>
           </div>
         </div>
         <iframe

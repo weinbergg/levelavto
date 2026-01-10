@@ -17,8 +17,9 @@ from ..models import Car, Source, CarImage
 from ..auth import get_current_user
 from urllib.parse import quote
 from ..utils.localization import display_body, display_color
-from ..utils.taxonomy import ru_body, ru_color
+from ..utils.taxonomy import ru_body, ru_color, ru_fuel, ru_transmission, normalize_fuel
 from ..utils.country_map import country_label_ru, resolve_display_country
+from ..utils.home_content import build_home_content
 
 
 router = APIRouter()
@@ -74,6 +75,15 @@ def _range_steps(max_val: Optional[float], base_step: int, min_val: int, max_opt
     return values
 
 
+def _mileage_suggestions(max_val: Optional[float]) -> List[int]:
+    base = [0, 5_000, 10_000, 20_000, 50_000, 90_000]
+    if not max_val:
+        return base
+    steps = _range_steps(max_val, 10_000, 0, 14)
+    all_vals = sorted({*base, *steps})
+    return all_vals
+
+
 def _build_filter_context(service: CarsService, db: Session) -> Dict[str, Any]:
     countries = service.available_countries()
     reg_years = (
@@ -117,7 +127,7 @@ def _build_filter_context(service: CarsService, db: Session) -> Dict[str, Any]:
         "reg_years": reg_years,
         "reg_months": reg_months,
         "price_options": _range_steps(price_max, 500_000, 1_000_000, 12),
-        "mileage_options": _range_steps(mileage_max, 10_000, 20_000, 12),
+        "mileage_options": _mileage_suggestions(mileage_max),
         "generations": generations,
         "colors_basic": colors_basic,
         "colors_other": colors_other,
@@ -141,8 +151,11 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
         code, label = resolve_display_country(car)
         car.display_country_code = code
         car.display_country_label = label
+        car.display_engine_type = ru_fuel(car.engine_type) or ru_fuel(normalize_fuel(car.engine_type)) or car.engine_type
+        car.display_transmission = ru_transmission(car.transmission) or car.transmission
     content = ContentService(db).content_map(
         [
+            "home_content",
             "hero_title",
             "hero_subtitle",
             "hero_note",
@@ -153,6 +166,7 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
             "contact_wa",
             "contact_ig",
         ])
+    home_content = build_home_content(content)
     fx_rates = service.get_fx_rates() or {}
     # медиа лежат рядом с корнем проекта: /code/фото-видео
     media_root = Path(__file__).resolve().parents[3] / "фото-видео"
@@ -282,6 +296,7 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
         "body_type_stats": body_type_stats,
         "recommended_cars": recommended,
         "content": content,
+        "home": home_content,
         "fx_rates": fx_rates,
         "hero_videos": hero_videos,
         "collage_images": collage_display or collage_images,
@@ -420,6 +435,8 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     if car:
         car.display_body_type = ru_body(getattr(car, "body_type", None)) or display_body(getattr(car, "body_type", None)) or car.body_type
         car.display_color = ru_color(getattr(car, "color", None)) or display_color(getattr(car, "color", None)) or car.color
+        car.display_engine_type = ru_fuel(getattr(car, "engine_type", None)) or ru_fuel(normalize_fuel(getattr(car, "engine_type", None))) or car.engine_type
+        car.display_transmission = ru_transmission(getattr(car, "transmission", None)) or car.transmission
     return templates.TemplateResponse("car_detail.html", {"request": request, "car": car, "user": getattr(request.state, "user", None)})
 
 

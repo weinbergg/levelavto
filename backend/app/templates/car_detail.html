@@ -53,7 +53,7 @@
           <div>
             <div class="badge">В наличии</div>
             <h1>{{ car.brand or '' }} {{ car.model or '' }}</h1>
-            {% set meta = [] %} {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %} {% if car.engine_type %}{% set _ = meta.append(car.engine_type) %}{% endif %} {% if meta %}
+            {% set meta = [] %} {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %} {% if car.display_engine_type or car.engine_type %}{% set _ = meta.append(car.display_engine_type or car.engine_type) %}{% endif %} {% if meta %}
             <p class="muted">{{ meta|join(' · ') }}</p>
             {% endif %}
             <p class="muted">

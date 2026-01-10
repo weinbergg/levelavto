@@ -28,94 +28,342 @@ content %}
     </style>
 
     <div class="admin-block">
-      <h3>Тексты на главной</h3>
-      <form method="post" action="/admin/content" class="form-vertical">
-        <label
-          >Заголовок
-          <input
-            type="text"
-            name="hero_title"
-            value="{{ content.get('hero_title','Импорт и подбор автомобилей из Европы, Кореи и России') }}"
-          />
-        </label>
-        <label
-          >Подзаголовок
-          <textarea name="hero_subtitle" rows="2">
-{{ content.get('hero_subtitle','Актуальные предложения от проверенных партнёров — в одном каталоге.') }}</textarea
-          >
-        </label>
-        <label
-          >Примечание
-          <textarea name="hero_note" rows="2">
-{{ content.get('hero_note','Возим проверенные авто из Европы, Кореи и РФ. Минимальная предоплата — основная часть по факту поставки.') }}</textarea
-          >
-        </label>
-        <label
-          >email для заявок
-          <input
-            type="email"
-            name="lead_email"
-            value="{{ content.get('lead_email','info@levelavto.ru') }}"
-          />
+      <h3>Контакты</h3>
+      <form method="post" action="/admin/contacts" class="form-vertical">
+        <label>Email для заявок
+          <input type="email" name="lead_email" value="{{ content.get('lead_email','info@levelavto.ru') }}" />
           <span class="small muted">Сюда будут уходить заявки с формы</span>
         </label>
         <div class="admin-grid-2">
-          <label
-            >Телефон
-            <input
-              type="text"
-              name="contact_phone"
-              placeholder="+7 (911) 070-75-00"
-              value="{{ content.get('contact_phone','+7 (911) 070-75-00') }}"
-            />
+          <label>Телефон
+            <input type="text" name="contact_phone" placeholder="+7 (911) 070-75-00" value="{{ content.get('contact_phone','+7 (911) 070-75-00') }}" />
           </label>
-          <label
-            >Email
-            <input
-              type="email"
-              name="contact_email"
-              placeholder="info@levelavto.ru"
-              value="{{ content.get('contact_email','info@levelavto.ru') }}"
-            />
+          <label>Email
+            <input type="email" name="contact_email" placeholder="info@levelavto.ru" value="{{ content.get('contact_email','info@levelavto.ru') }}" />
           </label>
-          <label
-            >Адрес
-            <input
-              type="text"
-              name="contact_address"
-              placeholder="Шелепихинская наб. 34к4, Москва"
-              value="{{ content.get('contact_address','Шелепихинская набережная, 34к4 стр.8, Москва') }}"
-            />
+          <label>Адрес
+            <input type="text" name="contact_address" placeholder="Шелепихинская наб. 34к4, Москва" value="{{ content.get('contact_address','Шелепихинская набережная, 34к4 стр.8, Москва') }}" />
           </label>
-          <label
-            >Telegram (ссылка)
-            <input
-              type="text"
-              name="contact_tg"
-              placeholder="https://t.me/levelavto"
-              value="{{ content.get('contact_tg','') }}"
-            />
+          <label>Telegram (ссылка)
+            <input type="text" name="contact_tg" placeholder="https://t.me/levelavto" value="{{ content.get('contact_tg','') }}" />
           </label>
-          <label
-            >WhatsApp (ссылка)
-            <input
-              type="text"
-              name="contact_wa"
-              placeholder="https://wa.me/79110707500"
-              value="{{ content.get('contact_wa','') }}"
-            />
+          <label>WhatsApp (ссылка)
+            <input type="text" name="contact_wa" placeholder="https://wa.me/79110707500" value="{{ content.get('contact_wa','') }}" />
           </label>
-          <label
-            >Instagram (ссылка)
-            <input
-              type="text"
-              name="contact_ig"
-              placeholder="https://instagram.com/..."
-              value="{{ content.get('contact_ig','') }}"
-            />
+          <label>Instagram (ссылка)
+            <input type="text" name="contact_ig" placeholder="https://instagram.com/..." value="{{ content.get('contact_ig','') }}" />
           </label>
         </div>
+        <button type="submit" class="btn btn-primary">Сохранить контакты</button>
+      </form>
+    </div>
+
+    <div class="admin-block">
+      <h3>Тексты на главной</h3>
+      <form method="post" action="/admin/home_content" class="form-vertical">
+        <h4>Поиск</h4>
+        <div class="admin-grid-2">
+          <label>Заголовок поиска
+            <input type="text" name="search_title" value="{{ home.search.title }}" />
+          </label>
+          <label>Подпись под счетчиком
+            <input type="text" name="search_subtitle_suffix" value="{{ home.search.subtitle_suffix }}" />
+          </label>
+          <label>Текст кнопки
+            <input type="text" name="search_submit_label" value="{{ home.search.submit_label }}" />
+          </label>
+          <label>Суффикс кнопки
+            <input type="text" name="search_submit_suffix" value="{{ home.search.submit_suffix }}" />
+          </label>
+          <label>Ссылка сброса
+            <input type="text" name="search_reset_label" value="{{ home.search.reset_label }}" />
+          </label>
+          <label>Ссылка каталога
+            <input type="text" name="search_catalog_label" value="{{ home.search.catalog_label }}" />
+          </label>
+        </div>
+
+        <h4>Hero</h4>
+        <label>Суффикс счетчика
+          <input type="text" name="hero_stats_suffix" value="{{ home.hero.stats_suffix }}" />
+        </label>
+        <label>Заголовок
+          <input type="text" name="hero_title" value="{{ home.hero.title }}" />
+        </label>
+        <label>Подзаголовок
+          <textarea name="hero_subtitle" rows="2">{{ home.hero.subtitle }}</textarea>
+        </label>
+        <label>Примечание
+          <textarea name="hero_note" rows="2">{{ home.hero.note }}</textarea>
+        </label>
+        <label>Пункты преимуществ (по одному в строке)
+          <textarea name="hero_benefits" rows="4">{{ home.hero.benefits | join('\n') }}</textarea>
+        </label>
+        <div class="admin-grid-2">
+          <label>Кнопка основная
+            <input type="text" name="hero_primary_label" value="{{ home.hero.actions.primary_label }}" />
+          </label>
+          <label>Кнопка вторичная
+            <input type="text" name="hero_secondary_label" value="{{ home.hero.actions.secondary_label }}" />
+          </label>
+        </div>
+        <label>Заголовок блока «Почему мы»
+          <input type="text" name="hero_why_title" value="{{ home.hero.why_title }}" />
+        </label>
+        <label>Пункты «Почему мы» (по одному в строке)
+          <textarea name="hero_why_items" rows="4">{{ home.hero.why_items | join('\n') }}</textarea>
+        </label>
+
+        <h4>Кейсы</h4>
+        <div class="admin-grid-2">
+          <label>Заголовок секции
+            <input type="text" name="cases_title" value="{{ home.cases.title }}" />
+          </label>
+          <label>Подзаголовок секции
+            <input type="text" name="cases_subtitle" value="{{ home.cases.subtitle }}" />
+          </label>
+        </div>
+
+        <h4>О нас</h4>
+        <label>Лид-строка
+          <input type="text" name="about_eyebrow" value="{{ home.about.eyebrow }}" />
+        </label>
+        <label>Заголовок
+          <input type="text" name="about_title" value="{{ home.about.title }}" />
+        </label>
+        <label>Подзаголовок
+          <textarea name="about_subtitle" rows="2">{{ home.about.subtitle }}</textarea>
+        </label>
+        <label>Карточка 1: заголовок
+          <input type="text" name="about_card1_title" value="{{ home.about.cards[0].title }}" />
+        </label>
+        <label>Карточка 1: пункты (по одному в строке)
+          <textarea name="about_card1_items" rows="4">{{ home.about.cards[0]['items'] | join('\n') }}</textarea>
+        </label>
+        <label>Карточка 2: заголовок
+          <input type="text" name="about_card2_title" value="{{ home.about.cards[1].title }}" />
+        </label>
+        <label>Карточка 2: пункты (по одному в строке)
+          <textarea name="about_card2_items" rows="4">{{ home.about.cards[1]['items'] | join('\n') }}</textarea>
+        </label>
+        <label>Карточка 3: заголовок
+          <input type="text" name="about_card3_title" value="{{ home.about.cards[2].title }}" />
+        </label>
+        <label>Карточка 3: пункты (по одному в строке)
+          <textarea name="about_card3_items" rows="4">{{ home.about.cards[2]['items'] | join('\n') }}</textarea>
+        </label>
+        <label>Карточка 4: заголовок
+          <input type="text" name="about_card4_title" value="{{ home.about.cards[3].title }}" />
+        </label>
+        <label>Карточка 4: пункты (по одному в строке)
+          <textarea name="about_card4_items" rows="4">{{ home.about.cards[3]['items'] | join('\n') }}</textarea>
+        </label>
+        <label>Карточка 4: абзац
+          <textarea name="about_card4_paragraph" rows="3">{{ home.about.cards[3].paragraph }}</textarea>
+        </label>
+        <label>Карточка 4: выделенный текст
+          <textarea name="about_card4_emphasis" rows="2">{{ home.about.cards[3].emphasis }}</textarea>
+        </label>
+
+        <h4>Рекомендуемые</h4>
+        <div class="admin-grid-2">
+          <label>Заголовок секции
+            <input type="text" name="recommended_title" value="{{ home.recommended.title }}" />
+          </label>
+          <label>Подзаголовок секции
+            <input type="text" name="recommended_subtitle" value="{{ home.recommended.subtitle }}" />
+          </label>
+          <label>Бейдж
+            <input type="text" name="recommended_badge_label" value="{{ home.recommended.badge_label }}" />
+          </label>
+          <label>Текст, если нет авто
+            <input type="text" name="recommended_empty_note" value="{{ home.recommended.empty_note }}" />
+          </label>
+        </div>
+
+        <h4>Типы кузова</h4>
+        <div class="admin-grid-2">
+          <label>Заголовок секции
+            <input type="text" name="vehicle_types_title" value="{{ home.vehicle_types.title }}" />
+          </label>
+          <label>Подзаголовок секции
+            <input type="text" name="vehicle_types_subtitle" value="{{ home.vehicle_types.subtitle }}" />
+          </label>
+          <label>Текст, если нет авто
+            <input type="text" name="vehicle_types_empty_note" value="{{ home.vehicle_types.empty_note }}" />
+          </label>
+        </div>
+
+        <h4>Преимущества</h4>
+        <label>Заголовок секции
+          <input type="text" name="advantages_title" value="{{ home.advantages.title }}" />
+        </label>
+        <label>Подзаголовок секции
+          <textarea name="advantages_subtitle" rows="2">{{ home.advantages.subtitle }}</textarea>
+        </label>
+        <div class="admin-grid-2">
+          <label>Карточка 1: заголовок
+            <input type="text" name="advantages_card1_title" value="{{ home.advantages.cards[0].title }}" />
+          </label>
+          <label>Карточка 1: текст
+            <textarea name="advantages_card1_text" rows="2">{{ home.advantages.cards[0].text }}</textarea>
+          </label>
+          <label>Карточка 2: заголовок
+            <input type="text" name="advantages_card2_title" value="{{ home.advantages.cards[1].title }}" />
+          </label>
+          <label>Карточка 2: текст
+            <textarea name="advantages_card2_text" rows="2">{{ home.advantages.cards[1].text }}</textarea>
+          </label>
+          <label>Карточка 3: заголовок
+            <input type="text" name="advantages_card3_title" value="{{ home.advantages.cards[2].title }}" />
+          </label>
+          <label>Карточка 3: текст
+            <textarea name="advantages_card3_text" rows="2">{{ home.advantages.cards[2].text }}</textarea>
+          </label>
+        </div>
+
+        <h4>Популярные марки</h4>
+        <div class="admin-grid-2">
+          <label>Заголовок секции
+            <input type="text" name="brands_title" value="{{ home.brands.title }}" />
+          </label>
+          <label>Подзаголовок секции
+            <input type="text" name="brands_subtitle" value="{{ home.brands.subtitle }}" />
+          </label>
+          <label>Текст, если нет логотипов
+            <input type="text" name="brands_empty_note" value="{{ home.brands.empty_note }}" />
+          </label>
+        </div>
+
+        <h4>Как мы работаем</h4>
+        <label>Заголовок секции
+          <input type="text" name="how_title" value="{{ home.how_it_works.title }}" />
+        </label>
+        <label>Подзаголовок секции
+          <textarea name="how_subtitle" rows="2">{{ home.how_it_works.subtitle }}</textarea>
+        </label>
+        <div class="admin-grid-2">
+          <label>Шаг 1: заголовок
+            <input type="text" name="how_step1_title" value="{{ home.how_it_works.steps[0].title }}" />
+          </label>
+          <label>Шаг 1: текст
+            <textarea name="how_step1_text" rows="2">{{ home.how_it_works.steps[0].text }}</textarea>
+          </label>
+          <label>Шаг 2: заголовок
+            <input type="text" name="how_step2_title" value="{{ home.how_it_works.steps[1].title }}" />
+          </label>
+          <label>Шаг 2: текст
+            <textarea name="how_step2_text" rows="2">{{ home.how_it_works.steps[1].text }}</textarea>
+          </label>
+          <label>Шаг 3: заголовок
+            <input type="text" name="how_step3_title" value="{{ home.how_it_works.steps[2].title }}" />
+          </label>
+          <label>Шаг 3: текст
+            <textarea name="how_step3_text" rows="2">{{ home.how_it_works.steps[2].text }}</textarea>
+          </label>
+          <label>Шаг 4: заголовок
+            <input type="text" name="how_step4_title" value="{{ home.how_it_works.steps[3].title }}" />
+          </label>
+          <label>Шаг 4: текст
+            <textarea name="how_step4_text" rows="2">{{ home.how_it_works.steps[3].text }}</textarea>
+          </label>
+        </div>
+
+        <h4>SEO блок</h4>
+        <label>Заголовок
+          <input type="text" name="seo_title" value="{{ home.seo.title }}" />
+        </label>
+        <label>Абзац 1
+          <textarea name="seo_p1" rows="3">{{ home.seo.paragraphs[0] }}</textarea>
+        </label>
+        <label>Абзац 2
+          <textarea name="seo_p2" rows="3">{{ home.seo.paragraphs[1] }}</textarea>
+        </label>
+        <label>Абзац 3
+          <textarea name="seo_p3" rows="3">{{ home.seo.paragraphs[2] }}</textarea>
+        </label>
+
+        <h4>Форма заявки</h4>
+        <div class="admin-grid-2">
+          <label>Заголовок секции
+            <input type="text" name="lead_title" value="{{ home.lead.title }}" />
+          </label>
+          <label>Подзаголовок секции
+            <input type="text" name="lead_subtitle" value="{{ home.lead.subtitle }}" />
+          </label>
+          <label>Кнопка отправки
+            <input type="text" name="lead_submit_label" value="{{ home.lead.submit_label }}" />
+          </label>
+          <label>Примечание под кнопкой
+            <input type="text" name="lead_note" value="{{ home.lead.note }}" />
+          </label>
+          <label>Текст перед ссылкой политики
+            <input type="text" name="lead_privacy_prefix" value="{{ home.lead.privacy_prefix }}" />
+          </label>
+          <label>Текст ссылки политики
+            <input type="text" name="lead_privacy_link_text" value="{{ home.lead.privacy_link_text }}" />
+          </label>
+        </div>
+
+        <h4>Контакты (тексты секции)</h4>
+        <div class="admin-grid-2">
+          <label>Заголовок секции
+            <input type="text" name="contacts_title" value="{{ home.contacts.title }}" />
+          </label>
+          <label>Суффикс подзаголовка
+            <input type="text" name="contacts_subtitle_suffix" value="{{ home.contacts.subtitle_suffix }}" />
+          </label>
+          <label>Лейбл «Обратный звонок»
+            <input type="text" name="contacts_callback_label" value="{{ home.contacts.callback_label }}" />
+          </label>
+          <label>Строка времени работы
+            <input type="text" name="contacts_hours_note" value="{{ home.contacts.hours_note }}" />
+          </label>
+          <label>Кнопка «Позвонить»
+            <input type="text" name="contacts_call_button" value="{{ home.contacts.call_button }}" />
+          </label>
+          <label>Кнопка email
+            <input type="text" name="contacts_email_button" value="{{ home.contacts.email_button }}" />
+          </label>
+        </div>
+
         <button type="submit" class="btn btn-primary">Сохранить тексты</button>
+      </form>
+    </div>
+
+    <div class="admin-block">
+      <h3>Рекомендуемые диапазоны</h3>
+      <form method="post" action="/admin/recommended" class="form-vertical">
+        <div class="admin-grid-2">
+          <label>Макс. возраст, лет
+            <input type="number" name="max_age_years" value="{{ recommended_cfg.max_age_years }}" />
+          </label>
+          <label>Цена от, ₽
+            <input type="number" name="price_min" value="{{ recommended_cfg.price_min }}" />
+          </label>
+          <label>Цена до, ₽
+            <input type="number" name="price_max" value="{{ recommended_cfg.price_max }}" />
+          </label>
+          <label>Пробег до, км
+            <input type="number" name="mileage_max" value="{{ recommended_cfg.mileage_max }}" />
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить диапазоны</button>
+      </form>
+    </div>
+
+    <div class="admin-block">
+      <h3>Калькулятор</h3>
+      {% if calc_cfg %}
+      <p class="small muted">Текущая версия: {{ calc_cfg.version }} · {{ calc_cfg.source }} · {{ calc_cfg.comment or 'без комментария' }}</p>
+      {% else %}
+      <p class="small muted">Конфигурация еще не загружена.</p>
+      {% endif %}
+      <form method="post" action="/admin/calculator/upload" enctype="multipart/form-data" class="form-vertical">
+        <label>Загрузить Excel
+          <input type="file" name="file" accept=".xlsx,.xlsm,.xls" />
+        </label>
+        <button type="submit" class="btn btn-primary">Загрузить файл</button>
       </form>
     </div>
 

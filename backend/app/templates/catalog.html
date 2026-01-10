@@ -47,24 +47,10 @@
             </label>
             {% endif %}
             <label>Цена от, ₽
-              <select name="price_min">
-                <option value="">Любая</option>
-                {% for p in price_options %}
-                <option value="{{ p }}" {% if params.get('price_min')|int == p %}selected{% endif %}>
-                  {{ '{:,.0f}'.format(p).replace(',', ' ') }}
-                </option>
-                {% endfor %}
-              </select>
+              <input type="number" name="price_min" inputmode="numeric" min="0" step="1000" list="price-options" value="{{ params.get('price_min','') }}">
             </label>
             <label>Цена до, ₽
-              <select name="price_max">
-                <option value="">Любая</option>
-                {% for p in price_options %}
-                <option value="{{ p }}" {% if params.get('price_max')|int == p %}selected{% endif %}>
-                  {{ '{:,.0f}'.format(p).replace(',', ' ') }}
-                </option>
-                {% endfor %}
-              </select>
+              <input type="number" name="price_max" inputmode="numeric" min="0" step="1000" list="price-options" value="{{ params.get('price_max','') }}">
             </label>
             {% if reg_years %}
             <label>Поставлен на учёт с (год)
@@ -101,24 +87,10 @@
             </label>
             {% endif %}
             <label>Пробег от, км
-              <select name="mileage_min">
-                <option value="">Любой</option>
-                {% for m in mileage_options %}
-                <option value="{{ m }}" {% if params.get('mileage_min')|int == m %}selected{% endif %}>
-                  {{ '{:,.0f}'.format(m).replace(',', ' ') }}
-                </option>
-                {% endfor %}
-              </select>
+              <input type="number" name="mileage_min" inputmode="numeric" min="0" step="1000" list="mileage-options" value="{{ params.get('mileage_min','') }}">
             </label>
             <label>Пробег до, км
-              <select name="mileage_max">
-                <option value="">Любой</option>
-                {% for m in mileage_options %}
-                <option value="{{ m }}" {% if params.get('mileage_max')|int == m %}selected{% endif %}>
-                  {{ '{:,.0f}'.format(m).replace(',', ' ') }}
-                </option>
-                {% endfor %}
-              </select>
+              <input type="number" name="mileage_max" inputmode="numeric" min="0" step="1000" list="mileage-options" value="{{ params.get('mileage_max','') }}">
             </label>
             {% if engine_types and engine_types|length > 0 %}
             <label>Топливо
@@ -185,6 +157,16 @@
           <button class="btn btn-ghost" id="resetFilters" type="button">Сбросить</button>
           <button class="btn btn-primary" id="applyFilters">Применить</button>
         </div>
+        <datalist id="price-options">
+          {% for p in price_options %}
+          <option value="{{ p }}"></option>
+          {% endfor %}
+        </datalist>
+        <datalist id="mileage-options">
+          {% for m in mileage_options %}
+          <option value="{{ m }}"></option>
+          {% endfor %}
+        </datalist>
         <input type="hidden" name="sort" id="sortHidden" value="{{ params.get('sort','price_asc') }}">
         <input type="hidden" name="page" value="{{ request.query_params.get('page', '1') if request else '1' }}">
       </form>

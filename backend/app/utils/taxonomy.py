@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import re
 from pathlib import Path
 from typing import Dict, Optional, Set, Tuple, List
@@ -102,6 +103,17 @@ _COLOR_HEX = {
     "pink": "#f472b6",
 }
 
+_COLOR_FALLBACK = [
+    "#f59e0b",
+    "#22c55e",
+    "#3b82f6",
+    "#ef4444",
+    "#a855f7",
+    "#14b8a6",
+    "#eab308",
+    "#f97316",
+]
+
 _COLOR_KEYWORDS = {
     "white": ["white", "ivory", "cream", "snow", "pearl", "weiss", "weiß", "bianco", "blanc", "бел", "слон"],
     "black": ["black", "obsidian", "onyx", "noir", "nero", "schwarz", "черн"],
@@ -145,7 +157,11 @@ def color_hex(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     key = value.strip().lower()
-    return _COLOR_HEX.get(key)
+    if key in _COLOR_HEX:
+        return _COLOR_HEX[key]
+    digest = hashlib.md5(key.encode("utf-8")).hexdigest()
+    idx = int(digest[:8], 16) % len(_COLOR_FALLBACK)
+    return _COLOR_FALLBACK[idx]
 
 
 def _normalize_alias(category: str, val: Optional[str]) -> Optional[str]:

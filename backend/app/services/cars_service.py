@@ -430,7 +430,7 @@ class CarsService:
                     "value": norm,
                     "label": label,
                     "count": 0,
-                    "hex": color_hex(norm) or "#444",
+                    "hex": color_hex(norm),
                 }
             agg[norm]["count"] += int(cnt)
         return sorted(agg.values(), key=lambda x: x["count"], reverse=True)
