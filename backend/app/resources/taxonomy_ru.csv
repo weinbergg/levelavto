@@ -27,3 +27,7 @@ fuel,diesel,Дизель,Diesel
 fuel,hybrid,Гибрид,Hybrid; HEV; Vollhybrid
 fuel,phev,Гибрид (PHEV),Plug-in hybrid; PHEV; Plug-in-Hybrid
 fuel,electric,Электро,Electric; EV; Elektro; BEV
+fuel,lpg,Газ,LPG; propane; propan; propan-butane; propane-butane
+fuel,other,Другое,other; others
+transmission,automatic,Автомат,Automatic; Auto; AT; АКП; автомат; Tiptronic; DSG; CVT; вариатор; робот
+transmission,manual,Механика,Manual; MT; механика; мех; Schalt; Handschalt; Schaltgetriebe

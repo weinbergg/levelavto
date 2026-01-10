@@ -71,7 +71,9 @@
               {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}
             </span>
             {% else %}Цена по запросу{% endif %}
-            <button class="fav-btn" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>
+          {% if user %}
+          <button class="fav-btn" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>
+          {% endif %}
           </div>
         </div>
         <div class="detail-specs">

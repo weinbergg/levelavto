@@ -11,9 +11,9 @@ from pathlib import Path
 import requests
 
 
-HOST = "https://parsers1-valdez.auto-parser.ru"
-LOGIN = "admin"
-PASSWORD = "8C8CuVAgnBKARBKNchBr"
+HOST = os.getenv("MOBILEDE_HOST", "https://parsers1-valdez.auto-parser.ru")
+LOGIN = os.getenv("MOBILEDE_LOGIN")
+PASSWORD = os.getenv("MOBILEDE_PASSWORD")
 FILENAME = "mobilede_active_offers.csv"
 DOWNLOAD_DIR = Path("/app/tmp")
 
@@ -32,6 +32,8 @@ def rotate_backups(directory: Path, keep: int = 5) -> None:
 
 
 def download_file(for_date: dt.date, dest: Path) -> None:
+    if not LOGIN or not PASSWORD:
+        raise RuntimeError("MOBILEDE_LOGIN/MOBILEDE_PASSWORD must be set in environment")
     url = f"{HOST}/mobilede/{for_date:%Y-%m-%d}/{FILENAME}"
     auth_header = base64.b64encode(f"{LOGIN}:{PASSWORD}".encode()).decode()
     headers = {"authorization": f"Basic {auth_header}"}

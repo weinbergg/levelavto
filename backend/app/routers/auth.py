@@ -37,7 +37,7 @@ def login(
             status_code=400,
         )
     request.session["user_id"] = user.id
-    return RedirectResponse(url="/", status_code=302)
+    return RedirectResponse(url="/", status_code=303)
 
 
 @router.get("/register")
@@ -69,12 +69,11 @@ def register(
             status_code=400,
         )
     request.session["user_id"] = user.id
-    return RedirectResponse(url="/", status_code=302)
+    return RedirectResponse(url="/", status_code=303)
 
 
 @router.get("/logout")
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/", status_code=302)
-
 

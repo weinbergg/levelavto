@@ -9,7 +9,7 @@ from typing import Optional, Dict, List, Any
 from pathlib import Path
 import datetime as dt
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, BotCommand, MenuButtonCommands
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -22,10 +22,9 @@ from telegram.ext import (
 from ..db import SessionLocal
 from ..services.parser_control_service import ParserControlService
 from ..services.parsing_data_service import ParsingDataService
-from ..services.admin_service import AdminService
-from ..services.cars_service import CarsService
 from ..services.calculator_config_service import CalculatorConfigService
 from ..services.calculator_extractor import CalculatorExtractor
+from ..utils.recommended_config import load_config, save_config
 import asyncio
 from .telegram_bot_jobs import format_status as format_job_status
 
@@ -68,13 +67,7 @@ subscribers: set[str] = set()
 AWAITING_CHUNKS = "awaiting_chunks"
 AWAITING_CALC = "awaiting_calc_upload"
 CALC_PENDING = "calc_pending"
-AWAITING_FEATURED = "awaiting_featured"
-FEATURED_PLACEMENTS: Dict[str, str] = {
-    "home_popular": "Главная — популярные",
-    "home_recommended": "Главная — рекомендуемые",
-    "catalog_popular": "Каталог — популярные",
-    "catalog_recommended": "Каталог — рекомендуемые",
-}
+AWAITING_RECO = "awaiting_recommended"
 MOBILE_DOWNLOAD_DIR = Path(os.environ.get("MOBILE_DOWNLOAD_DIR", "/app/tmp"))
 MOBILE_FILENAME = "mobilede_active_offers.csv"
 MOBILE_SCRIPT = ["bash", "scripts/fetch_mobilede_csv.sh"]
@@ -183,6 +176,37 @@ def _fmt_val(val) -> str:
             return f"{int(val)}"
         return f"{val:.2f}".rstrip("0").rstrip(".")
     return str(val)
+
+
+def _fmt_int(val: Any) -> str:
+    try:
+        return f"{int(val):,}".replace(",", " ")
+    except Exception:
+        return "—"
+
+
+def format_reco_config(cfg: Dict[str, Any]) -> str:
+    return (
+        "Рекомендуемые авто — текущие диапазоны:\n"
+        f"Возраст до: {_fmt_val(cfg.get('max_age_years'))} лет\n"
+        f"Цена: {_fmt_int(cfg.get('price_min'))} — {_fmt_int(cfg.get('price_max'))} ₽\n"
+        f"Пробег до: {_fmt_int(cfg.get('mileage_max'))} км"
+    )
+
+
+async def show_recommended_menu(update: Update) -> None:
+    cfg = load_config()
+    keyboard = [
+        [InlineKeyboardButton("Возраст (лет)", callback_data="reco_age")],
+        [InlineKeyboardButton("Цена мин/макс", callback_data="reco_price")],
+        [InlineKeyboardButton("Пробег макс", callback_data="reco_mileage")],
+        [InlineKeyboardButton("Назад", callback_data="menu")],
+    ]
+    text = format_reco_config(cfg)
+    if update.message:
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    elif update.callback_query and update.callback_query.message:
+        await update.callback_query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 def _diff_map(old: Dict[str, float], new: Dict[str, float], label: str) -> List[str]:
@@ -300,43 +324,20 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await show_menu(update)
 
 
+async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not allowed_user(update):
+        return
+    await show_menu(update)
+
+
 async def show_menu(update: Update) -> None:
     keyboard = [
-        [InlineKeyboardButton("Статус", callback_data="status")],
-        [InlineKeyboardButton("Запуск (текущие настройки)",
-                              callback_data="start_parse")],
-        [
-            InlineKeyboardButton(
-                "Полный с начала", callback_data="start_full"),
-            InlineKeyboardButton("Обновление каталога",
-                                 callback_data="start_incremental"),
-        ],
-        [InlineKeyboardButton("Настроить чанки", callback_data="set_chunks")],
-        [InlineKeyboardButton("Стоп (стоп-файл)", callback_data="stop_parse")],
-        [InlineKeyboardButton("Витрина (рекоменд./популярн.)",
-                              callback_data="featured_menu")],
-        [
-            InlineKeyboardButton("mobile.de статус",
-                                 callback_data="mobile_status"),
-            InlineKeyboardButton("mobile.de скачать",
-                                 callback_data="mobile_download"),
-        ],
-        [
-            InlineKeyboardButton("mobile.de импорт", callback_data="mobile_import"),
-            InlineKeyboardButton("M-Auto статус", callback_data="emavto_status"),
-        ],
-        [
-            InlineKeyboardButton("Обновить M-Auto", callback_data="emavto_run"),
-        ],
-        [InlineKeyboardButton("Последние ошибки", callback_data="last_errors")],
-        [InlineKeyboardButton("Калькулятор (Excel)", callback_data="calc_menu")],
+        [InlineKeyboardButton("Обновить mobile.de", callback_data="run_mobilede")],
+        [InlineKeyboardButton("Обновить emavto", callback_data="run_emavto")],
+        [InlineKeyboardButton("Статус обновлений", callback_data="status_updates")],
+        [InlineKeyboardButton("Рекомендуемые — диапазоны", callback_data="reco_menu")],
     ]
-    text = (
-        f"Бот готов.\n"
-        f"Текущие параметры:\n"
-        f"pages={CHUNK_PAGES}, pause={CHUNK_PAUSE_SEC}s, runtime={CHUNK_MAX_RUNTIME_SEC}s, total={CHUNK_TOTAL_PAGES}, mode=full\n"
-        f"Кнопками ниже можно менять и запускать."
-    )
+    text = "Бот готов. Выберите действие:"
     if update.message:
         await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     elif update.callback_query and update.callback_query.message:
@@ -348,6 +349,12 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     text = format_status()
     await reply(update, text)
+
+
+async def cmd_updates_status(update: Update) -> None:
+    if not allowed_user(update):
+        return
+    await reply(update, f"{summarize_job('mobilede')}\n\n{summarize_job('emavto')}")
 
 
 async def cmd_start_parse(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -448,9 +455,9 @@ async def set_chunks_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     global CHUNK_PAGES, CHUNK_PAUSE_SEC, CHUNK_MAX_RUNTIME_SEC, CHUNK_TOTAL_PAGES
     if not allowed_user(update):
         return 0
-    # если ждём ввод подборки — не трогаем
-    if context.user_data.get(AWAITING_FEATURED):
-        return await set_featured_apply(update, context)
+    # если ждём ввод диапазонов рекомендуемых — не трогаем
+    if context.user_data.get(AWAITING_RECO):
+        return await apply_reco_edit(update, context)
     if not context.user_data.get(AWAITING_CHUNKS):
         return 0
     parts = (update.message.text or "").strip().split()
@@ -470,6 +477,57 @@ async def set_chunks_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     except Exception:
         await reply(update, "Не понял формат. Пример: 12 45 3000 0")
     context.user_data[AWAITING_CHUNKS] = False
+    return 0
+
+
+async def set_reco_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE, field: str) -> None:
+    context.user_data[AWAITING_RECO] = field
+    if field == "age":
+        await reply(update, "Введите максимальный возраст авто (лет), например: 5")
+    elif field == "price":
+        await reply(update, "Введите цену min и max через пробел, например: 1200000 4000000")
+    elif field == "mileage":
+        await reply(update, "Введите максимальный пробег (км), например: 80000")
+    else:
+        context.user_data[AWAITING_RECO] = None
+
+
+async def apply_reco_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    field = context.user_data.get(AWAITING_RECO)
+    if not field:
+        return 0
+    text = (update.message.text or "").strip() if update.message else ""
+    if not text:
+        await reply(update, "Пустое значение. Повторите ввод.")
+        return 0
+    cfg = load_config()
+    try:
+        if field == "age":
+            cfg["max_age_years"] = max(1, int(text))
+        elif field == "price":
+            parts = [p for p in text.replace("—", " ").replace("-", " ").split() if p]
+            if len(parts) < 2:
+                await reply(update, "Нужны два числа: min и max.")
+                return 0
+            price_min = int(parts[0])
+            price_max = int(parts[1])
+            if price_min < 0 or price_max < 0:
+                await reply(update, "Цена должна быть неотрицательной.")
+                return 0
+            if price_min > price_max:
+                price_min, price_max = price_max, price_min
+            cfg["price_min"] = price_min
+            cfg["price_max"] = price_max
+        elif field == "mileage":
+            cfg["mileage_max"] = max(0, int(text))
+        else:
+            return 0
+    except ValueError:
+        await reply(update, "Не удалось распознать число. Пример: 1200000 4000000")
+        return 0
+    save_config(cfg)
+    context.user_data[AWAITING_RECO] = None
+    await reply(update, f"Готово.\n{format_reco_config(cfg)}")
     return 0
 
 
@@ -541,47 +599,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         context.user_data[AWAITING_CALC] = False
         if path and os.path.exists(path):
             os.unlink(path)
-    return 0
-
-
-async def set_featured_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE, placement: str) -> None:
-    context.user_data[AWAITING_FEATURED] = placement
-    db = SessionLocal()
-    try:
-        cars = CarsService(db).recent_with_thumbnails(limit=10)
-        sample = ", ".join(
-            f"#{c.id} {c.brand or ''} {c.model or ''}".strip() for c in cars)
-    finally:
-        db.close()
-    await reply(
-        update,
-        f"Выбрано: {FEATURED_PLACEMENTS.get(placement, placement)}\n"
-        f"Пришлите ID авто через запятую (пример: 12, 45, 78). Порядок сохраняется.\n"
-        f"Последние с фото: {sample or 'нет'}",
-    )
-
-
-async def set_featured_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    placement = context.user_data.get(AWAITING_FEATURED)
-    if not placement:
-        return 0
-    text = (update.message.text or "").strip()
-    ids: List[int] = []
-    for part in text.split(","):
-        part = part.strip()
-        if not part:
-            continue
-        try:
-            ids.append(int(part))
-        except ValueError:
-            continue
-    db = SessionLocal()
-    try:
-        AdminService(db).set_featured(placement, ids)
-    finally:
-        db.close()
-    context.user_data[AWAITING_FEATURED] = None
-    await reply(update, f"Сохранено для {FEATURED_PLACEMENTS.get(placement, placement)}: {ids or 'пусто'}")
     return 0
 
 
@@ -658,9 +675,19 @@ def main() -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN не задан")
-    application = Application.builder().token(token).build()
+    async def post_init(app: Application) -> None:
+        await app.bot.set_my_commands(
+            [
+                BotCommand("start", "Запуск и меню"),
+                BotCommand("menu", "Показать меню"),
+            ]
+        )
+        await app.bot.set_chat_menu_button(MenuButtonCommands())
+
+    application = Application.builder().token(token).post_init(post_init).build()
 
     application.add_handler(CommandHandler("start", cmd_start))
+    application.add_handler(CommandHandler("menu", cmd_menu))
     application.add_handler(CommandHandler("status", cmd_status))
     application.add_handler(CommandHandler("start_parse", cmd_start_parse))
     application.add_handler(CommandHandler("start_full", cmd_start_full))
@@ -703,26 +730,24 @@ def main() -> None:
             await cmd_stop_parse(update, context)
         elif data == "menu":
             await show_menu(update)
-        elif data == "featured_menu":
-            kb = [
-                [InlineKeyboardButton(v, callback_data=f"feat_{k}")]
-                for k, v in FEATURED_PLACEMENTS.items()
-            ]
-            kb.append([InlineKeyboardButton("Назад", callback_data="menu")])
-            await q.message.reply_text("Выберите блок для заполнения:", reply_markup=InlineKeyboardMarkup(kb))
-        elif data.startswith("feat_"):
-            placement = data.split("feat_", 1)[1]
-            await set_featured_prompt(update, context, placement)
+        elif data == "status_updates":
+            await cmd_updates_status(update)
+        elif data == "reco_menu":
+            await show_recommended_menu(update)
+        elif data == "reco_age":
+            await set_reco_prompt(update, context, "age")
+        elif data == "reco_price":
+            await set_reco_prompt(update, context, "price")
+        elif data == "reco_mileage":
+            await set_reco_prompt(update, context, "mileage")
+        elif data == "run_mobilede":
+            await run_job(MOBILE_SCRIPT, "mobilede", update)
+        elif data == "run_emavto":
+            await run_job(EMAVTO_SCRIPT, "emavto", update)
         elif data == "mobile_status":
             await q.message.reply_text(summarize_job("mobilede"))
-        elif data == "mobile_download":
-            await run_job(MOBILE_SCRIPT, "mobilede", update)
-        elif data == "mobile_import":
-            await run_job(MOBILE_SCRIPT, "mobilede", update)
         elif data == "emavto_status":
             await q.message.reply_text(summarize_job("emavto"))
-        elif data == "emavto_run":
-            await run_job(EMAVTO_SCRIPT, "emavto", update)
         elif data == "last_errors":
             await q.message.reply_text(summarize_errors())
         elif data == "calc_menu":
@@ -760,7 +785,7 @@ def main() -> None:
 
     application.add_handler(CallbackQueryHandler(cb_handler))
 
-    print("Bot started. Commands: /start /status /start_parse /stop_parse")
+    print("Bot started. Commands: /start /menu /status /start_parse /stop_parse")
     application.run_polling()
 
 

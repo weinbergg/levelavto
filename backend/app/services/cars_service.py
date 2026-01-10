@@ -2,18 +2,77 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, and_, or_, literal_column, case
+from sqlalchemy import select, func, and_, or_
 import os
 import requests
 import time
 from ..models import Car, Source, FeaturedCar
 from ..utils.localization import display_region, display_body, display_color
-from ..utils.taxonomy import normalize_color, ru_color
+from ..utils.taxonomy import (
+    normalize_color,
+    normalize_fuel,
+    ru_color,
+    ru_fuel,
+    ru_transmission,
+    color_aliases,
+    fuel_aliases,
+    color_hex,
+)
 
 
 class CarsService:
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    EU_COUNTRIES = {
+        "DE", "AT", "FR", "IT", "ES", "NL", "BE", "PL", "CZ", "SE", "FI",
+        "NO", "DK", "PT", "GR", "CH", "LU", "IE", "GB", "HU", "SK",
+        "SI", "HR", "RO", "BG", "EE", "LV", "LT",
+    }
+    KOREA_SOURCE_HINTS = ("emavto", "encar", "m-auto", "m_auto")
+    EUROPE_SOURCE_PREFIX = "mobile"
+
+    def _source_ids_for_hints(self, hints: tuple[str, ...]) -> List[int]:
+        if not hints:
+            return []
+        key_expr = func.lower(Source.key)
+        conds = [key_expr.like(f"%{hint}%") for hint in hints]
+        return self.db.execute(select(Source.id).where(or_(*conds))).scalars().all()
+
+    def _source_ids_for_europe(self) -> List[int]:
+        return self.db.execute(
+            select(Source.id).where(func.lower(Source.key).like(f"{self.EUROPE_SOURCE_PREFIX}%"))
+        ).scalars().all()
+
+    def available_regions(self) -> List[str]:
+        regions: List[str] = []
+        src_keys = self.db.execute(
+            select(func.distinct(Source.key))
+            .join(Car, Car.source_id == Source.id)
+            .where(Car.is_available.is_(True))
+        ).scalars().all()
+        has_kr = any(
+            key and any(hint in key.lower() for hint in self.KOREA_SOURCE_HINTS)
+            for key in src_keys
+        )
+        has_eu = any(
+            key and key.lower().startswith(self.EUROPE_SOURCE_PREFIX)
+            for key in src_keys
+        )
+        countries = self.db.execute(
+            select(func.distinct(func.upper(Car.country)))
+            .where(Car.is_available.is_(True), Car.country.is_not(None))
+        ).scalars().all()
+        for c in countries:
+            if c.startswith("KR"):
+                has_kr = True
+            if c in self.EU_COUNTRIES:
+                has_eu = True
+        if has_eu:
+            regions.append("EU")
+        if has_kr:
+            regions.append("KR")
+        return regions
 
     _fx_cache: dict | None = None
     _fx_cache_ts: float | None = None
@@ -53,6 +112,10 @@ class CarsService:
         year_max: Optional[int] = None,
         mileage_min: Optional[int] = None,
         mileage_max: Optional[int] = None,
+        reg_year_min: Optional[int] = None,
+        reg_month_min: Optional[int] = None,
+        reg_year_max: Optional[int] = None,
+        reg_month_max: Optional[int] = None,
         body_type: Optional[str] = None,
         engine_type: Optional[str] = None,
         transmission: Optional[str] = None,
@@ -61,28 +124,20 @@ class CarsService:
         page_size: int = 20,
     ) -> Tuple[List[Car], int]:
         conditions = [Car.is_available.is_(True)]
-        region = None
         if country:
             c = country.upper()
-            if c == "EU":
-                region = "EU"
-            elif c == "KR":
-                region = "KR"
-
-        if region:
-            region_keys = []
-            if region == "EU":
-                region_keys = ["mobile", "mobile_de"]
-            elif region == "KR":
-                region_keys = ["emavto", "encar", "m-auto", "m_auto"]
-            if region_keys:
-                src_ids = self.db.execute(
-                    select(Source.id).where(
-                        or_(*[Source.key.ilike(f"{k}%") for k in region_keys])
-                    )
-                ).scalars().all()
-                if src_ids:
-                    conditions.append(Car.source_id.in_(src_ids))
+            if c == "KR":
+                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                kr_conds = [func.upper(Car.country).like("KR%")]
+                if kr_sources:
+                    kr_conds.append(Car.source_id.in_(kr_sources))
+                conditions.append(or_(*kr_conds))
+            elif c == "EU":
+                eu_sources = self._source_ids_for_europe()
+                eu_conds = [func.upper(Car.country).in_(self.EU_COUNTRIES)]
+                if eu_sources:
+                    eu_conds.append(Car.source_id.in_(eu_sources))
+                conditions.append(or_(*eu_conds))
         if brand:
             # case-insensitive contains (brand may have variants/extra symbols)
             b = brand.strip().strip(".,;")
@@ -111,7 +166,13 @@ class CarsService:
             conditions.append(func.lower(Car.generation).like(
                 func.lower(f"%{generation.strip()}%")))
         if color:
-            conditions.append(func.lower(Car.color) == color.lower())
+            aliases = color_aliases(color)
+            if aliases:
+                conditions.append(or_(
+                    *[func.lower(Car.color).like(f"%{a}%") for a in aliases]
+                ))
+            else:
+                conditions.append(func.lower(Car.color) == color.lower())
         if source_key:
             keys: List[str] = []
             if isinstance(source_key, str):
@@ -123,24 +184,10 @@ class CarsService:
                     Source.key.in_(keys))).scalars().all()
                 if src_ids:
                     conditions.append(Car.source_id.in_(src_ids))
-        if price_min is not None or price_max is not None:
-            rates = self.get_fx_rates()
-            if rates:
-                rub_expr = case(
-                    (func.lower(Car.currency) == "usd",
-                     Car.price * rates.get("USD", 1.0)),
-                    (func.lower(Car.currency) == "rub", Car.price),
-                    else_=Car.price * rates.get("EUR", 1.0),
-                )
-                if price_min is not None:
-                    conditions.append(rub_expr >= price_min)
-                if price_max is not None:
-                    conditions.append(rub_expr <= price_max)
-            else:
-                if price_min is not None:
-                    conditions.append(Car.price >= price_min)
-                if price_max is not None:
-                    conditions.append(Car.price <= price_max)
+        if price_min is not None:
+            conditions.append(Car.price_rub_cached >= price_min)
+        if price_max is not None:
+            conditions.append(Car.price_rub_cached <= price_max)
         if year_min is not None:
             conditions.append(Car.year >= year_min)
         if year_max is not None:
@@ -149,11 +196,44 @@ class CarsService:
             conditions.append(Car.mileage >= mileage_min)
         if mileage_max is not None:
             conditions.append(Car.mileage <= mileage_max)
+        if reg_year_min is not None:
+            if reg_month_min is not None:
+                conditions.append(
+                    or_(
+                        Car.registration_year > reg_year_min,
+                        and_(
+                            Car.registration_year == reg_year_min,
+                            Car.registration_month.is_not(None),
+                            Car.registration_month >= reg_month_min,
+                        ),
+                    )
+                )
+            else:
+                conditions.append(Car.registration_year >= reg_year_min)
+        if reg_year_max is not None:
+            if reg_month_max is not None:
+                conditions.append(
+                    or_(
+                        Car.registration_year < reg_year_max,
+                        and_(
+                            Car.registration_year == reg_year_max,
+                            Car.registration_month.is_not(None),
+                            Car.registration_month <= reg_month_max,
+                        ),
+                    )
+                )
+            else:
+                conditions.append(Car.registration_year <= reg_year_max)
         if body_type:
             conditions.append(func.lower(Car.body_type) == body_type.lower())
         if engine_type:
-            conditions.append(func.lower(Car.engine_type)
-                              == engine_type.lower())
+            aliases = fuel_aliases(engine_type)
+            if aliases:
+                conditions.append(or_(
+                    *[func.lower(Car.engine_type).like(f"%{a}%") for a in aliases]
+                ))
+            else:
+                conditions.append(func.lower(Car.engine_type) == engine_type.lower())
         if transmission:
             conditions.append(func.lower(Car.transmission)
                               == transmission.lower())
@@ -225,6 +305,49 @@ class CarsService:
         rows = self.db.execute(stmt).all()
         return [{"body_type": r[0], "count": int(r[1])} for r in rows if r[0]]
 
+    def transmissions(self) -> List[str]:
+        stmt = (
+            select(func.distinct(Car.transmission))
+            .where(Car.is_available.is_(True), Car.transmission.is_not(None))
+            .order_by(Car.transmission.asc())
+        )
+        return [row[0] for row in self.db.execute(stmt).all() if row[0]]
+
+    def transmission_options(self) -> List[Dict[str, Any]]:
+        stmt = (
+            select(Car.transmission, func.count().label("count"))
+            .where(Car.is_available.is_(True), Car.transmission.is_not(None))
+            .group_by(Car.transmission)
+            .order_by(func.count().desc(), Car.transmission.asc())
+        )
+        rows = self.db.execute(stmt).all()
+        out: List[Dict[str, Any]] = []
+        for val, cnt in rows:
+            if not val:
+                continue
+            label = ru_transmission(val) or val
+            out.append({"value": val, "label": label, "count": int(cnt)})
+        return out
+
+    def engine_types(self) -> List[Dict[str, Any]]:
+        stmt = (
+            select(Car.engine_type, func.count().label("count"))
+            .where(Car.is_available.is_(True), Car.engine_type.is_not(None))
+            .group_by(Car.engine_type)
+            .order_by(func.count().desc(), Car.engine_type.asc())
+        )
+        rows = self.db.execute(stmt).all()
+        agg: Dict[str, Dict[str, Any]] = {}
+        for val, cnt in rows:
+            if not val:
+                continue
+            norm = normalize_fuel(val) or val.strip().lower()
+            label = ru_fuel(val) or ru_fuel(norm) or val
+            if norm not in agg:
+                agg[norm] = {"value": norm, "label": label, "count": 0}
+            agg[norm]["count"] += int(cnt)
+        return sorted(agg.values(), key=lambda x: x["count"], reverse=True)
+
     def models_for_brand(self, brand: str) -> List[Dict[str, Any]]:
         if not brand:
             return []
@@ -240,6 +363,51 @@ class CarsService:
         )
         rows = self.db.execute(stmt).all()
         return [{"model": r[0], "count": int(r[1])} for r in rows if r[0]]
+
+    def recommended_auto(
+        self,
+        *,
+        max_age_years: int | None = 5,
+        price_min: int | None = 1_000_000,
+        price_max: int | None = 4_000_000,
+        mileage_max: int | None = 80_000,
+        limit: int = 12,
+    ) -> List[Car]:
+        """
+        Подбор рекомендуемых без ручных списков: возраст, цена, пробег.
+        Возраст считаем по registration_year/month, иначе по year.
+        """
+        conditions = [Car.is_available.is_(True)]
+        now_year = func.extract("year", func.now())
+        now_month = func.extract("month", func.now())
+
+        if max_age_years is not None:
+            # возраст в месяцах
+            max_months = max_age_years * 12
+            reg_year = func.coalesce(Car.registration_year, Car.year)
+            reg_month = func.coalesce(Car.registration_month, 1)
+            age_months = (now_year - reg_year) * 12 + (now_month - reg_month)
+            conditions.append(age_months <= max_months)
+
+        if price_min is not None:
+            conditions.append(Car.price_rub_cached >= price_min)
+        if price_max is not None:
+            conditions.append(Car.price_rub_cached <= price_max)
+        if mileage_max is not None:
+            conditions.append(Car.mileage <= mileage_max)
+
+        stmt = (
+            select(Car)
+            .where(and_(*conditions))
+            .order_by(
+                Car.price_rub_cached.asc().nullslast(),
+                Car.mileage.asc().nullslast(),
+                Car.year.desc().nullslast(),
+                Car.created_at.desc(),
+            )
+            .limit(limit)
+        )
+        return list(self.db.execute(stmt).scalars().all())
 
     def top_models_by_brand(self, max_brands: int = 5, top_n: int = 6) -> Dict[str, List[Dict[str, Any]]]:
         brands = [b["brand"] for b in self.brand_stats()[:max_brands]]
@@ -260,9 +428,14 @@ class CarsService:
             if not color:
                 continue
             norm = normalize_color(color) or color.strip().lower()
-            label = ru_color(color) or display_color(color) or color
+            label = ru_color(color) or ru_color(norm) or display_color(color) or color
             if norm not in agg:
-                agg[norm] = {"value": norm, "label": label, "count": 0}
+                agg[norm] = {
+                    "value": norm,
+                    "label": label,
+                    "count": 0,
+                    "hex": color_hex(norm) or "#444",
+                }
             agg[norm]["count"] += int(cnt)
         return sorted(agg.values(), key=lambda x: x["count"], reverse=True)
 
@@ -302,14 +475,6 @@ class CarsService:
             .limit(limit)
         )
         return list(self.db.execute(stmt).scalars().all())
-
-    def colors(self) -> List[str]:
-        stmt = (
-            select(func.distinct(Car.color))
-            .where(Car.is_available.is_(True), Car.color.is_not(None))
-            .order_by(Car.color.asc())
-        )
-        return [row[0] for row in self.db.execute(stmt).all() if row[0]]
 
     def total_cars(self, source_keys: Optional[List[str]] = None) -> int:
         conditions = [Car.is_available.is_(True)]

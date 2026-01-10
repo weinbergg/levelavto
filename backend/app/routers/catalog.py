@@ -7,6 +7,7 @@ from ..schemas import CarOut, CarDetailOut
 from ..models import Car, CarImage, Source
 from sqlalchemy import select, func
 from ..utils.localization import display_region, display_body, display_color
+from ..utils.taxonomy import ru_color, normalize_color, color_hex
 
 router = APIRouter()
 
@@ -30,6 +31,10 @@ def list_cars(
     year_max: Optional[int] = Query(default=None),
     mileage_min: Optional[int] = Query(default=None),
     mileage_max: Optional[int] = Query(default=None),
+    reg_year_min: Optional[int] = Query(default=None),
+    reg_month_min: Optional[int] = Query(default=None),
+    reg_year_max: Optional[int] = Query(default=None),
+    reg_month_max: Optional[int] = Query(default=None),
     sort: Optional[str] = Query(default=None, description="price_asc|price_desc|year_desc|year_asc|mileage_asc|mileage_desc|created_desc"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -50,6 +55,10 @@ def list_cars(
         year_max=year_max,
         mileage_min=mileage_min,
         mileage_max=mileage_max,
+        reg_year_min=reg_year_min,
+        reg_month_min=reg_month_min,
+        reg_year_max=reg_year_max,
+        reg_month_max=reg_month_max,
         body_type=body_type,
         engine_type=engine_type,
         transmission=transmission,
@@ -85,7 +94,11 @@ def list_cars(
         display_reg = display_region(src_key) or co.get("country")
         co["display_region"] = display_reg
         co["display_body_type"] = display_body(co.get("body_type")) or co.get("body_type")
-        co["display_color"] = display_color(co.get("color")) or co.get("color")
+        raw_color = co.get("color")
+        norm_color = normalize_color(raw_color)
+        co["display_color"] = ru_color(raw_color) or ru_color(norm_color) or display_color(raw_color) or raw_color
+        if raw_color:
+            co["color_hex"] = color_hex(norm_color) or "#444"
         co["images_count"] = counts_map.get(c.id, 0)
         payload_items.append(co)
     return {

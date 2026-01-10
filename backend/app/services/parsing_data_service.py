@@ -6,6 +6,8 @@ import hashlib
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from ..models import Car, Source, CarImage, ProgressKV
+from ..services.cars_service import CarsService
+from ..utils.pricing import to_rub
 
 
 def compute_car_hash(payload: Dict[str, Any]) -> str:
@@ -51,6 +53,7 @@ class ParsingDataService:
         now = datetime.utcnow()
         inserted = 0
         updated = 0
+        rates = CarsService(self.db).get_fx_rates() or {}
         # Normalize and de-duplicate by external_id
         unique_items: Dict[str, Dict[str, Any]] = {}
         for p in parsed_items:
@@ -59,6 +62,9 @@ class ParsingDataService:
             payload.setdefault("country", source.country)
             payload.setdefault("thumbnail_url", None)
             payload.setdefault("is_available", True)
+            rub = to_rub(payload.get("price"), payload.get("currency"), rates)
+            if rub is not None:
+                payload["price_rub_cached"] = round(rub, 2)
             payload["hash"] = compute_car_hash(payload)
             unique_items[payload["external_id"]] = payload
 
@@ -94,6 +100,9 @@ class ParsingDataService:
                     existing.is_available = True
                     updated += 1
                 else:
+                    if existing.price_rub_cached is None and payload.get("price_rub_cached") is not None:
+                        existing.price_rub_cached = payload["price_rub_cached"]
+                        updated += 1
                     existing.last_seen_at = now
                     existing.is_available = True
                 car_row = existing

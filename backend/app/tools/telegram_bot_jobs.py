@@ -38,6 +38,12 @@ def format_status(job: str, data: Optional[dict]) -> str:
     if files:
         parts.append(f"CSV дата: {files.get('csv_date','')}")
     if stats:
+        processed = stats.get("cars_total_processed")
+        inserted = stats.get("cars_inserted")
+        updated = stats.get("cars_updated")
+        skipped = None
+        if processed is not None and inserted is not None and updated is not None:
+            skipped = max(0, int(processed) - int(inserted) - int(updated))
         parts.append(
             "processed={processed}, inserted={inserted}, updated={updated}, deactivated={deactivated}, no_photo={no_photo}".format(
                 processed=stats.get("cars_total_processed"),
@@ -45,6 +51,13 @@ def format_status(job: str, data: Optional[dict]) -> str:
                 updated=stats.get("cars_updated"),
                 deactivated=stats.get("cars_deactivated"),
                 no_photo=stats.get("cars_without_photos"),
+            )
+        )
+        parts.append(
+            "Добавлено={ins}, обновлено={upd}, пропущено={skip}".format(
+                ins=stats.get("cars_inserted", "—"),
+                upd=stats.get("cars_updated", "—"),
+                skip=skipped if skipped is not None else "—",
             )
         )
     return "\n".join([p for p in parts if p])

@@ -1,12 +1,15 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 from fastapi import APIRouter, Request, Depends, Query, Form
 import os
 import smtplib
+import random
+import math
 from email.mime.text import MIMEText
 from ..db import get_db
 from ..services.cars_service import CarsService
+from ..utils.recommended_config import load_config
 from ..services.content_service import ContentService
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, exists
@@ -19,21 +22,118 @@ from ..utils.taxonomy import ru_body, ru_color
 
 router = APIRouter()
 RECOMMENDED_PLACEMENT = "recommended"
+MONTHS_RU = [
+    "январь",
+    "февраль",
+    "март",
+    "апрель",
+    "май",
+    "июнь",
+    "июль",
+    "август",
+    "сентябрь",
+    "октябрь",
+    "ноябрь",
+    "декабрь",
+]
+
+BASIC_COLORS = [
+    "white",
+    "black",
+    "gray",
+    "silver",
+    "blue",
+    "red",
+    "green",
+    "orange",
+    "yellow",
+    "brown",
+    "beige",
+    "purple",
+    "pink",
+]
+
+
+def _range_steps(max_val: Optional[float], base_step: int, min_val: int, max_options: int) -> List[int]:
+    if not max_val or max_val <= 0:
+        max_val = min_val
+    try:
+        max_int = int(float(max_val))
+    except (TypeError, ValueError):
+        max_int = min_val
+    step = base_step
+    last = int(math.ceil(max_int / step) * step)
+    start = int(math.ceil(min_val / step) * step)
+    values = list(range(start, last + step, step))
+    if len(values) > max_options:
+        factor = max(2, int(math.ceil(len(values) / max_options)))
+        step *= factor
+        last = int(math.ceil(max_int / step) * step)
+        values = list(range(step, last + step, step))
+    return values
+
+
+def _build_filter_context(service: CarsService, db: Session) -> Dict[str, Any]:
+    regions = service.available_regions()
+    reg_years = (
+        db.execute(
+            select(func.distinct(Car.registration_year))
+            .where(Car.is_available.is_(True), Car.registration_year.is_not(None))
+            .order_by(Car.registration_year.desc())
+        )
+        .scalars()
+        .all()
+    )
+    reg_years = [y for y in reg_years if y]
+    reg_months = (
+        [{"value": i + 1, "label": MONTHS_RU[i]} for i in range(12)]
+        if reg_years
+        else []
+    )
+    price_max = db.execute(select(func.max(Car.price_rub_cached))).scalar_one_or_none()
+    if price_max is None:
+        price_max = db.execute(select(func.max(Car.price))).scalar_one_or_none()
+    mileage_max = db.execute(select(func.max(Car.mileage))).scalar_one_or_none()
+    generations = (
+        db.execute(
+            select(func.distinct(Car.generation))
+            .where(Car.is_available.is_(True), Car.generation.is_not(None))
+            .order_by(Car.generation.asc())
+        )
+        .scalars()
+        .all()
+    )
+    generations = [g for g in generations if g]
+    colors = service.colors()
+    basic_set = set(BASIC_COLORS)
+    basic_by_value = {c["value"]: c for c in colors if c.get("value") in basic_set}
+    colors_basic = [basic_by_value[c] for c in BASIC_COLORS if c in basic_by_value]
+    colors_other = [c for c in colors if c.get("value") not in basic_set]
+    return {
+        "regions": regions,
+        "reg_years": reg_years,
+        "reg_months": reg_months,
+        "price_options": _range_steps(price_max, 500_000, 1_000_000, 12),
+        "mileage_options": _range_steps(mileage_max, 10_000, 20_000, 12),
+        "generations": generations,
+        "colors_basic": colors_basic,
+        "colors_other": colors_other,
+        "engine_types": service.engine_types(),
+        "transmissions": service.transmission_options(),
+    }
 
 
 def _home_context(request: Request, service: CarsService, db: Session, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     brand_stats = service.brand_stats()
     body_type_stats = service.body_type_stats()
-    top_models = service.top_models_by_brand(max_brands=6, top_n=6)
-    recommended = service.featured_for(
-        RECOMMENDED_PLACEMENT, limit=12, fallback_limit=4)
-    if not recommended:
-        # обратная совместимость со старыми ключами
-        recommended = service.featured_for(
-            "home_recommended", limit=12, fallback_limit=4)
-    if not recommended:
-        recommended = service.featured_for(
-            "catalog_recommended", limit=12, fallback_limit=4)
+    reco_cfg = load_config()
+    recommended = service.recommended_auto(
+        max_age_years=reco_cfg.get("max_age_years"),
+        price_min=reco_cfg.get("price_min"),
+        price_max=reco_cfg.get("price_max"),
+        mileage_max=reco_cfg.get("mileage_max"),
+        limit=12,
+    )
     content = ContentService(db).content_map(
         [
             "hero_title",
@@ -58,6 +158,8 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
         for p in sorted(video_dir.iterdir()):
             if p.suffix.lower() in {".mp4", ".mov", ".webm"}:
                 hero_videos.append(f"/media/{prefix}/{p.name}")
+    if len(hero_videos) > 1:
+        hero_videos = [hero_videos[1]]
 
     collage_images = []
     thumb_dir = media_root / "машины_thumbs"
@@ -69,7 +171,10 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
             safe_name = name.replace("\u00a0", " ")
             return f"/media/{prefix}/{quote(safe_name)}"
 
-        for p in sorted(car_photos_dir.iterdir()):
+        files = list(car_photos_dir.iterdir())
+        rng_files = random.Random(42)
+        rng_files.shuffle(files)
+        for p in files:
             if p.name.startswith("."):
                 continue
             if p.suffix.lower() not in {".jpg", ".jpeg", ".webp", ".png"}:
@@ -92,6 +197,20 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
                 "height": 240,
                 "fallback": build_url(orig_prefix, p.name),
             })
+
+    collage_display = []
+    if collage_images:
+        rng = random.Random(21)
+        pool = collage_images.copy()
+        rng.shuffle(pool)
+        while len(collage_display) < 60:
+            for img in pool:
+                if collage_display and collage_display[-1]["src"] == img["src"]:
+                    continue
+                collage_display.append(img)
+                if len(collage_display) >= 60:
+                    break
+            rng.shuffle(pool)
 
     # brand logos: map brands that have logo files in static/img/brand-logos
     static_root = Path(__file__).resolve().parent.parent / \
@@ -134,21 +253,30 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
             )
             seen.add(b["brand"])
 
+    filter_ctx = _build_filter_context(service, db)
     context = {
         "request": request,
         "user": getattr(request.state, "user", None),
         "total_cars": service.total_cars(),
         "brands": service.brands(),
-        "colors": service.colors(),
+        "regions": filter_ctx["regions"],
+        "reg_years": filter_ctx["reg_years"],
+        "reg_months": filter_ctx["reg_months"],
+        "price_options": filter_ctx["price_options"],
+        "mileage_options": filter_ctx["mileage_options"],
+        "generations": filter_ctx["generations"],
+        "colors_basic": filter_ctx["colors_basic"],
+        "colors_other": filter_ctx["colors_other"],
+        "engine_types": filter_ctx["engine_types"],
+        "transmissions": filter_ctx["transmissions"],
         "brand_stats": brand_stats,
         "brand_logos": brand_logos,
         "body_type_stats": body_type_stats,
-        "top_models": top_models,
         "recommended_cars": recommended,
         "content": content,
         "fx_rates": fx_rates,
         "hero_videos": hero_videos,
-        "collage_images": collage_images,
+        "collage_images": collage_display or collage_images,
     }
     if extra:
         context.update(extra)
@@ -232,8 +360,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     templates = request.app.state.templates
     service = CarsService(db)
     brands = service.brands()
-    countries = ["DE", "KR", "RU"]
-    raw_colors = service.colors()
+    filter_ctx = _build_filter_context(service, db)
     contact_content = ContentService(db).content_map(
         [
             "contact_phone",
@@ -244,104 +371,22 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "contact_ig",
         ])
 
-    palette = {
-        "black": "#1d1d1f",
-        "white": "#f8f8f8",
-        "gray": "#888888",
-        "dark_gray": "#5f6570",
-        "graphite": "#4b4f56",
-        "silver": "#c0c0c0",
-        "red": "#e03a3a",
-        "blue": "#2d7dd2",
-        "navy": "#1f3b73",
-        "green": "#4caf50",
-        "teal": "#14b8a6",
-        "yellow": "#f4c430",
-        "orange": "#f97316",
-        "brown": "#8b5a2b",
-        "beige": "#d7c4a5",
-        "purple": "#8b5cf6",
-        "violet": "#7c3aed",
-        "gold": "#d4af37",
-        "pink": "#f472b6",
-        "light_blue": "#6ab8ff",
-        "champagne": "#e6d4b3",
-        "ivory": "#f6efe2",
-    }
-    labels_ru = {
-        "black": "Чёрный",
-        "white": "Белый",
-        "gray": "Серый",
-        "dark_gray": "Тёмно-серый",
-        "graphite": "Графит",
-        "silver": "Серебристый",
-        "red": "Красный",
-        "blue": "Синий",
-        "light_blue": "Голубой",
-        "green": "Зелёный",
-        "teal": "Бирюзовый",
-        "yellow": "Жёлтый",
-        "orange": "Оранжевый",
-        "brown": "Коричневый",
-        "beige": "Бежевый",
-        "purple": "Фиолетовый",
-        "violet": "Фиолетовый",
-        "gold": "Золотой",
-        "pink": "Розовый",
-        "champagne": "Шампань",
-        "ivory": "Айвори",
-    }
-
-    seen_colors = set()
-    color_options = []
-    for raw in raw_colors:
-        key = raw.get("value") if isinstance(raw, dict) else None
-        label = raw.get("label") if isinstance(raw, dict) else None
-        cnt = raw.get("count", 0) if isinstance(raw, dict) else 0
-        if not key or key in seen_colors or cnt <= 0:
-            continue
-        seen_colors.add(key)
-        color_options.append(
-            {
-                "value": key,
-                "key": key,
-                "label": label or key.title(),
-                "hex": palette.get(key, ""),
-                "count": cnt,
-            }
-        )
-
-    brand_filter = request.query_params.get("brand")
-    featured_recommended = service.featured_for(
-        RECOMMENDED_PLACEMENT, limit=12, fallback_limit=6)
-    if not featured_recommended:
-        featured_recommended = service.featured_for(
-            "catalog_recommended", limit=12, fallback_limit=6)
-    if not featured_recommended:
-        featured_recommended = service.featured_for(
-            "home_recommended", limit=12, fallback_limit=6)
-    # удаляем дубли по id
-    seen_ids = set()
-    dedup = []
-    for c in featured_recommended:
-        if c.id in seen_ids:
-            continue
-        dedup.append(c)
-        seen_ids.add(c.id)
-    featured_recommended = dedup
-    if brand_filter:
-        featured_recommended = [c for c in featured_recommended if (
-            c.brand or "").lower() == brand_filter.lower()]
-
     return templates.TemplateResponse(
         "catalog.html",
         {
             "request": request,
             "user": getattr(request.state, "user", None),
             "brands": brands,
-            "countries": countries,
-            "colors": color_options,
-            "featured_recommended": featured_recommended,
+            "regions": filter_ctx["regions"],
+            "reg_years": filter_ctx["reg_years"],
+            "reg_months": filter_ctx["reg_months"],
+            "price_options": filter_ctx["price_options"],
+            "mileage_options": filter_ctx["mileage_options"],
+            "generations": filter_ctx["generations"],
+            "colors_basic": filter_ctx["colors_basic"],
+            "colors_other": filter_ctx["colors_other"],
+            "engine_types": filter_ctx["engine_types"],
+            "transmissions": filter_ctx["transmissions"],
             "fx_rates": service.get_fx_rates() or {},
             "content": contact_content,
             "contact_phone": contact_content.get("contact_phone"),
@@ -361,7 +406,12 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     car = service.get_car(car_id)
     if car and car.source:
         src_key = car.source.key or ""
-        car.display_region = display_region(src_key) or car.country
+        if src_key.startswith("mobile"):
+            car.display_region = "Европа"
+        elif "emavto" in src_key or "encar" in src_key or "m-auto" in src_key or "m_auto" in src_key:
+            car.display_region = "Корея"
+        else:
+            car.display_region = display_region(src_key) or car.country
     if car:
         car.display_body_type = ru_body(getattr(car, "body_type", None)) or display_body(getattr(car, "body_type", None)) or car.body_type
         car.display_color = ru_color(getattr(car, "color", None)) or display_color(getattr(car, "color", None)) or car.color

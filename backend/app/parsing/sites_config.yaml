@@ -48,7 +48,7 @@ encar:
 emavto_klg:
   key: emavto_klg
   name: "EMAVTO KLG"
-  country: "RU"
+  country: "KR"
   type: "html"
   enabled: true
   base_search_url: "https://emavto.ru/"

@@ -1,16 +1,124 @@
 {% extends "base.html" %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
 <link rel="stylesheet" href="/static/css/home.css?v=7" />
+{% if hero_videos and hero_videos|length > 0 %}
+<link rel="preload" as="video" href="{{ hero_videos[0] }}" fetchpriority="high" />
+{% endif %}
 {% endblock %} {% block content %}
 <section class="hero hero-with-video" id="hero">
   {% if hero_videos %}
   <div class="hero-video" id="hero-video">
-    <video id="hero-video-el" class="hero-video__el" playsinline muted loop preload="auto" autoplay></video>
+    <video
+      id="hero-video-el"
+      class="hero-video__el"
+      playsinline
+      muted
+      loop
+      autoplay
+      preload="auto"
+      src="{{ hero_videos[0] }}"
+      poster="{{ collage_images[0].src if collage_images else '' }}"
+    ></video>
     <div class="hero-video__overlay"></div>
-    <button class="hero-video__control hero-video__control--prev" aria-label="Предыдущее видео"></button>
-    <button class="hero-video__control hero-video__control--next" aria-label="Следующее видео"></button>
   </div>
   {% endif %}
+
+  <div class="la-container hero-search">
+    <div class="search-card search-card--overlay">
+      <div class="search-head">
+        <h3 style="margin: 0">Найти машину</h3>
+        <p class="muted" style="margin:0;">{{ total_cars }} актуальных объявлений</p>
+      </div>
+      <form class="search-form" id="home-search" method="get" action="/catalog">
+        <div class="filter-grid filter-grid--overlay">
+          {% set region_labels = {'EU': 'Европа', 'KR': 'Корея'} %}
+          <div class="field">
+            <label for="home-brand">Марка</label>
+            <select id="home-brand" name="brand">
+              <option value="">Все</option>
+              {% for b in brands|sort %}
+              <option value="{{ b }}">{{ b }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="home-model">Модель</label>
+            <select id="home-model" name="model" disabled>
+              <option value="">Все</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="home-country">Страна</label>
+            <select id="home-country" name="country">
+              <option value="">Все</option>
+              {% for r in regions %}
+              <option value="{{ r }}">{{ region_labels.get(r, r) }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="home-price">Цена до, ₽</label>
+            <select id="home-price" name="price_max">
+              <option value="">Любая</option>
+              {% for p in price_options %}
+              <option value="{{ p }}">{{ '{:,.0f}'.format(p).replace(',', ' ') }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% if reg_years %}
+          <div class="field">
+            <label for="home-reg-year">Поставлен на учёт с (год)</label>
+            <select id="home-reg-year" name="reg_year_min">
+              <option value="">Не важно</option>
+              {% for y in reg_years %}
+              <option value="{{ y }}">{{ y }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="home-reg-month">Поставлен на учёт с (месяц)</label>
+            <select id="home-reg-month" name="reg_month_min">
+              <option value="">Не важно</option>
+              {% for m in reg_months %}
+              <option value="{{ m.value }}">{{ m.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+          <div class="field">
+            <label for="home-mileage">Пробег до, км</label>
+            <select id="home-mileage" name="mileage_max">
+              <option value="">Любой</option>
+              {% for m in mileage_options %}
+              <option value="{{ m }}">{{ '{:,.0f}'.format(m).replace(',', ' ') }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% if transmissions and transmissions|length > 0 %}
+          <div class="field">
+            <label for="home-transmission">Трансмиссия</label>
+            <select id="home-transmission" name="transmission">
+              <option value="">Любая</option>
+              {% for t in transmissions %}
+              <option value="{{ t.value }}">{{ t.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+        </div>
+        <div class="inline-actions">
+          <button type="submit" class="btn btn-primary">
+            Найти · {{ total_cars }} объявлений
+          </button>
+          <div class="links">
+            <a href="#" id="home-reset">Сбросить</a>
+            <a href="/catalog">К каталогу</a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="la-container hero-grid">
     <div class="hero-text">
       <div class="stats-badge">{{ total_cars }} авто в наличии</div>
@@ -34,9 +142,7 @@
         </div>
       </div>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="/catalog?source=mobile_de"
-          >Привезённые авто</a
-        >
+        <a class="btn btn-primary" href="/catalog">Привезённые авто</a>
         <a class="btn btn-secondary" href="#lead-form">Заявка на расчёт</a>
       </div>
       <div class="hero-note">
@@ -57,67 +163,6 @@
     </div>
   </div>
 </section>
-
-<section class="search-block" id="pricing">
-  <div class="la-container">
-    <div class="search-card">
-      <div class="search-head">
-        <h3 style="margin: 0">Найти машину</h3>
-      </div>
-      <form class="search-form" id="home-search" method="get" action="/catalog">
-        <input type="hidden" name="source" value="mobile_de,emavto_klg" />
-        <div class="filter-grid filter-grid--12">
-          <div class="field">
-            <label for="home-query">Поиск (марка/модель)</label>
-            <input
-              id="home-query"
-              type="text"
-              name="model"
-              placeholder="например, BMW X5 или Golf"
-            />
-          </div>
-          <div class="field">
-            <label for="home-price-min">Цена от, ₽</label>
-            <input
-              id="home-price-min"
-              type="number"
-              name="price_min"
-              step="1000"
-              placeholder="1500000"
-            />
-          </div>
-          <div class="field">
-            <label for="home-price">Цена до, ₽</label>
-            <input
-              id="home-price"
-              type="number"
-              name="price_max"
-              step="1000"
-              placeholder="3000000"
-            />
-          </div>
-          <div class="field">
-            <label for="home-country">Страна</label>
-            <select id="home-country" name="country">
-              <option value="">Все</option>
-              <option value="EU">Европа</option>
-              <option value="KR">Корея</option>
-            </select>
-          </div>
-        </div>
-        <div class="inline-actions">
-          <button type="submit" class="btn btn-primary">
-            Найти · {{ total_cars }} объявлений
-          </button>
-          <div class="links">
-            <a href="#" id="home-reset">Сбросить</a>
-            <a href="/catalog?advanced=1">Расширенный поиск</a>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-</section>
 <section class="section" id="cases">
   <div class="la-container">
     <div class="section-header">
@@ -128,8 +173,8 @@
     </div>
   </div>
   <div class="collage-wrap">
-    {% set visible = collage_images[:36] %}
-    {% set hidden = collage_images[36:] %}
+    {% set visible = collage_images[:60] %}
+    {% set hidden = collage_images[60:] %}
     <div class="collage-track" id="collage-track">
       {% for img in visible %}
       <div class="collage-item">
@@ -281,74 +326,8 @@
         </div>
       </a>
       {% else %}
-      <p class="hero-note">Добавьте рекомендуемые авто в админке.</p>
+      <p class="hero-note">Подборка появится автоматически при наличии подходящих авто.</p>
       {% endfor %}
-    </div>
-  </div>
-</section>
-
-<section class="categories" id="categories">
-  <div class="la-container">
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Популярные категории</h2>
-        <p class="section-sub">Готовые подборки под разные задачи</p>
-      </div>
-    </div>
-    <div class="category-grid">
-      <a
-        class="category-card"
-        href="/catalog?year_min=2016&mileage_max=150000&price_max=3000000"
-      >
-        <img src="/static/img/categories/family.svg" alt="Семейные" />
-        <div class="category-body">
-          <div class="category-title">Семейные</div>
-          <div class="tag-row">
-            <span class="tag">от 2016</span>
-            <span class="tag">до 150 000 км</span>
-            <span class="tag">до 50 000 €</span>
-          </div>
-        </div>
-      </a>
-      <a
-        class="category-card"
-        href="/catalog?price_max=1500000&mileage_max=120000&year_min=2012"
-      >
-        <img src="/static/img/categories/first.svg" alt="Первые" />
-        <div class="category-body">
-          <div class="category-title">Первые</div>
-          <div class="tag-row">
-            <span class="tag">компактные</span>
-            <span class="tag">доступные</span>
-            <span class="tag">ниже 20 000 €</span>
-          </div>
-        </div>
-      </a>
-      <a
-        class="category-card"
-        href="/catalog?year_min=2018&price_min=35000&mileage_max=90000"
-      >
-        <img src="/static/img/categories/premium.svg" alt="Премиум" />
-        <div class="category-body">
-          <div class="category-title">Премиум</div>
-          <div class="tag-row">
-            <span class="tag">от 2018</span>
-            <span class="tag">35 000 €+</span>
-            <span class="tag">низкий пробег</span>
-          </div>
-        </div>
-      </a>
-      <a class="category-card" href="/catalog?engine_type=Electric">
-        <img src="/static/img/categories/electric.svg" alt="Электро" />
-        <div class="category-body">
-          <div class="category-title">Электро</div>
-          <div class="tag-row">
-            <span class="tag">без эмиссии</span>
-            <span class="tag">гос.льготы</span>
-            <span class="tag">EV и PHEV</span>
-          </div>
-        </div>
-      </a>
     </div>
   </div>
 </section>
@@ -458,55 +437,9 @@
         </p>
         {% endfor %}
       </div>
-      {% if others %}
-      <div class="section-header" style="margin-top: 24px">
-        <div>
-          <h3 class="section-title" style="font-size: 22px">
-            Другие марки автомобилей
-          </h3>
-        </div>
-      </div>
-      <div class="brand-grid">
-        {% for item in others if item.brand not in primary_names %}
-        <a class="brand-tile" href="/catalog?brand={{ item.brand }}">
-          <strong>{{ item.brand }}</strong>
-          <span class="small">{{ item.count }} авто</span>
-        </a>
-        {% endfor %}
-      </div>
-      {% endif %}
     </div>
   </section>
 
-
-  <section class="section" id="models">
-    <div class="la-container">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title">Модели по брендам</h2>
-          <p class="section-sub">Подборки моделей без прокрутки</p>
-        </div>
-      </div>
-      <div class="models-grid">
-        {% for brand, models in top_models.items() %}
-        <div class="model-column">
-          <h4>{{ brand }}</h4>
-          <ul>
-            {% for item in models[:6] %}
-            <li>
-              <a href="/catalog?brand={{ brand }}&model={{ item.model }}"
-                >{{ item.model }} ({{ item.count }})</a
-              >
-            </li>
-            {% endfor %} {% if models|length > 6 %}
-            <li class="muted">… и ещё {{ models|length - 6 }}</li>
-            {% endif %}
-          </ul>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-  </section>
 
   <section class="section" id="how-it-works">
     <div class="la-container">
@@ -735,77 +668,27 @@
   </section>
   <script>
     (() => {
-      const heroVideos = {{ hero_videos | tojson }};
       const videoEl = document.getElementById("hero-video-el");
-      const prevBtn = document.querySelector(".hero-video__control--prev");
-      const nextBtn = document.querySelector(".hero-video__control--next");
-      let idx = 0;
-      let timer;
-      let loaded = false;
-      function setSrc() {
-        if (!loaded && heroVideos.length) {
-          videoEl.src = heroVideos[idx];
-          loaded = true;
-        }
-      }
-      function applyVideo() {
-        if (!videoEl || !heroVideos.length) return;
-        setSrc();
-        videoEl.currentTime = 0;
-        videoEl.playbackRate = 0.8;
+      if (videoEl) {
         videoEl.muted = true;
-        videoEl.play().catch(() => {});
-        resetTimer();
-      }
-      function resetTimer() {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(next, 5 * 60 * 1000);
-      }
-      function next() {
-        if (!heroVideos.length) return;
-        idx = (idx + 1) % heroVideos.length;
-        videoEl.src = heroVideos[idx];
-        applyVideo();
-      }
-      function prev() {
-        if (!heroVideos.length) return;
-        idx = (idx - 1 + heroVideos.length) % heroVideos.length;
-        videoEl.src = heroVideos[idx];
-        applyVideo();
-      }
-      if (videoEl && heroVideos.length) {
-        videoEl.addEventListener("ended", next);
-        nextBtn?.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          next();
-        });
-        prevBtn?.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          prev();
-        });
-        const obs = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting && !document.hidden) {
-                applyVideo();
-              } else {
-                videoEl.pause();
-              }
-            });
-          },
-          { threshold: 0.25 }
-        );
-        obs.observe(videoEl);
-        applyVideo();
+        videoEl.setAttribute("muted", "");
+        videoEl.playsInline = true;
+        videoEl.setAttribute("playsinline", "");
+        videoEl.controls = false;
+        videoEl.removeAttribute("controls");
+        const tryPlay = () => {
+          if (document.hidden) return;
+          const p = videoEl.play();
+          if (p && typeof p.catch === "function") {
+            p.catch(() => {});
+          }
+        };
+        videoEl.addEventListener("canplay", tryPlay, { once: true });
+        requestAnimationFrame(tryPlay);
+        setTimeout(tryPlay, 400);
         document.addEventListener("visibilitychange", () => {
-          if (document.hidden) {
-            videoEl.pause();
-          } else {
-            const rect = videoEl.getBoundingClientRect();
-            const inView = rect.top < window.innerHeight * 0.75 && rect.bottom > 0;
-            if (inView) applyVideo();
+          if (!document.hidden) {
+            tryPlay();
           }
         });
       }

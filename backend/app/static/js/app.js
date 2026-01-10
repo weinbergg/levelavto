@@ -70,9 +70,103 @@
         field.value = value
       }
     })
-    const searchField = qs('#catalog-search')
-    const qVal = params.get('q') || params.get('model')
-    if (searchField && qVal) searchField.value = qVal
+    syncColorChips(form)
+    syncRegMonthState(form)
+  }
+
+  function syncColorChips(scope) {
+    if (!scope) return
+    const input = qs('input[name="color"]', scope)
+    const chips = qsa('.color-chip', scope)
+    if (!input || !chips.length) return
+    const value = input.value
+    chips.forEach((chip) => {
+      chip.classList.toggle('active', chip.dataset.color === value)
+    })
+  }
+
+  function bindColorChips(scope, onChange) {
+    if (!scope) return
+    const input = qs('input[name="color"]', scope)
+    const chips = qsa('.color-chip', scope)
+    if (!input || !chips.length) return
+    chips.forEach((chip) => {
+      if (chip.dataset.bound) return
+      chip.dataset.bound = '1'
+      chip.addEventListener('click', () => {
+        const next = chip.dataset.color || ''
+        if (input.value === next) {
+          input.value = ''
+        } else {
+          input.value = next
+        }
+        syncColorChips(scope)
+        if (typeof onChange === 'function') onChange()
+      })
+    })
+    syncColorChips(scope)
+  }
+
+  function bindOtherColorsToggle(scope) {
+    if (!scope) return
+    const toggle = qs('#colorsToggle', scope)
+    const extra = qs('#colorsExtra', scope)
+    const input = qs('input[name="color"]', scope)
+    if (!toggle || !extra) return
+    const update = (expanded) => {
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false')
+      extra.classList.toggle('is-collapsed', !expanded)
+      toggle.textContent = expanded ? 'Скрыть цвета' : 'Другие цвета'
+    }
+    if (!toggle.dataset.bound) {
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true'
+        update(!expanded)
+      })
+      toggle.dataset.bound = '1'
+    }
+    if (input?.value) {
+      const hasInExtra = extra.querySelector(`.color-chip[data-color="${input.value}"]`)
+      if (hasInExtra) {
+        update(true)
+        return
+      }
+    }
+    update(false)
+  }
+
+  function syncRegMonthState(scope) {
+    if (!scope) return
+    const pairs = [
+      {
+        year: qs('#reg-year-min', scope),
+        month: qs('#reg-month-min', scope),
+        label: qs('[data-reg-month="min"]', scope),
+      },
+      {
+        year: qs('#reg-year-max', scope),
+        month: qs('#reg-month-max', scope),
+        label: qs('[data-reg-month="max"]', scope),
+      },
+    ]
+    pairs.forEach(({ year, month, label }) => {
+      if (!year || !month || !label) return
+      const hasYear = Boolean(year.value)
+      if (!hasYear) {
+        month.value = ''
+      }
+      month.disabled = !hasYear
+      label.classList.toggle('is-hidden', !hasYear)
+    })
+  }
+
+  function bindRegMonthState(scope) {
+    if (!scope) return
+    const yearMin = qs('#reg-year-min', scope)
+    const yearMax = qs('#reg-year-max', scope)
+    yearMin?.addEventListener('change', () => syncRegMonthState(scope))
+    yearMax?.addEventListener('change', () => syncRegMonthState(scope))
+    syncRegMonthState(scope)
   }
 
   function renderSkeleton(cards, count = 6) {
@@ -106,26 +200,35 @@
     const labels = {
       country: 'Страна',
       brand: 'Марка',
-      q: 'Поиск',
       model: 'Модель',
       generation: 'Поколение',
-      color: 'Цвет',
-      body_type: 'Кузов',
       engine_type: 'Топливо',
-      transmission: 'КПП',
+      transmission: 'Трансмиссия',
       price_min: 'Цена от',
       price_max: 'Цена до',
-      year_min: 'Год от',
-      year_max: 'Год до',
       mileage_min: 'Пробег от',
       mileage_max: 'Пробег до',
-      source: 'Источник',
+      color: 'Цвет',
+      reg_year_min: null,
+      reg_month_min: null,
+      reg_year_max: null,
+      reg_month_max: null,
       sort: null,
-      reg_year_min: 'Учёт год от',
-      reg_month_min: 'Учёт мес. от',
-      reg_year_max: 'Учёт год до',
-      reg_month_max: 'Учёт мес. до',
     }
+    const selectLabel = (name, value) => {
+      const el = form.elements[name]
+      if (!el || !value || el.tagName !== 'SELECT') return value
+      const opt = Array.from(el.options || []).find((o) => o.value === value)
+      return opt ? opt.textContent.trim() : value
+    }
+    const colorLabel = (value) => {
+      const chip = form.querySelector(`.color-chip[data-color="${value}"]`)
+      return chip?.dataset?.label || value
+    }
+    const regMinYear = params.get('reg_year_min')
+    const regMinMonth = params.get('reg_month_min')
+    const regMaxYear = params.get('reg_year_max')
+    const regMaxMonth = params.get('reg_month_max')
     const chips = []
     params.forEach((value, key) => {
       if (!value || ['page', 'page_size'].includes(key)) return
@@ -139,22 +242,72 @@
         if (val === 'EU') displayValue = 'Европа'
         else if (val === 'KR') displayValue = 'Корея'
       }
+      if (key === 'price_min' || key === 'price_max') {
+        const n = Number(value)
+        displayValue = Number.isFinite(n) ? formatRub(n) : value
+      }
+      if (key === 'mileage_min' || key === 'mileage_max') {
+        const n = Number(value)
+        displayValue = Number.isFinite(n) ? `${n.toLocaleString('ru-RU')} км` : value
+      }
+      if (key === 'engine_type' || key === 'transmission') {
+        displayValue = selectLabel(key, value)
+      }
+      if (key === 'color') {
+        displayValue = colorLabel(value)
+      }
       chips.push({ key, label, value: displayValue })
     })
+    if (regMinYear || regMinMonth) {
+      const parts = []
+      if (regMinMonth) parts.push(selectLabel('reg_month_min', regMinMonth))
+      if (regMinYear) parts.push(regMinYear)
+      chips.push({
+        keys: ['reg_year_min', 'reg_month_min'],
+        label: 'Учёт от',
+        value: parts.join(' '),
+      })
+    }
+    if (regMaxYear || regMaxMonth) {
+      const parts = []
+      if (regMaxMonth) parts.push(selectLabel('reg_month_max', regMaxMonth))
+      if (regMaxYear) parts.push(regMaxYear)
+      chips.push({
+        keys: ['reg_year_max', 'reg_month_max'],
+        label: 'Учёт до',
+        value: parts.join(' '),
+      })
+    }
     if (!chips.length) {
       container.innerHTML = '<span class="muted">Фильтры не выбраны</span>'
       return
     }
     container.innerHTML = ''
-    chips.forEach(({ key, label, value }) => {
+    chips.forEach(({ key, keys, label, value }) => {
       const chip = document.createElement('button')
       chip.type = 'button'
       chip.className = 'filter-chip'
       chip.innerHTML = `<span>${label}: ${value}</span><span class="chip-close">×</span>`
       chip.addEventListener('click', () => {
-        const el = form.elements[key]
-        if (el) el.value = ''
-        if (key === 'model' || key === 'q') qs('#catalog-search') && (qs('#catalog-search').value = '')
+        const toClear = keys || [key]
+        toClear.forEach((item) => {
+          const el = form.elements[item]
+          if (el) el.value = ''
+        })
+        if (toClear.includes('model')) {
+          const modelSelect = qs('#model-select')
+          if (modelSelect) modelSelect.value = ''
+        }
+        if (toClear.includes('brand')) {
+          const modelSelect = qs('#model-select')
+          if (modelSelect) {
+            modelSelect.innerHTML = '<option value="">Все</option>'
+            modelSelect.disabled = true
+          }
+        }
+        if (toClear.includes('color')) {
+          syncColorChips(form)
+        }
         loadCars(1)
       })
       container.appendChild(chip)
@@ -165,9 +318,16 @@
     const form = qs('#filters')
     const data = new FormData(form)
     const params = new URLSearchParams()
-    const numericKeys = ['price_min', 'price_max', 'year_min', 'year_max', 'mileage_max']
-    const searchField = qs('#catalog-search')
-    const searchValue = searchField?.value?.trim()
+    const numericKeys = [
+      'price_min',
+      'price_max',
+      'mileage_min',
+      'mileage_max',
+      'reg_year_min',
+      'reg_month_min',
+      'reg_year_max',
+      'reg_month_max',
+    ]
     for (const [k, v] of data.entries()) {
       if (!v) continue
       if (numericKeys.includes(k)) {
@@ -179,13 +339,6 @@
       }
       params.append(k, v)
     }
-    if (searchValue) {
-      params.set('q', searchValue)
-      params.set('model', searchValue)
-    } else {
-      params.delete('q')
-      params.delete('model')
-    }
     params.set('page', String(page || 1))
     params.set('page_size', '12')
     const pageField = form.querySelector('input[name="page"]')
@@ -196,8 +349,16 @@
   function renderEmpty(cards, reason = 'Нет результатов по выбранным фильтрам.') {
     cards.innerHTML = `<div class="empty-state">${reason}<br><button class="btn btn-secondary" id="emptyReset">Сбросить фильтры</button></div>`
     qs('#emptyReset')?.addEventListener('click', () => {
-      qs('#filters')?.reset()
-      qs('#catalog-search') && (qs('#catalog-search').value = '')
+      const form = qs('#filters')
+      form?.reset()
+      syncColorChips(form)
+      syncRegMonthState(form)
+      bindOtherColorsToggle(form)
+      const modelSelect = qs('#model-select')
+      if (modelSelect) {
+        modelSelect.innerHTML = '<option value=\"\">Все</option>'
+        modelSelect.disabled = true
+      }
       loadCars(1)
     })
   }
@@ -264,7 +425,6 @@
     const spinner = qs('#spinner')
     const cards = qs('#cards')
     const pageInfo = qs('#pageInfo')
-      const featuredBlock = qs('#featuredBlock')
     const resultCount = qs('#resultCount')
     if (!spinner || !cards) return
     spinner.style.display = 'block'
@@ -278,19 +438,6 @@
       }
       const data = await res.json()
       renderActiveFilters(params)
-      // hide featured block if any filters applied
-      if (featuredBlock) {
-        const defaultSource = 'mobile_de'
-        const defaultSort = 'price_asc'
-        const whitelist = ['page', 'page_size']
-        const hasFilters = Array.from(params.entries()).some(([k, v]) => {
-          if (!v || whitelist.includes(k)) return false
-          if (k === 'source' && (v === defaultSource || v === '')) return false
-          if (k === 'sort' && v === defaultSort) return false
-          return true
-        })
-        featuredBlock.style.display = hasFilters ? 'none' : ''
-      }
       if (pageInfo) {
       pageInfo.textContent = `Страница ${data.page} из ${Math.max(1, Math.ceil(data.total / data.page_size))}`
       }
@@ -348,107 +495,9 @@
         const more = (car.images_count && car.images_count > 1 && car.thumbnail_url) ? `<span class="more-badge">+${car.images_count - 1} фото</span>` : ''
         const price = car.price != null ? formatPrice(car.price, car.currency, fx) : ''
         const metaLine = [car.year, car.engine_type].filter(Boolean).join(' · ')
-        const normalizeColor = (clr) => {
-          if (!clr) return ''
-          const t = clr.toLowerCase()
-          const map = [
-            ['серебрист', 'silver'],
-            ['серебро', 'silver'],
-            ['серебр', 'silver'],
-            ['серо', 'gray'],
-            ['темно-сер', 'dark_gray'],
-            ['graphite', 'graphite'],
-            ['графит', 'graphite'],
-            ['grey', 'gray'],
-            ['gray', 'gray'],
-            ['платин', 'silver'],
-            ['черн', 'black'],
-            ['black', 'black'],
-            ['бел', 'white'],
-            ['white', 'white'],
-            ['ivory', 'ivory'],
-            ['слон', 'ivory'],
-            ['голуб', 'light_blue'],
-            ['син', 'blue'],
-            ['navy', 'blue'],
-            ['blue', 'blue'],
-            ['зелен', 'green'],
-            ['green', 'green'],
-            ['бирюз', 'teal'],
-            ['teal', 'teal'],
-            ['желт', 'yellow'],
-            ['yellow', 'yellow'],
-            ['оранж', 'orange'],
-            ['orange', 'orange'],
-            ['красн', 'red'],
-            ['red', 'red'],
-            ['коричн', 'brown'],
-            ['brown', 'brown'],
-            ['беж', 'beige'],
-            ['капуч', 'beige'],
-            ['latte', 'beige'],
-            ['champagne', 'champagne'],
-            ['шамп', 'champagne'],
-            ['beige', 'beige'],
-            ['фиол', 'purple'],
-            ['пурпур', 'purple'],
-            ['violet', 'purple'],
-            ['purple', 'purple'],
-            ['зол', 'gold'],
-            ['gold', 'gold'],
-            ['роз', 'pink'],
-            ['pink', 'pink'],
-          ]
-          for (const [key, norm] of map) {
-            if (t.includes(key)) return norm
-          }
-          return clr
-        }
-        const colorLabels = {
-          black: 'Чёрный',
-          white: 'Белый',
-          gray: 'Серый',
-          silver: 'Серебристый',
-          red: 'Красный',
-          blue: 'Синий',
-          light_blue: 'Голубой',
-          green: 'Зелёный',
-          teal: 'Бирюзовый',
-          yellow: 'Жёлтый',
-          orange: 'Оранжевый',
-          brown: 'Коричневый',
-          beige: 'Бежевый',
-          purple: 'Фиолетовый',
-          gold: 'Золотой',
-          pink: 'Розовый',
-        }
-        const colorDot = (clr) => {
-          if (!clr) return ''
-          const norm = normalizeColor(clr)
-          const palette = {
-            black: '#111',
-            white: '#f5f5f5',
-            gray: '#888',
-            dark_gray: '#5f6570',
-            graphite: '#4b4f56',
-            silver: '#c0c0c0',
-            red: '#d82424',
-            blue: '#2d7dd2',
-            light_blue: '#6ab8ff',
-            green: '#1f9d55',
-            teal: '#14b8a6',
-            yellow: '#f9c846',
-            orange: '#f97316',
-            brown: '#9c6b3c',
-            beige: '#d9c6a5',
-            purple: '#8b5cf6',
-            gold: '#d4af37',
-            pink: '#f472b6',
-            champagne: '#e6d4b3',
-            ivory: '#f6efe2',
-          }
-          const val = palette[norm] || clr
-          return `<span class="spec-dot" style="background:${val}"></span>`
+        const colorDot = (hex) => {
+          if (!hex) return ''
+          return `<span class="spec-dot" style="background:${hex}"></span>`
         }
         const specLines = []
         if (car.mileage != null) {
@@ -459,7 +508,7 @@
         }
         if (car.display_color || car.color) {
           const label = car.display_color || car.color
-          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt="">${colorDot(car.color)}${label}</span>`)
+          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt="">${colorDot(car.color_hex)}${label}</span>`)
         }
         if (car.display_region || car.country) {
           specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt="">${car.display_region || car.country}</span>`)
@@ -533,53 +582,28 @@
     const urlParams = new URLSearchParams(window.location.search)
     const initialPage = Number(urlParams.get('page') || 1)
     const initialModelParam = urlParams.get('model') || ''
-    const initialGeneration = urlParams.get('generation') || ''
     const initialSort = urlParams.get('sort') || 'price_asc'
-    const searchField = qs('#catalog-search')
     const modelSelect = qs('#model-select')
     const brandSelect = qs('#brand')
-    const colorSelect = qs('#colorSelect')
-    const colorChipsBase = qsa('#colorSwatchesBase .color-chip')
-    const colorChipsExtra = qsa('#colorSwatchesExtra .color-chip')
-    const colorChips = [...colorChipsBase, ...colorChipsExtra]
-    const colorLabel = qs('#colorLabel')
-    const colorToggle = qs('#toggleExtraColors')
-    const colorExtra = qs('#colorSwatchesExtra')
-    const advancedToggle = qs('#advancedToggle')
-    const advancedBody = qs('#advancedBody')
     qs('#applyFilters')?.addEventListener('click', (e) => {
       e.preventDefault()
       sessionStorage.setItem('catalogScroll', String(window.scrollY))
-      loadCars(1)
-    })
-    searchField?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        loadCars(1)
-      }
-    })
-    qs('#catalogSearchBtn')?.addEventListener('click', () => {
       loadCars(1)
     })
     qs('#resetFilters')?.addEventListener('click', (e) => {
       e.preventDefault()
       const form = qs('#filters')
       form?.reset()
-      if (searchField) searchField.value = ''
-      colorChips.forEach((chip) => chip.classList.remove('active'))
-      if (colorLabel) colorLabel.textContent = 'Все цвета'
+      syncColorChips(form)
+      syncRegMonthState(form)
+      bindOtherColorsToggle(form)
+      if (modelSelect) {
+        modelSelect.innerHTML = '<option value="">Все</option>'
+        modelSelect.disabled = true
+      }
       sessionStorage.setItem('catalogScroll', String(0))
       loadCars(1)
     })
-    if (advancedToggle && advancedBody) {
-      let collapsed = false
-      const setState = (v) => {
-        collapsed = v
-        advancedBody.classList.toggle('is-collapsed', collapsed)
-      }
-      setState(false)
-      advancedToggle.addEventListener('click', () => setState(!collapsed))
-    }
 
     qs('#prevPage')?.addEventListener('click', () => {
       const p = Math.max(1, (window.__page || 1) - 1)
@@ -593,6 +617,9 @@
     // auto-apply filters on change / typing
     const filtersForm = qs('#filters')
     if (filtersForm) {
+      bindColorChips(filtersForm, () => loadCars(1))
+      bindOtherColorsToggle(filtersForm)
+      bindRegMonthState(filtersForm)
       const ctrls = qsa('input, select', filtersForm)
       let debounce
       const trigger = () => {
@@ -606,10 +633,8 @@
         el.addEventListener('input', trigger)
       })
       // apply initial sort/generation if present
-      const sortSelect = qs('select[name="sort"]', filtersForm)
+      const sortSelect = qs('#sortHidden', filtersForm)
       if (sortSelect && initialSort) sortSelect.value = initialSort
-      const generationInput = qs('input[name="generation"]', filtersForm)
-      if (generationInput && initialGeneration) generationInput.value = initialGeneration
       const sortTopbar = qs('#sort-select')
       if (sortTopbar && initialSort) sortTopbar.value = initialSort
       if (sortTopbar) {
@@ -622,85 +647,27 @@
     }
     const toggle = qs('#filtersToggle')
     const panel = qs('#filtersPanel')
-    toggle?.addEventListener('click', () => {
-      panel?.classList.toggle('open')
+    const overlay = qs('#filtersOverlay')
+    const closeBtn = qs('#filtersClose')
+    const setFiltersOpen = (next) => {
+      if (!panel) return
+      panel.classList.toggle('open', next)
+      overlay?.classList.toggle('open', next)
+      document.body.classList.toggle('filters-open', next)
+    }
+    toggle?.addEventListener('click', () => setFiltersOpen(true))
+    closeBtn?.addEventListener('click', () => setFiltersOpen(false))
+    overlay?.addEventListener('click', () => setFiltersOpen(false))
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') setFiltersOpen(false)
     })
 
-    // color chips: sync with select and query
-    if (colorChips.length && colorSelect) {
-      const stringToColor = (str) => {
-        if (!str) return '#666'
-        let hash = 0
-        for (let i = 0; i < str.length; i += 1) {
-          hash = str.charCodeAt(i) + ((hash << 5) - hash)
-        }
-        const h = Math.abs(hash) % 360
-        return `hsl(${h}, 55%, 55%)`
-      }
-      const setLabel = (val) => {
-        if (!colorLabel) return
-        const active = colorChips.find((c) => c.dataset.value === val)
-        colorLabel.textContent = active?.dataset.label || 'Все цвета'
-      }
-      colorChips.forEach((chip) => {
-        const hex = chip.dataset.hex
-        if (hex) chip.style.background = hex
-        else chip.style.background = stringToColor(chip.dataset.label || chip.dataset.value)
-        if (chip.hasAttribute('title')) {
-          chip.removeAttribute('title')
-        }
-      })
-      const setActive = (vals) => {
-        const set = new Set(vals)
-        colorChips.forEach((chip) => {
-          chip.classList.toggle('active', set.has(chip.dataset.value))
-        })
-        const labelVal = vals[vals.length - 1] || ''
-        setLabel(labelVal)
-      }
-      const getValues = () => {
-        const raw = colorSelect.value || ''
-        if (!raw) return []
-        return raw.split(',').filter(Boolean)
-      }
-      setActive(getValues())
-      const updateSelect = (vals) => {
-        colorSelect.value = vals.join(',')
-      }
-      colorChips.forEach((chip) => {
-        chip.addEventListener('click', () => {
-          const val = chip.dataset.value || ''
-          let vals = getValues()
-          if (vals.includes(val)) {
-            vals = vals.filter((v) => v !== val)
-          } else {
-            vals.push(val)
-          }
-          updateSelect(vals)
-          setActive(vals)
-    loadCars(1)
-        })
-      })
-      colorSelect.addEventListener('change', () => setActive(getValues()))
-      if (colorToggle && colorExtra) {
-        let collapsed = true
-        const updateToggle = () => {
-          colorExtra.classList.toggle('is-collapsed', collapsed)
-          colorToggle.textContent = collapsed ? 'Показать больше цветов' : 'Скрыть дополнительные цвета'
-        }
-        updateToggle()
-        colorToggle.addEventListener('click', () => {
-          collapsed = !collapsed
-          updateToggle()
-        })
-      }
-    }
     async function updateCatalogModels() {
       if (!brandSelect || !modelSelect) return
       const brand = brandSelect.value
       modelSelect.innerHTML = ''
       if (!brand) {
-        modelSelect.disabled = false
+        modelSelect.disabled = true
         modelSelect.innerHTML = '<option value=\"\">Все</option>'
         return
       }
@@ -863,13 +830,47 @@
     const form = qs('#home-search')
     if (!form) return
     const resetBtn = qs('#home-reset')
+    const brandSelect = qs('#home-brand')
+    const modelSelect = qs('#home-model')
 
     if (resetBtn) {
       resetBtn.addEventListener('click', (e) => {
         e.preventDefault()
         form.reset()
+        syncColorChips(form)
+        if (modelSelect) {
+          modelSelect.innerHTML = '<option value="">Все</option>'
+          modelSelect.disabled = true
+        }
       })
     }
+
+    async function updateHomeModels() {
+      if (!brandSelect || !modelSelect) return
+      const brand = brandSelect.value
+      modelSelect.innerHTML = ''
+      if (!brand) {
+        modelSelect.disabled = true
+        modelSelect.innerHTML = '<option value="">Все</option>'
+        return
+      }
+      modelSelect.disabled = true
+      modelSelect.innerHTML = '<option value="">Загрузка…</option>'
+      const models = await fetchModels(brand)
+      modelSelect.innerHTML = '<option value="">Все</option>'
+      models.forEach(({ model }) => {
+        const opt = document.createElement('option')
+        opt.value = model
+        opt.textContent = model
+        modelSelect.appendChild(opt)
+      })
+      modelSelect.disabled = false
+    }
+
+    brandSelect?.addEventListener('change', () => {
+      updateHomeModels()
+    })
+    bindColorChips(form)
   }
 
   async function convertInlinePrices() {
