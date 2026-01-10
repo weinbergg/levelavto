@@ -11,15 +11,14 @@
       </div>
       <form id="filters" onsubmit="return false;">
         {% set params = request.query_params %}
-        {% set region_labels = {'EU': 'Европа', 'KR': 'Корея'} %}
         <div class="filters-primary">
           <div class="filters-primary-grid">
-            {% if regions %}
+            {% if countries %}
             <label>Страна
               <select name="country" id="country">
                 <option value="">Все</option>
-                {% for r in regions %}
-                <option value="{{ r }}" {% if params.get('country') == r %}selected{% endif %}>{{ region_labels.get(r, r) }}</option>
+                {% for c in countries %}
+                <option value="{{ c }}" {% if params.get('country') == c %}selected{% endif %}>{{ country_labels.get(c, c) }}</option>
                 {% endfor %}
               </select>
             </label>

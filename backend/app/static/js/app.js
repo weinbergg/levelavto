@@ -238,9 +238,7 @@
       if (label === null) return
       let displayValue = value
       if (key === 'country') {
-        const val = value.toUpperCase()
-        if (val === 'EU') displayValue = 'Европа'
-        else if (val === 'KR') displayValue = 'Корея'
+        displayValue = selectLabel(key, value)
       }
       if (key === 'price_min' || key === 'price_max') {
         const n = Number(value)
@@ -510,8 +508,8 @@
           const label = car.display_color || car.color
           specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt="">${colorDot(car.color_hex)}${label}</span>`)
         }
-        if (car.display_region || car.country) {
-          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt="">${car.display_region || car.country}</span>`)
+        if (car.display_country_label || car.country) {
+          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt="">${car.display_country_label || car.country}</span>`)
         }
         card.innerHTML = `
           <div class="thumb-wrap">

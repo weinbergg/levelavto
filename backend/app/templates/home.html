@@ -31,8 +31,7 @@
       </div>
       <form class="search-form" id="home-search" method="get" action="/catalog">
         <div class="filter-grid filter-grid--overlay">
-          {% set region_labels = {'EU': 'Европа', 'KR': 'Корея'} %}
-          <div class="field">
+        <div class="field">
             <label for="home-brand">Марка</label>
             <select id="home-brand" name="brand">
               <option value="">Все</option>
@@ -51,8 +50,8 @@
             <label for="home-country">Страна</label>
             <select id="home-country" name="country">
               <option value="">Все</option>
-              {% for r in regions %}
-              <option value="{{ r }}">{{ region_labels.get(r, r) }}</option>
+              {% for c in countries %}
+              <option value="{{ c }}">{{ country_labels.get(c, c) }}</option>
               {% endfor %}
             </select>
           </div>
@@ -313,7 +312,7 @@
             <ul class="specs">
               <li>Пробег: {{ car.mileage or '—' }}</li>
               <li>Кузов: {{ car.body_type or '—' }}</li>
-              <li>Страна: {{ car.country or '—' }}</li>
+              <li>Страна: {{ car.display_country_label or car.country or '—' }}</li>
             </ul>
           </div>
           <div class="car-card__price">

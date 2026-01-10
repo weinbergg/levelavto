@@ -7,7 +7,8 @@ import os
 import requests
 import time
 from ..models import Car, Source, FeaturedCar
-from ..utils.localization import display_region, display_body, display_color
+from ..utils.localization import display_color
+from ..utils.country_map import normalize_country_code
 from ..utils.taxonomy import (
     normalize_color,
     normalize_fuel,
@@ -26,8 +27,9 @@ class CarsService:
 
     EU_COUNTRIES = {
         "DE", "AT", "FR", "IT", "ES", "NL", "BE", "PL", "CZ", "SE", "FI",
-        "NO", "DK", "PT", "GR", "CH", "LU", "IE", "GB", "HU", "SK",
-        "SI", "HR", "RO", "BG", "EE", "LV", "LT",
+        "NO", "DK", "PT", "GR", "CH", "LU", "IE", "GB", "HU", "SK", "SI",
+        "HR", "RO", "BG", "EE", "LV", "LT", "MT", "CY", "IS", "LI", "MC",
+        "SM", "AD",
     }
     KOREA_SOURCE_HINTS = ("emavto", "encar", "m-auto", "m_auto")
     EUROPE_SOURCE_PREFIX = "mobile"
@@ -44,35 +46,27 @@ class CarsService:
             select(Source.id).where(func.lower(Source.key).like(f"{self.EUROPE_SOURCE_PREFIX}%"))
         ).scalars().all()
 
-    def available_regions(self) -> List[str]:
-        regions: List[str] = []
-        src_keys = self.db.execute(
-            select(func.distinct(Source.key))
-            .join(Car, Car.source_id == Source.id)
-            .where(Car.is_available.is_(True))
-        ).scalars().all()
-        has_kr = any(
-            key and any(hint in key.lower() for hint in self.KOREA_SOURCE_HINTS)
-            for key in src_keys
-        )
-        has_eu = any(
-            key and key.lower().startswith(self.EUROPE_SOURCE_PREFIX)
-            for key in src_keys
-        )
-        countries = self.db.execute(
-            select(func.distinct(func.upper(Car.country)))
+    def available_countries(self) -> List[str]:
+        rows = self.db.execute(
+            select(func.distinct(Car.country))
             .where(Car.is_available.is_(True), Car.country.is_not(None))
         ).scalars().all()
-        for c in countries:
-            if c.startswith("KR"):
+        countries: List[str] = []
+        seen = set()
+        has_kr = False
+        for c in rows:
+            code = normalize_country_code(c)
+            if not code:
+                continue
+            if code == "KR":
                 has_kr = True
-            if c in self.EU_COUNTRIES:
-                has_eu = True
-        if has_eu:
-            regions.append("EU")
-        if has_kr:
-            regions.append("KR")
-        return regions
+            if code in self.EU_COUNTRIES and code not in seen:
+                countries.append(code)
+                seen.add(code)
+        kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+        if (has_kr or kr_sources) and "KR" not in seen:
+            countries.append("KR")
+        return countries
 
     _fx_cache: dict | None = None
     _fx_cache_ts: float | None = None
@@ -125,7 +119,7 @@ class CarsService:
     ) -> Tuple[List[Car], int]:
         conditions = [Car.is_available.is_(True)]
         if country:
-            c = country.upper()
+            c = normalize_country_code(country)
             if c == "KR":
                 kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
                 kr_conds = [func.upper(Car.country).like("KR%")]
@@ -138,6 +132,8 @@ class CarsService:
                 if eu_sources:
                     eu_conds.append(Car.source_id.in_(eu_sources))
                 conditions.append(or_(*eu_conds))
+            elif c:
+                conditions.append(func.upper(Car.country) == c)
         if brand:
             # case-insensitive contains (brand may have variants/extra symbols)
             b = brand.strip().strip(".,;")

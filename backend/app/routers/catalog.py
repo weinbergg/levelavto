@@ -6,7 +6,8 @@ from ..services.cars_service import CarsService
 from ..schemas import CarOut, CarDetailOut
 from ..models import Car, CarImage, Source
 from sqlalchemy import select, func
-from ..utils.localization import display_region, display_body, display_color
+from ..utils.localization import display_body, display_color
+from ..utils.country_map import resolve_display_country
 from ..utils.taxonomy import ru_color, normalize_color, color_hex
 
 router = APIRouter()
@@ -85,14 +86,9 @@ def list_cars(
     for c in items:
         co = CarOut.model_validate(c).model_dump()
         src_key = source_map.get(c.source_id, "") if c.source_id else ""
-        if src_key.startswith("mobile"):
-            co["country"] = "Европа"
-            co["region"] = "EU"
-        elif "emavto" in src_key or "encar" in src_key or "m-auto" in src_key or "m_auto" in src_key:
-            co["country"] = "Корея"
-            co["region"] = "KR"
-        display_reg = display_region(src_key) or co.get("country")
-        co["display_region"] = display_reg
+        display_code, display_label = resolve_display_country(c, source_key=src_key)
+        co["display_country_code"] = display_code
+        co["display_country_label"] = display_label
         co["display_body_type"] = display_body(co.get("body_type")) or co.get("body_type")
         raw_color = co.get("color")
         norm_color = normalize_color(raw_color)
@@ -118,12 +114,10 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     detail = CarDetailOut.model_validate(car)
     if car.source:
         detail.source_name = car.source.name
-        src_key = car.source.key or ""
-        if src_key.startswith("mobile"):
-            detail.country = "Европа"
-        elif "emavto" in src_key:
-            detail.country = "Корея"
         detail.source_country = car.source.country
+    display_code, display_label = resolve_display_country(car)
+    detail.display_country_code = display_code
+    detail.display_country_label = display_label
     return detail.model_dump()
 
 

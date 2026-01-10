@@ -16,8 +16,9 @@ from sqlalchemy import select, and_, func, exists
 from ..models import Car, Source, CarImage
 from ..auth import get_current_user
 from urllib.parse import quote
-from ..utils.localization import display_region, display_body, display_color
+from ..utils.localization import display_body, display_color
 from ..utils.taxonomy import ru_body, ru_color
+from ..utils.country_map import country_label_ru, resolve_display_country
 
 
 router = APIRouter()
@@ -74,7 +75,7 @@ def _range_steps(max_val: Optional[float], base_step: int, min_val: int, max_opt
 
 
 def _build_filter_context(service: CarsService, db: Session) -> Dict[str, Any]:
-    regions = service.available_regions()
+    countries = service.available_countries()
     reg_years = (
         db.execute(
             select(func.distinct(Car.registration_year))
@@ -109,8 +110,10 @@ def _build_filter_context(service: CarsService, db: Session) -> Dict[str, Any]:
     basic_by_value = {c["value"]: c for c in colors if c.get("value") in basic_set}
     colors_basic = [basic_by_value[c] for c in BASIC_COLORS if c in basic_by_value]
     colors_other = [c for c in colors if c.get("value") not in basic_set]
+    countries_sorted = sorted(countries)
     return {
-        "regions": regions,
+        "countries": countries_sorted,
+        "country_labels": {c: country_label_ru(c) for c in countries_sorted},
         "reg_years": reg_years,
         "reg_months": reg_months,
         "price_options": _range_steps(price_max, 500_000, 1_000_000, 12),
@@ -134,6 +137,10 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
         mileage_max=reco_cfg.get("mileage_max"),
         limit=12,
     )
+    for car in recommended:
+        code, label = resolve_display_country(car)
+        car.display_country_code = code
+        car.display_country_label = label
     content = ContentService(db).content_map(
         [
             "hero_title",
@@ -259,7 +266,8 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
         "user": getattr(request.state, "user", None),
         "total_cars": service.total_cars(),
         "brands": service.brands(),
-        "regions": filter_ctx["regions"],
+        "countries": filter_ctx["countries"],
+        "country_labels": filter_ctx["country_labels"],
         "reg_years": filter_ctx["reg_years"],
         "reg_months": filter_ctx["reg_months"],
         "price_options": filter_ctx["price_options"],
@@ -377,7 +385,8 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "request": request,
             "user": getattr(request.state, "user", None),
             "brands": brands,
-            "regions": filter_ctx["regions"],
+            "countries": filter_ctx["countries"],
+            "country_labels": filter_ctx["country_labels"],
             "reg_years": filter_ctx["reg_years"],
             "reg_months": filter_ctx["reg_months"],
             "price_options": filter_ctx["price_options"],
@@ -404,14 +413,10 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     templates = request.app.state.templates
     service = CarsService(db)
     car = service.get_car(car_id)
-    if car and car.source:
-        src_key = car.source.key or ""
-        if src_key.startswith("mobile"):
-            car.display_region = "Европа"
-        elif "emavto" in src_key or "encar" in src_key or "m-auto" in src_key or "m_auto" in src_key:
-            car.display_region = "Корея"
-        else:
-            car.display_region = display_region(src_key) or car.country
+    if car:
+        code, label = resolve_display_country(car)
+        car.display_country_code = code
+        car.display_country_label = label
     if car:
         car.display_body_type = ru_body(getattr(car, "body_type", None)) or display_body(getattr(car, "body_type", None)) or car.body_type
         car.display_color = ru_color(getattr(car, "color", None)) or display_color(getattr(car, "color", None)) or car.color

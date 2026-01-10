@@ -42,10 +42,13 @@ class CarBase(BaseModel):
 
 class CarOut(CarBase):
     images_count: Optional[int] = None
+    display_country_code: Optional[str] = None
+    display_country_label: Optional[str] = None
 
 
 class CarDetailOut(CarBase):
     source_name: Optional[str] = None
     source_country: Optional[str] = None
-
+    display_country_code: Optional[str] = None
+    display_country_label: Optional[str] = None
 

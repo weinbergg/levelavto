@@ -57,7 +57,7 @@
             <p class="muted">{{ meta|join(' · ') }}</p>
             {% endif %}
             <p class="muted">
-              Источник: надёжный партнёр · {% if car.country %}Страна: {{ car.display_region or car.country }} · {% endif %} Фото:
+              Источник: надёжный партнёр · {% if car.display_country_label or car.country %}Страна: {{ car.display_country_label or car.country }} · {% endif %} Фото:
               {{ car.images|length if car.images else 0 }}
             </p>
           </div>
@@ -85,8 +85,8 @@
           <div class="chip">Привод: {{ car.drive_type }}</div>
           {% endif %} {% if car.color %}
           <div class="chip">Цвет: {{ car.display_color or car.color }}</div>
-          {% endif %} {% if car.country %}
-          <div class="chip">Страна: {{ car.display_region or car.country }}</div>
+          {% endif %} {% if car.display_country_label or car.country %}
+          <div class="chip">Страна: {{ car.display_country_label or car.country }}</div>
           {% endif %} {% if car.vin %}
           <div class="chip">VIN: {{ car.vin }}</div>
           {% endif %}
