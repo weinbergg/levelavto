@@ -1113,8 +1113,10 @@
       const data = new FormData(form)
       const params = new URLSearchParams()
       const numericKeys = ['price_min', 'price_max', 'mileage_min', 'mileage_max']
+      const skipKeys = ['region', 'eu_country', 'kr_type']
       for (const [k, v] of data.entries()) {
         if (!v) continue
+        if (skipKeys.includes(k)) continue
         if (k === 'brand') {
           const norm = normalizeBrand(v)
           if (norm) {
