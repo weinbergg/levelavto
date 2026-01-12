@@ -84,8 +84,20 @@ def _mileage_suggestions(max_val: Optional[float]) -> List[int]:
     return all_vals
 
 
-def _build_filter_context(service: CarsService, db: Session) -> Dict[str, Any]:
-    countries = service.available_countries()
+def _sort_numeric_strings(values: List[str]) -> List[str]:
+    def to_num(v: str) -> int:
+        digits = "".join(ch for ch in str(v) if ch.isdigit())
+        return int(digits) if digits else 0
+
+    return sorted(values, key=lambda v: (to_num(v), str(v)))
+
+
+def _build_filter_context(service: CarsService, db: Session, include_payload: bool = True) -> Dict[str, Any]:
+    regions = service.available_regions()
+    eu_countries = service.available_eu_countries()
+    eu_source_ids = service.source_ids_for_region("EU")
+    kr_source_ids = service.source_ids_for_region("KR")
+    has_air_suspension = service.has_air_suspension() if include_payload else False
     reg_years = (
         db.execute(
             select(func.distinct(Car.registration_year))
@@ -120,10 +132,88 @@ def _build_filter_context(service: CarsService, db: Session) -> Dict[str, Any]:
     basic_by_value = {c["value"]: c for c in colors if c.get("value") in basic_set}
     colors_basic = [basic_by_value[c] for c in BASIC_COLORS if c in basic_by_value]
     colors_other = [c for c in colors if c.get("value") not in basic_set]
-    countries_sorted = sorted(countries)
+    countries_sorted = sorted(eu_countries)
+    body_types = []
+    for row in service.body_type_stats():
+        val = row.get("body_type")
+        if not val:
+            continue
+        label = ru_body(val) or display_body(val) or val
+        body_types.append({"value": val, "label": label, "count": row.get("count")})
+    if include_payload:
+        payload_keys = [
+            "num_seats",
+            "doors_count",
+            "owners_count",
+            "emission_class",
+            "efficiency_class",
+            "climatisation",
+            "airbags",
+            "interior_design",
+            "price_rating_label",
+        ]
+        eu_payload = service.payload_values_bulk(payload_keys, source_ids=eu_source_ids)
+        kr_payload = service.payload_values_bulk(payload_keys, source_ids=kr_source_ids)
+        seats_options = []
+        doors_options = []
+        owners_options = []
+        emission_classes = []
+        efficiency_classes = []
+        climatisation_options = []
+        airbags_options = []
+        interior_design_options = []
+        price_rating_labels = []
+        seats_options_eu = _sort_numeric_strings(eu_payload.get("num_seats", []))
+        doors_options_eu = _sort_numeric_strings(eu_payload.get("doors_count", []))
+        owners_options_eu = _sort_numeric_strings(eu_payload.get("owners_count", []))
+        emission_classes_eu = eu_payload.get("emission_class", [])
+        efficiency_classes_eu = eu_payload.get("efficiency_class", [])
+        climatisation_options_eu = eu_payload.get("climatisation", [])
+        airbags_options_eu = eu_payload.get("airbags", [])
+        interior_design_options_eu = eu_payload.get("interior_design", [])
+        price_rating_labels_eu = eu_payload.get("price_rating_label", [])
+        seats_options_kr = _sort_numeric_strings(kr_payload.get("num_seats", []))
+        doors_options_kr = _sort_numeric_strings(kr_payload.get("doors_count", []))
+        owners_options_kr = _sort_numeric_strings(kr_payload.get("owners_count", []))
+        emission_classes_kr = kr_payload.get("emission_class", [])
+        efficiency_classes_kr = kr_payload.get("efficiency_class", [])
+        climatisation_options_kr = kr_payload.get("climatisation", [])
+        airbags_options_kr = kr_payload.get("airbags", [])
+        interior_design_options_kr = kr_payload.get("interior_design", [])
+        price_rating_labels_kr = kr_payload.get("price_rating_label", [])
+    else:
+        seats_options = []
+        doors_options = []
+        owners_options = []
+        emission_classes = []
+        efficiency_classes = []
+        climatisation_options = []
+        airbags_options = []
+        interior_design_options = []
+        price_rating_labels = []
+        seats_options_eu = []
+        doors_options_eu = []
+        owners_options_eu = []
+        emission_classes_eu = []
+        efficiency_classes_eu = []
+        climatisation_options_eu = []
+        airbags_options_eu = []
+        interior_design_options_eu = []
+        price_rating_labels_eu = []
+        seats_options_kr = []
+        doors_options_kr = []
+        owners_options_kr = []
+        emission_classes_kr = []
+        efficiency_classes_kr = []
+        climatisation_options_kr = []
+        airbags_options_kr = []
+        interior_design_options_kr = []
+        price_rating_labels_kr = []
     return {
+        "regions": regions,
         "countries": countries_sorted,
-        "country_labels": {c: country_label_ru(c) for c in countries_sorted},
+        "country_labels": {**{c: country_label_ru(c) for c in countries_sorted}, "EU": "Европа", "KR": "Корея"},
+        "kr_types": [],
         "reg_years": reg_years,
         "reg_months": reg_months,
         "price_options": _range_steps(price_max, 500_000, 1_000_000, 12),
@@ -131,8 +221,38 @@ def _build_filter_context(service: CarsService, db: Session) -> Dict[str, Any]:
         "generations": generations,
         "colors_basic": colors_basic,
         "colors_other": colors_other,
+        "body_types": body_types,
         "engine_types": service.engine_types(),
         "transmissions": service.transmission_options(),
+        "drive_types": service.drive_types(),
+        "seats_options": seats_options,
+        "doors_options": doors_options,
+        "owners_options": owners_options,
+        "emission_classes": emission_classes,
+        "efficiency_classes": efficiency_classes,
+        "climatisation_options": climatisation_options,
+        "airbags_options": airbags_options,
+        "interior_design_options": interior_design_options,
+        "price_rating_labels": price_rating_labels,
+        "seats_options_eu": seats_options_eu,
+        "doors_options_eu": doors_options_eu,
+        "owners_options_eu": owners_options_eu,
+        "emission_classes_eu": emission_classes_eu,
+        "efficiency_classes_eu": efficiency_classes_eu,
+        "climatisation_options_eu": climatisation_options_eu,
+        "airbags_options_eu": airbags_options_eu,
+        "interior_design_options_eu": interior_design_options_eu,
+        "price_rating_labels_eu": price_rating_labels_eu,
+        "seats_options_kr": seats_options_kr,
+        "doors_options_kr": doors_options_kr,
+        "owners_options_kr": owners_options_kr,
+        "emission_classes_kr": emission_classes_kr,
+        "efficiency_classes_kr": efficiency_classes_kr,
+        "climatisation_options_kr": climatisation_options_kr,
+        "airbags_options_kr": airbags_options_kr,
+        "interior_design_options_kr": interior_design_options_kr,
+        "price_rating_labels_kr": price_rating_labels_kr,
+        "has_air_suspension": has_air_suspension,
     }
 
 
@@ -274,14 +394,16 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
             )
             seen.add(b["brand"])
 
-    filter_ctx = _build_filter_context(service, db)
+    filter_ctx = _build_filter_context(service, db, include_payload=False)
     context = {
         "request": request,
         "user": getattr(request.state, "user", None),
         "total_cars": service.total_cars(),
         "brands": service.brands(),
+        "regions": filter_ctx["regions"],
         "countries": filter_ctx["countries"],
         "country_labels": filter_ctx["country_labels"],
+        "kr_types": filter_ctx["kr_types"],
         "reg_years": filter_ctx["reg_years"],
         "reg_months": filter_ctx["reg_months"],
         "price_options": filter_ctx["price_options"],
@@ -383,7 +505,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     templates = request.app.state.templates
     service = CarsService(db)
     brands = service.brands()
-    filter_ctx = _build_filter_context(service, db)
+    filter_ctx = _build_filter_context(service, db, include_payload=False)
     contact_content = ContentService(db).content_map(
         [
             "contact_phone",
@@ -400,8 +522,10 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "request": request,
             "user": getattr(request.state, "user", None),
             "brands": brands,
+            "regions": filter_ctx["regions"],
             "countries": filter_ctx["countries"],
             "country_labels": filter_ctx["country_labels"],
+            "kr_types": filter_ctx["kr_types"],
             "reg_years": filter_ctx["reg_years"],
             "reg_months": filter_ctx["reg_months"],
             "price_options": filter_ctx["price_options"],
@@ -409,9 +533,85 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "generations": filter_ctx["generations"],
             "colors_basic": filter_ctx["colors_basic"],
             "colors_other": filter_ctx["colors_other"],
+            "body_types": filter_ctx["body_types"],
             "engine_types": filter_ctx["engine_types"],
             "transmissions": filter_ctx["transmissions"],
+            "drive_types": filter_ctx["drive_types"],
+            "has_air_suspension": filter_ctx["has_air_suspension"],
             "fx_rates": service.get_fx_rates() or {},
+            "content": contact_content,
+            "contact_phone": contact_content.get("contact_phone"),
+            "contact_email": contact_content.get("contact_email"),
+            "contact_address": contact_content.get("contact_address"),
+            "contact_tg": contact_content.get("contact_tg"),
+            "contact_wa": contact_content.get("contact_wa"),
+            "contact_ig": contact_content.get("contact_ig"),
+        },
+    )
+
+
+@router.get("/search")
+def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
+    templates = request.app.state.templates
+    service = CarsService(db)
+    filter_ctx = _build_filter_context(service, db, include_payload=True)
+    contact_content = ContentService(db).content_map(
+        [
+            "contact_phone",
+            "contact_email",
+            "contact_address",
+            "contact_tg",
+            "contact_wa",
+            "contact_ig",
+        ])
+    return templates.TemplateResponse(
+        "search.html",
+        {
+            "request": request,
+            "user": getattr(request.state, "user", None),
+            "total_cars": service.total_cars(),
+            "brands": service.brands(),
+            "regions": filter_ctx["regions"],
+            "countries": filter_ctx["countries"],
+            "country_labels": filter_ctx["country_labels"],
+            "kr_types": filter_ctx["kr_types"],
+            "reg_years": filter_ctx["reg_years"],
+            "reg_months": filter_ctx["reg_months"],
+            "generations": filter_ctx["generations"],
+            "colors_basic": filter_ctx["colors_basic"],
+            "colors_other": filter_ctx["colors_other"],
+            "body_types": filter_ctx["body_types"],
+            "engine_types": filter_ctx["engine_types"],
+            "transmissions": filter_ctx["transmissions"],
+            "drive_types": filter_ctx["drive_types"],
+            "seats_options": filter_ctx["seats_options"],
+            "doors_options": filter_ctx["doors_options"],
+            "owners_options": filter_ctx["owners_options"],
+            "emission_classes": filter_ctx["emission_classes"],
+            "efficiency_classes": filter_ctx["efficiency_classes"],
+            "climatisation_options": filter_ctx["climatisation_options"],
+            "airbags_options": filter_ctx["airbags_options"],
+            "interior_design_options": filter_ctx["interior_design_options"],
+            "price_rating_labels": filter_ctx["price_rating_labels"],
+            "seats_options_eu": filter_ctx["seats_options_eu"],
+            "doors_options_eu": filter_ctx["doors_options_eu"],
+            "owners_options_eu": filter_ctx["owners_options_eu"],
+            "emission_classes_eu": filter_ctx["emission_classes_eu"],
+            "efficiency_classes_eu": filter_ctx["efficiency_classes_eu"],
+            "climatisation_options_eu": filter_ctx["climatisation_options_eu"],
+            "airbags_options_eu": filter_ctx["airbags_options_eu"],
+            "interior_design_options_eu": filter_ctx["interior_design_options_eu"],
+            "price_rating_labels_eu": filter_ctx["price_rating_labels_eu"],
+            "seats_options_kr": filter_ctx["seats_options_kr"],
+            "doors_options_kr": filter_ctx["doors_options_kr"],
+            "owners_options_kr": filter_ctx["owners_options_kr"],
+            "emission_classes_kr": filter_ctx["emission_classes_kr"],
+            "efficiency_classes_kr": filter_ctx["efficiency_classes_kr"],
+            "climatisation_options_kr": filter_ctx["climatisation_options_kr"],
+            "airbags_options_kr": filter_ctx["airbags_options_kr"],
+            "interior_design_options_kr": filter_ctx["interior_design_options_kr"],
+            "price_rating_labels_kr": filter_ctx["price_rating_labels_kr"],
+            "has_air_suspension": filter_ctx["has_air_suspension"],
             "content": contact_content,
             "contact_phone": contact_content.get("contact_phone"),
             "contact_email": contact_content.get("contact_email"),

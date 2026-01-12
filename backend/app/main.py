@@ -33,6 +33,11 @@ def create_app() -> FastAPI:
     app.include_router(favorites_router)
     app.include_router(catalog_router, prefix="/api", tags=["catalog"])
     app.include_router(calc_router)
+
+    @app.get("/health", include_in_schema=False)
+    def healthcheck():
+        return {"status": "ok"}
+
     return app
 
 

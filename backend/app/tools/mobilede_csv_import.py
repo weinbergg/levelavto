@@ -65,7 +65,6 @@ def main() -> None:
         db.refresh(run)
 
         inserted_total = updated_total = seen_total = skipped_total = 0
-        seen_external_ids: List[str] = []
         batch: List[dict] = []
         BATCH_SIZE = 500
 
@@ -75,7 +74,6 @@ def main() -> None:
             row_iter = itertools.islice(row_iter, args.limit)
 
         for parsed in row_iter:
-            seen_external_ids.append(parsed.external_id)
             batch.append(parsed.as_dict())
             if len(batch) >= BATCH_SIZE:
                 ins, upd, seen = service.upsert_parsed_items(source, batch)
@@ -91,7 +89,7 @@ def main() -> None:
 
         deactivated = 0
         if not args.skip_deactivate:
-            deactivated = service.deactivate_missing(source, seen_external_ids)
+            deactivated = service.deactivate_missing_by_last_seen(source, run.started_at)
 
         # Record per-source stats
         prs = ParserRunSource(

@@ -12,8 +12,8 @@ import requests
 
 
 HOST = os.getenv("MOBILEDE_HOST", "https://parsers1-valdez.auto-parser.ru")
-LOGIN = os.getenv("MOBILEDE_LOGIN")
-PASSWORD = os.getenv("MOBILEDE_PASSWORD")
+LOGIN = os.getenv("MOBILEDE_LOGIN") or os.getenv("MOBILEDE_USER")
+PASSWORD = os.getenv("MOBILEDE_PASSWORD") or os.getenv("MOBILEDE_PASS")
 FILENAME = "mobilede_active_offers.csv"
 DOWNLOAD_DIR = Path("/app/tmp")
 

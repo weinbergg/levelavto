@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from ..db import get_db
-from ..services.cars_service import CarsService
+from ..services.cars_service import CarsService, normalize_brand
 from ..schemas import CarOut, CarDetailOut
 from ..models import Car, CarImage, Source
 from sqlalchemy import select, func
@@ -15,8 +15,10 @@ router = APIRouter()
 
 @router.get("/cars")
 def list_cars(
+    region: Optional[str] = Query(default=None),
     country: Optional[str] = Query(default=None),
     brand: Optional[str] = Query(default=None),
+    line: Optional[List[str]] = Query(default=None, description="Advanced search lines brand|model|variant"),
     source: Optional[str | List[str]] = Query(
         default=None, description="Source key, e.g., mobile_de or emavto_klg"),
     q: Optional[str] = Query(default=None, description="Free-text brand/model search"),
@@ -26,8 +28,22 @@ def list_cars(
     body_type: Optional[str] = Query(default=None),
     engine_type: Optional[str] = Query(default=None),
     transmission: Optional[str] = Query(default=None),
+    drive_type: Optional[str] = Query(default=None),
+    num_seats: Optional[str] = Query(default=None),
+    doors_count: Optional[str] = Query(default=None),
+    emission_class: Optional[str] = Query(default=None),
+    efficiency_class: Optional[str] = Query(default=None),
+    climatisation: Optional[str] = Query(default=None),
+    airbags: Optional[str] = Query(default=None),
+    interior_design: Optional[str] = Query(default=None),
+    price_rating_label: Optional[str] = Query(default=None),
+    owners_count: Optional[str] = Query(default=None),
     price_min: Optional[float] = Query(default=None),
     price_max: Optional[float] = Query(default=None),
+    power_hp_min: Optional[float] = Query(default=None),
+    power_hp_max: Optional[float] = Query(default=None),
+    engine_cc_min: Optional[int] = Query(default=None),
+    engine_cc_max: Optional[int] = Query(default=None),
     year_min: Optional[int] = Query(default=None),
     year_max: Optional[int] = Query(default=None),
     mileage_min: Optional[int] = Query(default=None),
@@ -36,6 +52,7 @@ def list_cars(
     reg_month_min: Optional[int] = Query(default=None),
     reg_year_max: Optional[int] = Query(default=None),
     reg_month_max: Optional[int] = Query(default=None),
+    condition: Optional[str] = Query(default=None),
     sort: Optional[str] = Query(default=None, description="price_asc|price_desc|year_desc|year_asc|mileage_asc|mileage_desc|created_desc"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -43,8 +60,10 @@ def list_cars(
 ):
     service = CarsService(db)
     items, total = service.list_cars(
+        region=region,
         country=country,
         brand=brand,
+        lines=line,
         source_key=source,
         q=q,
         model=model,
@@ -52,6 +71,10 @@ def list_cars(
         color=color,
         price_min=price_min,
         price_max=price_max,
+        power_hp_min=power_hp_min,
+        power_hp_max=power_hp_max,
+        engine_cc_min=engine_cc_min,
+        engine_cc_max=engine_cc_max,
         year_min=year_min,
         year_max=year_max,
         mileage_min=mileage_min,
@@ -63,6 +86,17 @@ def list_cars(
         body_type=body_type,
         engine_type=engine_type,
         transmission=transmission,
+        drive_type=drive_type,
+        num_seats=num_seats,
+        doors_count=doors_count,
+        emission_class=emission_class,
+        efficiency_class=efficiency_class,
+        climatisation=climatisation,
+        airbags=airbags,
+        interior_design=interior_design,
+        price_rating_label=price_rating_label,
+        owners_count=owners_count,
+        condition=condition,
         sort=sort,
         page=page,
         page_size=page_size,
@@ -75,8 +109,22 @@ def list_cars(
                 CarImage.car_id.in_(ids)).group_by(CarImage.car_id)
         ).all()
         counts_map = {cid: cnt for cid, cnt in counts}
+        image_rows = db.execute(
+            select(CarImage.car_id, CarImage.url)
+            .where(CarImage.car_id.in_(ids))
+            .order_by(CarImage.car_id.asc(), CarImage.position.asc(), CarImage.id.asc())
+        ).all()
+        images_map: dict[int, list[str]] = {}
+        for car_id, url in image_rows:
+            if not url:
+                continue
+            bucket = images_map.setdefault(car_id, [])
+            if len(bucket) >= 6:
+                continue
+            bucket.append(url)
     else:
         counts_map = {}
+        images_map = {}
     # map source_id -> key
     src_rows = db.execute(
         select(Car.source_id, Source.key).join(Source, Car.source_id == Source.id)
@@ -101,6 +149,7 @@ def list_cars(
         if raw_color:
             co["color_hex"] = color_hex(norm_color)
         co["images_count"] = counts_map.get(c.id, 0)
+        co["images"] = images_map.get(c.id, []) if images_map else []
         payload_items.append(co)
     return {
         "items": payload_items,
@@ -137,5 +186,6 @@ def list_brands(db: Session = Depends(get_db)):
 @router.get("/brands/{brand}/models")
 def list_models_for_brand(brand: str, db: Session = Depends(get_db)):
     service = CarsService(db)
-    models = service.models_for_brand(brand)
-    return {"brand": brand, "models": models}
+    normalized = normalize_brand(brand)
+    models = service.models_for_brand(normalized)
+    return {"brand": normalized, "models": models}

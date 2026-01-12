@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from sqlalchemy import String, Integer, Numeric, Boolean, ForeignKey, UniqueConstraint, Text
+from sqlalchemy import String, Integer, Numeric, Boolean, ForeignKey, UniqueConstraint, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .source import Base
 
@@ -19,6 +19,7 @@ class Car(Base):
     brand: Mapped[str] = mapped_column(String(80), nullable=True, index=True)
     model: Mapped[str] = mapped_column(String(120), nullable=True, index=True)
     generation: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    variant: Mapped[str | None] = mapped_column(String(160), nullable=True)
     year: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     mileage: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     price: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True, index=True)
@@ -38,6 +39,7 @@ class Car(Base):
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     thumbnail_local_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     hash: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     first_seen_at: Mapped[datetime | None] = mapped_column(nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True)
@@ -47,5 +49,4 @@ class Car(Base):
 
     source = relationship("Source")
     images = relationship("CarImage", back_populates="car", cascade="all, delete-orphan")
-
 

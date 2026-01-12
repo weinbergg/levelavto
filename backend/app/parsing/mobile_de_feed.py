@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Iterable, Iterator, List, Optional
+from typing import Iterable, Iterator, List, Optional, Any, Dict
+from dataclasses import asdict
+from decimal import Decimal
+from datetime import datetime
 from .base import CarParsed
 from .config import SiteConfig
 from ..importing.mobilede_csv import MobileDeCsvRow
@@ -9,6 +12,15 @@ from ..importing.mobilede_csv import MobileDeCsvRow
 class MobileDeFeedParser:
     def __init__(self, site_config: SiteConfig):
         self.config = site_config
+
+    def _payload_from_row(self, row: MobileDeCsvRow) -> Dict[str, Any]:
+        data = asdict(row)
+        for key, value in list(data.items()):
+            if isinstance(value, Decimal):
+                data[key] = float(value)
+            elif isinstance(value, datetime):
+                data[key] = value.isoformat()
+        return data
 
     def _normalize_transmission(self, raw: Optional[str]) -> Optional[str]:
         if not raw:
@@ -65,6 +77,7 @@ class MobileDeFeedParser:
             images: List[str] = list(row.image_urls) if row.image_urls else []
             thumb = images[0] if images else None
             drive = self._detect_drive(row.options or [])
+            payload = self._payload_from_row(row)
             # skip obviously broken rows
             if not row.mark and not row.model and not row.title:
                 continue
@@ -76,6 +89,7 @@ class MobileDeFeedParser:
                 country=row.seller_country or self.config.country or "DE",
                 brand=(row.mark or None),
                 model=(row.model or None),
+                variant=(row.sub_title or None),
                 year=row.year,
                 registration_year=int(row.first_registration.split("/")[1]) if row.first_registration and "/" in row.first_registration else None,
                 registration_month=int(row.first_registration.split("/")[0]) if row.first_registration and "/" in row.first_registration else None,
@@ -97,4 +111,5 @@ class MobileDeFeedParser:
                 source_url=row.url,
                 thumbnail_url=thumb,
                 images=images,
+                source_payload=payload,
             )

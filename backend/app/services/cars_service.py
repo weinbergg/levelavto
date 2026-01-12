@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, case, cast, String
+from sqlalchemy.dialects.postgresql import JSONB
+import re
 import os
 import requests
 import time
@@ -18,7 +20,32 @@ from ..utils.taxonomy import (
     color_aliases,
     fuel_aliases,
     color_hex,
+    is_color_base,
 )
+
+BRAND_ALIASES = {
+    "alfa": "Alfa Romeo",
+    "alfa romeo": "Alfa Romeo",
+}
+
+
+def normalize_brand(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    raw = str(value).strip()
+    if not raw:
+        return ""
+    return BRAND_ALIASES.get(raw.lower(), raw)
+
+
+def brand_variants(value: Optional[str]) -> List[str]:
+    norm = normalize_brand(value)
+    if not norm:
+        return []
+    variants = {norm}
+    if norm == "Alfa Romeo":
+        variants.add("Alfa")
+    return sorted(variants, key=lambda v: v.lower())
 
 
 class CarsService:
@@ -46,27 +73,40 @@ class CarsService:
             select(Source.id).where(func.lower(Source.key).like(f"{self.EUROPE_SOURCE_PREFIX}%"))
         ).scalars().all()
 
-    def available_countries(self) -> List[str]:
+    def available_eu_countries(self) -> List[str]:
         rows = self.db.execute(
             select(func.distinct(Car.country))
             .where(Car.is_available.is_(True), Car.country.is_not(None))
         ).scalars().all()
         countries: List[str] = []
         seen = set()
-        has_kr = False
         for c in rows:
             code = normalize_country_code(c)
             if not code:
                 continue
-            if code == "KR":
-                has_kr = True
             if code in self.EU_COUNTRIES and code not in seen:
                 countries.append(code)
                 seen.add(code)
-        kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-        if (has_kr or kr_sources) and "KR" not in seen:
-            countries.append("KR")
         return countries
+
+    def has_korea(self) -> bool:
+        rows = self.db.execute(
+            select(func.distinct(Car.country))
+            .where(Car.is_available.is_(True), Car.country.is_not(None))
+        ).scalars().all()
+        for c in rows:
+            code = normalize_country_code(c)
+            if code == "KR":
+                return True
+        return bool(self._source_ids_for_hints(self.KOREA_SOURCE_HINTS))
+
+    def available_regions(self) -> List[str]:
+        regions: List[str] = []
+        if self.available_eu_countries() or self._source_ids_for_europe():
+            regions.append("EU")
+        if self.has_korea():
+            regions.append("KR")
+        return regions
 
     _fx_cache: dict | None = None
     _fx_cache_ts: float | None = None
@@ -93,8 +133,10 @@ class CarsService:
     def list_cars(
         self,
         *,
+        region: Optional[str] = None,
         country: Optional[str] = None,
         brand: Optional[str] = None,
+        lines: Optional[List[str]] = None,
         source_key: Optional[str | List[str]] = None,
         q: Optional[str] = None,
         model: Optional[str] = None,
@@ -113,11 +155,56 @@ class CarsService:
         body_type: Optional[str] = None,
         engine_type: Optional[str] = None,
         transmission: Optional[str] = None,
+        drive_type: Optional[str] = None,
+        num_seats: Optional[str] = None,
+        doors_count: Optional[str] = None,
+        emission_class: Optional[str] = None,
+        efficiency_class: Optional[str] = None,
+        climatisation: Optional[str] = None,
+        airbags: Optional[str] = None,
+        interior_design: Optional[str] = None,
+        price_rating_label: Optional[str] = None,
+        owners_count: Optional[str] = None,
+        power_hp_min: Optional[float] = None,
+        power_hp_max: Optional[float] = None,
+        engine_cc_min: Optional[int] = None,
+        engine_cc_max: Optional[int] = None,
+        condition: Optional[str] = None,
         sort: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
     ) -> Tuple[List[Car], int]:
         conditions = [Car.is_available.is_(True)]
+        if region and not country:
+            country = region
+        if lines:
+            line_conditions = []
+            brand_field = func.lower(func.trim(Car.brand))
+            model_field = func.lower(func.trim(Car.model))
+            variant_field = func.lower(func.trim(Car.variant))
+            for line in lines:
+                parts = [p.strip() for p in (line or "").split("|")]
+                while len(parts) < 3:
+                    parts.append("")
+                b, m, v = parts[0], parts[1], parts[2]
+                group = []
+                if b:
+                    norm_b = normalize_brand(b).strip().strip(".,;")
+                    variants = brand_variants(norm_b) if norm_b else []
+                    if variants:
+                        group.append(or_(*[
+                            brand_field.like(func.lower(f"%{v}%")) for v in variants
+                        ]))
+                    else:
+                        group.append(brand_field.like(func.lower(f"%{b}%")))
+                if m:
+                    group.append(model_field.like(func.lower(f"%{m}%")))
+                if v:
+                    group.append(variant_field.like(func.lower(f"%{v}%")))
+                if group:
+                    line_conditions.append(and_(*group))
+            if line_conditions:
+                conditions.append(or_(*line_conditions))
         if country:
             c = normalize_country_code(country)
             if c == "KR":
@@ -136,18 +223,67 @@ class CarsService:
                 conditions.append(func.upper(Car.country) == c)
         if brand:
             # case-insensitive contains (brand may have variants/extra symbols)
-            b = brand.strip().strip(".,;")
+            b = normalize_brand(brand).strip().strip(".,;")
             if b:
-                conditions.append(func.lower(Car.brand).like(func.lower(f"%{b}%")))
+                variants = brand_variants(b)
+                if variants:
+                    brand_field = func.lower(func.trim(Car.brand))
+                    brand_conds = [brand_field.like(func.lower(f"%{v}%")) for v in variants]
+                    conditions.append(or_(*brand_conds))
         if q:
-            like = f"%{q.strip()}%"
-            conditions.append(
-                or_(
-                    func.lower(Car.brand).like(func.lower(like)),
-                    func.lower(Car.model).like(func.lower(like)),
-                    func.lower(func.concat(Car.brand, " ", Car.model)).like(func.lower(like)),
-                )
-            )
+            tokens = [t for t in re.split(r"[\\s,]+", q.strip().lower()) if t]
+            payload_text = func.lower(cast(Car.source_payload, String))
+            token_groups = []
+            fuel_map = {
+                "дизель": ["diesel"],
+                "дизельный": ["diesel"],
+                "дизельные": ["diesel"],
+                "дизельное": ["diesel"],
+                "diesel": ["diesel"],
+                "бензин": ["petrol", "gasoline", "benzin"],
+                "бенз": ["petrol", "gasoline", "benzin"],
+                "hybrid": ["hybrid"],
+                "гибрид": ["hybrid"],
+                "электро": ["electric", "ev"],
+                "электр": ["electric", "ev"],
+                "electric": ["electric", "ev"],
+            }
+            drive_tokens = {"4x4", "4х4", "4wd", "awd", "full", "полный", "полныйпривод"}
+            for token in tokens:
+                conds = []
+                if token in fuel_map or token.startswith("дизел"):
+                    mapped = fuel_map.get(token, fuel_map["дизель"])
+                    for f in mapped:
+                        conds.append(func.lower(Car.engine_type).like(f"%{f}%"))
+                        conds.append(payload_text.like(f"%{f}%"))
+                elif token in drive_tokens:
+                    conds.append(func.lower(Car.drive_type).like("%awd%"))
+                    conds.append(func.lower(Car.drive_type).like("%4wd%"))
+                    conds.append(payload_text.like("%four-wheel%"))
+                    conds.append(payload_text.like("%all wheel%"))
+                    conds.append(payload_text.like("%4x4%"))
+                elif token.startswith("панор") or token.startswith("panor"):
+                    conds.append(payload_text.like("%panor%"))
+                else:
+                    like = f"%{token}%"
+                    conds.extend(
+                        [
+                            func.lower(Car.brand).like(like),
+                            func.lower(Car.model).like(like),
+                            func.lower(Car.variant).like(like),
+                            func.lower(Car.generation).like(like),
+                            func.lower(Car.body_type).like(like),
+                            func.lower(Car.engine_type).like(like),
+                            func.lower(Car.transmission).like(like),
+                            func.lower(Car.drive_type).like(like),
+                            func.lower(Car.color).like(like),
+                            payload_text.like(like),
+                        ]
+                    )
+                if conds:
+                    token_groups.append(or_(*conds))
+            if token_groups:
+                conditions.append(and_(*token_groups))
         if model:
             like = f"%{model.strip()}%"
             # match by model field; if brand is not specified, also try brand+model text
@@ -158,6 +294,51 @@ class CarsService:
                 conditions.append(or_(model_expr, concat_expr))
             else:
                 conditions.append(model_expr)
+        if num_seats:
+            conditions.append(
+                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "num_seats")
+                == str(num_seats)
+            )
+        if doors_count:
+            conditions.append(
+                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "doors_count")
+                == str(doors_count)
+            )
+        if emission_class:
+            conditions.append(
+                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "emission_class")
+                == emission_class
+            )
+        if efficiency_class:
+            conditions.append(
+                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "efficiency_class")
+                == efficiency_class
+            )
+        if climatisation:
+            conditions.append(
+                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "climatisation")
+                == climatisation
+            )
+        if airbags:
+            conditions.append(
+                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "airbags")
+                == airbags
+            )
+        if interior_design:
+            conditions.append(
+                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "interior_design")
+                == interior_design
+            )
+        if price_rating_label:
+            conditions.append(
+                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "price_rating_label")
+                == price_rating_label
+            )
+        if owners_count:
+            conditions.append(
+                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "owners_count")
+                == str(owners_count)
+            )
         if generation:
             conditions.append(func.lower(Car.generation).like(
                 func.lower(f"%{generation.strip()}%")))
@@ -233,6 +414,24 @@ class CarsService:
         if transmission:
             conditions.append(func.lower(Car.transmission)
                               == transmission.lower())
+        if drive_type:
+            conditions.append(func.lower(Car.drive_type) == drive_type.lower())
+        if power_hp_min is not None:
+            conditions.append(Car.power_hp >= power_hp_min)
+        if power_hp_max is not None:
+            conditions.append(Car.power_hp <= power_hp_max)
+        if engine_cc_min is not None:
+            conditions.append(Car.engine_cc >= engine_cc_min)
+        if engine_cc_max is not None:
+            conditions.append(Car.engine_cc <= engine_cc_max)
+        if condition:
+            cond = condition.strip().lower()
+            if cond == "new":
+                conditions.append(Car.mileage.is_not(None))
+                conditions.append(Car.mileage <= 100)
+            elif cond == "used":
+                conditions.append(Car.mileage.is_not(None))
+                conditions.append(Car.mileage > 100)
 
         where_expr = and_(*conditions) if conditions else None
 
@@ -256,7 +455,11 @@ class CarsService:
             # default: цена сначала дешевые
             order_clause = [Car.price_rub_cached.asc().nullslast()]
         # всегда поднимаем машины с фото выше
-        order_clause.insert(0, Car.thumbnail_url.is_(None).asc())
+        missing_thumb = case(
+            (or_(Car.thumbnail_url.is_(None), Car.thumbnail_url == ""), 1),
+            else_=0,
+        )
+        order_clause.insert(0, missing_thumb.asc())
 
         stmt = (
             select(Car)
@@ -278,8 +481,14 @@ class CarsService:
             conditions.append(Car.country == country)
         stmt = select(func.distinct(Car.brand)).where(
             and_(*conditions)).order_by(Car.brand.asc())
-        brands = [row[0] for row in self.db.execute(stmt).all() if row[0]]
-        return brands
+        raw = [row[0] for row in self.db.execute(stmt).all() if row[0]]
+        merged: Dict[str, None] = {}
+        for val in raw:
+            norm = normalize_brand(val)
+            if not norm:
+                continue
+            merged[norm] = None
+        return sorted(merged.keys(), key=lambda v: v.lower())
 
     def brand_stats(self) -> List[Dict[str, Any]]:
         stmt = (
@@ -289,7 +498,16 @@ class CarsService:
             .order_by(func.count().desc(), Car.brand.asc())
         )
         rows = self.db.execute(stmt).all()
-        return [{"brand": r[0], "count": int(r[1])} for r in rows if r[0]]
+        merged: Dict[str, int] = {}
+        for brand, count in rows:
+            if not brand:
+                continue
+            norm = normalize_brand(brand)
+            if not norm:
+                continue
+            merged[norm] = merged.get(norm, 0) + int(count)
+        out = [{"brand": b, "count": c} for b, c in merged.items()]
+        return sorted(out, key=lambda x: (-x["count"], x["brand"].lower()))
 
     def body_type_stats(self) -> List[Dict[str, Any]]:
         stmt = (
@@ -344,21 +562,176 @@ class CarsService:
             agg[norm]["count"] += int(cnt)
         return sorted(agg.values(), key=lambda x: x["count"], reverse=True)
 
+    def payload_values(
+        self,
+        key: str,
+        limit: int = 120,
+        source_ids: Optional[List[int]] = None,
+    ) -> List[str]:
+        if not key:
+            return []
+        stmt = (
+            select(Car.source_payload)
+            .where(Car.is_available.is_(True), Car.source_payload.is_not(None))
+        )
+        if source_ids is None:
+            stmt = stmt.join(Source, Car.source_id == Source.id).where(Source.key == "mobile_de")
+        else:
+            if not source_ids:
+                return []
+            stmt = stmt.where(Car.source_id.in_(source_ids))
+        stmt = stmt.execution_options(stream_results=True)
+        seen: set[str] = set()
+        results: List[str] = []
+        scanned = 0
+        max_scan = 50000
+        for payload in self.db.execute(stmt).scalars().yield_per(1000):
+            scanned += 1
+            if not payload or key not in payload:
+                if scanned >= max_scan:
+                    break
+                continue
+            val = payload.get(key)
+            items = val if isinstance(val, list) else [val]
+            for item in items:
+                if item is None:
+                    continue
+                text = str(item).strip()
+                if not text or text in seen:
+                    continue
+                seen.add(text)
+                results.append(text)
+                if len(results) >= limit:
+                    break
+            if len(results) >= limit or scanned >= max_scan:
+                break
+        return sorted(results)
+
+    def payload_values_bulk(
+        self,
+        keys: List[str],
+        limit: int = 120,
+        source_ids: Optional[List[int]] = None,
+        max_scan: int = 50000,
+    ) -> Dict[str, List[str]]:
+        if not keys:
+            return {}
+        stmt = (
+            select(Car.source_payload)
+            .where(Car.is_available.is_(True), Car.source_payload.is_not(None))
+        )
+        if source_ids is None:
+            stmt = stmt.join(Source, Car.source_id == Source.id).where(Source.key == "mobile_de")
+        else:
+            if not source_ids:
+                return {k: [] for k in keys}
+            stmt = stmt.where(Car.source_id.in_(source_ids))
+        stmt = stmt.execution_options(stream_results=True)
+        buckets: Dict[str, set[str]] = {k: set() for k in keys}
+        scanned = 0
+        for payload in self.db.execute(stmt).scalars().yield_per(1000):
+            scanned += 1
+            if not payload:
+                if scanned >= max_scan:
+                    break
+                continue
+            for key in keys:
+                if key not in payload:
+                    continue
+                items = payload.get(key)
+                values = items if isinstance(items, list) else [items]
+                bucket = buckets[key]
+                if len(bucket) >= limit:
+                    continue
+                for item in values:
+                    if item is None:
+                        continue
+                    text = str(item).strip()
+                    if not text:
+                        continue
+                    bucket.add(text)
+                    if len(bucket) >= limit:
+                        break
+            if scanned >= max_scan:
+                break
+            if all(len(buckets[k]) >= limit for k in keys):
+                break
+        return {k: sorted(list(v)) for k, v in buckets.items()}
+
+    def source_ids_for_region(self, region: str) -> List[int]:
+        if not region:
+            return []
+        key = region.strip().upper()
+        if key == "EU":
+            return self._source_ids_for_europe()
+        if key == "KR":
+            return self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+        return []
+
+    def has_air_suspension(self) -> bool:
+        payload_text = func.lower(cast(Car.source_payload, String))
+        stmt = (
+            select(Car.id)
+            .where(
+                Car.is_available.is_(True),
+                Car.source_payload.is_not(None),
+                or_(
+                    payload_text.like("%air suspension%"),
+                    payload_text.like("%air_suspension%"),
+                    payload_text.like("%pneum%"),
+                    payload_text.like("%пневмо%"),
+                ),
+            )
+            .limit(1)
+        )
+        return self.db.execute(stmt).first() is not None
+
     def models_for_brand(self, brand: str) -> List[Dict[str, Any]]:
         if not brand:
             return []
+        variants = brand_variants(brand)
+        if not variants:
+            return []
+        norm_variants = [v.lower() for v in variants]
+        brand_field = func.lower(func.trim(Car.brand))
         stmt = (
             select(Car.model, func.count().label("count"))
             .where(
                 Car.is_available.is_(True),
-                func.lower(Car.brand) == brand.lower(),
+                or_(*[brand_field == v for v in norm_variants]),
                 Car.model.is_not(None),
             )
             .group_by(Car.model)
-            .order_by(func.count().desc(), Car.model.asc())
         )
         rows = self.db.execute(stmt).all()
-        return [{"model": r[0], "count": int(r[1])} for r in rows if r[0]]
+        models = [{"model": r[0], "count": int(r[1])} for r in rows if r[0]]
+
+        def sort_key(item: Dict[str, Any]):
+            val = str(item.get("model") or "").strip()
+            m = re.match(r"^\\s*(\\d+)", val)
+            if m:
+                return (0, int(m.group(1)), val.lower())
+            return (1, val.lower())
+
+        return sorted(models, key=sort_key)
+
+    def drive_types(self) -> List[Dict[str, Any]]:
+        stmt = (
+            select(Car.drive_type, func.count().label("count"))
+            .where(Car.is_available.is_(True), Car.drive_type.is_not(None))
+            .group_by(Car.drive_type)
+            .order_by(func.count().desc(), Car.drive_type.asc())
+        )
+        rows = self.db.execute(stmt).all()
+        out: List[Dict[str, Any]] = []
+        mapping = {"awd": "Полный", "4wd": "Полный", "fwd": "Передний", "rwd": "Задний"}
+        for val, cnt in rows:
+            if not val:
+                continue
+            key = val.strip().lower()
+            label = mapping.get(key, val)
+            out.append({"value": val, "label": label, "count": int(cnt)})
+        return out
 
     def recommended_auto(
         self,
@@ -423,8 +796,10 @@ class CarsService:
         for color, cnt in rows:
             if not color:
                 continue
-            norm = normalize_color(color) or color.strip().lower()
-            label = ru_color(color) or ru_color(norm) or display_color(color) or color
+            norm = normalize_color(color)
+            if not norm or not is_color_base(norm):
+                continue
+            label = ru_color(norm) or display_color(norm) or ru_color(color) or display_color(color) or color
             if norm not in agg:
                 agg[norm] = {
                     "value": norm,
@@ -457,7 +832,11 @@ class CarsService:
         # Fallback to fresh cars when featured is empty
         fallback_stmt = (
             select(Car)
-            .where(Car.is_available.is_(True), Car.thumbnail_url.is_not(None))
+            .where(
+                Car.is_available.is_(True),
+                Car.thumbnail_url.is_not(None),
+                Car.thumbnail_url != "",
+            )
             .order_by(Car.created_at.desc(), Car.id.desc())
             .limit(fallback_limit)
         )
@@ -466,7 +845,11 @@ class CarsService:
     def recent_with_thumbnails(self, limit: int = 50) -> List[Car]:
         stmt = (
             select(Car)
-            .where(Car.is_available.is_(True), Car.thumbnail_url.is_not(None))
+            .where(
+                Car.is_available.is_(True),
+                Car.thumbnail_url.is_not(None),
+                Car.thumbnail_url != "",
+            )
             .order_by(Car.created_at.desc(), Car.id.desc())
             .limit(limit)
         )

@@ -3,12 +3,15 @@ from __future__ import annotations
 import argparse
 import os
 import time
+from datetime import datetime
 from typing import Optional
 
 from ..db import SessionLocal
 from ..parsing.config import load_sites_config
 from ..parsing.emavto_klg import EmAvtoKlgParser
 from ..services.parsing_data_service import ParsingDataService
+from ..models import Car
+from sqlalchemy import select
 
 
 def run_chunk(
@@ -32,6 +35,8 @@ def run_chunk(
     # mode override for incremental
     if hasattr(parser, "config") and getattr(parser, "config", None):
         profile["mode"] = profile.get("mode", "full")
+    if mode == "incremental":
+        profile["skip_details"] = True
     items = parser.fetch_items(profile)
     missing = len(parser.missing_tasks or [])
     initial_missing = max(0, getattr(parser, "last_tasks_total", 0) - getattr(parser, "last_details_done", 0))
@@ -42,7 +47,83 @@ def run_chunk(
         items.extend(backfill_items)
         missing = len(parser.missing_tasks or [])
 
-    inserted, updated, _ = ds.upsert_parsed_items(source, [c.as_dict() for c in items])
+    if mode == "incremental":
+        tasks = list(parser.last_list_tasks or [])
+        ext_ids = [t.get("external_id") for t in tasks if t.get("external_id")]
+        existing = {}
+        if ext_ids:
+            rows = ds.db.execute(
+                select(Car).where(Car.source_id == source.id, Car.external_id.in_(ext_ids))
+            ).scalars().all()
+            existing = {c.external_id: c for c in rows}
+
+        def same_basic(car: Car, task: dict) -> bool:
+            return (
+                (car.price or 0) == (task.get("price") or 0)
+                and (car.mileage or 0) == (task.get("mileage") or 0)
+                and (car.year or 0) == (task.get("year") or 0)
+                and (car.engine_type or "") == (task.get("engine_type") or "")
+            )
+
+        tasks_to_detail = []
+        unchanged_ids = []
+        for task in tasks:
+            ext_id = task.get("external_id")
+            if not ext_id:
+                continue
+            car = existing.get(ext_id)
+            if car and same_basic(car, task):
+                unchanged_ids.append(ext_id)
+                continue
+            tasks_to_detail.append(task)
+
+        detail_items = []
+        if tasks_to_detail:
+            detail_items = parser.fetch_missing_details(
+                tasks_to_detail, max_runtime_sec=max_runtime_sec // 2
+            )
+        detail_by_id = {c.external_id: c for c in detail_items}
+        fallback_items = []
+        for task in tasks_to_detail:
+            ext_id = task.get("external_id")
+            if not ext_id or ext_id in detail_by_id:
+                continue
+            fallback_items.append(
+                {
+                    "source_key": parser.config.key,
+                    "external_id": ext_id,
+                    "country": parser.config.country,
+                    "brand": task.get("brand"),
+                    "model": task.get("model"),
+                    "year": task.get("year"),
+                    "mileage": task.get("mileage"),
+                    "price": task.get("price"),
+                    "currency": parser.config.defaults.get("currency"),
+                    "engine_type": task.get("engine_type"),
+                    "body_type": None,
+                    "transmission": None,
+                    "drive_type": None,
+                    "color": None,
+                    "vin": None,
+                    "source_url": task.get("source_url"),
+                    "thumbnail_url": task.get("thumbnail_url"),
+                    "images": None,
+                }
+            )
+        parsed_items = [c.as_dict() for c in detail_items] + fallback_items
+        inserted = updated = 0
+        if parsed_items:
+            inserted, updated, _ = ds.upsert_parsed_items(source, parsed_items)
+        if unchanged_ids:
+            ds.db.query(Car).filter(
+                Car.source_id == source.id, Car.external_id.in_(unchanged_ids)
+            ).update(
+                {"last_seen_at": datetime.utcnow(), "is_available": True},
+                synchronize_session=False,
+            )
+            ds.db.commit()
+    else:
+        inserted, updated, _ = ds.upsert_parsed_items(source, [c.as_dict() for c in items])
     if getattr(parser, "progress", None) and "last_page_full" in parser.progress:
         last_page = int(parser.progress["last_page_full"])
     else:

@@ -130,6 +130,8 @@ _COLOR_KEYWORDS = {
     "pink": ["pink", "rose", "rosé", "роз"],
 }
 
+COLOR_BASES = set(_COLOR_KEYWORDS.keys())
+
 _COLOR_MODIFIERS = {
     "metallic",
     "met",
@@ -189,6 +191,12 @@ def normalize_color(val: Optional[str]) -> Optional[str]:
     if "metal" in cleaned or "metallic" in raw:
         return "silver"
     return _normalize_alias("color", cleaned)
+
+
+def is_color_base(val: Optional[str]) -> bool:
+    if not val:
+        return False
+    return val.strip().lower() in COLOR_BASES
 
 
 def normalize_fuel(val: Optional[str]) -> Optional[str]:

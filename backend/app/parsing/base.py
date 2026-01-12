@@ -33,6 +33,7 @@ class CarParsed:
     brand: Optional[str] = None
     model: Optional[str] = None
     generation: Optional[str] = None
+    variant: Optional[str] = None
     year: Optional[int] = None
     registration_year: Optional[int] = None
     registration_month: Optional[int] = None
@@ -50,6 +51,7 @@ class CarParsed:
     vin: Optional[str] = None
     source_url: Optional[str] = None
     thumbnail_url: Optional[str] = None
+    source_payload: Optional[Dict[str, Any]] = None
     is_available: bool = True
     # optional list of image URLs in display order (first is primary)
     images: Optional[List[str]] = None
@@ -146,5 +148,4 @@ class BaseParser:
     def _http_get(self, url: str, *, params: Optional[Dict[str, Any]] = None):
         logger.info(f"[{self.config.key}] GET {url} params={params}")
         return self.client.get(url, params=params)
-
 

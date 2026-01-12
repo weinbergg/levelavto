@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Any
 
 
 class CarBase(BaseModel):
@@ -42,6 +42,7 @@ class CarBase(BaseModel):
 
 class CarOut(CarBase):
     images_count: Optional[int] = None
+    images: Optional[List[Any]] = None
     display_country_code: Optional[str] = None
     display_country_label: Optional[str] = None
     display_engine_type: Optional[str] = None

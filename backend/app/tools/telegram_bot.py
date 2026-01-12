@@ -348,7 +348,8 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not allowed_user(update):
         return
     text = format_status()
-    await reply(update, text)
+    updates = f"{summarize_job('mobilede')}\n\n{summarize_job('emavto')}"
+    await reply(update, f"{text}\n\n{updates}")
 
 
 async def cmd_updates_status(update: Update) -> None:
@@ -682,7 +683,10 @@ def main() -> None:
                 BotCommand("menu", "Показать меню"),
             ]
         )
-        await app.bot.set_chat_menu_button(MenuButtonCommands())
+        try:
+            await app.bot.set_chat_menu_button(MenuButtonCommands())
+        except Exception as exc:
+            print(f"[bot] set_chat_menu_button failed: {exc}")
 
     application = Application.builder().token(token).post_init(post_init).build()
 

@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+{% block title %}Расширенный поиск — Автокаталог{% endblock %}
+{% block content %}
+<section class="advanced-search">
+  <div class="la-container">
+    <div class="advanced-search__header">
+      <h1>Расширенный поиск</h1>
+      <p class="muted">Настройте параметры и перейдите в каталог с примененными фильтрами.</p>
+    </div>
+    <form id="advanced-search-form" method="get" action="/catalog">
+      {% set params = request.query_params %}
+      <div class="advanced-lines">
+        <div class="search-filters search-filters--lines">
+          <div class="search-rows" id="search-rows"></div>
+          <template id="search-row-template">
+            <div class="search-row" data-search-row>
+              <div class="field">
+                <label>Марка</label>
+                <select name="line_brand" data-line-brand>
+                  <option value="">Неважно</option>
+                  {% for b in brands|sort %}
+                  <option value="{{ b }}">{{ b }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="field">
+                <label>Модель</label>
+                <select name="line_model" data-line-model disabled>
+                  <option value="">Неважно</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Вариант</label>
+                <input type="text" name="line_variant" data-line-variant placeholder="Например GTI..." />
+              </div>
+              <button class="icon-btn icon-btn--danger" type="button" data-line-remove aria-label="Удалить строку">🗑</button>
+            </div>
+          </template>
+          <div class="advanced-row-actions">
+            <button class="btn btn-secondary btn-small" type="button" id="add-search-row">Добавить марку</button>
+          </div>
+        </div>
+      </div>
+
+      <section class="advanced-section" id="advanced-base">
+        <h2 class="advanced-section__title">Основные данные</h2>
+        <div class="search-filters search-filters--base">
+          <div class="advanced-basic">
+            {% set region_value = params.get('region') %}
+            {% if not region_value %}
+              {% if params.get('country') == 'KR' %}
+                {% set region_value = 'KR' %}
+              {% elif params.get('country') %}
+                {% set region_value = 'EU' %}
+              {% endif %}
+            {% endif %}
+            <div class="advanced-row advanced-row--two">
+              {% if regions %}
+              <label class="field">Регион
+                <select name="region" data-region-select>
+                  <option value="">Все регионы</option>
+                  {% for r in regions %}
+                  <option value="{{ r }}" {% if region_value == r %}selected{% endif %}>{{ country_labels.get(r, r) }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              {% endif %}
+              <div class="field region-subfield" data-region-sub>
+                <label class="region-sub region-sub--eu" data-region-sub-eu>Страна (Европа)
+                  <select name="eu_country" data-eu-country>
+                    <option value="">Все страны</option>
+                    {% for c in countries %}
+                    <option value="{{ c }}" {% if params.get('country') == c %}selected{% endif %}>{{ country_labels.get(c, c) }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                {% if kr_types %}
+                <label class="region-sub region-sub--kr" data-region-sub-kr>Тип (Корея)
+                  <select name="kr_type" data-kr-type>
+                    <option value="">Корейские</option>
+                    <option value="import">Импортные</option>
+                  </select>
+                </label>
+                {% endif %}
+              </div>
+            </div>
+            <input type="hidden" name="country" value="{{ params.get('country', '') }}">
+
+            <div class="advanced-row advanced-row--two">
+              <label class="field">Кузов
+                <select name="body_type" {% if not body_types %}disabled{% endif %}>
+                  <option value="">Любой</option>
+                  {% for t in body_types %}
+                  <option value="{{ t.value }}" {% if params.get('body_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">Состояние
+                <select name="condition">
+                  <option value="">Все</option>
+                  <option value="new" {% if params.get('condition') == 'new' %}selected{% endif %}>Новые</option>
+                  <option value="used" {% if params.get('condition') == 'used' %}selected{% endif %}>С пробегом</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="advanced-row advanced-row--two">
+              <label class="field">Цена от, ₽
+                <input type="number" name="price_min" inputmode="numeric" min="0" step="1000" value="{{ params.get('price_min','') }}">
+              </label>
+              <label class="field">Цена до, ₽
+                <input type="number" name="price_max" inputmode="numeric" min="0" step="1000" value="{{ params.get('price_max','') }}">
+              </label>
+            </div>
+
+            <div class="advanced-row advanced-row--two">
+              <label class="field">Поставлен на учёт с
+                <div class="field-pair">
+                  <select name="reg_year_min" id="reg-year-min" {% if not reg_years %}disabled{% endif %}>
+                    <option value="">Не важно</option>
+                    {% for y in reg_years %}
+                    <option value="{{ y }}" {% if params.get('reg_year_min')|int == y %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="field-pair__month" data-reg-month="min">
+                    <select name="reg_month_min" id="reg-month-min" {% if not reg_years %}disabled{% endif %}>
+                      <option value="">Месяц</option>
+                      {% for m in reg_months %}
+                      <option value="{{ m.value }}" {% if params.get('reg_month_min')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+              </label>
+              <label class="field">Поставлен на учёт по
+                <div class="field-pair">
+                  <select name="reg_year_max" id="reg-year-max" {% if not reg_years %}disabled{% endif %}>
+                    <option value="">Не важно</option>
+                    {% for y in reg_years %}
+                    <option value="{{ y }}" {% if params.get('reg_year_max')|int == y %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="field-pair__month" data-reg-month="max">
+                    <select name="reg_month_max" id="reg-month-max" {% if not reg_years %}disabled{% endif %}>
+                      <option value="">Месяц</option>
+                      {% for m in reg_months %}
+                      <option value="{{ m.value }}" {% if params.get('reg_month_max')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div class="advanced-row advanced-row--two">
+              <label class="field">Пробег от, км
+                <input type="number" name="mileage_min" inputmode="numeric" min="0" step="1" value="{{ params.get('mileage_min','') }}">
+              </label>
+              <label class="field">Пробег до, км
+                <input type="number" name="mileage_max" inputmode="numeric" min="0" step="1" value="{{ params.get('mileage_max','') }}">
+              </label>
+            </div>
+
+            <div class="advanced-row advanced-row--three">
+              <label class="field">Топливо
+                <select name="engine_type" {% if not engine_types %}disabled{% endif %}>
+                  <option value="">Любое</option>
+                  {% for t in engine_types %}
+                  <option value="{{ t.value }}" {% if params.get('engine_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">Трансмиссия
+                <select name="transmission" {% if not transmissions %}disabled{% endif %}>
+                  <option value="">Любая</option>
+                  {% for t in transmissions %}
+                  <option value="{{ t.value }}" {% if params.get('transmission') == t.value %}selected{% endif %}>{{ t.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">Привод
+                <select name="drive_type" {% if not drive_types %}disabled{% endif %}>
+                  <option value="">Любой</option>
+                  {% for t in drive_types %}
+                  <option value="{{ t.value }}" {% if params.get('drive_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
+
+            <div class="advanced-row advanced-row--two">
+              <label class="field">Мощность от, л.с
+                <input type="number" name="power_hp_min" inputmode="numeric" min="0" step="10" value="{{ params.get('power_hp_min','') }}">
+              </label>
+              <label class="field">Мощность до, л.с
+                <input type="number" name="power_hp_max" inputmode="numeric" min="0" step="10" value="{{ params.get('power_hp_max','') }}">
+              </label>
+            </div>
+
+            <div class="advanced-row advanced-row--two">
+              <label class="field">Объём двигателя от, см³
+                <input type="number" name="engine_cc_min" inputmode="numeric" min="0" step="100" value="{{ params.get('engine_cc_min','') }}">
+              </label>
+              <label class="field">Объём двигателя до, см³
+                <input type="number" name="engine_cc_max" inputmode="numeric" min="0" step="100" value="{{ params.get('engine_cc_max','') }}">
+              </label>
+            </div>
+
+            <div class="advanced-row advanced-row--two">
+              <label class="field">Поколение
+                <select name="generation" {% if not generations %}disabled{% endif %}>
+                  <option value="">Любое</option>
+                  {% for g in generations %}
+                  <option value="{{ g }}" {% if params.get('generation') == g %}selected{% endif %}>{{ g }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">Поиск по ключевым словам
+                <input type="text" name="q" value="{{ params.get('q','') }}" placeholder="Например: дизель, 4x4, панорама">
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="advanced-section" id="advanced-exterior">
+        <h2 class="advanced-section__title">Экстерьер</h2>
+        <div class="search-filters">
+          <div class="filters-primary-grid advanced-grid">
+            {% if (colors_basic and colors_basic|length > 0) or (colors_other and colors_other|length > 0) %}
+            <label class="field--full">Цвет кузова
+              {% if colors_basic and colors_basic|length > 0 %}
+              <div class="color-swatches color-swatches--basic" data-color-chips>
+                {% for c in colors_basic %}
+                <button
+                  type="button"
+                  class="color-chip"
+                  data-color="{{ c.value }}"
+                  data-label="{{ c.label }}"
+                  title="{{ c.label }}"
+                  aria-label="{{ c.label }}"
+                  {% if c.hex %}style="--chip-color: {{ c.hex }}"{% endif %}
+                ></button>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% if colors_other and colors_other|length > 0 %}
+              <button type="button" class="btn btn-ghost btn-small color-toggle" id="colorsToggle" aria-expanded="false">
+                Другие цвета
+              </button>
+              <div class="color-swatches color-swatches-extra is-collapsed" id="colorsExtra" data-color-chips>
+                {% for c in colors_other %}
+                <button
+                  type="button"
+                  class="color-chip"
+                  data-color="{{ c.value }}"
+                  data-label="{{ c.label }}"
+                  title="{{ c.label }}"
+                  aria-label="{{ c.label }}"
+                  {% if c.hex %}style="--chip-color: {{ c.hex }}"{% endif %}
+                ></button>
+                {% endfor %}
+              </div>
+              {% endif %}
+              <input type="hidden" name="color" value="{{ params.get('color','') }}">
+            </label>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+
+      {% set interior_has_eu = interior_design_options_eu and interior_design_options_eu|length > 0 %}
+      {% set interior_has_kr = interior_design_options_kr and interior_design_options_kr|length > 0 %}
+      {% if interior_has_eu or interior_has_kr %}
+      <section class="advanced-section" id="advanced-interior" data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">
+        <h2 class="advanced-section__title">Интерьер</h2>
+        <div class="search-filters">
+          <div class="filters-primary-grid advanced-grid">
+            <label data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">Отделка салона
+              <select
+                name="interior_design"
+                data-region-options
+                data-options-eu='{{ interior_design_options_eu | tojson }}'
+                data-options-kr='{{ interior_design_options_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for v in interior_design_options_eu %}
+                <option value="{{ v }}" {% if params.get('interior_design') == v %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        </div>
+      </section>
+      {% endif %}
+
+      {% set details_has_eu = (seats_options_eu and seats_options_eu|length > 0) or (doors_options_eu and doors_options_eu|length > 0) or (owners_options_eu and owners_options_eu|length > 0) or (climatisation_options_eu and climatisation_options_eu|length > 0) or (airbags_options_eu and airbags_options_eu|length > 0) or (emission_classes_eu and emission_classes_eu|length > 0) or (efficiency_classes_eu and efficiency_classes_eu|length > 0) or (price_rating_labels_eu and price_rating_labels_eu|length > 0) %}
+      {% set details_has_kr = (seats_options_kr and seats_options_kr|length > 0) or (doors_options_kr and doors_options_kr|length > 0) or (owners_options_kr and owners_options_kr|length > 0) or (climatisation_options_kr and climatisation_options_kr|length > 0) or (airbags_options_kr and airbags_options_kr|length > 0) or (emission_classes_kr and emission_classes_kr|length > 0) or (efficiency_classes_kr and efficiency_classes_kr|length > 0) or (price_rating_labels_kr and price_rating_labels_kr|length > 0) %}
+      {% if details_has_eu or details_has_kr %}
+      <section class="advanced-section" id="advanced-details" data-has-eu="{{ 1 if details_has_eu else 0 }}" data-has-kr="{{ 1 if details_has_kr else 0 }}">
+        <h2 class="advanced-section__title">Детали предложения</h2>
+        <div class="search-filters">
+          <div class="filters-primary-grid advanced-grid">
+            {% if (seats_options_eu and seats_options_eu|length > 0) or (seats_options_kr and seats_options_kr|length > 0) %}
+            <label data-has-eu="{{ 1 if (seats_options_eu and seats_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (seats_options_kr and seats_options_kr|length > 0) else 0 }}">Количество мест
+              <select
+                name="num_seats"
+                data-region-options
+                data-options-eu='{{ seats_options_eu | tojson }}'
+                data-options-kr='{{ seats_options_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for v in seats_options_eu %}
+                <option value="{{ v }}" {% if params.get('num_seats') == v %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% endif %}
+            {% if (doors_options_eu and doors_options_eu|length > 0) or (doors_options_kr and doors_options_kr|length > 0) %}
+            <label data-has-eu="{{ 1 if (doors_options_eu and doors_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (doors_options_kr and doors_options_kr|length > 0) else 0 }}">Количество дверей
+              <select
+                name="doors_count"
+                data-region-options
+                data-options-eu='{{ doors_options_eu | tojson }}'
+                data-options-kr='{{ doors_options_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for v in doors_options_eu %}
+                <option value="{{ v }}" {% if params.get('doors_count') == v %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% endif %}
+            {% if (owners_options_eu and owners_options_eu|length > 0) or (owners_options_kr and owners_options_kr|length > 0) %}
+            <label data-has-eu="{{ 1 if (owners_options_eu and owners_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (owners_options_kr and owners_options_kr|length > 0) else 0 }}">Количество владельцев
+              <select
+                name="owners_count"
+                data-region-options
+                data-options-eu='{{ owners_options_eu | tojson }}'
+                data-options-kr='{{ owners_options_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for v in owners_options_eu %}
+                <option value="{{ v }}" {% if params.get('owners_count') == v %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% endif %}
+            {% if (climatisation_options_eu and climatisation_options_eu|length > 0) or (climatisation_options_kr and climatisation_options_kr|length > 0) %}
+            <label data-has-eu="{{ 1 if (climatisation_options_eu and climatisation_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (climatisation_options_kr and climatisation_options_kr|length > 0) else 0 }}">Климат
+              <select
+                name="climatisation"
+                data-region-options
+                data-options-eu='{{ climatisation_options_eu | tojson }}'
+                data-options-kr='{{ climatisation_options_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for v in climatisation_options_eu %}
+                <option value="{{ v }}" {% if params.get('climatisation') == v %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% endif %}
+            {% if (airbags_options_eu and airbags_options_eu|length > 0) or (airbags_options_kr and airbags_options_kr|length > 0) %}
+            <label data-has-eu="{{ 1 if (airbags_options_eu and airbags_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (airbags_options_kr and airbags_options_kr|length > 0) else 0 }}">Подушки безопасности
+              <select
+                name="airbags"
+                data-region-options
+                data-options-eu='{{ airbags_options_eu | tojson }}'
+                data-options-kr='{{ airbags_options_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for v in airbags_options_eu %}
+                <option value="{{ v }}" {% if params.get('airbags') == v %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% endif %}
+            {% if (emission_classes_eu and emission_classes_eu|length > 0) or (emission_classes_kr and emission_classes_kr|length > 0) %}
+            <label data-has-eu="{{ 1 if (emission_classes_eu and emission_classes_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (emission_classes_kr and emission_classes_kr|length > 0) else 0 }}">Экокласс
+              <select
+                name="emission_class"
+                data-region-options
+                data-options-eu='{{ emission_classes_eu | tojson }}'
+                data-options-kr='{{ emission_classes_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for v in emission_classes_eu %}
+                <option value="{{ v }}" {% if params.get('emission_class') == v %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% endif %}
+            {% if (efficiency_classes_eu and efficiency_classes_eu|length > 0) or (efficiency_classes_kr and efficiency_classes_kr|length > 0) %}
+            <label data-has-eu="{{ 1 if (efficiency_classes_eu and efficiency_classes_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (efficiency_classes_kr and efficiency_classes_kr|length > 0) else 0 }}">Класс эффективности
+              <select
+                name="efficiency_class"
+                data-region-options
+                data-options-eu='{{ efficiency_classes_eu | tojson }}'
+                data-options-kr='{{ efficiency_classes_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for v in efficiency_classes_eu %}
+                <option value="{{ v }}" {% if params.get('efficiency_class') == v %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% endif %}
+            {% if (price_rating_labels_eu and price_rating_labels_eu|length > 0) or (price_rating_labels_kr and price_rating_labels_kr|length > 0) %}
+            <label data-has-eu="{{ 1 if (price_rating_labels_eu and price_rating_labels_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (price_rating_labels_kr and price_rating_labels_kr|length > 0) else 0 }}">Оценка цены
+              <select
+                name="price_rating_label"
+                data-region-options
+                data-options-eu='{{ price_rating_labels_eu | tojson }}'
+                data-options-kr='{{ price_rating_labels_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for v in price_rating_labels_eu %}
+                <option value="{{ v }}" {% if params.get('price_rating_label') == v %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% endif %}
+            {% if has_air_suspension %}
+            <label class="field--checkbox">
+              <input type="checkbox" name="air_suspension">
+              <span>Пневмоподвеска</span>
+            </label>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+      {% endif %}
+
+      <div class="advanced-actions">
+        <button type="submit" class="btn btn-primary" id="advanced-submit">
+          <span class="label">Найти</span>
+          <span class="sep">·</span>
+          <span id="advanced-count" data-count="{{ total_cars }}">{{ total_cars }}</span>
+          <span class="suffix">объявлений</span>
+        </button>
+        <button type="reset" class="btn btn-ghost" id="advanced-reset">Сбросить</button>
+      </div>
+
+      <div class="advanced-message" id="advanced-message"></div>
+      <div class="advanced-suggestions" id="advanced-suggestions"></div>
+    </form>
+  </div>
+</section>
+<script>
+  window.COUNTRY_LABELS = {{ country_labels | tojson }};
+</script>
+{% endblock %}

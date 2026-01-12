@@ -55,6 +55,7 @@ class EmAvtoKlgParser(BaseParser):
         self.last_tasks_total: int = 0
         self.last_details_done: int = 0
         self.missing_tasks: List[Dict[str, Any]] = []
+        self.last_list_tasks: List[Dict[str, Any]] = []
 
     def _build_query(self, profile: Dict[str, Any], page: int) -> Dict[str, str]:
         # Base query from profile + pagination
@@ -107,11 +108,13 @@ class EmAvtoKlgParser(BaseParser):
 
         # If skipping details, we already appended results inside produce_page
         if skip_details:
+            self.last_list_tasks = list(tasks)
             for t in tasks:
                 dc = t.get("direct_car")
                 if dc:
                     results.append(dc)
         else:
+            self.last_list_tasks = []
             self.last_tasks_total = len(tasks)
             logger.info(
                 "[emavto_klg] detail loop start tasks=%s max_items=%s", len(

@@ -4,7 +4,7 @@ from typing import Iterable, Tuple, List, Dict, Any
 from datetime import datetime
 import hashlib
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update, or_
 from ..models import Car, Source, CarImage, ProgressKV
 from ..services.cars_service import CarsService
 from ..utils.pricing import to_rub
@@ -15,6 +15,7 @@ def compute_car_hash(payload: Dict[str, Any]) -> str:
     parts = [
         payload.get("brand") or "",
         payload.get("model") or "",
+        payload.get("variant") or "",
         str(payload.get("year") or ""),
         str(payload.get("mileage") or ""),
         str(payload.get("price") or ""),
@@ -100,6 +101,9 @@ class ParsingDataService:
                     existing.is_available = True
                     updated += 1
                 else:
+                    if existing.source_payload is None and payload.get("source_payload") is not None:
+                        existing.source_payload = payload["source_payload"]
+                        updated += 1
                     if existing.price_rub_cached is None and payload.get("price_rub_cached") is not None:
                         existing.price_rub_cached = payload["price_rub_cached"]
                         updated += 1
@@ -154,6 +158,25 @@ class ParsingDataService:
         if changed:
             self.db.commit()
         return changed
+
+    def deactivate_missing_by_last_seen(self, source: Source, run_started_at: datetime) -> int:
+        """
+        Deactivate cars not seen during the current run based on last_seen_at.
+        This avoids keeping a full external_id list in memory for large feeds.
+        """
+        now = datetime.utcnow()
+        stmt = (
+            update(Car)
+            .where(
+                Car.source_id == source.id,
+                Car.is_available.is_(True),
+                or_(Car.last_seen_at.is_(None), Car.last_seen_at < run_started_at),
+            )
+            .values(is_available=False, last_seen_at=now)
+        )
+        result = self.db.execute(stmt)
+        self.db.commit()
+        return int(result.rowcount or 0)
 
     # --- progress helpers ---
     def get_progress(self, key: str) -> str | None:

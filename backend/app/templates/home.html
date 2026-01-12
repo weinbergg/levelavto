@@ -27,11 +27,14 @@
     <div class="search-card search-card--overlay">
       <div class="search-head">
         <h3 style="margin: 0">{{ home.search.title }}</h3>
-        <p class="muted" style="margin:0;">{{ total_cars }} {{ home.search.subtitle_suffix }}</p>
+        <p class="search-count">
+          <span id="home-count-top" data-count="{{ total_cars }}">{{ total_cars }}</span>
+          {{ home.search.subtitle_suffix }}
+        </p>
       </div>
       <form class="search-form" id="home-search" method="get" action="/catalog">
         <div class="filter-grid filter-grid--overlay">
-        <div class="field">
+          <div class="field">
             <label for="home-brand">Марка</label>
             <select id="home-brand" name="brand">
               <option value="">Все</option>
@@ -50,6 +53,7 @@
             <label for="home-country">Страна</label>
             <select id="home-country" name="country">
               <option value="">Все</option>
+              <option value="KR">Корея</option>
               {% for c in countries %}
               <option value="{{ c }}">{{ country_labels.get(c, c) }}</option>
               {% endfor %}
@@ -64,7 +68,6 @@
               inputmode="numeric"
               min="0"
               step="1000"
-              list="home-price-options"
             />
           </div>
           <div class="field">
@@ -76,10 +79,8 @@
               inputmode="numeric"
               min="0"
               step="1000"
-              list="home-price-options"
             />
           </div>
-          {% if reg_years %}
           <div class="field">
             <label for="home-reg-year">Поставлен на учёт с (год)</label>
             <select id="home-reg-year" name="reg_year_min">
@@ -98,7 +99,6 @@
               {% endfor %}
             </select>
           </div>
-          {% endif %}
           <div class="field">
             <label for="home-mileage-min">Пробег от, км</label>
             <input
@@ -107,8 +107,7 @@
               type="number"
               inputmode="numeric"
               min="0"
-              step="1000"
-              list="home-mileage-options"
+              step="1"
             />
           </div>
           <div class="field">
@@ -119,11 +118,9 @@
               type="number"
               inputmode="numeric"
               min="0"
-              step="1000"
-              list="home-mileage-options"
+              step="1"
             />
           </div>
-          {% if transmissions and transmissions|length > 0 %}
           <div class="field">
             <label for="home-transmission">Трансмиссия</label>
             <select id="home-transmission" name="transmission">
@@ -133,28 +130,20 @@
               {% endfor %}
             </select>
           </div>
-          {% endif %}
         </div>
         <div class="inline-actions">
-          <button type="submit" class="btn btn-primary">
-            {{ home.search.submit_label }} · {{ total_cars }} {{ home.search.submit_suffix }}
+          <button type="submit" class="btn btn-primary" id="home-submit">
+            <span class="label">{{ home.search.submit_label }}</span>
+            <span class="sep">·</span>
+            <span id="home-count" data-count="{{ total_cars }}">{{ total_cars }}</span>
+            <span class="suffix">{{ home.search.submit_suffix }}</span>
           </button>
           <div class="links">
             <a href="#" id="home-reset">{{ home.search.reset_label }}</a>
-            <a href="/catalog">{{ home.search.catalog_label }}</a>
+            <a href="/search">{{ home.search.catalog_label }}</a>
           </div>
         </div>
       </form>
-      <datalist id="home-price-options">
-        {% for p in price_options %}
-        <option value="{{ p }}"></option>
-        {% endfor %}
-      </datalist>
-      <datalist id="home-mileage-options">
-        {% for m in mileage_options %}
-        <option value="{{ m }}"></option>
-        {% endfor %}
-      </datalist>
     </div>
   </div>
 
