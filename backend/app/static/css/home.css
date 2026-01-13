@@ -37,25 +37,25 @@
   border-radius: 12px;
   color-scheme: dark;
 }
-.filter-grid--overlay {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+.filter-grid--overlay.filter-grid--compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 .filter-grid--overlay .field--dynamic {
   min-height: 100%;
 }
 @media (max-width: 1200px) {
-  .filter-grid--overlay {
+  .filter-grid--overlay.filter-grid--compact {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 820px) {
-  .filter-grid--overlay {
+  .filter-grid--overlay.filter-grid--compact {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 560px) {
-  .filter-grid--overlay {
+  .filter-grid--overlay.filter-grid--compact {
     grid-template-columns: 1fr;
   }
 }

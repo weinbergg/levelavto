@@ -643,12 +643,37 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         payload = car.source_payload or {}
         pricing = service.price_info(car)
 
+        def translate_value(val: Any) -> Any:
+            if not isinstance(val, str):
+                return val
+            s = val.strip()
+            low = s.lower()
+            repl = [
+                ("automatic", "автоматический"),
+                ("climatisation", "климат-контроль"),
+                ("climatization", "климат-контроль"),
+                ("2 zones", "2 зоны"),
+                ("two zones", "2 зоны"),
+                ("zone", "зона"),
+                ("front and side", "фронтальные и боковые"),
+                ("airbags", "подушки безопасности"),
+                ("navigation", "навигация"),
+                ("leather", "кожа"),
+                ("sport package", "спорт пакет"),
+                ("park assist", "помощь при парковке"),
+            ]
+            out = s
+            for src, dst in repl:
+                if src in low:
+                    out = out.replace(src, dst).replace(src.title(), dst)
+            return out
+
         def push(label: str, value: Any) -> None:
             if value is None:
                 return
             if isinstance(value, str) and not value.strip():
                 return
-            details.append({"label": label, "value": value})
+            details.append({"label": label, "value": translate_value(value)})
 
         push("Мест", payload.get("num_seats"))
         push("Дверей", payload.get("doors_count"))
@@ -666,9 +691,10 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
 
         raw_options = payload.get("options")
         if isinstance(raw_options, list):
-            options = [str(opt).strip() for opt in raw_options if str(opt).strip()]
+            options = [translate_value(str(opt).strip()) for opt in raw_options if str(opt).strip()]
         elif isinstance(raw_options, str):
-            options = [raw_options.strip()] if raw_options.strip() else []
+            opt = raw_options.strip()
+            options = [translate_value(opt)] if opt else []
         calc = service.ensure_calc_cache(car)
     return templates.TemplateResponse(
         "car_detail.html",

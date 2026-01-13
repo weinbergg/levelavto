@@ -21,6 +21,17 @@ _LABELS: Dict[str, str] = {
     "vat": "НДС",
     "vat_percent": "НДС",
     "excise": "Акциз",
+    "customs_fee": "Таможенный сбор",
+    "broker_elpts": "Брокер и ЭлПТС",
+    "delivery": "Доставка",
+    "insurance": "Страхование",
+    "price_rating_label": "Оценка цены",
+    "emission_class": "Экокласс",
+    "efficiency_class": "Класс эффективности",
+    "climatisation": "Климат",
+    "airbags": "Подушки безопасности",
+    "interior_design": "Интерьер",
+    "park_assists": "Парктроники",
 }
 
 

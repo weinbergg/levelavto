@@ -663,10 +663,15 @@
         if (net != null) priceLines.push(`NET: ${Number(net).toLocaleString('ru-RU')} €`)
         if (vatInfo != null) priceLines.push(vatInfo ? 'НДС: возмещается' : 'НДС: не возмещается')
         let calcLine = ''
+        let footnote = ''
         if (car.calc_total_rub != null) {
-          calcLine = `<div class="car-card__meta">Итог в РФ: ${formatRub(car.calc_total_rub)}</div>`
+          calcLine = `<div class="price-main">${formatRub(car.calc_total_rub)}</div>`
         } else {
-          calcLine = `<div class="car-card__meta muted">* Итог не рассчитан</div>`
+          // добавить звёздочку к первой цене, если есть
+          if (priceLines.length) {
+            priceLines[0] = `${priceLines[0]} *`
+          }
+          footnote = `<div class="price-sub muted">* Итог в РФ не рассчитан (недостаточно данных)</div>`
         }
         const metaLine = [car.year, car.display_engine_type || car.engine_type].filter(Boolean).join(' · ')
         const colorDot = (hex, raw) => {
@@ -725,8 +730,9 @@
               ${specLines.length ? `<ul class="specs">${specLines.map((s) => `<li>${s}</li>`).join('')}</ul>` : ''}
             </div>
             <div class="car-card__price">
-              ${priceLines.map((p) => `<div>${p}</div>`).join('')}
               ${calcLine}
+              ${priceLines.map((p) => `<div class="price-sub">${p}</div>`).join('')}
+              ${footnote}
             </div>
           </div>
         `

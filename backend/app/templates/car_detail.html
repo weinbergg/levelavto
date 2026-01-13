@@ -54,17 +54,16 @@
       </div>
       <div class="detail-info card">
         <div class="detail-heading">
-          <div>
-            <div class="badge">В наличии</div>
-            <h1>{{ car.brand or '' }} {{ car.model or '' }}</h1>
-            {% set meta = [] %} {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %} {% if car.display_engine_type or car.engine_type %}{% set _ = meta.append(car.display_engine_type or car.engine_type) %}{% endif %} {% if meta %}
-            <p class="muted">{{ meta|join(' · ') }}</p>
-            {% endif %}
-            <p class="muted">
-              Источник: надёжный партнёр · {% if car.display_country_label or car.country %}Страна: {{ car.display_country_label or car.country }} · {% endif %} Фото:
-              {{ car.images|length if car.images else 0 }}
-            </p>
-          </div>
+            <div>
+              <h1 class="detail-title">{{ car.brand or '' }} {{ car.model or '' }}</h1>
+              {% set meta = [] %} {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %} {% if car.display_engine_type or car.engine_type %}{% set _ = meta.append(car.display_engine_type or car.engine_type) %}{% endif %} {% if meta %}
+              <p class="muted">{{ meta|join(' · ') }}</p>
+              {% endif %}
+              <p class="muted">
+                {% if car.display_country_label or car.country %}Страна: {{ car.display_country_label or car.country }} · {% endif %} Фото:
+                {{ car.images|length if car.images else 0 }}
+              </p>
+            </div>
           <div class="detail-price">
             {% set gross = pricing.gross_eur if pricing else None %}
             {% set net = pricing.net_eur if pricing else None %}
@@ -72,7 +71,7 @@
             {% set vat_reclaim = pricing.vat_reclaimable if pricing else False %}
             {% if calc and calc.total_rub %}
             <div class="detail-price__total">
-              Итог в РФ: {{ '{:,.0f}'.format(calc.total_rub).replace(',', ' ') }} ₽
+              {{ '{:,.0f}'.format(calc.total_rub).replace(',', ' ') }} ₽
             </div>
             {% endif %}
             <div class="detail-price__base">
@@ -90,7 +89,7 @@
                 <br>НДС: {% if vat_reclaim %}возмещается ({{ vat_pct }}%){% else %}не возмещается{% endif %}
               {% endif %}
               {% if not calc or not calc.total_rub %}
-                <br><span class="muted">* Итог не рассчитан</span>
+                <br><span class="muted">* Итог в РФ не рассчитан</span>
               {% endif %}
             </div>
           {% if user %}
@@ -100,18 +99,19 @@
         </div>
         {% if calc %}
         <div class="detail-calc">
-          {% if calc.breakdown and calc.breakdown|length > 0 %}
-          <div class="detail-calc__line">
-            {% for item in calc.breakdown %}
-            <div class="calc-chip">
-              <span>{{ item.title }}</span>
-              <span>{{ '{:,.0f}'.format(item.amount_rub).replace(',', ' ') }} ₽</span>
-            </div>
-            {% endfor %}
+          <button class="btn btn-ghost btn-small" type="button" id="toggleCalc">Детали доставки</button>
+          <div class="detail-calc__line" id="calcBreakdown" style="display:none;">
+            {% if calc.breakdown and calc.breakdown|length > 0 %}
+              {% for item in calc.breakdown %}
+              <div class="calc-chip">
+                <span>{{ item.title }}</span>
+                <span>{{ '{:,.0f}'.format(item.amount_rub).replace(',', ' ') }} ₽</span>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="muted">Недостаточно данных для расчёта стоимости.</div>
+            {% endif %}
           </div>
-          {% else %}
-          <div class="muted">Недостаточно данных для расчёта стоимости.</div>
-          {% endif %}
         </div>
         {% endif %}
         <div class="detail-specs">
@@ -248,6 +248,16 @@
         })
         let startX = null
       }
+    }
+
+    // breakdown toggle
+    const toggleCalc = document.getElementById('toggleCalc')
+    const calcBlock = document.getElementById('calcBreakdown')
+    if (toggleCalc && calcBlock) {
+      toggleCalc.addEventListener('click', () => {
+        const isHidden = calcBlock.style.display === 'none'
+        calcBlock.style.display = isHidden ? '' : 'none'
+      })
     }
   })()
 </script>

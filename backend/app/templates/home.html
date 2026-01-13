@@ -30,7 +30,7 @@
       </div>
       <form class="search-form" id="home-search" method="get" action="/catalog">
         {% set params = request.query_params %}
-        <div class="filter-grid filter-grid--overlay">
+        <div class="filter-grid filter-grid--overlay filter-grid--compact">
           <div class="field">
             <label for="home-brand">Марка</label>
             <select id="home-brand" name="brand">
@@ -54,12 +54,6 @@
               <option value="KR" {% if params.get('region') == 'KR' %}selected{% endif %}>Корея</option>
             </select>
           </div>
-          <div class="field field--dynamic" id="home-region-slot">
-            <label id="home-region-slot-label">Регион</label>
-            <select id="home-region-slot-select" disabled>
-              <option value="">—</option>
-            </select>
-          </div>
           <div class="field">
             <label for="home-price-max">Цена до, ₽</label>
             <input
@@ -72,7 +66,7 @@
             />
           </div>
           <div class="field field--dynamic" id="home-region-slot">
-            <label id="home-region-slot-label">Регион</label>
+            <label id="home-region-slot-label">Страна / Тип</label>
             <select id="home-region-slot-select" disabled>
               <option value="">—</option>
             </select>
@@ -100,51 +94,11 @@
           </div>
           {% endif %}
           <div class="field">
-            <label for="home-reg-year">Поставлен на учёт с (год)</label>
+            <label for="home-reg-year">Поставлен на учёт с</label>
             <select id="home-reg-year" name="reg_year_min">
               <option value="">Не важно</option>
               {% for y in reg_years %}
               <option value="{{ y }}">{{ y }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="field">
-            <label for="home-reg-month">Поставлен на учёт с (месяц)</label>
-            <select id="home-reg-month" name="reg_month_min">
-              <option value="">Не важно</option>
-              {% for m in reg_months %}
-              <option value="{{ m.value }}">{{ m.label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="field">
-            <label for="home-mileage-min">Пробег от, км</label>
-            <input
-              id="home-mileage-min"
-              name="mileage_min"
-              type="number"
-              inputmode="numeric"
-              min="0"
-              step="1"
-            />
-          </div>
-          <div class="field">
-            <label for="home-mileage-max">Пробег до, км</label>
-            <input
-              id="home-mileage-max"
-              name="mileage_max"
-              type="number"
-              inputmode="numeric"
-              min="0"
-              step="1"
-            />
-          </div>
-          <div class="field">
-            <label for="home-transmission">Трансмиссия</label>
-            <select id="home-transmission" name="transmission">
-              <option value="">Любая</option>
-              {% for t in transmissions %}
-              <option value="{{ t.value }}">{{ t.label }}</option>
               {% endfor %}
             </select>
           </div>

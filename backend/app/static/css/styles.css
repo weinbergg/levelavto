@@ -1377,6 +1377,9 @@ body.filters-open {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 10px;
 }
+.filters-primary-grid label {
+  line-height: 1.2;
+}
 .filters-range {
   grid-column: 1 / -1;
   display: grid;
@@ -1388,6 +1391,7 @@ body.filters-open {
   gap: 6px;
   line-height: 1.2;
   white-space: normal;
+  min-height: 56px;
 }
 .filters-primary-grid .field--full {
   grid-column: 1 / -1;
@@ -2134,6 +2138,18 @@ input[type="number"]::-webkit-outer-spin-button {
   font-weight: 800;
   color: var(--text-1);
   text-align: right;
+  display: grid;
+  gap: 4px;
+}
+.price-main {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-1);
+}
+.price-sub {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-3);
 }
 .specs {
   list-style: none;
@@ -2486,6 +2502,17 @@ input[type="number"]::-webkit-outer-spin-button {
   flex: 1;
   min-width: 0;
 }
+.detail-title {
+  margin: 0 0 6px;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  flex: 1;
+  min-width: 0;
+}
 .detail-heading .muted {
   color: var(--color-text-secondary);
 }
@@ -2498,7 +2525,7 @@ input[type="number"]::-webkit-outer-spin-button {
   line-height: 1.1;
 }
 .detail-price__total {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--color-accent);
 }
@@ -2523,6 +2550,7 @@ input[type="number"]::-webkit-outer-spin-button {
   overflow-x: visible;
   padding-bottom: 4px;
   -webkit-overflow-scrolling: touch;
+  margin-top: 8px;
 }
 .calc-chip {
   display: inline-flex;
