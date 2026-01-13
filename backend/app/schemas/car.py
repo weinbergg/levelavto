@@ -52,6 +52,7 @@ class CarOut(CarBase):
     calc_total_rub: Optional[float] = None
     calc_breakdown: Optional[list] = None
     calc_used_price: Optional[dict] = None
+    kr_market_type: Optional[str] = None
 
 
 class CarDetailOut(CarBase):

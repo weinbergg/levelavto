@@ -63,6 +63,10 @@ class ParsingDataService:
             payload.setdefault("country", source.country)
             payload.setdefault("thumbnail_url", None)
             payload.setdefault("is_available", True)
+        # normalize KR market type
+        if payload.get("country") == "KR":
+            if not payload.get("kr_market_type"):
+                payload["kr_market_type"] = "domestic"
             listing_val = payload.get("listing_date")
             ts = None
             if isinstance(listing_val, str):

@@ -246,13 +246,20 @@ class CarsService:
                     conds.append(Car.source_id.in_(eu_sources))
                 conditions.append(or_(*conds))
         if kr_type:
-            kt = str(kr_type).upper()
-            conditions.append(
-                func.jsonb_extract_path_text(
-                    cast(Car.source_payload, JSONB), "kr_type"
-                )
-                == kt
-            )
+            kt_raw = str(kr_type).upper()
+            kt = None
+            if kt_raw in ("KR_INTERNAL", "DOMESTIC"):
+                kt = "domestic"
+            elif kt_raw in ("KR_IMPORT", "IMPORT"):
+                kt = "import"
+            if kt:
+                # allow KR by country or by source hints
+                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                conds = [func.lower(Car.kr_market_type) == kt]
+                conds.append(func.upper(Car.country).like("KR%"))
+                if kr_sources:
+                    conds.append(Car.source_id.in_(kr_sources))
+                conditions.append(and_(or_(*conds)))
         if brand:
             # case-insensitive contains (brand may have variants/extra symbols)
             b = normalize_brand(brand).strip().strip(".,;")
@@ -393,10 +400,12 @@ class CarsService:
                     Source.key.in_(keys))).scalars().all()
                 if src_ids:
                     conditions.append(Car.source_id.in_(src_ids))
-        if price_min is not None:
-            conditions.append(Car.price_rub_cached >= price_min)
-        if price_max is not None:
-            conditions.append(Car.price_rub_cached <= price_max)
+        if price_min is not None or price_max is not None:
+            conditions.append(Car.total_price_rub_cached.is_not(None))
+            if price_min is not None:
+                conditions.append(Car.total_price_rub_cached >= price_min)
+            if price_max is not None:
+                conditions.append(Car.total_price_rub_cached <= price_max)
         if year_min is not None:
             conditions.append(Car.year >= year_min)
         if year_max is not None:
@@ -472,10 +481,11 @@ class CarsService:
 
         order_clause = []
         calc_first = case((Car.total_price_rub_cached.is_(None), 1), else_=0)
+        price_expr = Car.total_price_rub_cached
         if sort == "price_asc":
-            order_clause = [calc_first.asc(), Car.price_rub_cached.asc().nullslast()]
+            order_clause = [calc_first.asc(), price_expr.asc().nullslast()]
         elif sort == "price_desc":
-            order_clause = [calc_first.asc(), Car.price_rub_cached.desc().nullslast()]
+            order_clause = [calc_first.asc(), price_expr.desc().nullslast()]
         elif sort == "year_desc":
             order_clause = [calc_first.asc(), Car.year.desc().nullslast()]
         elif sort == "year_asc":
@@ -511,7 +521,7 @@ class CarsService:
         stmt = (
             select(Car)
             .where(where_expr)
-            .order_by(*order_clause, Car.created_at.desc(), Car.updated_at.desc())
+            .order_by(*order_clause, Car.id.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
         )

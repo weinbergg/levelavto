@@ -106,15 +106,15 @@ def calc_endpoint(payload: CalcRequest, db: Session = Depends(get_db)):
         for item in result.get("breakdown", []):
             t = item.get("title")
             cur = (item.get("currency") or "RUB").upper()
-            amt = item.get("amount") or 0
+            amt = float(item.get("amount") or 0)
             ru = label_map.get(t, label_for(t)) if t else ""
             rub = amt
             if cur == "EUR" and eur_rate_used:
                 rub = amt * eur_rate_used
             disp.append({
                 "title": ru,
-                "amount_rub": rub,
-                "original_amount": amt,
+                "amount_rub": round(rub, 2),
+                "original_amount": round(amt, 2),
                 "original_currency": cur,
             })
         result["display_breakdown"] = disp

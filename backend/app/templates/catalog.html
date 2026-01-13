@@ -73,6 +73,22 @@
                 {% endif %}
               </select>
             </label>
+            <div class="filters-row">
+              <label>Цена от, ₽
+                <input type="number" name="price_min" inputmode="numeric" min="0" step="1000" value="{{ params.get('price_min','') }}" placeholder="от">
+              </label>
+              <label>Цена до, ₽
+                <input type="number" name="price_max" inputmode="numeric" min="0" step="1000" value="{{ params.get('price_max','') }}" placeholder="до">
+              </label>
+            </div>
+            <div class="filters-row">
+              <label>Пробег от, км
+                <input type="number" name="mileage_min" inputmode="numeric" min="0" step="1" value="{{ params.get('mileage_min','') }}" placeholder="от">
+              </label>
+              <label>Пробег до, км
+                <input type="number" name="mileage_max" inputmode="numeric" min="0" step="1" value="{{ params.get('mileage_max','') }}" placeholder="до">
+              </label>
+            </div>
             {% if body_types and body_types|length > 0 %}
             <label>Кузов
               <select name="body_type" id="body_type">
@@ -158,22 +174,6 @@
             </label>
             {% endif %}
             <div class="filters-range">
-              <label>Цена от, ₽
-                <input type="number" name="price_min" inputmode="numeric" min="0" step="1000" value="{{ params.get('price_min','') }}">
-              </label>
-              <label>Цена до, ₽
-                <input type="number" name="price_max" inputmode="numeric" min="0" step="1000" value="{{ params.get('price_max','') }}">
-              </label>
-            </div>
-            <div class="filters-range">
-              <label>Пробег от, км
-                <input type="number" name="mileage_min" inputmode="numeric" min="0" step="1" value="{{ params.get('mileage_min','') }}">
-              </label>
-              <label>Пробег до, км
-                <input type="number" name="mileage_max" inputmode="numeric" min="0" step="1" value="{{ params.get('mileage_max','') }}">
-              </label>
-            </div>
-            <div class="filters-range">
               <label>Мощность от, л.с
                 <input type="number" name="power_hp_min" inputmode="numeric" min="0" step="10" value="{{ params.get('power_hp_min','') }}">
               </label>
@@ -189,22 +189,8 @@
                 <input type="number" name="engine_cc_max" inputmode="numeric" min="0" step="100" value="{{ params.get('engine_cc_max','') }}">
               </label>
             </div>
-            <label>Цвет салона
-              <select name="interior_color" disabled>
-                <option value="">Нет данных</option>
-              </select>
-            </label>
-            <label>Материал салона
-              <select name="interior_material" disabled>
-                <option value="">Нет данных</option>
-              </select>
-            </label>
-            {% if has_air_suspension %}
-            <label class="field--checkbox">
-              <input type="checkbox" name="air_suspension">
-              <span>Пневмоподвеска</span>
-            </label>
-            {% endif %}
+            <!-- interior filters moved to advanced search; hidden in main panel -->
+            {# фильтр пневмоподвески скрыт: данных нет или не используется #}
             {% if (colors_basic and colors_basic|length > 0) or (colors_other and colors_other|length > 0) %}
             <label class="field--full">Цвет
               {% if colors_basic and colors_basic|length > 0 %}

@@ -1162,7 +1162,11 @@
         params.append(k, v)
       }
       if (regionVal === 'KR') {
-        if (!params.has('country')) params.set('country', 'KR')
+        params.set('country', 'KR')
+        const slotVal = regionSlotSelect?.value || ''
+        if (slotVal === 'KR_INTERNAL') params.set('kr_type', 'KR_INTERNAL')
+        else if (slotVal === 'KR_IMPORT') params.set('kr_type', 'KR_IMPORT')
+        else params.delete('kr_type')
       }
       if (withPaging) {
         params.set('page', '1')

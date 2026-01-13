@@ -177,15 +177,15 @@
             <input type="hidden" name="preferred" value="{{ title_line }} /car/{{ car.id }}">
             <input type="hidden" name="comment" value="Авто: {{ title_line }}{% if price_line %} · Цена: {{ price_line }}{% endif %} · Ссылка: /car/{{ car.id }}">
             <input type="hidden" name="car_id" value="{{ car.id }}">
-            <div class="field span-12">
+            <div class="field">
               <label for="lead-name">Имя</label>
               <input id="lead-name" name="name" type="text" required />
             </div>
-            <div class="field span-12">
+            <div class="field">
               <label for="lead-phone">Телефон</label>
               <input id="lead-phone" name="phone" type="tel" required />
             </div>
-            <div class="field span-12">
+            <div class="field">
               <label for="lead-email">Email (опционально)</label>
               <input id="lead-email" name="email" type="email" />
             </div>

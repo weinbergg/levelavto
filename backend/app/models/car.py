@@ -26,6 +26,7 @@ class Car(Base):
     currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     price_rub_cached: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True, index=True)
     total_price_rub_cached: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
+    kr_market_type: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     registration_year: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     registration_month: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     body_type: Mapped[str | None] = mapped_column(String(80), nullable=True)

@@ -14,8 +14,10 @@
   gap: 6px;
 }
 .lead-form-grid {
-  gap: 16px;
+  display: grid;
   grid-template-columns: 1fr;
+  row-gap: 14px;
+  width: 100%;
 }
 .lead-form-grid .form-actions {
   display: flex;
@@ -27,12 +29,24 @@
 }
 .lead-form-grid .form-actions .btn {
   min-width: 180px;
+  width: 100%;
 }
 .lead-form-grid .field {
   grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .lead-form-grid .field.full-width {
   grid-column: 1 / -1;
+}
+.lead-form-grid label {
+  display: block;
+  width: 100%;
+}
+.lead-form-grid input {
+  width: 100%;
+  box-sizing: border-box;
 }
 .form-grid.form-grid--12 .field input,
 .form-grid.form-grid--12 .field select {
@@ -1405,6 +1419,15 @@ body.filters-open {
 .filters-range {
   grid-column: 1 / -1;
 }
+.filters-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.filters-row label {
+  display: grid;
+  gap: 6px;
+}
 .reg-range {
   display: grid;
   gap: 8px;
@@ -1455,17 +1478,17 @@ body.filters-open {
 }
 .filters-primary-grid .field--checkbox,
 .search-filters .field--checkbox {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 12px;
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px 10px;
   border: 1px solid var(--border-1);
-  border-radius: var(--r-sm);
-  background: var(--bg-interactive);
+  border-radius: 10px;
+  background: transparent;
   color: var(--color-text-primary);
   cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 .filters-primary-grid .field--checkbox input,
 .search-filters .field--checkbox input {
@@ -1473,10 +1496,17 @@ body.filters-open {
   height: 18px;
   margin: 0;
   accent-color: var(--accent);
+  border-radius: 4px;
+  border: 1px solid var(--border-1);
+  background: var(--color-bg-elevated);
 }
 .filters-primary-grid .field--checkbox:focus-within,
 .search-filters .field--checkbox:focus-within {
   box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.2);
+}
+.filters-primary-grid .field--checkbox input:checked,
+.search-filters .field--checkbox input:checked {
+  border-color: var(--accent);
 }
 .filters-advanced {
   border-top: 1px solid var(--color-border-subtle);
@@ -1717,6 +1747,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .color-toggle {
   margin-top: 8px;
+  width: 100%;
 }
 .color-swatches-extra {
   margin-top: 10px;

@@ -31,6 +31,7 @@ class CarParsed:
     source_key: str
     external_id: str  # unique ID from source
     country: str
+    kr_market_type: Optional[str] = None
     brand: Optional[str] = None
     model: Optional[str] = None
     generation: Optional[str] = None
