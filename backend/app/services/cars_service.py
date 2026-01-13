@@ -6,6 +6,9 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_, or_, case, cast, String
 from sqlalchemy.dialects.postgresql import JSONB
+import logging
+
+logger = logging.getLogger(__name__)
 import re
 import os
 import requests
@@ -56,6 +59,7 @@ def brand_variants(value: Optional[str]) -> List[str]:
 class CarsService:
     def __init__(self, db: Session) -> None:
         self.db = db
+        self.logger = logging.getLogger(__name__)
 
     EU_COUNTRIES = {
         "DE", "AT", "FR", "IT", "ES", "NL", "BE", "PL", "CZ", "SE", "FI",
@@ -140,6 +144,7 @@ class CarsService:
         *,
         region: Optional[str] = None,
         country: Optional[str] = None,
+        kr_type: Optional[str] = None,
         brand: Optional[str] = None,
         lines: Optional[List[str]] = None,
         source_key: Optional[str | List[str]] = None,
@@ -226,6 +231,28 @@ class CarsService:
                 conditions.append(or_(*eu_conds))
             elif c:
                 conditions.append(func.upper(Car.country) == c)
+        if region:
+            r = region.upper()
+            if r == "KR":
+                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                conds = [func.upper(Car.country).like("KR%")]
+                if kr_sources:
+                    conds.append(Car.source_id.in_(kr_sources))
+                conditions.append(or_(*conds))
+            elif r == "EU":
+                eu_sources = self._source_ids_for_europe()
+                conds = [func.upper(Car.country).in_(self.EU_COUNTRIES)]
+                if eu_sources:
+                    conds.append(Car.source_id.in_(eu_sources))
+                conditions.append(or_(*conds))
+        if kr_type:
+            kt = str(kr_type).upper()
+            conditions.append(
+                func.jsonb_extract_path_text(
+                    cast(Car.source_payload, JSONB), "kr_type"
+                )
+                == kt
+            )
         if brand:
             # case-insensitive contains (brand may have variants/extra symbols)
             b = normalize_brand(brand).strip().strip(".,;")
@@ -511,12 +538,12 @@ class CarsService:
             used_price = car.price
             used_currency = car.currency or "EUR"
         if not used_price:
-            logger.info("calc_skip_no_price car=%s src=%s", car.id, getattr(car.source, "key", None))
+            self.logger.info("calc_skip_no_price car=%s src=%s", car.id, getattr(car.source, "key", None))
             return None
         reg_year = car.registration_year or car.year
         reg_month = car.registration_month or 1
         if reg_year is None:
-            logger.info("calc_skip_no_reg_year car=%s src=%s", car.id, getattr(car.source, "key", None))
+            self.logger.info("calc_skip_no_reg_year car=%s src=%s", car.id, getattr(car.source, "key", None))
             return None
         # кеш
         if (
@@ -556,19 +583,19 @@ class CarsService:
             price_net_eur = used_price
         elif cur in ("RUB", "₽"):
             if eur_rate:
-                price_net_eur = used_price / eur_rate
+                price_net_eur = float(used_price) / float(eur_rate)
         elif cur == "USD":
             if eur_rate and usd_rate:
-                price_net_eur = used_price * (usd_rate / eur_rate)
+                price_net_eur = float(used_price) * (float(usd_rate) / float(eur_rate))
         if price_net_eur is None:
             return None
         engine_type = (car.engine_type or "").lower()
         is_electric = "electric" in engine_type or "ev" in engine_type
         if is_electric and not (car.power_hp or car.power_kw):
-            logger.info("calc_skip_no_power car=%s src=%s", car.id, getattr(car.source, "key", None))
+            self.logger.info("calc_skip_no_power car=%s src=%s", car.id, getattr(car.source, "key", None))
             return None
         if not is_electric and not car.engine_cc:
-            logger.info("calc_skip_no_cc car=%s src=%s", car.id, getattr(car.source, "key", None))
+            self.logger.info("calc_skip_no_cc car=%s src=%s", car.id, getattr(car.source, "key", None))
             return None
         scenario = None
         if is_electric:
@@ -589,7 +616,7 @@ class CarsService:
         try:
             result = calculate(cfg.payload, req)
         except Exception:
-            logger.exception("calc_failed car=%s src=%s", car.id, getattr(car.source, "key", None))
+            self.logger.exception("calc_failed car=%s src=%s", car.id, getattr(car.source, "key", None))
             return None
         display = []
         label_map = cfg.payload.get("label_map", {})

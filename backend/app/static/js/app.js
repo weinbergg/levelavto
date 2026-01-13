@@ -480,10 +480,8 @@
       'engine_cc_min',
       'engine_cc_max',
     ]
-    const skipKeys = ['region', 'eu_country', 'kr_type']
     for (const [k, v] of data.entries()) {
       if (!v) continue
-      if (skipKeys.includes(k)) continue
       if (k === 'brand') {
         const norm = normalizeBrand(v)
         if (norm) params.append(k, norm)
@@ -497,6 +495,23 @@
         continue
       }
       params.append(k, v)
+    }
+    // region-dependent fields
+    const regionSel = form.elements['region']
+    const countryHidden = form.elements['country']
+    const euSel = form.elements['eu_country']
+    const krSel = form.elements['kr_type']
+    if (regionSel && regionSel.value) {
+      params.set('region', regionSel.value)
+      if (regionSel.value === 'EU' && euSel && euSel.value) {
+        params.set('country', euSel.value)
+      }
+      if (regionSel.value === 'KR') {
+        params.set('country', 'KR')
+        if (krSel && krSel.value) params.set('kr_type', krSel.value)
+      }
+    } else if (countryHidden && countryHidden.value) {
+      params.set('country', countryHidden.value)
     }
     params.set('page', String(page || 1))
     params.set('page_size', '12')
@@ -687,16 +702,16 @@
           specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/fuel.svg" alt="">${car.display_engine_type || car.engine_type}</span>`)
         }
         if (car.power_hp) {
-            specLines.push(`<span class="spec-line">Мощность: ${Math.round(car.power_hp)} л.с.</span>`)
+          specLines.push(`<span class="spec-line">Мощность: ${Math.round(car.power_hp)} л.с.</span>`)
         }
         if (car.engine_cc) {
-            specLines.push(`<span class="spec-line">Объём: ${Number(car.engine_cc).toLocaleString('ru-RU')} см³</span>`)
+          specLines.push(`<span class="spec-line">Объём: ${Number(car.engine_cc).toLocaleString('ru-RU')} см³</span>`)
         }
         if (car.display_transmission || car.transmission) {
-            specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/drive.svg" alt="">${car.display_transmission || car.transmission}</span>`)
+          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/drive.svg" alt="">${car.display_transmission || car.transmission}</span>`)
         }
         if (car.body_type) {
-            specLines.push(`<span class="spec-line">${car.body_type}</span>`)
+          specLines.push(`<span class="spec-line">${car.body_type}</span>`)
         }
         if (car.display_color || car.color) {
           const label = car.display_color || car.color
@@ -1125,7 +1140,9 @@
       const params = new URLSearchParams()
       const numericKeys = ['price_min', 'price_max', 'mileage_min', 'mileage_max']
       const skipKeys = ['region_extra']
+      let regionVal = ''
       for (const [k, v] of data.entries()) {
+        if (k === 'region') regionVal = v
         if (!v) continue
         if (skipKeys.includes(k)) continue
         if (k === 'brand') {
@@ -1144,11 +1161,29 @@
         }
         params.append(k, v)
       }
+      if (regionVal === 'KR') {
+        if (!params.has('country')) params.set('country', 'KR')
+      }
       if (withPaging) {
         params.set('page', '1')
         params.set('page_size', '1')
       }
       return params
+    }
+
+    const animateCount = (el, target) => {
+      const start = Number(el.dataset.count || 0)
+      const end = Number(target || 0)
+      const duration = 400
+      const startTs = performance.now()
+      const step = (ts) => {
+        const t = Math.min(1, (ts - startTs) / duration)
+        const val = Math.round(start + (end - start) * t)
+        el.textContent = val.toLocaleString('ru-RU')
+        if (t < 1) requestAnimationFrame(step)
+        else el.dataset.count = String(end)
+      }
+      requestAnimationFrame(step)
     }
 
     let debounce
@@ -1164,8 +1199,11 @@
           if (!res.ok) return
           const data = await res.json()
           const total = Number(data.total || 0)
-          countEl.textContent = total.toLocaleString('ru-RU')
-          countEl.dataset.count = String(total)
+          if (initialAnimation) {
+            countEl.dataset.count = '0'
+            countEl.textContent = '0'
+          }
+          animateCount(countEl, total)
           lastTotal = total
           initialAnimation = false
           if (DEBUG_FILTERS) {
@@ -1213,7 +1251,7 @@
         regionSlotSelect.appendChild(optImp)
         regionSlotSelect.name = 'kr_type'
       } else {
-        regionSlotLabel.textContent = 'Регион'
+        regionSlotLabel.textContent = 'Страна / Тип'
         const opt = document.createElement('option')
         opt.value = ''
         opt.textContent = '—'
@@ -1452,13 +1490,28 @@
     const buildParams = (withPaging) => {
       const data = new FormData(form)
       const params = new URLSearchParams()
-      const skipKeys = ['region', 'eu_country', 'kr_type']
       const lineKeys = ['line_brand', 'line_model', 'line_variant']
       for (const [k, v] of data.entries()) {
         if (!v) continue
-        if (skipKeys.includes(k)) continue
         if (lineKeys.includes(k)) continue
         params.append(k, v)
+      }
+      // region-dependent fields
+      const regionSel = form.elements['region']
+      const countryHidden = form.elements['country']
+      const euSel = form.elements['eu_country']
+      const krSel = form.elements['kr_type']
+      if (regionSel && regionSel.value) {
+        params.set('region', regionSel.value)
+        if (regionSel.value === 'EU' && euSel && euSel.value) {
+          params.set('country', euSel.value)
+        }
+        if (regionSel.value === 'KR') {
+          params.set('country', 'KR')
+          if (krSel && krSel.value) params.set('kr_type', krSel.value)
+        }
+      } else if (countryHidden && countryHidden.value) {
+        params.set('country', countryHidden.value)
       }
       buildLines().forEach((line) => params.append('line', line))
       if (withPaging) {
@@ -1681,6 +1734,32 @@
     })
   }
 
+  function initDetailActions() {
+    const calcBtn = qs('#toggleCalc')
+    const calcBlock = qs('#calcBreakdown')
+    if (calcBtn && calcBlock) {
+      calcBtn.addEventListener('click', (e) => {
+        e.preventDefault()
+        const hidden = getComputedStyle(calcBlock).display === 'none'
+        calcBlock.style.display = hidden ? '' : 'none'
+        calcBtn.setAttribute('aria-expanded', hidden ? 'true' : 'false')
+      })
+    }
+    const leadBtn = qs('#detail-lead-btn')
+    const leadForm = qs('#detail-lead-form')
+    if (leadBtn && leadForm) {
+      leadBtn.addEventListener('click', (e) => {
+        e.preventDefault()
+        const hidden = getComputedStyle(leadForm).display === 'none'
+        leadForm.style.display = hidden ? '' : 'none'
+        leadBtn.setAttribute('aria-expanded', hidden ? 'true' : 'false')
+        if (hidden) {
+          leadForm.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      })
+    }
+  }
+
   function initAll() {
     initNav()
     loadFavoritesState()
@@ -1688,6 +1767,7 @@
     initHome()
     initAdvancedSearch()
     initDetailGallery()
+    initDetailActions()
     applyLeadPrefill()
     initLeadFromDetail()
     initBackToTop()

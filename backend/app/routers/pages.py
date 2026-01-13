@@ -17,7 +17,15 @@ from ..models import Car, Source, CarImage
 from ..auth import get_current_user
 from urllib.parse import quote
 from ..utils.localization import display_body, display_color
-from ..utils.taxonomy import ru_body, ru_color, ru_fuel, ru_transmission, normalize_fuel
+from ..utils.taxonomy import (
+    ru_body,
+    ru_color,
+    ru_fuel,
+    ru_transmission,
+    normalize_fuel,
+    normalize_color as _normalize_color,
+)
+normalize_color = _normalize_color
 from ..utils.country_map import country_label_ru, resolve_display_country
 from ..utils.home_content import build_home_content
 
@@ -209,11 +217,18 @@ def _build_filter_context(service: CarsService, db: Session, include_payload: bo
         airbags_options_kr = []
         interior_design_options_kr = []
         price_rating_labels_kr = []
+    kr_types = []
+    if service.has_korea():
+        kr_types = [
+            {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
+            {"value": "KR_IMPORT", "label": "Корея (импорт)"},
+        ]
+
     return {
         "regions": regions,
         "countries": countries_sorted,
         "country_labels": {**{c: country_label_ru(c) for c in countries_sorted}, "EU": "Европа", "KR": "Корея"},
-        "kr_types": [],
+        "kr_types": kr_types,
         "reg_years": reg_years,
         "reg_months": reg_months,
         "price_options": _range_steps(price_max, 500_000, 1_000_000, 12),
@@ -395,14 +410,21 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
             seen.add(b["brand"])
 
     filter_ctx = _build_filter_context(service, db, include_payload=False)
+    country_labels = filter_ctx.get("country_labels") or {}
+    countries_list = filter_ctx.get("countries") or []
+    countries_with_labels = [
+        {"value": c, "label": country_labels.get(c, c)}
+        for c in countries_list
+    ]
     context = {
         "request": request,
         "user": getattr(request.state, "user", None),
         "total_cars": service.total_cars(),
         "brands": service.brands(),
         "regions": filter_ctx["regions"],
-        "countries": filter_ctx["countries"],
-        "country_labels": filter_ctx["country_labels"],
+        "countries": countries_list,
+        "countries_labeled": countries_with_labels,
+        "country_labels": country_labels,
         "kr_types": filter_ctx["kr_types"],
         "reg_years": filter_ctx["reg_years"],
         "reg_months": filter_ctx["reg_months"],
@@ -648,30 +670,119 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
                 return val
             s = val.strip()
             low = s.lower()
-            repl = [
-                ("automatic", "автоматический"),
+            exact = {
+                "automatic climate control": "климат-контроль",
+                "automatic climate control, 2 zones": "климат-контроль, 2 зоны",
+                "automatic climate control, 3 zones": "климат-контроль, 3 зоны",
+                "automatic climate control, 4 zones": "климат-контроль, 4 зоны",
+                "automatic climatisation": "климат-контроль",
+                "automatic climatisation, 2 zones": "климат-контроль, 2 зоны",
+                "automatic climatisation, 3 zones": "климат-контроль, 3 зоны",
+                "automatic climatisation, 4 zones": "климат-контроль, 4 зоны",
+                "airbags": "подушки безопасности",
+                "front and side airbags": "фронтальные и боковые подушки",
+                "front, side and more airbags": "фронтальные, боковые и дополнительные подушки",
+                "front and side and more airbags": "фронтальные, боковые и дополнительные подушки",
+                "parking sensors front and rear": "парктроники спереди и сзади",
+                "front and rear parking sensors": "парктроники спереди и сзади",
+                "parking assists": "ассистенты парковки",
+                "park assist": "ассистент парковки",
+                "front, rear": "спереди и сзади",
+                "360° camera": "камера 360°",
+                "rear, front, 360° camera": "камеры спереди, сзади и 360°",
+                "front, rear, 360° camera": "камеры спереди, сзади и 360°",
+                "rear view camera": "камера заднего вида",
+                "backup camera": "камера заднего вида",
+                "reverse camera": "камера заднего вида",
+                "full leather": "кожа",
+                "part leather": "частичная кожа",
+                "alcantara": "алькантара",
+                "no_rating": "нет оценки",
+                "very_good_price": "отличная цена",
+                "good_price": "хорошая цена",
+                "average_price": "средняя цена",
+                "high_price": "высокая цена",
+                "dealer": "дилер",
+                "private": "частное лицо",
+                "petrol": "бензин",
+                "diesel": "дизель",
+                "electric": "электромобиль",
+                "hybrid": "гибрид",
+                "automatic": "автомат",
+                "manual": "механика",
+                "awd": "полный привод",
+                "4x4": "полный привод",
+                "fwd": "передний привод",
+                "rwd": "задний привод",
+                "abs": "ABS",
+                "alarm system": "сигнализация",
+                "alloy wheels": "легкосплавные диски",
+                "apple carplay": "Apple CarPlay",
+                "android auto": "Android Auto",
+                "air suspension": "пневмоподвеска",
+                "navigation system": "навигация",
+                "heated seats": "подогрев сидений",
+                "heated steering wheel": "подогрев руля",
+                "led headlights": "LED-фары",
+                "cruise control": "круиз-контроль",
+                "adaptive cruise control": "адаптивный круиз-контроль",
+                "lane change assist": "ассистент смены полосы",
+                "blind spot assist": "контроль слепых зон",
+                "panoramic roof": "панорамная крыша",
+                "sunroof": "люк",
+                "keyless central locking": "бесключевой доступ",
+                "isofix": "ISOFIX",
+                "dab radio": "DAB-радио",
+                "bluetooth": "Bluetooth",
+                "head-up display": "проекционный дисплей",
+                "hill-start assist": "помощь при старте в гору",
+                "start-stop system": "система старт-стоп",
+                "trailer coupling": "фаркоп",
+                "tinted windows": "тонировка",
+                "warranty": "гарантия",
+                "full service history": "полная сервисная история",
+                "non-smoker vehicle": "не курили в салоне",
+                "rain sensor": "датчик дождя",
+                "light sensor": "датчик света",
+                "tyre pressure monitoring": "контроль давления в шинах",
+                "usb port": "USB",
+                "touchscreen": "сенсорный экран",
+            }
+            if low in exact:
+                return exact[low]
+            replacements = [
                 ("climatisation", "климат-контроль"),
                 ("climatization", "климат-контроль"),
-                ("2 zones", "2 зоны"),
-                ("two zones", "2 зоны"),
-                ("zone", "зона"),
-                ("front and side", "фронтальные и боковые"),
+                ("climate control", "климат-контроль"),
                 ("airbags", "подушки безопасности"),
                 ("navigation", "навигация"),
                 ("leather", "кожа"),
                 ("sport package", "спорт пакет"),
-                ("park assist", "помощь при парковке"),
+                ("park assist", "ассистент парковки"),
+                ("360° camera", "камера 360°"),
+                ("front, rear", "спереди и сзади"),
+                ("rear view camera", "камера заднего вида"),
+                ("backup camera", "камера заднего вида"),
+                ("reverse camera", "камера заднего вида"),
+                ("parking sensors", "парктроники"),
+                ("multifunction steering wheel", "мульти-руль"),
+                ("leather", "кожа"),
             ]
             out = s
-            for src, dst in repl:
+            for src, dst in replacements:
                 if src in low:
                     out = out.replace(src, dst).replace(src.title(), dst)
             return out
 
-        def push(label: str, value: Any) -> None:
+        def push(label: str, value: Any, *, as_color: bool = False) -> None:
             if value is None:
                 return
             if isinstance(value, str) and not value.strip():
+                return
+            if as_color:
+                norm = _normalize_color(value)
+                ru = ru_color(norm) or translate_value(value)
+                details.append({"label": label, "value": ru})
                 return
             details.append({"label": label, "value": translate_value(value)})
 
@@ -684,7 +795,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         push("Интерьер", payload.get("interior_design"))
         push("Парктроники", payload.get("park_assists"))
         push("Подушки", payload.get("airbags"))
-        push("Цвет производителя", payload.get("manufacturer_color"))
+        push("Цвет производителя", payload.get("manufacturer_color"), as_color=True)
         push("Расход топлива", payload.get("fuel_consumption"))
         push("CO₂", payload.get("co_emission"))
         push("Оценка цены", payload.get("price_rating_label"))

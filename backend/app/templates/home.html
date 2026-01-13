@@ -54,22 +54,34 @@
               <option value="KR" {% if params.get('region') == 'KR' %}selected{% endif %}>Корея</option>
             </select>
           </div>
-          <div class="field">
-            <label for="home-price-max">Цена до, ₽</label>
-            <input
-              id="home-price-max"
-              name="price_max"
-              type="number"
-              inputmode="numeric"
-              min="0"
-              step="1000"
-            />
-          </div>
           <div class="field field--dynamic" id="home-region-slot">
             <label id="home-region-slot-label">Страна / Тип</label>
             <select id="home-region-slot-select" disabled>
               <option value="">—</option>
             </select>
+          </div>
+          <div class="field field--range">
+            <label for="home-price-min">Цена, ₽</label>
+            <div class="field-range__inputs">
+              <input
+                id="home-price-min"
+                name="price_min"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                step="1000"
+                placeholder="от"
+              />
+              <input
+                id="home-price-max"
+                name="price_max"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                step="1000"
+                placeholder="до"
+              />
+            </div>
           </div>
           <div class="field">
             <label for="home-mileage-max">Пробег до, км</label>
@@ -151,7 +163,7 @@
   </div>
 </section>
 <script>
-  window.HOME_COUNTRIES = {{ countries | map('string') | list | tojson }};
+  window.HOME_COUNTRIES = {{ countries_labeled | tojson }};
 </script>
 <section class="section" id="cases">
   <div class="la-container">
@@ -272,9 +284,10 @@
             </ul>
           </div>
           <div class="car-card__price">
-            {% if car.price %} {% set rate = fx_rates.get((car.currency or
-            'EUR').upper(), 1) | float %} {% set rub = (car.price | float *
-            rate) | round(0, 'ceil') | int %}
+          {% if car.price %}
+          {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) | float %}
+          {% set price_val = car.price | float %}
+          {% set rub = (price_val * rate) | round(0, 'ceil') | int %}
             <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
             {% endif %}
           </div>

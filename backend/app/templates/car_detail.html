@@ -33,10 +33,11 @@
         </div>
         {% if car.images and car.images|length > 1 %}
         <div class="detail-hero__thumbs">
-          {% for im in car.images[:10] %}
+          {% for im in car.images[:30] %}
           <button
             type="button"
             class="thumb"
+            data-thumb-index="{{ loop.index0 }}"
             onclick="document.getElementById('primaryImage').src='{{ im.url }}'"
           >
             <img
@@ -54,52 +55,55 @@
       </div>
       <div class="detail-info card">
         <div class="detail-heading">
-            <div>
-              <h1 class="detail-title">{{ car.brand or '' }} {{ car.model or '' }}</h1>
-              {% set meta = [] %} {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %} {% if car.display_engine_type or car.engine_type %}{% set _ = meta.append(car.display_engine_type or car.engine_type) %}{% endif %} {% if meta %}
-              <p class="muted">{{ meta|join(' · ') }}</p>
-              {% endif %}
-              <p class="muted">
-                {% if car.display_country_label or car.country %}Страна: {{ car.display_country_label or car.country }} · {% endif %} Фото:
-                {{ car.images|length if car.images else 0 }}
-              </p>
-            </div>
+          <h1 class="detail-title">{{ car.brand or '' }} {{ car.model or '' }}</h1>
+          {% set meta = [] %} {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %} {% if car.display_engine_type or car.engine_type %}{% set _ = meta.append(car.display_engine_type or car.engine_type) %}{% endif %}
+          {% set gross = pricing.gross_eur if pricing else None %}
+          {% set net = pricing.net_eur if pricing else None %}
+          {% set vat_pct = pricing.vat_percent if pricing else None %}
+          {% set vat_reclaim = pricing.vat_reclaimable if pricing else False %}
+          {% set has_total = calc and calc.total_rub %}
+          {% set base_line = gross or car.price %}
           <div class="detail-price">
-            {% set gross = pricing.gross_eur if pricing else None %}
-            {% set net = pricing.net_eur if pricing else None %}
-            {% set vat_pct = pricing.vat_percent if pricing else None %}
-            {% set vat_reclaim = pricing.vat_reclaimable if pricing else False %}
-            {% if calc and calc.total_rub %}
             <div class="detail-price__total">
+              {% if has_total %}
               {{ '{:,.0f}'.format(calc.total_rub).replace(',', ' ') }} ₽
-            </div>
-            {% endif %}
-            <div class="detail-price__base">
-              {% if gross %}
-                BRUTTO: {{ '{:,.0f}'.format(gross).replace(',', ' ') }} €
-              {% elif car.price %}
-                Цена: {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}
+              {% elif base_line %}
+              {{ '{:,.0f}'.format(base_line).replace(',', ' ') }} {{ car.currency or '€' }}{% if not has_total %} *{% endif %}
               {% else %}
-                Цена по запросу
+              Цена по запросу
+              {% endif %}
+            </div>
+            <div class="detail-price__meta">
+              {% if gross %}
+              BRUTTO: {{ '{:,.0f}'.format(gross).replace(',', ' ') }} €
+              {% elif car.price %}
+              Цена: {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}
               {% endif %}
               {% if net %}
-                <br>NET: {{ '{:,.0f}'.format(net).replace(',', ' ') }} €
+              <br>NET: {{ '{:,.0f}'.format(net).replace(',', ' ') }} €
               {% endif %}
               {% if vat_pct is not none %}
-                <br>НДС: {% if vat_reclaim %}возмещается ({{ vat_pct }}%){% else %}не возмещается{% endif %}
+              <br>НДС: {% if vat_reclaim %}возмещается ({{ vat_pct }}%){% else %}не возмещается{% endif %}
               {% endif %}
-              {% if not calc or not calc.total_rub %}
-                <br><span class="muted">* Итог в РФ не рассчитан</span>
+              {% if not has_total %}
+              <br><span class="muted">* Итог в РФ не рассчитан</span>
               {% endif %}
             </div>
+          </div>
+          {% if meta %}
+          <p class="muted detail-meta">{{ meta|join(' · ') }}</p>
+          {% endif %}
+          <p class="muted">
+            {% if car.display_country_label or car.country %}Страна: {{ car.display_country_label or car.country }} · {% endif %} Фото:
+            {{ car.images|length if car.images else 0 }}
+          </p>
           {% if user %}
           <button class="fav-btn" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>
           {% endif %}
-          </div>
         </div>
         {% if calc %}
         <div class="detail-calc">
-          <button class="btn btn-ghost btn-small" type="button" id="toggleCalc">Детали доставки</button>
+          <button class="btn btn-ghost btn-small" type="button" id="toggleCalc" aria-expanded="false" onclick="return window.toggleDetailCalc(event);">Детали доставки</button>
           <div class="detail-calc__line" id="calcBreakdown" style="display:none;">
             {% if calc.breakdown and calc.breakdown|length > 0 %}
               {% for item in calc.breakdown %}
@@ -154,25 +158,34 @@
         {% endif %}
         <div class="detail-actions">
           <div class="detail-actions__lead">
-            <button class="btn cta-lead" id="detail-lead-btn">
+            <button class="btn cta-lead" id="detail-lead-btn" type="button" onclick="return window.toggleLeadForm(event);">
               Связаться
             </button>
           </div>
         </div>
         <div id="detail-lead-form" class="card" style="margin-top:12px; display:none;">
-          <form method="post" action="/lead" class="form-grid form-grid--12">
-            <input type="hidden" name="preferred" value="{{ car.brand or '' }} {{ car.model or '' }} {% if car.year %}{{ car.year }}{% endif %} /car/{{ car.id }}">
-            <input type="hidden" name="comment" value="Авто: {{ car.brand or '' }} {{ car.model or '' }} {% if car.year %}{{ car.year }}{% endif %} /car/{{ car.id }}">
+          <form method="post" action="/lead" class="form-grid form-grid--12 lead-form-grid">
+            {% set title_line = (car.brand or '') ~ ' ' ~ (car.model or '') ~ (' ' ~ car.year if car.year else '') %}
+            {% set price_line = '' %}
+            {% if calc and calc.total_rub %}
+              {% set price_line = '{:,.0f}'.format(calc.total_rub).replace(",", " ") ~ ' ₽ (итог в РФ)' %}
+            {% elif pricing and pricing.gross_eur %}
+              {% set price_line = '{:,.0f}'.format(pricing.gross_eur).replace(",", " ") ~ ' € (BRUTTO)' %}
+            {% elif car.price %}
+              {% set price_line = '{:,.0f}'.format(car.price).replace(",", " ") ~ ' ' ~ (car.currency or '') %}
+            {% endif %}
+            <input type="hidden" name="preferred" value="{{ title_line }} /car/{{ car.id }}">
+            <input type="hidden" name="comment" value="Авто: {{ title_line }}{% if price_line %} · Цена: {{ price_line }}{% endif %} · Ссылка: /car/{{ car.id }}">
             <input type="hidden" name="car_id" value="{{ car.id }}">
-            <div class="field span-6">
+            <div class="field span-12">
               <label for="lead-name">Имя</label>
               <input id="lead-name" name="name" type="text" required />
             </div>
-            <div class="field span-6">
+            <div class="field span-12">
               <label for="lead-phone">Телефон</label>
               <input id="lead-phone" name="phone" type="tel" required />
             </div>
-            <div class="field span-6">
+            <div class="field span-12">
               <label for="lead-email">Email (опционально)</label>
               <input id="lead-email" name="email" type="email" />
             </div>
@@ -186,57 +199,66 @@
     {% endif %}
   </div>
 </section>
-{% block scripts_extra %}
 <script>
-  (() => {
-    const leadBtn = document.getElementById('detail-lead-btn')
-    const leadForm = document.getElementById('detail-lead-form')
-    const backLink = document.getElementById('back-to-catalog')
-    if (backLink) {
-      const ref = document.referrer || ''
-      const fromCatalog = ref.includes('/catalog')
-      if (fromCatalog) {
-        const url = new URL(ref)
-        sessionStorage.setItem('catalogScroll', String(window.scrollY))
-        backLink.href = url.toString()
-      } else {
-        backLink.href = '/catalog'
+  ;(() => {
+    const init = () => {
+      const leadBtn = document.getElementById('detail-lead-btn')
+      const leadForm = document.getElementById('detail-lead-form')
+      const backLink = document.getElementById('back-to-catalog')
+      if (backLink) {
+        const ref = document.referrer || ''
+        const fromCatalog = ref.includes('/catalog')
+        if (fromCatalog) {
+          try {
+            const url = new URL(ref)
+            sessionStorage.setItem('catalogScroll', String(window.scrollY || 0))
+            backLink.href = url.toString()
+          } catch (e) {
+            backLink.href = '/catalog'
+          }
+        } else {
+          backLink.href = '/catalog'
+        }
+        backLink.style.display = ''
       }
-      backLink.style.display = ''
-    }
-    if (leadBtn) {
-      leadBtn.addEventListener('click', (e) => {
-        e.preventDefault()
-        if (leadForm) leadForm.style.display = leadForm.style.display === 'none' ? '' : 'none'
-      })
-    }
-    // gallery navigation
-    const mainWrap = document.querySelector('.detail-hero__main')
-    if (mainWrap) {
-      let startX = null
-      const imgs = (() => {
+      // кнопки уже инициализируются в app.js (initDetailActions)
+
+      // gallery navigation
+      const mainWrap = document.querySelector('.detail-hero__main')
+      if (mainWrap && !mainWrap.dataset.bound) {
+        let startX = null
+        let idx = 0
+        let imgs = []
         try {
           const data = mainWrap.dataset.images ? JSON.parse(mainWrap.dataset.images) : []
-          return Array.isArray(data) ? data : []
+          if (Array.isArray(data)) imgs = data
         } catch (e) {
-          return []
+          imgs = []
         }
-      })()
-      const imgEl = document.getElementById('primaryImage')
-      if (imgEl && imgs.length > 1) {
-        let idx = 0
+        const imgEl = document.getElementById('primaryImage')
+        const thumbs = Array.from(document.querySelectorAll('.detail-hero__thumbs .thumb'))
         const setImg = (next) => {
+          if (!imgEl || !imgs.length) return
           idx = (next + imgs.length) % imgs.length
           imgEl.src = imgs[idx]
+          thumbs.forEach((t, i) => t.classList.toggle('active', i === idx))
         }
-        document.querySelector('[data-detail-prev]')?.addEventListener('click', (e) => {
-          e.preventDefault()
-          setImg(idx - 1)
-        })
-        document.querySelector('[data-detail-next]')?.addEventListener('click', (e) => {
-          e.preventDefault()
-          setImg(idx + 1)
-        })
+        const prevBtn = document.querySelector('[data-detail-prev]')
+        const nextBtn = document.querySelector('[data-detail-next]')
+        if (prevBtn && !prevBtn.dataset.bound) {
+          prevBtn.addEventListener('click', (e) => {
+            e.preventDefault()
+            setImg(idx - 1)
+          })
+          prevBtn.dataset.bound = '1'
+        }
+        if (nextBtn && !nextBtn.dataset.bound) {
+          nextBtn.addEventListener('click', (e) => {
+            e.preventDefault()
+            setImg(idx + 1)
+          })
+          nextBtn.dataset.bound = '1'
+        }
         mainWrap.addEventListener('touchstart', (e) => {
           if (e.touches.length) startX = e.touches[0].clientX
         })
@@ -246,20 +268,30 @@
           if (Math.abs(diff) > 30) setImg(diff > 0 ? idx - 1 : idx + 1)
           startX = null
         })
-        let startX = null
+        if (thumbs.length) {
+          thumbs.forEach((btn, i) => {
+            if (btn.dataset.bound) return
+            btn.addEventListener('click', (e) => {
+              e.preventDefault()
+              setImg(i)
+            })
+            btn.dataset.bound = '1'
+          })
+        }
+        if (imgs.length) setImg(0)
+        mainWrap.dataset.bound = '1'
       }
+
+      // breakdown handled in app.js
     }
 
-    // breakdown toggle
-    const toggleCalc = document.getElementById('toggleCalc')
-    const calcBlock = document.getElementById('calcBreakdown')
-    if (toggleCalc && calcBlock) {
-      toggleCalc.addEventListener('click', () => {
-        const isHidden = calcBlock.style.display === 'none'
-        calcBlock.style.display = isHidden ? '' : 'none'
-      })
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      init()
+    } else {
+      document.addEventListener('DOMContentLoaded', init, { once: true })
     }
+    window.addEventListener('load', init, { once: true })
+    setTimeout(init, 300)
   })()
 </script>
-{% endblock %}
 {% endblock %}

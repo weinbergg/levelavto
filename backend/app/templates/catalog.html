@@ -43,7 +43,9 @@
             <label data-region-panel="kr">Корея
               <select name="kr_type" id="kr-type" data-kr-type>
                 <option value="">Корейские</option>
-                <option value="import">Импортные</option>
+                {% for kt in kr_types %}
+                <option value="{{ kt.value }}" {% if params.get('kr_type')|upper == kt.value %}selected{% endif %}>{{ kt.label }}</option>
+                {% endfor %}
               </select>
             </label>
             {% endif %}
@@ -92,44 +94,38 @@
             </label>
             {% endif %}
             {% if reg_years %}
-            <div class="filters-range">
-              <label>Поставлен на учёт с
-                <div class="field-pair">
+            <label class="reg-range">Поставлен на учёт с / по
+              <div class="reg-range__inputs">
+                <div class="reg-range__col">
                   <select name="reg_year_min" id="reg-year-min">
                     <option value="">Не важно</option>
                     {% for y in reg_years %}
                     <option value="{{ y }}" {% if params.get('reg_year_min')|int == y %}selected{% endif %}>{{ y }}</option>
                     {% endfor %}
                   </select>
-                  <div class="field-pair__month" data-reg-month="min">
-                    <select name="reg_month_min" id="reg-month-min">
-                      <option value="">Месяц</option>
-                      {% for m in reg_months %}
-                      <option value="{{ m.value }}" {% if params.get('reg_month_min')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
-                      {% endfor %}
-                    </select>
-                  </div>
+                  <select name="reg_month_min" id="reg-month-min" data-reg-month="min">
+                    <option value="">Месяц</option>
+                    {% for m in reg_months %}
+                    <option value="{{ m.value }}" {% if params.get('reg_month_min')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
+                    {% endfor %}
+                  </select>
                 </div>
-              </label>
-              <label>Поставлен на учёт по
-                <div class="field-pair">
+                <div class="reg-range__col">
                   <select name="reg_year_max" id="reg-year-max">
                     <option value="">Не важно</option>
                     {% for y in reg_years %}
                     <option value="{{ y }}" {% if params.get('reg_year_max')|int == y %}selected{% endif %}>{{ y }}</option>
                     {% endfor %}
                   </select>
-                  <div class="field-pair__month" data-reg-month="max">
-                    <select name="reg_month_max" id="reg-month-max">
-                      <option value="">Месяц</option>
-                      {% for m in reg_months %}
-                      <option value="{{ m.value }}" {% if params.get('reg_month_max')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
-                      {% endfor %}
-                    </select>
-                  </div>
+                  <select name="reg_month_max" id="reg-month-max" data-reg-month="max">
+                    <option value="">Месяц</option>
+                    {% for m in reg_months %}
+                    <option value="{{ m.value }}" {% if params.get('reg_month_max')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
+                    {% endfor %}
+                  </select>
                 </div>
-              </label>
-            </div>
+              </div>
+            </label>
             {% endif %}
             {% if engine_types and engine_types|length > 0 %}
             <label>Топливо
