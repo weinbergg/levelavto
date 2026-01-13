@@ -253,10 +253,21 @@
     if (!region.value && countryHidden.value) {
       region.value = countryHidden.value === 'KR' ? 'KR' : 'EU'
     }
+    const togglePanel = (panel, hidden) => {
+      if (!panel) return
+      const keep = panel.dataset.regionKeep === '1'
+      if (keep) {
+        panel.classList.toggle('is-hidden-keep', hidden)
+        panel.classList.remove('is-hidden')
+        return
+      }
+      panel.classList.toggle('is-hidden', hidden)
+      panel.classList.remove('is-hidden-keep')
+    }
     const update = () => {
       const val = region.value
-      if (euPanel) euPanel.classList.toggle('is-hidden', val !== 'EU')
-      if (krPanel) krPanel.classList.toggle('is-hidden', val !== 'KR')
+      togglePanel(euPanel, val !== 'EU')
+      togglePanel(krPanel, val !== 'KR')
       if (val === 'EU') {
         const euVal = euSelect?.value || ''
         countryHidden.value = euVal || 'EU'
@@ -641,16 +652,22 @@
         card.href = `/car/${car.id}`
         card.className = 'car-card'
         const images = Array.isArray(car.images) && car.images.length ? car.images : (car.thumbnail_url ? [car.thumbnail_url] : [])
-        const hasGallery = images.length > 1
         const thumbSrc = images[0] || ''
-        const navControls = hasGallery
-          ? `
-            <button class="thumb-nav thumb-nav--prev" type="button" aria-label="Предыдущее фото">‹</button>
-            <button class="thumb-nav thumb-nav--next" type="button" aria-label="Следующее фото">›</button>
-          `
-          : ''
+        const navControls = ''
         const more = (car.images_count && car.images_count > 1 && car.thumbnail_url) ? `<span class="more-badge">+${car.images_count - 1} фото</span>` : ''
-        const price = car.price != null ? formatPrice(car.price, car.currency, fx) : ''
+        const gross = car.pricing?.gross_eur
+        const net = car.pricing?.net_eur
+        const vatInfo = car.pricing?.vat_reclaimable
+        const priceLines = []
+        if (gross != null) priceLines.push(`BRUTTO: ${Number(gross).toLocaleString('ru-RU')} €`)
+        if (net != null) priceLines.push(`NET: ${Number(net).toLocaleString('ru-RU')} €`)
+        if (vatInfo != null) priceLines.push(vatInfo ? 'НДС: возмещается' : 'НДС: не возмещается')
+        let calcLine = ''
+        if (car.calc_total_rub != null) {
+          calcLine = `<div class="car-card__meta">Итог в РФ: ${formatRub(car.calc_total_rub)}</div>`
+        } else {
+          calcLine = `<div class="car-card__meta muted">* Итог не рассчитан</div>`
+        }
         const metaLine = [car.year, car.display_engine_type || car.engine_type].filter(Boolean).join(' · ')
         const colorDot = (hex, raw) => {
           if (!hex) return ''
@@ -663,6 +680,18 @@
         }
         if (car.engine_type) {
           specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/fuel.svg" alt="">${car.display_engine_type || car.engine_type}</span>`)
+        }
+        if (car.power_hp) {
+            specLines.push(`<span class="spec-line">Мощность: ${Math.round(car.power_hp)} л.с.</span>`)
+        }
+        if (car.engine_cc) {
+            specLines.push(`<span class="spec-line">Объём: ${Number(car.engine_cc).toLocaleString('ru-RU')} см³</span>`)
+        }
+        if (car.display_transmission || car.transmission) {
+            specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/drive.svg" alt="">${car.display_transmission || car.transmission}</span>`)
+        }
+        if (car.body_type) {
+            specLines.push(`<span class="spec-line">${car.body_type}</span>`)
         }
         if (car.display_color || car.color) {
           const label = car.display_color || car.color
@@ -695,7 +724,10 @@
               ${metaLine ? `<div class="car-card__meta">${metaLine}</div>` : ''}
               ${specLines.length ? `<ul class="specs">${specLines.map((s) => `<li>${s}</li>`).join('')}</ul>` : ''}
             </div>
-            <div class="car-card__price">${price}</div>
+            <div class="car-card__price">
+              ${priceLines.map((p) => `<div>${p}</div>`).join('')}
+              ${calcLine}
+            </div>
           </div>
         `
         const img = card.querySelector('img.thumb')
@@ -712,38 +744,7 @@
             if (wrap) wrap.classList.remove('thumb-loading')
           })
         }
-        if (hasGallery && img && wrap) {
-          let idx = 0
-          const setImage = (nextIdx) => {
-            idx = (nextIdx + images.length) % images.length
-            img.src = images[idx]
-          }
-          const prevBtn = wrap.querySelector('.thumb-nav--prev')
-          const nextBtn = wrap.querySelector('.thumb-nav--next')
-          prevBtn?.addEventListener('click', (e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            setImage(idx - 1)
-          })
-          nextBtn?.addEventListener('click', (e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            setImage(idx + 1)
-          })
-          let startX = null
-          wrap.addEventListener('touchstart', (e) => {
-            if (e.touches.length) startX = e.touches[0].clientX
-          })
-          wrap.addEventListener('touchend', (e) => {
-            if (startX == null) return
-            const endX = e.changedTouches[0].clientX
-            const diff = endX - startX
-            if (Math.abs(diff) > 30) {
-              setImage(diff > 0 ? idx - 1 : idx + 1)
-            }
-            startX = null
-          })
-        }
+        // gallery arrows removed for stability in catalog
         cards.appendChild(card)
       }
       bindFavoriteButtons(cards)
@@ -795,11 +796,6 @@
         sessionStorage.removeItem('homeSubmitParams')
       }
     }
-    qs('#applyFilters')?.addEventListener('click', (e) => {
-      e.preventDefault()
-      sessionStorage.setItem('catalogScroll', String(window.scrollY))
-      loadCars(1)
-    })
     qs('#resetFilters')?.addEventListener('click', (e) => {
       e.preventDefault()
       const form = qs('#filters')
@@ -1066,9 +1062,17 @@
     const resetBtn = qs('#home-reset')
     const brandSelect = qs('#home-brand')
     const modelSelect = qs('#home-model')
+    const submitBtn = qs('#home-submit')
     const countEl = qs('#home-count')
-    const countTopEl = qs('#home-count-top')
+    const regionSelect = qs('#home-region')
+    const regionSlot = qs('#home-region-slot')
+    const regionSlotSelect = qs('#home-region-slot-select')
+    const regionSlotLabel = qs('#home-region-slot-label')
+    const homeCountries = window.HOME_COUNTRIES || []
     normalizeBrandOptions(brandSelect)
+    let lastTotal = null
+    let initialAnimation = true
+    let pendingController = null
 
     if (resetBtn) {
       resetBtn.addEventListener('click', (e) => {
@@ -1079,6 +1083,7 @@
           modelSelect.innerHTML = '<option value="">Все</option>'
           modelSelect.disabled = true
         }
+        initialAnimation = true
         updateCount()
       })
     }
@@ -1113,7 +1118,7 @@
       const data = new FormData(form)
       const params = new URLSearchParams()
       const numericKeys = ['price_min', 'price_max', 'mileage_min', 'mileage_max']
-      const skipKeys = ['region', 'eu_country', 'kr_type']
+      const skipKeys = ['region_extra']
       for (const [k, v] of data.entries()) {
         if (!v) continue
         if (skipKeys.includes(k)) continue
@@ -1142,30 +1147,90 @@
 
     let debounce
     const updateCount = () => {
-      if (!countEl && !countTopEl) return
+      if (!countEl) return
       clearTimeout(debounce)
       debounce = setTimeout(async () => {
+        pendingController?.abort()
+        pendingController = new AbortController()
         try {
           const params = buildHomeParams(true)
-          const res = await fetch(`/api/cars?${params.toString()}`)
+          const res = await fetch(`/api/cars?${params.toString()}`, { signal: pendingController.signal })
           if (!res.ok) return
           const data = await res.json()
-          if (countEl) animateCount(countEl, data.total || 0)
-          if (countTopEl) animateCount(countTopEl, data.total || 0)
+          const total = Number(data.total || 0)
+          countEl.textContent = total.toLocaleString('ru-RU')
+          countEl.dataset.count = String(total)
+          lastTotal = total
+          initialAnimation = false
           if (DEBUG_FILTERS) {
             sessionStorage.setItem('homeCountParams', params.toString())
           }
         } catch (e) {
+          if (e?.name === 'AbortError') return
           console.warn('home count', e)
         }
-      }, 300)
+      }, 250)
+    }
+
+    function updateRegionSlot() {
+      const val = regionSelect?.value || ''
+      if (!regionSlot || !regionSlotSelect || !regionSlotLabel) return
+      regionSlotSelect.disabled = false
+      regionSlotSelect.innerHTML = ''
+      if (val === 'EU') {
+        regionSlotLabel.textContent = 'Страна (Европа)'
+        const optAll = document.createElement('option')
+        optAll.value = ''
+        optAll.textContent = 'Все страны'
+        regionSlotSelect.appendChild(optAll)
+        homeCountries.forEach((c) => {
+          const opt = document.createElement('option')
+          const val = c.value || c
+          opt.value = val
+          opt.textContent = c.label || val
+          regionSlotSelect.appendChild(opt)
+        })
+        regionSlotSelect.name = 'country'
+      } else if (val === 'KR') {
+        regionSlotLabel.textContent = 'Корея (тип)'
+        const optAny = document.createElement('option')
+        optAny.value = ''
+        optAny.textContent = 'Любой'
+        regionSlotSelect.appendChild(optAny)
+        const optInt = document.createElement('option')
+        optInt.value = 'KR_INTERNAL'
+        optInt.textContent = 'Корея (внутренний рынок)'
+        regionSlotSelect.appendChild(optInt)
+        const optImp = document.createElement('option')
+        optImp.value = 'KR_IMPORT'
+        optImp.textContent = 'Корея (импорт)'
+        regionSlotSelect.appendChild(optImp)
+        regionSlotSelect.name = 'kr_type'
+      } else {
+        regionSlotLabel.textContent = 'Регион'
+        const opt = document.createElement('option')
+        opt.value = ''
+        opt.textContent = '—'
+        regionSlotSelect.appendChild(opt)
+        regionSlotSelect.name = 'region_extra'
+        regionSlotSelect.disabled = true
+      }
     }
 
     const ctrls = qsa('input, select', form)
     ctrls.forEach((el) => {
-      el.addEventListener('change', updateCount)
-      el.addEventListener('input', updateCount)
+      const tag = el.tagName.toLowerCase()
+      if (tag === 'select') {
+        el.addEventListener('change', updateCount)
+      } else {
+        el.addEventListener('input', updateCount)
+      }
     })
+    regionSelect?.addEventListener('change', () => {
+      updateRegionSlot()
+      updateCount()
+    })
+    regionSlotSelect?.addEventListener('change', updateCount)
     form.addEventListener('submit', (e) => {
       e.preventDefault()
       const params = buildHomeParams(false)
@@ -1174,7 +1239,24 @@
       }
       window.location.href = `/catalog?${params.toString()}`
     })
-    bindRegionSelect(form)
+    window.addEventListener('pageshow', () => {
+      initialAnimation = true
+      updateCount()
+    })
+    // bootstrap region slot
+    if (regionSelect && regionSelect.value) {
+      updateRegionSlot()
+      // preselect from params
+      const params = new URLSearchParams(window.location.search)
+      const euVal = params.get('country')
+      const krVal = params.get('kr_type')
+      if (regionSlotSelect) {
+        if (euVal) regionSlotSelect.value = euVal
+        if (krVal) regionSlotSelect.value = krVal
+      }
+    } else {
+      updateRegionSlot()
+    }
     updateCount()
   }
 
@@ -1264,7 +1346,7 @@
       const region = regionSelect?.value || ''
       const hasKr = Boolean(regionSubKr)
       const showKr = region === 'KR' && hasKr
-      const showEu = !showKr
+      const showEu = region === 'EU' || (!region && !showKr)
       if (regionSubEu) {
         regionSubEu.classList.toggle('is-hidden-keep', !showEu)
       }

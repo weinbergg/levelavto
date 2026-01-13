@@ -98,7 +98,7 @@ def _parse_created_at(value: str | None) -> Optional[datetime]:
     v = value.strip()
     if not v:
         return None
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+    for fmt in ("%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
             return datetime.strptime(v, fmt)
         except Exception:

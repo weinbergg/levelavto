@@ -63,6 +63,18 @@ class ParsingDataService:
             payload.setdefault("country", source.country)
             payload.setdefault("thumbnail_url", None)
             payload.setdefault("is_available", True)
+            listing_val = payload.get("listing_date")
+            ts = None
+            if isinstance(listing_val, str):
+                try:
+                    ts = datetime.fromisoformat(listing_val)
+                except Exception:
+                    ts = None
+            elif isinstance(listing_val, datetime):
+                ts = listing_val
+            if ts is None:
+                ts = now
+            payload["listing_date"] = ts
             rub = to_rub(payload.get("price"), payload.get("currency"), rates)
             if rub is not None:
                 payload["price_rub_cached"] = round(rub, 2)
@@ -106,6 +118,9 @@ class ParsingDataService:
                         updated += 1
                     if existing.price_rub_cached is None and payload.get("price_rub_cached") is not None:
                         existing.price_rub_cached = payload["price_rub_cached"]
+                        updated += 1
+                    if existing.listing_date is None and payload.get("listing_date") is not None:
+                        existing.listing_date = payload["listing_date"]
                         updated += 1
                     existing.last_seen_at = now
                     existing.is_available = True

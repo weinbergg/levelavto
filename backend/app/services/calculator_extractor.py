@@ -177,7 +177,11 @@ class CalculatorExtractor:
             return fees
 
         def extract_util_flat(df: pd.DataFrame) -> float:
-            # Ищем строку, где есть "Утилизационный сбор" и берем первое числовое значение
+            """
+            Берём максимальное числовое значение из строки с "Утилизационный сбор".
+            В файле значения могут дублироваться в разных столбцах (база, коэффициенты, рассчитанный итог),
+            поэтому выбираем максимальное как итоговую сумму, совпадающую с Excel.
+            """
             mask = df.apply(lambda r: r.astype(str).str.contains(
                 "утилизационный", case=False, na=False).any(), axis=1)
             util_rows = df[mask]
@@ -187,10 +191,7 @@ class CalculatorExtractor:
                 lambda x: str(x).replace(" ", "").replace("\xa0", "") if x is not None else x).stack(), errors="coerce").dropna()
             if nums.empty:
                 raise ValueError("Не найдено числовых значений утилизационного сбора")
-            val = float(nums.iloc[0])
-            # В исходнике возможны значения в тысячах (3448800 вместо 3448.8) — нормализуем
-            if val > 100000:
-                val = val / 1000.0
+            val = float(nums.max())
             return val
 
         duty_table = extract_duty_table(df_under3)

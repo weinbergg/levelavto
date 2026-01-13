@@ -53,7 +53,10 @@ def list_cars(
     reg_year_max: Optional[int] = Query(default=None),
     reg_month_max: Optional[int] = Query(default=None),
     condition: Optional[str] = Query(default=None),
-    sort: Optional[str] = Query(default=None, description="price_asc|price_desc|year_desc|year_asc|mileage_asc|mileage_desc|created_desc"),
+    sort: Optional[str] = Query(
+        default=None,
+        description="price_asc|price_desc|mileage_asc|mileage_desc|reg_desc|reg_asc|listing_desc|listing_asc",
+    ),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -150,6 +153,17 @@ def list_cars(
             co["color_hex"] = color_hex(norm_color)
         co["images_count"] = counts_map.get(c.id, 0)
         co["images"] = images_map.get(c.id, []) if images_map else []
+        # pricing and calc summary
+        co["pricing"] = service.price_info(c)
+        calc = service.ensure_calc_cache(c)
+        if calc:
+            co["calc_total_rub"] = calc.get("total_rub")
+            co["calc_breakdown"] = calc.get("breakdown")
+            co["calc_used_price"] = {
+                "amount": calc.get("used_price"),
+                "currency": calc.get("used_currency"),
+                "vat_reclaimable": calc.get("vat_reclaim"),
+            }
         payload_items.append(co)
     return {
         "items": payload_items,

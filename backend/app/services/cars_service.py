@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_, or_, case, cast, String
 from sqlalchemy.dialects.postgresql import JSONB
@@ -22,6 +24,9 @@ from ..utils.taxonomy import (
     color_hex,
     is_color_base,
 )
+from ..utils.breakdown_labels import label_for
+from .calculator_config_service import CalculatorConfigService
+from .calculator_runtime import EstimateRequest, calculate
 
 BRAND_ALIASES = {
     "alfa": "Alfa Romeo",
@@ -439,21 +444,36 @@ class CarsService:
         total = self.db.execute(total_stmt).scalar_one()
 
         order_clause = []
+        calc_first = case((Car.total_price_rub_cached.is_(None), 1), else_=0)
         if sort == "price_asc":
-            order_clause = [Car.price_rub_cached.asc().nullslast()]
+            order_clause = [calc_first.asc(), Car.price_rub_cached.asc().nullslast()]
         elif sort == "price_desc":
-            order_clause = [Car.price_rub_cached.desc().nullslast()]
+            order_clause = [calc_first.asc(), Car.price_rub_cached.desc().nullslast()]
         elif sort == "year_desc":
-            order_clause = [Car.year.desc().nullslast()]
+            order_clause = [calc_first.asc(), Car.year.desc().nullslast()]
         elif sort == "year_asc":
-            order_clause = [Car.year.asc().nullslast()]
+            order_clause = [calc_first.asc(), Car.year.asc().nullslast()]
         elif sort == "mileage_asc":
-            order_clause = [Car.mileage.asc().nullslast()]
+            order_clause = [calc_first.asc(), Car.mileage.asc().nullslast()]
         elif sort == "mileage_desc":
-            order_clause = [Car.mileage.desc().nullslast()]
+            order_clause = [calc_first.asc(), Car.mileage.desc().nullslast()]
+        elif sort == "reg_desc":
+            reg_year = func.coalesce(Car.registration_year, Car.year, 0)
+            reg_month = func.coalesce(Car.registration_month, 1)
+            order_clause = [calc_first.asc(), reg_year.desc(), reg_month.desc()]
+        elif sort == "reg_asc":
+            reg_year = func.coalesce(Car.registration_year, Car.year, 0)
+            reg_month = func.coalesce(Car.registration_month, 1)
+            order_clause = [calc_first.asc(), reg_year.asc(), reg_month.asc()]
+        elif sort == "listing_desc":
+            listing = func.coalesce(Car.listing_date, Car.updated_at, Car.created_at)
+            order_clause = [calc_first.asc(), listing.desc()]
+        elif sort == "listing_asc":
+            listing = func.coalesce(Car.listing_date, Car.updated_at, Car.created_at)
+            order_clause = [calc_first.asc(), listing.asc()]
         else:
             # default: цена сначала дешевые
-            order_clause = [Car.price_rub_cached.asc().nullslast()]
+            order_clause = [calc_first.asc(), Car.price_rub_cached.asc().nullslast()]
         # всегда поднимаем машины с фото выше
         missing_thumb = case(
             (or_(Car.thumbnail_url.is_(None), Car.thumbnail_url == ""), 1),
@@ -470,6 +490,128 @@ class CarsService:
         )
         items = list(self.db.execute(stmt).scalars().all())
         return items, total
+
+    def ensure_calc_cache(self, car: Car) -> dict | None:
+        if not car:
+            return None
+        # базовые цены из source_payload
+        payload = car.source_payload or {}
+        price_gross = payload.get("price_eur")
+        price_net = payload.get("price_eur_nt")
+        vat_pct = payload.get("vat")
+        used_price = None
+        used_currency = "EUR"
+        vat_reclaim = False
+        if price_net and vat_pct and float(vat_pct) > 0:
+            used_price = float(price_net)
+            vat_reclaim = True
+        elif price_gross:
+            used_price = float(price_gross)
+        else:
+            used_price = car.price
+            used_currency = car.currency or "EUR"
+        if not used_price:
+            logger.info("calc_skip_no_price car=%s src=%s", car.id, getattr(car.source, "key", None))
+            return None
+        reg_year = car.registration_year or car.year
+        reg_month = car.registration_month or 1
+        if reg_year is None:
+            logger.info("calc_skip_no_reg_year car=%s src=%s", car.id, getattr(car.source, "key", None))
+            return None
+        # кеш
+        if (
+            car.total_price_rub_cached is not None
+            and car.calc_breakdown_json is not None
+            and car.calc_updated_at is not None
+            and car.updated_at is not None
+            and car.calc_updated_at >= car.updated_at
+        ):
+            return {
+                "total_rub": float(car.total_price_rub_cached),
+                "breakdown": car.calc_breakdown_json or [],
+                "vat_reclaim": vat_reclaim,
+                "used_price": used_price,
+                "used_currency": used_currency,
+            }
+        cfg_svc = CalculatorConfigService(self.db)
+        # try multiple known paths
+        base_paths = [
+            Path("/app/Калькулятор Авто под заказ.xlsx"),
+            Path("/mnt/data/Калькулятор Авто под заказ.xlsx"),
+            Path(__file__).resolve().parent.parent / "resources" / "Калькулятор Авто под заказ.xlsx",
+        ]
+        cfg = None
+        for p in base_paths:
+            cfg = cfg_svc.ensure_default_from_path(p)
+            if cfg:
+                break
+        if not cfg:
+            return None
+        fx = self.get_fx_rates() or {}
+        eur_rate = fx.get("EUR") or cfg.payload.get("meta", {}).get("eur_rate_default") or 95.0
+        usd_rate = fx.get("USD") or cfg.payload.get("meta", {}).get("usd_rate_default") or 85.0
+        cur = str(used_currency or "EUR").strip().upper()
+        price_net_eur = None
+        if cur == "EUR":
+            price_net_eur = used_price
+        elif cur in ("RUB", "₽"):
+            if eur_rate:
+                price_net_eur = used_price / eur_rate
+        elif cur == "USD":
+            if eur_rate and usd_rate:
+                price_net_eur = used_price * (usd_rate / eur_rate)
+        if price_net_eur is None:
+            return None
+        engine_type = (car.engine_type or "").lower()
+        is_electric = "electric" in engine_type or "ev" in engine_type
+        if is_electric and not (car.power_hp or car.power_kw):
+            logger.info("calc_skip_no_power car=%s src=%s", car.id, getattr(car.source, "key", None))
+            return None
+        if not is_electric and not car.engine_cc:
+            logger.info("calc_skip_no_cc car=%s src=%s", car.id, getattr(car.source, "key", None))
+            return None
+        scenario = None
+        if is_electric:
+            scenario = "electric"
+        elif not (car.registration_year and car.registration_month):
+            scenario = "3_5"
+        req = EstimateRequest(
+            scenario=scenario,
+            price_net_eur=price_net_eur,
+            eur_rate=eur_rate,
+            engine_cc=car.engine_cc,
+            power_hp=float(car.power_hp) if car.power_hp is not None else None,
+            power_kw=float(car.power_kw) if car.power_kw is not None else None,
+            is_electric=is_electric,
+            reg_year=reg_year,
+            reg_month=reg_month,
+        )
+        try:
+            result = calculate(cfg.payload, req)
+        except Exception:
+            logger.exception("calc_failed car=%s src=%s", car.id, getattr(car.source, "key", None))
+            return None
+        display = []
+        label_map = cfg.payload.get("label_map", {})
+        for item in result.get("breakdown", []):
+            title = item.get("title") or ""
+            if "итого" in title.lower():
+                continue
+            cur = (item.get("currency") or "RUB").upper()
+            amt = float(item.get("amount") or 0)
+            rub = amt
+            if cur == "EUR" and eur_rate:
+                rub = amt * eur_rate
+            display.append({
+                "title": label_map.get(title, label_for(title)),
+                "amount_rub": rub,
+            })
+        total_rub = float(result.get("total_rub") or 0)
+        car.total_price_rub_cached = total_rub
+        car.calc_breakdown_json = display
+        car.calc_updated_at = datetime.utcnow()
+        self.db.commit()
+        return {"total_rub": total_rub, "breakdown": display, "vat_reclaim": vat_reclaim, "used_price": used_price, "used_currency": used_currency}
 
     def get_car(self, car_id: int) -> Optional[Car]:
         stmt = select(Car).where(Car.id == car_id)
@@ -689,6 +831,11 @@ class CarsService:
     def models_for_brand(self, brand: str) -> List[Dict[str, Any]]:
         if not brand:
             return []
+        cache = getattr(self, "_models_cache", {})
+        key = brand.lower()
+        entry = cache.get(key) if cache else None
+        if entry and (datetime.utcnow().timestamp() - entry["ts"] < 300):
+            return entry["data"]
         variants = brand_variants(brand)
         if not variants:
             return []
@@ -702,6 +849,7 @@ class CarsService:
                 Car.model.is_not(None),
             )
             .group_by(Car.model)
+            .limit(200)
         )
         rows = self.db.execute(stmt).all()
         models = [{"model": r[0], "count": int(r[1])} for r in rows if r[0]]
@@ -713,7 +861,9 @@ class CarsService:
                 return (0, int(m.group(1)), val.lower())
             return (1, val.lower())
 
-        return sorted(models, key=sort_key)
+        data = sorted(models, key=sort_key)
+        setattr(self, "_models_cache", {**cache, key: {"ts": datetime.utcnow().timestamp(), "data": data}})
+        return data
 
     def drive_types(self) -> List[Dict[str, Any]]:
         stmt = (
@@ -864,6 +1014,19 @@ class CarsService:
                 conditions.append(Car.source_id.in_(src_ids))
         stmt = select(func.count()).select_from(Car).where(and_(*conditions))
         return self.db.execute(stmt).scalar_one()
+
+    def price_info(self, car: Car) -> Dict[str, Any]:
+        payload = car.source_payload or {}
+        price_gross = payload.get("price_eur")
+        price_net = payload.get("price_eur_nt")
+        vat_pct = payload.get("vat")
+        vat_reclaimable = bool(price_net and vat_pct and float(vat_pct) > 0)
+        return {
+            "gross_eur": float(price_gross) if price_gross is not None else None,
+            "net_eur": float(price_net) if price_net is not None else None,
+            "vat_percent": float(vat_pct) if vat_pct is not None else None,
+            "vat_reclaimable": vat_reclaimable,
+        }
 
     def upsert_cars(self, source: Source, parsed: List[Dict[str, Any]]) -> Tuple[int, int]:
         inserted = 0

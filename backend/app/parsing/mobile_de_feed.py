@@ -97,6 +97,7 @@ class MobileDeFeedParser:
                 price=float(
                     row.price_eur) if row.price_eur is not None else None,
                 currency="EUR",
+                listing_date=row.created_at,
                 engine_cc=int(row.displacement * 1000) if row.displacement else None,
                 power_hp=float(row.horse_power) if row.horse_power else None,
                 power_kw=float(row.power_kw) if hasattr(row, "power_kw") and row.power_kw else (float(row.horse_power) /

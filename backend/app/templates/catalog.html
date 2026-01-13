@@ -255,7 +255,6 @@
 
         <div class="filters-actions">
           <button class="btn btn-ghost" id="resetFilters" type="button">Сбросить</button>
-          <button class="btn btn-primary" id="applyFilters">Применить</button>
         </div>
         <div class="filters-extra">
           <a class="btn btn-secondary" href="/search">Расширенный поиск</a>
@@ -283,8 +282,12 @@
             <select name="sort" id="sort-select">
               <option value="price_asc" {% if params.get('sort','price_asc') == 'price_asc' %}selected{% endif %}>Цена (сначала дешевые)</option>
               <option value="price_desc" {% if params.get('sort') == 'price_desc' %}selected{% endif %}>Цена (сначала дорогие)</option>
-              <option value="mileage_asc" {% if params.get('sort') == 'mileage_asc' %}selected{% endif %}>Пробег</option>
-              <option value="year_desc" {% if params.get('sort') == 'year_desc' %}selected{% endif %}>Год/дата</option>
+              <option value="mileage_asc" {% if params.get('sort') == 'mileage_asc' %}selected{% endif %}>Пробег (сначала меньше)</option>
+              <option value="mileage_desc" {% if params.get('sort') == 'mileage_desc' %}selected{% endif %}>Пробег (сначала больше)</option>
+              <option value="reg_desc" {% if params.get('sort') == 'reg_desc' %}selected{% endif %}>Постановка на учёт (сначала новые)</option>
+              <option value="reg_asc" {% if params.get('sort') == 'reg_asc' %}selected{% endif %}>Постановка на учёт (сначала старые)</option>
+              <option value="listing_desc" {% if params.get('sort') == 'listing_desc' %}selected{% endif %}>Дата размещения (сначала новые)</option>
+              <option value="listing_asc" {% if params.get('sort') == 'listing_asc' %}selected{% endif %}>Дата размещения (сначала старые)</option>
             </select>
           </div>
         </div>

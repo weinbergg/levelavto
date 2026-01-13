@@ -632,12 +632,56 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         code, label = resolve_display_country(car)
         car.display_country_code = code
         car.display_country_label = label
+    details = []
+    options = []
+    calc = None
     if car:
         car.display_body_type = ru_body(getattr(car, "body_type", None)) or display_body(getattr(car, "body_type", None)) or car.body_type
         car.display_color = ru_color(getattr(car, "color", None)) or display_color(getattr(car, "color", None)) or car.color
         car.display_engine_type = ru_fuel(getattr(car, "engine_type", None)) or ru_fuel(normalize_fuel(getattr(car, "engine_type", None))) or car.engine_type
         car.display_transmission = ru_transmission(getattr(car, "transmission", None)) or car.transmission
-    return templates.TemplateResponse("car_detail.html", {"request": request, "car": car, "user": getattr(request.state, "user", None)})
+        payload = car.source_payload or {}
+        pricing = service.price_info(car)
+
+        def push(label: str, value: Any) -> None:
+            if value is None:
+                return
+            if isinstance(value, str) and not value.strip():
+                return
+            details.append({"label": label, "value": value})
+
+        push("Мест", payload.get("num_seats"))
+        push("Дверей", payload.get("doors_count"))
+        push("Владельцев", payload.get("owners_count"))
+        push("Экокласс", payload.get("emission_class"))
+        push("Эффективность", payload.get("efficiency_class"))
+        push("Климат", payload.get("climatisation"))
+        push("Интерьер", payload.get("interior_design"))
+        push("Парктроники", payload.get("park_assists"))
+        push("Подушки", payload.get("airbags"))
+        push("Цвет производителя", payload.get("manufacturer_color"))
+        push("Расход топлива", payload.get("fuel_consumption"))
+        push("CO₂", payload.get("co_emission"))
+        push("Оценка цены", payload.get("price_rating_label"))
+
+        raw_options = payload.get("options")
+        if isinstance(raw_options, list):
+            options = [str(opt).strip() for opt in raw_options if str(opt).strip()]
+        elif isinstance(raw_options, str):
+            options = [raw_options.strip()] if raw_options.strip() else []
+        calc = service.ensure_calc_cache(car)
+    return templates.TemplateResponse(
+        "car_detail.html",
+        {
+            "request": request,
+            "car": car,
+            "user": getattr(request.state, "user", None),
+            "car_details": details,
+            "car_options": options,
+            "calc": calc,
+            "pricing": pricing,
+        },
+    )
 
 
 @router.get("/privacy")

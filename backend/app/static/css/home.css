@@ -35,10 +35,14 @@
   height: 46px;
   padding: 12px 14px;
   border-radius: 12px;
+  color-scheme: dark;
 }
 .filter-grid--overlay {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
+}
+.filter-grid--overlay .field--dynamic {
+  min-height: 100%;
 }
 @media (max-width: 1200px) {
   .filter-grid--overlay {
@@ -193,9 +197,7 @@
   font-size: 22px;
 }
 .search-head .search-count {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
+  display: none;
 }
 .search-head p {
   margin: 0;

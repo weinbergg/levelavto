@@ -32,6 +32,7 @@ class CarBase(BaseModel):
     hash: Optional[str] = None
     first_seen_at: Optional[datetime] = None
     last_seen_at: Optional[datetime] = None
+    listing_date: Optional[datetime] = None
     is_available: bool
     created_at: datetime
     updated_at: datetime
@@ -47,6 +48,10 @@ class CarOut(CarBase):
     display_country_label: Optional[str] = None
     display_engine_type: Optional[str] = None
     display_transmission: Optional[str] = None
+    pricing: Optional[dict] = None
+    calc_total_rub: Optional[float] = None
+    calc_breakdown: Optional[list] = None
+    calc_used_price: Optional[dict] = None
 
 
 class CarDetailOut(CarBase):

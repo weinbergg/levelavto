@@ -27,21 +27,9 @@
     <div class="search-card search-card--overlay">
       <div class="search-head">
         <h3 style="margin: 0">{{ home.search.title }}</h3>
-        <p class="search-count">
-          <span id="home-count-top" data-count="{{ total_cars }}">{{ total_cars }}</span>
-          {{ home.search.subtitle_suffix }}
-        </p>
       </div>
       <form class="search-form" id="home-search" method="get" action="/catalog">
         {% set params = request.query_params %}
-        {% set region_value = params.get('region') %}
-        {% if not region_value %}
-          {% if params.get('country') == 'KR' %}
-            {% set region_value = 'KR' %}
-          {% elif params.get('country') %}
-            {% set region_value = 'EU' %}
-          {% endif %}
-        {% endif %}
         <div class="filter-grid filter-grid--overlay">
           <div class="field">
             <label for="home-brand">Марка</label>
@@ -60,42 +48,17 @@
           </div>
           <div class="field">
             <label for="home-region">Регион</label>
-            <select id="home-region" name="region" data-region-select>
+            <select id="home-region" name="region">
               <option value="">Все регионы</option>
-              {% for r in regions %}
-              <option value="{{ r }}" {% if region_value == r %}selected{% endif %}>{{ country_labels.get(r, r) }}</option>
-              {% endfor %}
+              <option value="EU" {% if params.get('region') == 'EU' %}selected{% endif %}>Европа</option>
+              <option value="KR" {% if params.get('region') == 'KR' %}selected{% endif %}>Корея</option>
             </select>
           </div>
-          <div class="field" data-region-panel="eu">
-            <label for="home-eu-country">Страна (Европа)</label>
-            <select id="home-eu-country" name="eu_country" data-eu-country>
-              <option value="">Все страны</option>
-              {% for c in countries %}
-              <option value="{{ c }}" {% if params.get('country') == c %}selected{% endif %}>{{ country_labels.get(c, c) }}</option>
-              {% endfor %}
+          <div class="field field--dynamic" id="home-region-slot">
+            <label id="home-region-slot-label">Регион</label>
+            <select id="home-region-slot-select" disabled>
+              <option value="">—</option>
             </select>
-          </div>
-          {% if kr_types %}
-          <div class="field" data-region-panel="kr">
-            <label for="home-kr-type">Тип (Корея)</label>
-            <select id="home-kr-type" name="kr_type" data-kr-type>
-              <option value="">Корейские</option>
-              <option value="import">Импортные</option>
-            </select>
-          </div>
-          {% endif %}
-          <input type="hidden" name="country" value="{{ params.get('country','') }}">
-          <div class="field">
-            <label for="home-price-min">Цена от, ₽</label>
-            <input
-              id="home-price-min"
-              name="price_min"
-              type="number"
-              inputmode="numeric"
-              min="0"
-              step="1000"
-            />
           </div>
           <div class="field">
             <label for="home-price-max">Цена до, ₽</label>
@@ -108,6 +71,34 @@
               step="1000"
             />
           </div>
+          <div class="field field--dynamic" id="home-region-slot">
+            <label id="home-region-slot-label">Регион</label>
+            <select id="home-region-slot-select" disabled>
+              <option value="">—</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="home-mileage-max">Пробег до, км</label>
+            <input
+              id="home-mileage-max"
+              name="mileage_max"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1"
+            />
+          </div>
+          {% if transmissions and transmissions|length > 0 %}
+          <div class="field">
+            <label for="home-transmission">Трансмиссия</label>
+            <select id="home-transmission" name="transmission">
+              <option value="">Любая</option>
+              {% for t in transmissions %}
+              <option value="{{ t.value }}">{{ t.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
           <div class="field">
             <label for="home-reg-year">Поставлен на учёт с (год)</label>
             <select id="home-reg-year" name="reg_year_min">
@@ -205,6 +196,9 @@
     </div>
   </div>
 </section>
+<script>
+  window.HOME_COUNTRIES = {{ countries | map('string') | list | tojson }};
+</script>
 <section class="section" id="cases">
   <div class="la-container">
     <div class="section-header">

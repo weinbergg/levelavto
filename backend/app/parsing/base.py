@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Dict, Any
+from datetime import datetime
 import httpx
 import time
 import random
@@ -53,6 +54,7 @@ class CarParsed:
     thumbnail_url: Optional[str] = None
     source_payload: Optional[Dict[str, Any]] = None
     is_available: bool = True
+    listing_date: Optional[datetime] = None
     # optional list of image URLs in display order (first is primary)
     images: Optional[List[str]] = None
 
@@ -148,4 +150,3 @@ class BaseParser:
     def _http_get(self, url: str, *, params: Optional[Dict[str, Any]] = None):
         logger.info(f"[{self.config.key}] GET {url} params={params}")
         return self.client.get(url, params=params)
-
