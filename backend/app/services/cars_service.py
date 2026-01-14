@@ -120,7 +120,7 @@ class CarsService:
 
     _fx_cache: dict | None = None
     _fx_cache_ts: float | None = None
-    _count_cache: TTLCache = TTLCache(maxsize=1024, ttl=90)
+    _count_cache: TTLCache = TTLCache(maxsize=1024, ttl=120)
 
     def get_fx_rates(self) -> dict | None:
         now = time.time()
@@ -514,58 +514,78 @@ class CarsService:
             kr_type,
         )
         total = self._count_cache.get(count_key)
+        total_t0 = time.perf_counter()
         if total is None:
             total_stmt = select(func.count()).select_from(Car).where(where_expr)
             total = self.db.execute(total_stmt).scalar_one()
             self._count_cache[count_key] = total
+            elapsed = time.perf_counter() - total_t0
+            if elapsed > 2:
+                self.logger.warning("count_slow total=%.3fs filters=%s", elapsed, count_key)
+            elif elapsed > 1:
+                self.logger.info("count_warn total=%.3fs filters=%s", elapsed, count_key)
 
         order_clause = []
-        calc_first = case((Car.total_price_rub_cached.is_(None), 1), else_=0)
-        price_expr = Car.total_price_rub_cached
         if sort == "price_asc":
-            order_clause = [calc_first.asc(), price_expr.asc().nullslast()]
+            order_clause = [
+                Car.total_price_rub_cached.asc().nullslast(),
+                Car.price_rub_cached.asc().nullslast(),
+                Car.id.desc(),
+            ]
         elif sort == "price_desc":
-            order_clause = [calc_first.asc(), price_expr.desc().nullslast()]
+            order_clause = [
+                Car.total_price_rub_cached.desc().nullslast(),
+                Car.price_rub_cached.desc().nullslast(),
+                Car.id.desc(),
+            ]
         elif sort == "year_desc":
-            order_clause = [calc_first.asc(), Car.year.desc().nullslast()]
+            order_clause = [Car.year.desc().nullslast(), Car.id.desc()]
         elif sort == "year_asc":
-            order_clause = [calc_first.asc(), Car.year.asc().nullslast()]
+            order_clause = [Car.year.asc().nullslast(), Car.id.desc()]
         elif sort == "mileage_asc":
-            order_clause = [calc_first.asc(), Car.mileage.asc().nullslast()]
+            order_clause = [Car.mileage.asc().nullslast(), Car.id.desc()]
         elif sort == "mileage_desc":
-            order_clause = [calc_first.asc(), Car.mileage.desc().nullslast()]
+            order_clause = [Car.mileage.desc().nullslast(), Car.id.desc()]
         elif sort == "reg_desc":
-            reg_year = func.coalesce(Car.registration_year, Car.year, 0)
-            reg_month = func.coalesce(Car.registration_month, 1)
-            order_clause = [calc_first.asc(), reg_year.desc(), reg_month.desc()]
+            order_clause = [Car.reg_sort_key.desc().nullslast(), Car.id.desc()]
         elif sort == "reg_asc":
-            reg_year = func.coalesce(Car.registration_year, Car.year, 0)
-            reg_month = func.coalesce(Car.registration_month, 1)
-            order_clause = [calc_first.asc(), reg_year.asc(), reg_month.asc()]
+            order_clause = [Car.reg_sort_key.asc().nullslast(), Car.id.desc()]
         elif sort == "listing_desc":
-            listing = func.coalesce(Car.listing_date, Car.updated_at, Car.created_at)
-            order_clause = [calc_first.asc(), listing.desc()]
+            order_clause = [Car.listing_sort_ts.desc().nullslast(), Car.id.desc()]
         elif sort == "listing_asc":
-            listing = func.coalesce(Car.listing_date, Car.updated_at, Car.created_at)
-            order_clause = [calc_first.asc(), listing.asc()]
+            order_clause = [Car.listing_sort_ts.asc().nullslast(), Car.id.desc()]
         else:
             # default: цена сначала дешевые
-            order_clause = [calc_first.asc(), Car.price_rub_cached.asc().nullslast()]
-        # всегда поднимаем машины с фото выше
-        missing_thumb = case(
-            (or_(Car.thumbnail_url.is_(None), Car.thumbnail_url == ""), 1),
-            else_=0,
-        )
-        order_clause.insert(0, missing_thumb.asc())
+            order_clause = [Car.price_rub_cached.asc().nullslast(), Car.id.desc()]
 
         stmt = (
             select(Car)
             .where(where_expr)
-            .order_by(*order_clause, Car.id.desc())
+            .order_by(*order_clause)
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
+        items_t0 = time.perf_counter()
         items = list(self.db.execute(stmt).scalars().all())
+        elapsed_items = time.perf_counter() - items_t0
+        if elapsed_items > 2:
+            self.logger.warning(
+                "list_slow total=%.3fs sort=%s page=%s size=%s filters=%s",
+                elapsed_items,
+                sort,
+                page,
+                page_size,
+                count_key,
+            )
+        elif elapsed_items > 1:
+            self.logger.info(
+                "list_warn total=%.3fs sort=%s page=%s size=%s filters=%s",
+                elapsed_items,
+                sort,
+                page,
+                page_size,
+                count_key,
+            )
         return items, total
 
     def ensure_calc_cache(self, car: Car) -> dict | None:

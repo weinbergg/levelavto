@@ -63,16 +63,29 @@
           {% set vat_reclaim = pricing.vat_reclaimable if pricing else False %}
           {% set has_total = calc and calc.total_rub %}
           {% set base_line = gross or car.price %}
+          {% set is_kr = (car.display_country_code or car.country or '')|upper == 'KR' %}
           <div class="detail-price">
             <div class="detail-price__total">
-              {% if has_total %}
-              {{ '{:,.0f}'.format(calc.total_rub).replace(',', ' ') }} ₽
-              {% elif base_line %}
-              {{ '{:,.0f}'.format(base_line).replace(',', ' ') }} {{ car.currency or '€' }}{% if not has_total %} *{% endif %}
+              {% if is_kr %}
+                {% set kr_price = car.total_price_rub_cached or car.price_rub_cached %}
+                {% if kr_price %}
+                  {{ '{:,.0f}'.format(kr_price).replace(',', ' ') }} ₽
+                {% elif car.price %}
+                  {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}
+                {% else %}
+                  Цена по запросу
+                {% endif %}
               {% else %}
-              Цена по запросу
+                {% if has_total %}
+                {{ '{:,.0f}'.format(calc.total_rub).replace(',', ' ') }} ₽
+                {% elif base_line %}
+                {{ '{:,.0f}'.format(base_line).replace(',', ' ') }} {{ car.currency or '€' }}{% if not has_total %} *{% endif %}
+                {% else %}
+                Цена по запросу
+                {% endif %}
               {% endif %}
             </div>
+            {% if not is_kr %}
             <div class="detail-price__meta">
               {% if gross %}
               BRUTTO: {{ '{:,.0f}'.format(gross).replace(',', ' ') }} €
@@ -89,6 +102,7 @@
               <br><span class="muted">* Итог в РФ уточняйте — свяжитесь с нами</span>
               {% endif %}
             </div>
+            {% endif %}
           </div>
           {% if meta %}
           <p class="muted detail-meta">{{ meta|join(' · ') }}</p>
@@ -101,23 +115,6 @@
           <button class="fav-btn" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>
           {% endif %}
         </div>
-        {% if calc %}
-        <div class="detail-calc">
-          <button class="btn btn-ghost btn-small" type="button" id="toggleCalc" aria-expanded="false" onclick="return window.toggleDetailCalc(event);">Детали доставки</button>
-          <div class="detail-calc__line" id="calcBreakdown" style="display:none;">
-            {% if calc.breakdown and calc.breakdown|length > 0 %}
-              {% for item in calc.breakdown %}
-              <div class="calc-chip">
-                <span>{{ item.title }}</span>
-                <span>{{ '{:,.0f}'.format(item.amount_rub).replace(',', ' ') }} ₽</span>
-              </div>
-              {% endfor %}
-            {% else %}
-              <div class="muted">* Итог в РФ уточняйте — свяжитесь с нами</div>
-            {% endif %}
-          </div>
-        </div>
-        {% endif %}
         <div class="detail-specs">
           {% if car.mileage %}
           <div class="chip">Пробег: {{ car.mileage }}</div>

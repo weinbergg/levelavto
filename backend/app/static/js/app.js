@@ -595,6 +595,9 @@
   }
   // -------- end favorites --------
 
+  let catalogController = null
+  let catalogReqId = 0
+
   async function loadCars(page = 1) {
     const spinner = qs('#spinner')
     const cards = qs('#cards')
@@ -606,11 +609,16 @@
     try {
       const fx = await getFx()
       const params = collectParams(page)
-      const res = await fetch(`${window.CATALOG_API}?${params.toString()}`)
+      const reqId = ++catalogReqId
+      catalogController?.abort()
+      catalogController = new AbortController()
+      const res = await fetch(`${window.CATALOG_API}?${params.toString()}`, { signal: catalogController.signal })
+      if (reqId !== catalogReqId) return
       if (!res.ok) {
         throw new Error(`API ${res.status}`)
       }
       const data = await res.json()
+      if (reqId !== catalogReqId) return
       renderActiveFilters(params)
       if (pageInfo) {
       pageInfo.textContent = `Страница ${data.page} из ${Math.max(1, Math.ceil(data.total / data.page_size))}`
@@ -673,6 +681,7 @@
         const gross = car.pricing?.gross_eur
         const net = car.pricing?.net_eur
         const vatInfo = car.pricing?.vat_reclaimable
+        const isKR = String(car.display_country_code || car.country || '').toUpperCase().startsWith('KR')
         const grossLine = gross != null ? `BRUTTO: ${Number(gross).toLocaleString('ru-RU')} €` : null
         const netLine = net != null ? `NET: ${Number(net).toLocaleString('ru-RU')} €` : null
         const vatLine = vatInfo != null ? (vatInfo ? 'НДС: возмещается' : 'НДС: не возмещается') : null
@@ -682,29 +691,39 @@
         const rawRub = car.price != null ? priceToRub(car.price, car.currency, fx) : null
         const baseRub = [grossRub, netRub, rawRub].find((v) => Number.isFinite(v))
         let primaryBase = ''
-        if (car.calc_total_rub != null) {
-          primaryBase = formatRub(car.calc_total_rub)
-        } else if (baseRub != null) {
-          primaryBase = `${formatRub(baseRub)} *`
-        } else if (grossLine) {
-          primaryBase = `${grossLine} *`
-        } else if (netLine) {
-          primaryBase = `${netLine} *`
-        } else if (car.price != null) {
-          primaryBase = `${Number(car.price).toLocaleString('ru-RU')} ${car.currency || ''}`.trim() + ' *'
-        }
-        if (grossLine && !primaryBase.startsWith('BRUTTO')) priceLines.push(grossLine)
-        if (netLine && !primaryBase.startsWith('NET')) priceLines.push(netLine)
-        if (vatLine) priceLines.push(vatLine)
         let calcLine = ''
         let footnote = ''
-        if (car.calc_total_rub != null) {
-          calcLine = `<div class="price-main">${primaryBase}</div>`
-        } else {
+        if (isKR) {
+          const krRub = car.calc_total_rub ?? car.price_rub_cached ?? baseRub
+          if (krRub != null) {
+            primaryBase = formatRub(krRub)
+          } else if (car.price != null) {
+            primaryBase = `${Number(car.price).toLocaleString('ru-RU')} ${car.currency || ''}`.trim()
+          }
           if (primaryBase) {
             calcLine = `<div class="price-main">${primaryBase}</div>`
           }
-          footnote = `<div class="price-sub muted">* Итог в РФ уточняйте — свяжитесь с нами</div>`
+        } else {
+          if (car.calc_total_rub != null) {
+            primaryBase = formatRub(car.calc_total_rub)
+          } else if (baseRub != null) {
+            primaryBase = `${formatRub(baseRub)} *`
+          } else if (grossLine) {
+            primaryBase = `${grossLine} *`
+          } else if (netLine) {
+            primaryBase = `${netLine} *`
+          } else if (car.price != null) {
+            primaryBase = `${Number(car.price).toLocaleString('ru-RU')} ${car.currency || ''}`.trim() + ' *'
+          }
+          if (grossLine && !primaryBase.startsWith('BRUTTO')) priceLines.push(grossLine)
+          if (netLine && !primaryBase.startsWith('NET')) priceLines.push(netLine)
+          if (vatLine) priceLines.push(vatLine)
+          if (primaryBase) {
+            calcLine = `<div class="price-main">${primaryBase}</div>`
+          }
+          if (primaryBase.includes('*')) {
+            footnote = `<div class="price-sub muted">* Итог в РФ уточняйте — свяжитесь с нами</div>`
+          }
         }
         const metaLine = [car.year, car.display_engine_type || car.engine_type].filter(Boolean).join(' · ')
         const colorDot = (hex, raw) => {
@@ -791,6 +810,7 @@
       window.__pageSize = data.page_size
       window.__total = data.total
     } catch (e) {
+      if (e?.name === 'AbortError') return
       console.error(e)
       if (pageInfo) pageInfo.textContent = 'Ошибка загрузки'
       if (cards) renderEmpty(cards, 'Не удалось загрузить данные. Попробуйте позже.')
