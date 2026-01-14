@@ -673,20 +673,38 @@
         const gross = car.pricing?.gross_eur
         const net = car.pricing?.net_eur
         const vatInfo = car.pricing?.vat_reclaimable
+        const grossLine = gross != null ? `BRUTTO: ${Number(gross).toLocaleString('ru-RU')} €` : null
+        const netLine = net != null ? `NET: ${Number(net).toLocaleString('ru-RU')} €` : null
+        const vatLine = vatInfo != null ? (vatInfo ? 'НДС: возмещается' : 'НДС: не возмещается') : null
         const priceLines = []
-        if (gross != null) priceLines.push(`BRUTTO: ${Number(gross).toLocaleString('ru-RU')} €`)
-        if (net != null) priceLines.push(`NET: ${Number(net).toLocaleString('ru-RU')} €`)
-        if (vatInfo != null) priceLines.push(vatInfo ? 'НДС: возмещается' : 'НДС: не возмещается')
+        const grossRub = gross != null ? priceToRub(gross, 'EUR', fx) : null
+        const netRub = net != null ? priceToRub(net, 'EUR', fx) : null
+        const rawRub = car.price != null ? priceToRub(car.price, car.currency, fx) : null
+        const baseRub = [grossRub, netRub, rawRub].find((v) => Number.isFinite(v))
+        let primaryBase = ''
+        if (car.calc_total_rub != null) {
+          primaryBase = formatRub(car.calc_total_rub)
+        } else if (baseRub != null) {
+          primaryBase = `${formatRub(baseRub)} *`
+        } else if (grossLine) {
+          primaryBase = `${grossLine} *`
+        } else if (netLine) {
+          primaryBase = `${netLine} *`
+        } else if (car.price != null) {
+          primaryBase = `${Number(car.price).toLocaleString('ru-RU')} ${car.currency || ''}`.trim() + ' *'
+        }
+        if (grossLine && !primaryBase.startsWith('BRUTTO')) priceLines.push(grossLine)
+        if (netLine && !primaryBase.startsWith('NET')) priceLines.push(netLine)
+        if (vatLine) priceLines.push(vatLine)
         let calcLine = ''
         let footnote = ''
         if (car.calc_total_rub != null) {
-          calcLine = `<div class="price-main">${formatRub(car.calc_total_rub)}</div>`
+          calcLine = `<div class="price-main">${primaryBase}</div>`
         } else {
-          // добавить звёздочку к первой цене, если есть
-          if (priceLines.length) {
-            priceLines[0] = `${priceLines[0]} *`
+          if (primaryBase) {
+            calcLine = `<div class="price-main">${primaryBase}</div>`
           }
-          footnote = `<div class="price-sub muted">* Итог в РФ не рассчитан (недостаточно данных)</div>`
+          footnote = `<div class="price-sub muted">* Итог в РФ уточняйте — свяжитесь с нами</div>`
         }
         const metaLine = [car.year, car.display_engine_type || car.engine_type].filter(Boolean).join(' · ')
         const colorDot = (hex, raw) => {

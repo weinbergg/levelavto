@@ -191,44 +191,7 @@
             </div>
             <!-- interior filters moved to advanced search; hidden in main panel -->
             {# фильтр пневмоподвески скрыт: данных нет или не используется #}
-            {% if (colors_basic and colors_basic|length > 0) or (colors_other and colors_other|length > 0) %}
-            <label class="field--full">Цвет
-              {% if colors_basic and colors_basic|length > 0 %}
-              <div class="color-swatches color-swatches--basic" data-color-chips>
-                {% for c in colors_basic %}
-                <button
-                  type="button"
-                  class="color-chip {% if params.get('color') == c.value %}active{% endif %}"
-                  data-color="{{ c.value }}"
-                  data-label="{{ c.label }}"
-                  title="{{ c.label }}"
-                  aria-label="{{ c.label }}"
-                  {% if c.hex %}style="--chip-color: {{ c.hex }}"{% endif %}
-                ></button>
-                {% endfor %}
-              </div>
-              {% endif %}
-              {% if colors_other and colors_other|length > 0 %}
-              <button type="button" class="btn btn-ghost btn-small color-toggle" id="colorsToggle" aria-expanded="false">
-                Другие цвета
-              </button>
-              <div class="color-swatches color-swatches-extra is-collapsed" id="colorsExtra" data-color-chips>
-                {% for c in colors_other %}
-                <button
-                  type="button"
-                  class="color-chip {% if params.get('color') == c.value %}active{% endif %}"
-                  data-color="{{ c.value }}"
-                  data-label="{{ c.label }}"
-                  title="{{ c.label }}"
-                  aria-label="{{ c.label }}"
-                  {% if c.hex %}style="--chip-color: {{ c.hex }}"{% endif %}
-                ></button>
-                {% endfor %}
-              </div>
-              {% endif %}
-              <input type="hidden" name="color" value="{{ params.get('color','') }}">
-            </label>
-            {% endif %}
+            {# Цвет убран из основной панели; оставьте в расширенном поиске при наличии данных #}
             <label class="field--full">Поиск по ключевым словам
               <input type="text" name="q" value="{{ params.get('q','') }}" placeholder="Например: дизель, 4x4, панорама">
             </label>

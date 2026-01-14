@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_, or_, case, cast, String
 from sqlalchemy.dialects.postgresql import JSONB
 import logging
+from cachetools import TTLCache
 
 logger = logging.getLogger(__name__)
 import re
@@ -119,6 +120,7 @@ class CarsService:
 
     _fx_cache: dict | None = None
     _fx_cache_ts: float | None = None
+    _count_cache: TTLCache = TTLCache(maxsize=1024, ttl=90)
 
     def get_fx_rates(self) -> dict | None:
         now = time.time()
@@ -476,8 +478,46 @@ class CarsService:
 
         where_expr = and_(*conditions) if conditions else None
 
-        total_stmt = select(func.count()).select_from(Car).where(where_expr)
-        total = self.db.execute(total_stmt).scalar_one()
+        # cached count for repeated requests
+        count_key = (
+            region,
+            country,
+            brand,
+            tuple(lines) if lines else None,
+            tuple(source_key) if isinstance(source_key, list) else source_key,
+            q,
+            model,
+            generation,
+            color,
+            price_min,
+            price_max,
+            mileage_min,
+            mileage_max,
+            reg_year_min,
+            reg_month_min,
+            reg_year_max,
+            reg_month_max,
+            body_type,
+            engine_type,
+            transmission,
+            drive_type,
+            num_seats,
+            doors_count,
+            emission_class,
+            efficiency_class,
+            climatisation,
+            airbags,
+            interior_design,
+            price_rating_label,
+            owners_count,
+            condition,
+            kr_type,
+        )
+        total = self._count_cache.get(count_key)
+        if total is None:
+            total_stmt = select(func.count()).select_from(Car).where(where_expr)
+            total = self.db.execute(total_stmt).scalar_one()
+            self._count_cache[count_key] = total
 
         order_clause = []
         calc_first = case((Car.total_price_rub_cached.is_(None), 1), else_=0)

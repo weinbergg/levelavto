@@ -14,10 +14,14 @@
   gap: 6px;
 }
 .lead-form-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  row-gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   width: 100%;
+}
+.lead-form-grid.form-grid--12 {
+  display: flex;
+  flex-direction: column;
 }
 .lead-form-grid .form-actions {
   display: flex;
@@ -25,17 +29,16 @@
   justify-content: flex-start;
   gap: var(--space-md);
   margin-top: var(--space-md);
-  grid-column: 1 / -1;
 }
 .lead-form-grid .form-actions .btn {
   min-width: 180px;
   width: 100%;
 }
 .lead-form-grid .field {
-  grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
 }
 .lead-form-grid .field.full-width {
   grid-column: 1 / -1;
