@@ -188,7 +188,8 @@ class CarsService:
     ) -> Tuple[List[Car], int]:
         conditions = [Car.is_available.is_(True)]
         if region and not country:
-            country = region
+            if region.upper() == "KR":
+                country = "KR"
         if lines:
             line_conditions = []
             brand_field = func.lower(func.trim(Car.brand))
@@ -219,18 +220,16 @@ class CarsService:
                 conditions.append(or_(*line_conditions))
         if country:
             c = normalize_country_code(country)
-            if c == "KR":
+            if c == "EU":
+                country = None
+                if not region:
+                    region = "EU"
+            elif c == "KR":
                 kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
                 kr_conds = [func.upper(Car.country).like("KR%")]
                 if kr_sources:
                     kr_conds.append(Car.source_id.in_(kr_sources))
                 conditions.append(or_(*kr_conds))
-            elif c == "EU":
-                eu_sources = self._source_ids_for_europe()
-                eu_conds = [func.upper(Car.country).in_(self.EU_COUNTRIES)]
-                if eu_sources:
-                    eu_conds.append(Car.source_id.in_(eu_sources))
-                conditions.append(or_(*eu_conds))
             elif c:
                 conditions.append(func.upper(Car.country) == c)
         if region:

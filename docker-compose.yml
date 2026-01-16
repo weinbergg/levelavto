@@ -2,10 +2,16 @@ services:
   db:
     image: postgres:16-alpine
     container_name: autodealer_db
+    shm_size: "1gb"
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+    command: >
+      postgres
+      -c max_wal_size=4GB
+      -c checkpoint_timeout=15min
+      -c checkpoint_completion_target=0.9
     expose:
       - "5432"
     volumes:

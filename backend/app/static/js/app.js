@@ -270,7 +270,7 @@
       togglePanel(krPanel, val !== 'KR')
       if (val === 'EU') {
         const euVal = euSelect?.value || ''
-        countryHidden.value = euVal || 'EU'
+        countryHidden.value = euVal || ''
       } else if (val === 'KR') {
         countryHidden.value = 'KR'
       } else {
