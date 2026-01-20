@@ -60,6 +60,12 @@
   border-radius: var(--r-sm);
   padding: 10px 12px;
 }
+.form-grid.form-grid--12 .field select,
+.form-grid.form-grid--12 .field select option {
+  background: var(--bg-interactive);
+  color: var(--text-1);
+  color-scheme: dark;
+}
 .form-grid.form-grid--12 .field textarea {
   min-height: 160px;
 }
@@ -1284,6 +1290,11 @@ body.filters-open {
   min-width: 140px;
   white-space: nowrap;
 }
+.filters-panel select option {
+  background: var(--bg-interactive);
+  color: var(--text-1);
+  color-scheme: dark;
+}
 .filters-panel input:focus,
 .filters-panel select:focus {
   outline: none;
@@ -1702,6 +1713,12 @@ body.filters-open {
   border-radius: var(--r-lg);
   border: 1px solid var(--border-1);
   background: var(--bg-card);
+}
+.search-filters select,
+.search-filters select option {
+  background: var(--bg-interactive);
+  color: var(--text-1);
+  color-scheme: dark;
 }
 .advanced-actions {
   display: flex;

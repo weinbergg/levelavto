@@ -37,6 +37,10 @@
   border-radius: 12px;
   color-scheme: dark;
 }
+.search-card--overlay select option {
+  background: #1b1f26;
+  color: #f4f5f7;
+}
 .filter-grid--overlay.filter-grid--compact {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;

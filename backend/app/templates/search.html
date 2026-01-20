@@ -161,6 +161,27 @@
               </label>
             </div>
 
+            <div class="advanced-row advanced-row--two">
+              <label class="field">Поколение
+                <select name="generation" {% if not generations %}disabled{% endif %}>
+                  <option value="">Любое</option>
+                  {% for g in generations %}
+                  <option value="{{ g }}" {% if params.get('generation') == g %}selected{% endif %}>{{ g }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">Поиск по ключевым словам
+                <input type="text" name="q" value="{{ params.get('q','') }}" placeholder="Например: дизель, 4x4, панорама">
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="advanced-section" id="advanced-tech">
+        <h2 class="advanced-section__title">Технические данные</h2>
+        <div class="search-filters search-filters--base">
+          <div class="advanced-basic">
             <div class="advanced-row advanced-row--three">
               <label class="field">Топливо
                 <select name="engine_type" {% if not engine_types %}disabled{% endif %}>
@@ -205,20 +226,6 @@
                 <input type="number" name="engine_cc_max" inputmode="numeric" min="0" step="100" value="{{ params.get('engine_cc_max','') }}">
               </label>
             </div>
-
-            <div class="advanced-row advanced-row--two">
-              <label class="field">Поколение
-                <select name="generation" {% if not generations %}disabled{% endif %}>
-                  <option value="">Любое</option>
-                  {% for g in generations %}
-                  <option value="{{ g }}" {% if params.get('generation') == g %}selected{% endif %}>{{ g }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label class="field">Поиск по ключевым словам
-                <input type="text" name="q" value="{{ params.get('q','') }}" placeholder="Например: дизель, 4x4, панорама">
-              </label>
-            </div>
           </div>
         </div>
       </section>
@@ -245,10 +252,16 @@
               </div>
               {% endif %}
               {% if colors_other and colors_other|length > 0 %}
-              <button type="button" class="btn btn-ghost btn-small color-toggle" id="colorsToggle" aria-expanded="false">
+              <button
+                type="button"
+                class="btn btn-ghost btn-small color-toggle"
+                data-colors-toggle
+                data-target="colors-extra-search"
+                aria-expanded="false"
+              >
                 Другие цвета
               </button>
-              <div class="color-swatches color-swatches-extra is-collapsed" id="colorsExtra" data-color-chips>
+              <div class="color-swatches color-swatches-extra is-collapsed" id="colors-extra-search" data-color-chips>
                 {% for c in colors_other %}
                 <button
                   type="button"
@@ -421,7 +434,12 @@
               </select>
             </label>
             {% endif %}
-            {# фильтр пневмоподвески скрыт: данных нет или не используется #}
+            {% if has_air_suspension %}
+            <label class="field--checkbox field--wide">
+              <input type="checkbox" name="air_suspension" value="1" {% if params.get('air_suspension') %}checked{% endif %}>
+              <span>Пневмоподвеска</span>
+            </label>
+            {% endif %}
           </div>
         </div>
       </section>

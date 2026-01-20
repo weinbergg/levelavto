@@ -181,30 +181,33 @@
 
   function bindOtherColorsToggle(scope) {
     if (!scope) return
-    const toggle = qs('#colorsToggle', scope)
-    const extra = qs('#colorsExtra', scope)
-    const input = qs('input[name="color"]', scope)
-    if (!toggle || !extra) return
-    const update = (expanded) => {
-      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false')
-      extra.classList.toggle('is-collapsed', !expanded)
-      toggle.textContent = expanded ? 'Скрыть цвета' : 'Другие цвета'
-    }
-    if (!toggle.dataset.bound) {
+    const toggles = qsa('[data-colors-toggle]', scope)
+    if (!toggles.length) return
+    toggles.forEach((toggle) => {
+      if (toggle.dataset.bound) return
+      const targetId = toggle.dataset.target || ''
+      const extra = targetId ? qs(`#${targetId}`, scope) : null
+      if (!extra) return
+      const input = qs('input[name="color"]', scope)
+      const update = (expanded) => {
+        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false')
+        extra.classList.toggle('is-collapsed', !expanded)
+        toggle.textContent = expanded ? 'Скрыть цвета' : 'Другие цвета'
+      }
       toggle.addEventListener('click', () => {
         const expanded = toggle.getAttribute('aria-expanded') === 'true'
         update(!expanded)
       })
       toggle.dataset.bound = '1'
-    }
-    if (input?.value) {
-      const hasInExtra = extra.querySelector(`.color-chip[data-color="${input.value}"]`)
-      if (hasInExtra) {
-        update(true)
-        return
+      if (input?.value) {
+        const hasInExtra = extra.querySelector(`.color-chip[data-color="${input.value}"]`)
+        if (hasInExtra) {
+          update(true)
+          return
+        }
       }
-    }
-    update(false)
+      update(false)
+    })
   }
 
   function syncRegMonthState(scope) {
@@ -345,7 +348,7 @@
       kr_type: null,
       interior_color: null,
       interior_material: null,
-      air_suspension: null,
+      air_suspension: 'Пневмоподвеска',
       reg_year_min: null,
       reg_month_min: null,
       reg_year_max: null,
@@ -676,7 +679,13 @@
         card.className = 'car-card'
         const images = Array.isArray(car.images) && car.images.length ? car.images : (car.thumbnail_url ? [car.thumbnail_url] : [])
         const thumbSrc = images[0] || ''
-        const navControls = ''
+        const hasGallery = images.length > 1
+        const navControls = hasGallery
+          ? `
+            <button class="thumb-nav thumb-nav--prev" type="button" data-thumb-prev aria-label="Предыдущее фото">‹</button>
+            <button class="thumb-nav thumb-nav--next" type="button" data-thumb-next aria-label="Следующее фото">›</button>
+          `
+          : ''
         const more = (car.images_count && car.images_count > 1 && car.thumbnail_url) ? `<span class="more-badge">+${car.images_count - 1} фото</span>` : ''
         const gross = car.pricing?.gross_eur
         const net = car.pricing?.net_eur
@@ -802,7 +811,31 @@
             if (wrap) wrap.classList.remove('thumb-loading')
           })
         }
-        // gallery arrows removed for stability in catalog
+        if (hasGallery && img) {
+          let index = 0
+          const updateThumb = () => {
+            const nextSrc = images[index] || ''
+            if (!nextSrc) return
+            img.src = nextSrc
+            img.srcset = `${nextSrc} 1x`
+          }
+          const onNav = (delta) => {
+            index = (index + delta + images.length) % images.length
+            updateThumb()
+          }
+          const prev = card.querySelector('[data-thumb-prev]')
+          const next = card.querySelector('[data-thumb-next]')
+          const bindNav = (btn, delta) => {
+            if (!btn) return
+            btn.addEventListener('click', (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onNav(delta)
+            })
+          }
+          bindNav(prev, -1)
+          bindNav(next, 1)
+        }
         cards.appendChild(card)
       }
       bindFavoriteButtons(cards)
@@ -1176,7 +1209,7 @@
     function buildHomeParams(withPaging = false) {
       const data = new FormData(form)
       const params = new URLSearchParams()
-      const numericKeys = ['price_min', 'price_max', 'mileage_min', 'mileage_max']
+      const numericKeys = ['price_max', 'mileage_max']
       const skipKeys = ['region_extra']
       let regionVal = ''
       for (const [k, v] of data.entries()) {

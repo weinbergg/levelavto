@@ -40,6 +40,19 @@ def main() -> None:
             print("Available sources:", ", ".join(keys))
             return
 
+        totals_by_source = db.execute(
+            select(Source.key, func.count())
+            .select_from(Car)
+            .join(Source, Car.source_id == Source.id)
+            .group_by(Source.key)
+            .order_by(func.count().desc())
+        ).all()
+        if totals_by_source:
+            print("Totals by source:")
+            for key, cnt in totals_by_source:
+                print(f"  {key}: {cnt}")
+            print("")
+
         total = db.execute(
             select(func.count()).select_from(Car).where(Car.source_id == src.id)
         ).scalar_one()
@@ -81,6 +94,30 @@ def main() -> None:
         print(f"cars_without_thumbnail={no_thumb}")
         print(f"car_images_total={image_total}")
         print(f"cars_with_images={cars_with_images}")
+
+        top_countries = db.execute(
+            select(Car.country, func.count())
+            .where(and_(Car.source_id == src.id, Car.country.is_not(None)))
+            .group_by(Car.country)
+            .order_by(func.count().desc())
+            .limit(20)
+        ).all()
+        if top_countries:
+            print("\nTop countries:")
+            for code, cnt in top_countries:
+                print(f"  {code}: {cnt}")
+
+        top_brands = db.execute(
+            select(Car.brand, func.count())
+            .where(and_(Car.source_id == src.id, Car.brand.is_not(None)))
+            .group_by(Car.brand)
+            .order_by(func.count().desc())
+            .limit(30)
+        ).all()
+        if top_brands:
+            print("\nTop brands:")
+            for brand, cnt in top_brands:
+                print(f"  {brand}: {cnt}")
 
         brands_check = _parse_brand_list(args.brands)
         if brands_check:

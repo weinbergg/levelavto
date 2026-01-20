@@ -175,6 +175,7 @@ class CarsService:
         climatisation: Optional[str] = None,
         airbags: Optional[str] = None,
         interior_design: Optional[str] = None,
+        air_suspension: Optional[bool] = None,
         price_rating_label: Optional[str] = None,
         owners_count: Optional[str] = None,
         power_hp_min: Optional[float] = None,
@@ -369,6 +370,16 @@ class CarsService:
                 func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "interior_design")
                 == interior_design
             )
+        if air_suspension:
+            payload_text = func.lower(cast(Car.source_payload, String))
+            conditions.append(
+                or_(
+                    payload_text.like("%air suspension%"),
+                    payload_text.like("%air_suspension%"),
+                    payload_text.like("%pneum%"),
+                    payload_text.like("%пневмо%"),
+                )
+            )
         if price_rating_label:
             conditions.append(
                 func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "price_rating_label")
@@ -507,6 +518,7 @@ class CarsService:
             climatisation,
             airbags,
             interior_design,
+            air_suspension,
             price_rating_label,
             owners_count,
             condition,
@@ -557,10 +569,14 @@ class CarsService:
             # default: цена сначала дешевые
             order_clause = [Car.price_rub_cached.asc().nullslast(), Car.id.desc()]
 
+        thumb_rank = case(
+            (and_(Car.thumbnail_url.is_not(None), Car.thumbnail_url != ""), 1),
+            else_=0,
+        ).desc()
         stmt = (
             select(Car)
             .where(where_expr)
-            .order_by(*order_clause)
+            .order_by(thumb_rank, *order_clause)
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
@@ -1038,23 +1054,42 @@ class CarsService:
             .group_by(Car.color)
         )
         rows = self.db.execute(stmt).all()
-        agg: Dict[str, Dict[str, Any]] = {}
+        basic: Dict[str, Dict[str, Any]] = {}
+        other: Dict[str, Dict[str, Any]] = {}
         for color, cnt in rows:
             if not color:
                 continue
-            norm = normalize_color(color)
-            if not norm or not is_color_base(norm):
+            raw = str(color).strip()
+            if not raw:
                 continue
-            label = ru_color(norm) or display_color(norm) or ru_color(color) or display_color(color) or color
-            if norm not in agg:
-                agg[norm] = {
-                    "value": norm,
-                    "label": label,
-                    "count": 0,
-                    "hex": color_hex(norm),
-                }
-            agg[norm]["count"] += int(cnt)
-        return sorted(agg.values(), key=lambda x: x["count"], reverse=True)
+            norm = normalize_color(raw) or raw.lower()
+            if is_color_base(norm):
+                entry = basic.get(norm)
+                if not entry:
+                    label = ru_color(norm) or display_color(norm) or raw
+                    entry = {
+                        "value": norm,
+                        "label": label,
+                        "count": 0,
+                        "hex": color_hex(norm),
+                    }
+                    basic[norm] = entry
+                entry["count"] += int(cnt)
+            if raw.lower() != norm:
+                key = raw.lower()
+                entry = other.get(key)
+                if not entry:
+                    label = ru_color(raw) or display_color(raw) or raw
+                    entry = {
+                        "value": raw,
+                        "label": label,
+                        "count": 0,
+                        "hex": color_hex(norm),
+                    }
+                    other[key] = entry
+                entry["count"] += int(cnt)
+        ordered = list(basic.values()) + sorted(other.values(), key=lambda x: x["count"], reverse=True)
+        return ordered
 
     def highlighted_cars(self, limit: int = 8) -> List[Car]:
         # для обратной совместимости используем рекомендованные

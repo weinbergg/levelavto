@@ -32,6 +32,20 @@
         {% set params = request.query_params %}
         <div class="filter-grid filter-grid--overlay filter-grid--compact">
           <div class="field">
+            <label for="home-region">Регион</label>
+            <select id="home-region" name="region">
+              <option value="">Все регионы</option>
+              <option value="EU" {% if params.get('region') == 'EU' %}selected{% endif %}>Европа</option>
+              <option value="KR" {% if params.get('region') == 'KR' %}selected{% endif %}>Корея</option>
+            </select>
+          </div>
+          <div class="field field--dynamic" id="home-region-slot">
+            <label id="home-region-slot-label">Страна / Тип</label>
+            <select id="home-region-slot-select" disabled>
+              <option value="">—</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="home-brand">Марка</label>
             <select id="home-brand" name="brand">
               <option value="">Все</option>
@@ -47,41 +61,15 @@
             </select>
           </div>
           <div class="field">
-            <label for="home-region">Регион</label>
-            <select id="home-region" name="region">
-              <option value="">Все регионы</option>
-              <option value="EU" {% if params.get('region') == 'EU' %}selected{% endif %}>Европа</option>
-              <option value="KR" {% if params.get('region') == 'KR' %}selected{% endif %}>Корея</option>
-            </select>
-          </div>
-          <div class="field field--dynamic" id="home-region-slot">
-            <label id="home-region-slot-label">Страна / Тип</label>
-            <select id="home-region-slot-select" disabled>
-              <option value="">—</option>
-            </select>
-          </div>
-          <div class="field field--range">
-            <label for="home-price-min">Цена, ₽</label>
-            <div class="field-range__inputs">
-              <input
-                id="home-price-min"
-                name="price_min"
-                type="number"
-                inputmode="numeric"
-                min="0"
-                step="1000"
-                placeholder="от"
-              />
-              <input
-                id="home-price-max"
-                name="price_max"
-                type="number"
-                inputmode="numeric"
-                min="0"
-                step="1000"
-                placeholder="до"
-              />
-            </div>
+            <label for="home-price-max">Цена до, ₽</label>
+            <input
+              id="home-price-max"
+              name="price_max"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1000"
+            />
           </div>
           <div class="field">
             <label for="home-mileage-max">Пробег до, км</label>
@@ -105,15 +93,6 @@
             </select>
           </div>
           {% endif %}
-          <div class="field">
-            <label for="home-reg-year">Поставлен на учёт с</label>
-            <select id="home-reg-year" name="reg_year_min">
-              <option value="">Не важно</option>
-              {% for y in reg_years %}
-              <option value="{{ y }}">{{ y }}</option>
-              {% endfor %}
-            </select>
-          </div>
         </div>
         <div class="inline-actions">
           <button type="submit" class="btn btn-primary" id="home-submit">

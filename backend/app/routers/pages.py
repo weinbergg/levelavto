@@ -105,7 +105,7 @@ def _build_filter_context(service: CarsService, db: Session, include_payload: bo
     eu_countries = service.available_eu_countries()
     eu_source_ids = service.source_ids_for_region("EU")
     kr_source_ids = service.source_ids_for_region("KR")
-    has_air_suspension = service.has_air_suspension() if include_payload else False
+    has_air_suspension = service.has_air_suspension()
     reg_years = (
         db.execute(
             select(func.distinct(Car.registration_year))

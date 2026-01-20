@@ -109,6 +109,50 @@
               </select>
             </label>
             {% endif %}
+            {% if (colors_basic and colors_basic|length > 0) or (colors_other and colors_other|length > 0) %}
+            <label class="field--full">Цвет кузова
+              {% if colors_basic and colors_basic|length > 0 %}
+              <div class="color-swatches color-swatches--basic" data-color-chips>
+                {% for c in colors_basic %}
+                <button
+                  type="button"
+                  class="color-chip"
+                  data-color="{{ c.value }}"
+                  data-label="{{ c.label }}"
+                  title="{{ c.label }}"
+                  aria-label="{{ c.label }}"
+                  {% if c.hex %}style="--chip-color: {{ c.hex }}"{% endif %}
+                ></button>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% if colors_other and colors_other|length > 0 %}
+              <button
+                type="button"
+                class="btn btn-ghost btn-small color-toggle"
+                data-colors-toggle
+                data-target="colors-extra-catalog"
+                aria-expanded="false"
+              >
+                Другие цвета
+              </button>
+              <div class="color-swatches color-swatches-extra is-collapsed" id="colors-extra-catalog" data-color-chips>
+                {% for c in colors_other %}
+                <button
+                  type="button"
+                  class="color-chip"
+                  data-color="{{ c.value }}"
+                  data-label="{{ c.label }}"
+                  title="{{ c.label }}"
+                  aria-label="{{ c.label }}"
+                  {% if c.hex %}style="--chip-color: {{ c.hex }}"{% endif %}
+                ></button>
+                {% endfor %}
+              </div>
+              {% endif %}
+              <input type="hidden" name="color" value="{{ params.get('color','') }}">
+            </label>
+            {% endif %}
             {% if reg_years %}
             <label class="reg-range">Поставлен на учёт с / по
               <div class="reg-range__inputs">
@@ -171,6 +215,12 @@
                 <option value="{{ t.value }}" {% if params.get('drive_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
                 {% endfor %}
               </select>
+            </label>
+            {% endif %}
+            {% if has_air_suspension %}
+            <label class="field--checkbox">
+              <input type="checkbox" name="air_suspension" value="1" {% if params.get('air_suspension') %}checked{% endif %}>
+              <span>Пневмоподвеска</span>
             </label>
             {% endif %}
             <div class="filters-range">
