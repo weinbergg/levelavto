@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, and_, or_, case, cast, String
+from sqlalchemy import select, func, and_, or_, case, cast, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 import logging
 from cachetools import TTLCache
@@ -79,8 +79,14 @@ class CarsService:
         return self.db.execute(select(Source.id).where(or_(*conds))).scalars().all()
 
     def _source_ids_for_europe(self) -> List[int]:
+        key_expr = func.lower(Source.key)
         return self.db.execute(
-            select(Source.id).where(func.lower(Source.key).like(f"{self.EUROPE_SOURCE_PREFIX}%"))
+            select(Source.id).where(
+                or_(
+                    key_expr.like(f"%{self.EUROPE_SOURCE_PREFIX}%"),
+                    func.upper(Source.country).in_(self.EU_COUNTRIES),
+                )
+            )
         ).scalars().all()
 
     def available_eu_countries(self) -> List[str]:
@@ -121,6 +127,209 @@ class CarsService:
     _fx_cache: dict | None = None
     _fx_cache_ts: float | None = None
     _count_cache: TTLCache = TTLCache(maxsize=1024, ttl=120)
+
+    def _can_fast_count(
+        self,
+        *,
+        region: Optional[str],
+        country: Optional[str],
+        brand: Optional[str],
+        model: Optional[str],
+        lines: Optional[List[str]],
+        source_key: Optional[str | List[str]],
+        q: Optional[str],
+        generation: Optional[str],
+        color: Optional[str],
+        price_min: Optional[float],
+        price_max: Optional[float],
+        year_min: Optional[int],
+        year_max: Optional[int],
+        mileage_min: Optional[int],
+        mileage_max: Optional[int],
+        reg_year_min: Optional[int],
+        reg_month_min: Optional[int],
+        reg_year_max: Optional[int],
+        reg_month_max: Optional[int],
+        body_type: Optional[str],
+        engine_type: Optional[str],
+        transmission: Optional[str],
+        drive_type: Optional[str],
+        num_seats: Optional[str],
+        doors_count: Optional[str],
+        emission_class: Optional[str],
+        efficiency_class: Optional[str],
+        climatisation: Optional[str],
+        airbags: Optional[str],
+        interior_design: Optional[str],
+        air_suspension: Optional[bool],
+        price_rating_label: Optional[str],
+        owners_count: Optional[str],
+        power_hp_min: Optional[float],
+        power_hp_max: Optional[float],
+        engine_cc_min: Optional[int],
+        engine_cc_max: Optional[int],
+        condition: Optional[str],
+        kr_type: Optional[str],
+    ) -> bool:
+        if not region:
+            return False
+        if any(
+            [
+                lines,
+                source_key,
+                q,
+                generation,
+                color,
+                price_min,
+                price_max,
+                year_min,
+                year_max,
+                mileage_min,
+                mileage_max,
+                reg_year_min,
+                reg_month_min,
+                reg_year_max,
+                reg_month_max,
+                body_type,
+                engine_type,
+                transmission,
+                drive_type,
+                num_seats,
+                doors_count,
+                emission_class,
+                efficiency_class,
+                climatisation,
+                airbags,
+                interior_design,
+                air_suspension,
+                price_rating_label,
+                owners_count,
+                power_hp_min,
+                power_hp_max,
+                engine_cc_min,
+                engine_cc_max,
+                condition,
+                kr_type,
+            ]
+        ):
+            return False
+        return True
+
+    def _fast_count(
+        self,
+        *,
+        region: str,
+        country: Optional[str],
+        brand: Optional[str],
+        model: Optional[str],
+    ) -> Optional[int]:
+        region_norm = region.upper().strip()
+        if region_norm not in ("EU", "KR"):
+            return None
+        brand_norm = normalize_brand(brand).strip() if brand else None
+        model_norm = model.strip() if model else None
+        country_norm = normalize_country_code(country) if country else None
+        if country_norm == "EU":
+            country_norm = None
+        if country_norm == "KR" and region_norm != "KR":
+            return None
+        stmt = text(
+            """
+            SELECT COALESCE(SUM(total), 0) AS total
+            FROM car_counts
+            WHERE region = :region
+              AND (:country IS NULL OR country = :country)
+              AND (:brand IS NULL OR brand = :brand)
+              AND (:model IS NULL OR model = :model)
+            """
+        )
+        try:
+            row = self.db.execute(
+                stmt,
+                {
+                    "region": region_norm,
+                    "country": country_norm,
+                    "brand": brand_norm or None,
+                    "model": model_norm or None,
+                },
+            ).first()
+        except Exception:
+            self.logger.exception("fast_count_failed region=%s", region_norm)
+            return None
+        return int(row[0]) if row else None
+
+    def _facet_where(self, filters: Dict[str, Any], params: Dict[str, Any]) -> List[str]:
+        clauses = []
+        for key, col in filters.items():
+            val = params.get(key)
+            if val is None or val == "":
+                continue
+            clauses.append(f"{col} = :{key}")
+        return clauses
+
+    def facet_counts(self, *, field: str, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+        cols = {
+            "region": "region",
+            "country": "country",
+            "brand": "brand",
+            "model": "model",
+            "color": "color",
+            "engine_type": "engine_type",
+            "transmission": "transmission",
+            "body_type": "body_type",
+            "drive_type": "drive_type",
+            "price_bucket": "price_bucket",
+            "mileage_bucket": "mileage_bucket",
+            "reg_year": "reg_year",
+        }
+        if field not in cols:
+            return []
+
+        params: Dict[str, Any] = {}
+        filters_norm = {
+            "region": filters.get("region"),
+            "country": normalize_country_code(filters.get("country")) if filters.get("country") else None,
+            "brand": normalize_brand(filters.get("brand")).strip() if filters.get("brand") else None,
+            "model": filters.get("model"),
+            "color": filters.get("color"),
+            "engine_type": filters.get("engine_type"),
+            "transmission": filters.get("transmission"),
+            "body_type": filters.get("body_type"),
+            "drive_type": filters.get("drive_type"),
+            "price_bucket": filters.get("price_bucket"),
+            "mileage_bucket": filters.get("mileage_bucket"),
+            "reg_year": filters.get("reg_year"),
+        }
+        for k, v in filters_norm.items():
+            if v is not None and v != "":
+                params[k] = v
+
+        where_clauses = self._facet_where(cols, params)
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        order_sql = "count DESC, value"
+        if field == "reg_year":
+            order_sql = "value DESC"
+
+        query = text(
+            f"""
+            SELECT {cols[field]} AS value, SUM(total) AS count
+            FROM car_counts
+            {where_sql}
+            GROUP BY {cols[field]}
+            HAVING SUM(total) > 0
+            ORDER BY {order_sql}
+            """
+        )
+        rows = self.db.execute(query, params).all()
+        out = []
+        for value, count in rows:
+            if value is None or value == "":
+                continue
+            out.append({"value": value, "count": int(count)})
+        return out
 
     def get_fx_rates(self) -> dict | None:
         now = time.time()
@@ -187,7 +396,7 @@ class CarsService:
         page: int = 1,
         page_size: int = 20,
     ) -> Tuple[List[Car], int]:
-        conditions = [or_(Car.is_available.is_(True), Car.is_available.is_(None))]
+        conditions = [Car.is_available.is_(True)]
         if region and not country:
             if region.upper() == "KR":
                 country = "KR"
@@ -243,10 +452,10 @@ class CarsService:
                 conditions.append(or_(*conds))
             elif r == "EU":
                 eu_sources = self._source_ids_for_europe()
-                conds = [func.upper(Car.country).in_(self.EU_COUNTRIES)]
                 if eu_sources:
-                    conds.append(Car.source_id.in_(eu_sources))
-                conditions.append(or_(*conds))
+                    conditions.append(Car.source_id.in_(eu_sources))
+                else:
+                    conditions.append(func.upper(Car.country).in_(self.EU_COUNTRIES))
         if kr_type:
             kt_raw = str(kr_type).upper()
             kt = None
@@ -527,8 +736,57 @@ class CarsService:
         total = self._count_cache.get(count_key)
         total_t0 = time.perf_counter()
         if total is None:
-            total_stmt = select(func.count()).select_from(Car).where(where_expr)
-            total = self.db.execute(total_stmt).scalar_one()
+            total = None
+            if self._can_fast_count(
+                region=region,
+                country=country,
+                brand=brand,
+                model=model,
+                lines=lines,
+                source_key=source_key,
+                q=q,
+                generation=generation,
+                color=color,
+                price_min=price_min,
+                price_max=price_max,
+                year_min=year_min,
+                year_max=year_max,
+                mileage_min=mileage_min,
+                mileage_max=mileage_max,
+                reg_year_min=reg_year_min,
+                reg_month_min=reg_month_min,
+                reg_year_max=reg_year_max,
+                reg_month_max=reg_month_max,
+                body_type=body_type,
+                engine_type=engine_type,
+                transmission=transmission,
+                drive_type=drive_type,
+                num_seats=num_seats,
+                doors_count=doors_count,
+                emission_class=emission_class,
+                efficiency_class=efficiency_class,
+                climatisation=climatisation,
+                airbags=airbags,
+                interior_design=interior_design,
+                air_suspension=air_suspension,
+                price_rating_label=price_rating_label,
+                owners_count=owners_count,
+                power_hp_min=power_hp_min,
+                power_hp_max=power_hp_max,
+                engine_cc_min=engine_cc_min,
+                engine_cc_max=engine_cc_max,
+                condition=condition,
+                kr_type=kr_type,
+            ):
+                total = self._fast_count(
+                    region=region or "",
+                    country=country,
+                    brand=brand,
+                    model=model,
+                )
+            if total is None:
+                total_stmt = select(func.count()).select_from(Car).where(where_expr)
+                total = self.db.execute(total_stmt).scalar_one()
             self._count_cache[count_key] = total
             elapsed = time.perf_counter() - total_t0
             if elapsed > 2:
@@ -948,22 +1206,20 @@ class CarsService:
         entry = cache.get(key) if cache else None
         if entry and (datetime.utcnow().timestamp() - entry["ts"] < 300):
             return entry["data"]
-        variants = brand_variants(brand)
-        if not variants:
+        norm_brand = normalize_brand(brand).strip()
+        if not norm_brand:
             return []
-        norm_variants = [v.lower() for v in variants]
-        brand_field = func.lower(func.trim(Car.brand))
-        stmt = (
-            select(Car.model, func.count().label("count"))
-            .where(
-                Car.is_available.is_(True),
-                or_(*[brand_field == v for v in norm_variants]),
-                Car.model.is_not(None),
-            )
-            .group_by(Car.model)
-            .limit(200)
+        stmt = text(
+            """
+            SELECT model, SUM(total) AS count
+            FROM car_counts
+            WHERE brand = :brand AND model IS NOT NULL AND model <> ''
+            GROUP BY model
+            ORDER BY count DESC, model ASC
+            LIMIT 200
+            """
         )
-        rows = self.db.execute(stmt).all()
+        rows = self.db.execute(stmt, {"brand": norm_brand}).all()
         models = [{"model": r[0], "count": int(r[1])} for r in rows if r[0]]
 
         def sort_key(item: Dict[str, Any]):

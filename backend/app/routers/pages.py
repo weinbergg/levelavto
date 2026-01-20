@@ -100,22 +100,32 @@ def _sort_numeric_strings(values: List[str]) -> List[str]:
     return sorted(values, key=lambda v: (to_num(v), str(v)))
 
 
-def _build_filter_context(service: CarsService, db: Session, include_payload: bool = True) -> Dict[str, Any]:
+def _build_filter_context(
+    service: CarsService,
+    db: Session,
+    include_payload: bool = True,
+    params: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     regions = service.available_regions()
-    eu_countries = service.available_eu_countries()
+    params = params or {}
+    facet_filters = {
+        "region": params.get("region"),
+        "country": params.get("country"),
+        "brand": params.get("brand"),
+        "model": params.get("model"),
+        "color": (params.get("color") or "").lower() or None,
+        "engine_type": (params.get("engine_type") or "").lower() or None,
+        "transmission": (params.get("transmission") or "").lower() or None,
+        "body_type": (params.get("body_type") or "").lower() or None,
+        "drive_type": (params.get("drive_type") or "").lower() or None,
+        "reg_year": int(params["reg_year"]) if params.get("reg_year") else None,
+    }
+
+    eu_countries = [c["value"] for c in service.facet_counts(field="country", filters=facet_filters)]
     eu_source_ids = service.source_ids_for_region("EU")
     kr_source_ids = service.source_ids_for_region("KR")
     has_air_suspension = service.has_air_suspension()
-    reg_years = (
-        db.execute(
-            select(func.distinct(Car.registration_year))
-            .where(Car.is_available.is_(True), Car.registration_year.is_not(None))
-            .order_by(Car.registration_year.desc())
-        )
-        .scalars()
-        .all()
-    )
-    reg_years = [y for y in reg_years if y]
+    reg_years = [int(r["value"]) for r in service.facet_counts(field="reg_year", filters=facet_filters)]
     reg_months = (
         [{"value": i + 1, "label": MONTHS_RU[i]} for i in range(12)]
         if reg_years
@@ -135,15 +145,25 @@ def _build_filter_context(service: CarsService, db: Session, include_payload: bo
         .all()
     )
     generations = [g for g in generations if g]
-    colors = service.colors()
+    colors = service.facet_counts(field="color", filters=facet_filters)
+    colors = [
+        {
+            "value": c["value"],
+            "label": ru_color(c["value"]) or display_color(c["value"]) or c["value"],
+            "hex": color_hex(c["value"]),
+            "count": c["count"],
+        }
+        for c in colors
+        if c.get("value")
+    ]
     basic_set = set(BASIC_COLORS)
     basic_by_value = {c["value"]: c for c in colors if c.get("value") in basic_set}
     colors_basic = [basic_by_value[c] for c in BASIC_COLORS if c in basic_by_value]
     colors_other = [c for c in colors if c.get("value") not in basic_set]
     countries_sorted = sorted(eu_countries)
     body_types = []
-    for row in service.body_type_stats():
-        val = row.get("body_type")
+    for row in service.facet_counts(field="body_type", filters=facet_filters):
+        val = row.get("value")
         if not val:
             continue
         label = ru_body(val) or display_body(val) or val
@@ -237,9 +257,22 @@ def _build_filter_context(service: CarsService, db: Session, include_payload: bo
         "colors_basic": colors_basic,
         "colors_other": colors_other,
         "body_types": body_types,
-        "engine_types": service.engine_types(),
-        "transmissions": service.transmission_options(),
-        "drive_types": service.drive_types(),
+        "brands": [
+            {"brand": b["value"], "count": b["count"]}
+            for b in service.facet_counts(field="brand", filters=facet_filters)
+        ],
+        "engine_types": [
+            {"value": v["value"], "label": ru_fuel(v["value"]) or v["value"], "count": v["count"]}
+            for v in service.facet_counts(field="engine_type", filters=facet_filters)
+        ],
+        "transmissions": [
+            {"value": v["value"], "label": ru_transmission(v["value"]) or v["value"], "count": v["count"]}
+            for v in service.facet_counts(field="transmission", filters=facet_filters)
+        ],
+        "drive_types": [
+            {"value": v["value"], "label": v["value"], "count": v["count"]}
+            for v in service.facet_counts(field="drive_type", filters=facet_filters)
+        ],
         "seats_options": seats_options,
         "doors_options": doors_options,
         "owners_options": owners_options,
@@ -409,7 +442,7 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
             )
             seen.add(b["brand"])
 
-    filter_ctx = _build_filter_context(service, db, include_payload=False)
+    filter_ctx = _build_filter_context(service, db, include_payload=False, params={})
     country_labels = filter_ctx.get("country_labels") or {}
     countries_list = filter_ctx.get("countries") or []
     countries_with_labels = [
@@ -420,7 +453,7 @@ def _home_context(request: Request, service: CarsService, db: Session, extra: Op
         "request": request,
         "user": getattr(request.state, "user", None),
         "total_cars": service.total_cars(),
-        "brands": service.brands(),
+        "brands": filter_ctx["brands"],
         "regions": filter_ctx["regions"],
         "countries": countries_list,
         "countries_labeled": countries_with_labels,
@@ -526,8 +559,7 @@ def submit_lead(
 def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
     templates = request.app.state.templates
     service = CarsService(db)
-    brands = service.brands()
-    filter_ctx = _build_filter_context(service, db, include_payload=False)
+    filter_ctx = _build_filter_context(service, db, include_payload=False, params=dict(request.query_params))
     contact_content = ContentService(db).content_map(
         [
             "contact_phone",
@@ -543,7 +575,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         {
             "request": request,
             "user": getattr(request.state, "user", None),
-            "brands": brands,
+            "brands": filter_ctx["brands"],
             "regions": filter_ctx["regions"],
             "countries": filter_ctx["countries"],
             "country_labels": filter_ctx["country_labels"],
@@ -576,7 +608,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
 def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
     templates = request.app.state.templates
     service = CarsService(db)
-    filter_ctx = _build_filter_context(service, db, include_payload=True)
+    filter_ctx = _build_filter_context(service, db, include_payload=True, params=dict(request.query_params))
     contact_content = ContentService(db).content_map(
         [
             "contact_phone",
@@ -592,7 +624,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "request": request,
             "user": getattr(request.state, "user", None),
             "total_cars": service.total_cars(),
-            "brands": service.brands(),
+            "brands": filter_ctx["brands"],
             "regions": filter_ctx["regions"],
             "countries": filter_ctx["countries"],
             "country_labels": filter_ctx["country_labels"],
