@@ -24,6 +24,7 @@ from ..utils.taxonomy import (
     ru_transmission,
     normalize_fuel,
     normalize_color as _normalize_color,
+    color_hex,
 )
 normalize_color = _normalize_color
 from ..utils.country_map import country_label_ru, resolve_display_country

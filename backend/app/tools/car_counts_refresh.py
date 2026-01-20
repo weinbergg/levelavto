@@ -15,7 +15,7 @@ from ..db import SessionLocal
 
 EU_COUNTRIES = CarsService.EU_COUNTRIES
 
-KOREA_HINTS = ["emavto", "m-auto", "korea", "kor", "kr"]
+KOREA_HINTS = ["emavto", "m-auto", "encar"]
 
 
 def _source_ids_for_europe(db: Session) -> list[int]:
@@ -29,6 +29,11 @@ def _source_ids_for_europe(db: Session) -> list[int]:
 
 
 def _source_ids_for_korea(db: Session) -> list[int]:
+    # Prefer explicit country=KR if set, fallback to key hints.
+    stmt = select(Source.id).where(func.upper(Source.country) == "KR")
+    ids = [r[0] for r in db.execute(stmt).all()]
+    if ids:
+        return ids
     conds = [func.lower(Source.key).like(f"%{hint}%") for hint in KOREA_HINTS]
     stmt = select(Source.id).where(or_(*conds))
     return [r[0] for r in db.execute(stmt).all()]
