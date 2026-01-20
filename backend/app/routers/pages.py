@@ -259,8 +259,9 @@ def _build_filter_context(
         "colors_other": colors_other,
         "body_types": body_types,
         "brands": [
-            {"brand": b["value"], "count": b["count"]}
+            b["value"]
             for b in service.facet_counts(field="brand", filters=facet_filters)
+            if b.get("value")
         ],
         "engine_types": [
             {"value": v["value"], "label": ru_fuel(v["value"]) or v["value"], "count": v["count"]}
