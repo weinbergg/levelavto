@@ -187,7 +187,7 @@ class CarsService:
         page: int = 1,
         page_size: int = 20,
     ) -> Tuple[List[Car], int]:
-        conditions = [Car.is_available.is_(True)]
+        conditions = [or_(Car.is_available.is_(True), Car.is_available.is_(None))]
         if region and not country:
             if region.upper() == "KR":
                 country = "KR"
