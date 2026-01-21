@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from sqlalchemy import String, Integer, Numeric, Boolean, ForeignKey, UniqueConstraint, Text, JSON
+from sqlalchemy import String, Integer, Numeric, Boolean, ForeignKey, UniqueConstraint, Text, JSON, Computed, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .source import Base
 
@@ -26,8 +26,19 @@ class Car(Base):
     currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     price_rub_cached: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True, index=True)
     total_price_rub_cached: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
-    listing_sort_ts: Mapped[datetime | None] = mapped_column(nullable=True)
-    reg_sort_key: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    listing_sort_ts: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True),
+        Computed("COALESCE(listing_date, updated_at, created_at)", persisted=True),
+        nullable=True,
+    )
+    reg_sort_key: Mapped[int | None] = mapped_column(
+        Integer,
+        Computed(
+            "(COALESCE(registration_year, year, 0) * 12) + COALESCE(registration_month, 1)",
+            persisted=True,
+        ),
+        nullable=True,
+    )
     kr_market_type: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     registration_year: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     registration_month: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)

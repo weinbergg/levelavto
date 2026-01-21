@@ -175,6 +175,7 @@ class ParserRunner:
         search_profile_ids: Optional[List[int]],
         mode: Optional[str],
     ) -> Dict[str, int]:
+        print(f"[parser] start source={site_cfg.key} mode={mode or 'default'}")
         data_service = ParsingDataService(db)
         source = data_service.ensure_source(
             key=site_cfg.key, name=site_cfg.name, country=site_cfg.country, base_url=site_cfg.base_search_url
@@ -237,6 +238,9 @@ class ParserRunner:
         )
         db.add(prs)
         db.commit()
+        print(
+            f"[parser] done source={site_cfg.key} seen={total_seen} ins={inserted} upd={updated} deact={deactivated}"
+        )
         return {
             "total_seen": total_seen,
             "inserted": inserted,

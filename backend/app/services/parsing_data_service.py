@@ -60,25 +60,27 @@ class ParsingDataService:
         for p in parsed_items:
             payload = dict(p)
             payload.pop("source_key", None)
+            payload.pop("listing_sort_ts", None)
+            payload.pop("reg_sort_key", None)
             payload.setdefault("country", source.country)
             payload.setdefault("thumbnail_url", None)
             payload.setdefault("is_available", True)
-        # normalize KR market type
-        if payload.get("country") == "KR":
-            if not payload.get("kr_market_type"):
-                payload["kr_market_type"] = "domestic"
-            listing_val = payload.get("listing_date")
-            ts = None
-            if isinstance(listing_val, str):
-                try:
-                    ts = datetime.fromisoformat(listing_val)
-                except Exception:
-                    ts = None
-            elif isinstance(listing_val, datetime):
-                ts = listing_val
-            if ts is None:
-                ts = now
-            payload["listing_date"] = ts
+            # normalize KR market type
+            if payload.get("country") == "KR":
+                if not payload.get("kr_market_type"):
+                    payload["kr_market_type"] = "domestic"
+                listing_val = payload.get("listing_date")
+                ts = None
+                if isinstance(listing_val, str):
+                    try:
+                        ts = datetime.fromisoformat(listing_val)
+                    except Exception:
+                        ts = None
+                elif isinstance(listing_val, datetime):
+                    ts = listing_val
+                if ts is None:
+                    ts = now
+                payload["listing_date"] = ts
             rub = to_rub(payload.get("price"), payload.get("currency"), rates)
             if rub is not None:
                 payload["price_rub_cached"] = round(rub, 2)
