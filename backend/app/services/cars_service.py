@@ -171,8 +171,6 @@ class CarsService:
         condition: Optional[str],
         kr_type: Optional[str],
     ) -> bool:
-        if not region:
-            return False
         if any(
             [
                 lines,
@@ -223,21 +221,21 @@ class CarsService:
         brand: Optional[str],
         model: Optional[str],
     ) -> Optional[int]:
-        region_norm = region.upper().strip()
-        if region_norm not in ("EU", "KR"):
+        region_norm = region.upper().strip() if region else None
+        if region_norm not in ("EU", "KR", None):
             return None
         brand_norm = normalize_brand(brand).strip() if brand else None
         model_norm = model.strip() if model else None
         country_norm = normalize_country_code(country) if country else None
         if country_norm == "EU":
             country_norm = None
-        if country_norm == "KR" and region_norm != "KR":
+        if country_norm == "KR" and region_norm not in (None, "KR"):
             return None
         stmt = text(
             """
             SELECT COALESCE(SUM(total), 0) AS total
             FROM car_counts
-            WHERE region = :region
+            WHERE (:region IS NULL OR region = :region)
               AND (:country IS NULL OR country = :country)
               AND (:brand IS NULL OR brand = :brand)
               AND (:model IS NULL OR model = :model)

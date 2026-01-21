@@ -75,13 +75,15 @@ def _mileage_bucket_expr() -> Any:
 def refresh_counts(db: Session) -> int:
     eu_ids = _source_ids_for_europe(db)
     kr_ids = _source_ids_for_korea(db)
+    kr_cond = or_(Car.source_id.in_(kr_ids), func.upper(Car.country).like("KR%"))
     region_case = case(
         (Car.source_id.in_(eu_ids), "EU"),
-        (
-            or_(Car.source_id.in_(kr_ids), func.upper(Car.country).like("KR%")),
-            "KR",
-        ),
+        (kr_cond, "KR"),
         else_="EU",
+    )
+    country_case = case(
+        (kr_cond, "KR"),
+        else_=func.upper(Car.country),
     )
 
     reg_year_expr = func.coalesce(Car.registration_year, Car.year).cast(Integer)
@@ -96,7 +98,7 @@ def refresh_counts(db: Session) -> int:
     stmt = (
         select(
             region_case.label("region"),
-            func.upper(Car.country).label("country"),
+            country_case.label("country"),
             Car.brand,
             Car.model,
             color_expr.label("color"),
@@ -112,7 +114,7 @@ def refresh_counts(db: Session) -> int:
         .where(Car.is_available.is_(True))
         .group_by(
             region_case,
-            func.upper(Car.country),
+            country_case,
             Car.brand,
             Car.model,
             color_expr,
