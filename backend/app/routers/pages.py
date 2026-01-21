@@ -125,7 +125,7 @@ def _build_filter_context(
     eu_countries = [c["value"] for c in service.facet_counts(field="country", filters=facet_filters)]
     eu_source_ids = service.source_ids_for_region("EU")
     kr_source_ids = service.source_ids_for_region("KR")
-    has_air_suspension = service.has_air_suspension()
+    has_air_suspension = False
     reg_years = [int(r["value"]) for r in service.facet_counts(field="reg_year", filters=facet_filters)]
     reg_months = (
         [{"value": i + 1, "label": MONTHS_RU[i]} for i in range(12)]

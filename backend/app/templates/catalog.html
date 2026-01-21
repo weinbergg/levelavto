@@ -217,12 +217,6 @@
               </select>
             </label>
             {% endif %}
-            {% if has_air_suspension %}
-            <label class="field--checkbox">
-              <input type="checkbox" name="air_suspension" value="1" {% if params.get('air_suspension') %}checked{% endif %}>
-              <span>Пневмоподвеска</span>
-            </label>
-            {% endif %}
             <div class="filters-range">
               <label>Мощность от, л.с
                 <input type="number" name="power_hp_min" inputmode="numeric" min="0" step="10" value="{{ params.get('power_hp_min','') }}">

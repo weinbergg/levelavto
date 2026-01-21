@@ -112,18 +112,17 @@ def format_status() -> str:
     try:
         pcs = ParserControlService(db)
         runs = pcs.list_recent_parser_runs(limit=1)
-        run_info = "Нет запусков"
+        run_info = "Emavto: нет запусков"
         if runs:
             r = runs[0]
-            run_info = (
-                f"Run #{r.id} status={r.status} "
-                f"seen={r.total_seen} ins={r.inserted} upd={r.updated} "
-                f"started={r.started_at} finished={r.finished_at}"
-            )
+            state = "в работе" if r.status == "running" or r.finished_at is None else "завершен"
+            run_info = f"Emavto: {state} (run #{r.id})"
         ds = ParsingDataService(db)
         progress = ds.get_progress("emavto_klg.last_page_full")
-        progress_line = f"last_page_full={progress or '—'}"
-        return f"{run_info}\n{progress_line}"
+        progress_line = f"Emavto last_page_full: {progress or '—'}"
+        mobile = summarize_job("mobilede")
+        emavto = summarize_job("emavto")
+        return "\n\n".join([mobile, emavto, run_info, progress_line])
     finally:
         db.close()
 

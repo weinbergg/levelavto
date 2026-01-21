@@ -2495,6 +2495,7 @@ input[type="number"]::-webkit-outer-spin-button {
 /* detail page */
 .car-detail-page {
   padding: 32px 0 60px;
+  overflow-x: hidden;
 }
 .detail-hero {
   display: grid;
@@ -2587,6 +2588,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .detail-info {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 .detail-heading h1 {
   margin: 4px 0 4px;
@@ -2739,6 +2741,26 @@ input[type="number"]::-webkit-outer-spin-button {
   border-radius: 14px;
 }
 
+@media (max-width: 720px) {
+  .detail-specs,
+  .detail-calc__line {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .detail-specs,
+  .detail-calc__line {
+    -webkit-overflow-scrolling: touch;
+  }
+  .detail-state,
+  .detail-options {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 600px;
+  }
+  .detail-actions .cta-lead {
+    min-width: 0;
+    width: 100%;
+  }
+}
 @media (max-width: 960px) {
   .detail-hero {
     grid-template-columns: 1fr;

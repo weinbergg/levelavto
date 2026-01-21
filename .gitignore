@@ -27,6 +27,7 @@ backend/app/static/img/legacy/
 
 # local ops notes
 ops_cheatsheet.md
+ops_runtime_instructions.md
 
 # node/bundle (if any)
 node_modules/
@@ -44,5 +45,4 @@ htmlcov/
 .cursor/
 .env.local
 *.dump
-
 

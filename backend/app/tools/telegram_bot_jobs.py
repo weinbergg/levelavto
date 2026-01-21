@@ -45,9 +45,9 @@ def format_status(job: str, data: Optional[dict]) -> str:
     if not stats and isinstance(data.get("stats"), dict):
         stats = data.get("stats", {})
     files = data.get("files", {})
+    label = JOB_LABELS.get(job, job)
     parts = [
-        f"{JOB_LABELS.get(job, job)}",
-        f"Статус: {'✅' if status == 'ok' else '❌'} ({status})",
+        f"{label}: {'✅' if status == 'ok' else '❌'} {status}",
         f"Длительность: {dur}s",
     ]
     if files:
@@ -60,12 +60,12 @@ def format_status(job: str, data: Optional[dict]) -> str:
         if processed is not None and inserted is not None and updated is not None:
             skipped = max(0, int(processed) - int(inserted) - int(updated))
         parts.append(
-            "processed={processed}, inserted={inserted}, updated={updated}, deactivated={deactivated}, no_photo={no_photo}".format(
-                processed=stats.get("cars_total_processed"),
-                inserted=stats.get("cars_inserted"),
-                updated=stats.get("cars_updated"),
-                deactivated=stats.get("cars_deactivated"),
-                no_photo=stats.get("cars_without_photos"),
+            "Всего: {processed}, добавлено: {ins}, обновлено: {upd}, снято: {deact}, без фото: {no_photo}".format(
+                processed=stats.get("cars_total_processed", "—"),
+                ins=stats.get("cars_inserted", "—"),
+                upd=stats.get("cars_updated", "—"),
+                deact=stats.get("cars_deactivated", "—"),
+                no_photo=stats.get("cars_without_photos", "—"),
             )
         )
         parts.append(

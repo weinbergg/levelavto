@@ -15,6 +15,27 @@ RESULT_FILE="$LOG_DIR/emavto_last.json"
 STATUS="ok"
 ERR=""
 
+cat >"$RESULT_FILE" <<EOF
+{
+  "job": "emavto",
+  "started_at": "${START_TS}",
+  "finished_at": null,
+  "duration_sec": 0,
+  "status": "running",
+  "stats": {
+    "cars_total_processed": null,
+    "cars_inserted": null,
+    "cars_updated": null,
+    "cars_skipped": null,
+    "cars_deactivated": null,
+    "cars_without_photos": null
+  },
+  "errors": []
+}
+EOF
+
+python -m backend.app.tools.notify_tg --job emavto --result "$RESULT_FILE" || true
+
 {
   echo "[emavto] start ${START_TS}"
   bash scripts/nightly_emavto.sh
@@ -42,5 +63,7 @@ cat >"$RESULT_FILE" <<EOF
   "errors": []
 }
 EOF
+
+python -m backend.app.tools.notify_tg --job emavto --result "$RESULT_FILE" || true
 
 echo "[emavto] done status=${STATUS} duration=${DUR}s"

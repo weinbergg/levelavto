@@ -55,4 +55,5 @@ fi
 # Import without deactivation (skip missing)
 echo "[fetch-mobilede] importing..."
 docker compose exec "$WEB" python -m backend.app.tools.mobilede_csv_import --file backend/app/imports/mobilede_active_offers.csv --skip-deactivate --stats-file backend/app/runtime/jobs/mobilede_last.json
+python -m backend.app.tools.notify_tg --job mobilede --result backend/app/runtime/jobs/mobilede_last.json || true
 echo "[fetch-mobilede] done"

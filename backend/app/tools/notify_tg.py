@@ -18,20 +18,20 @@ def format_message(job: str, data: dict) -> str:
     stats = data.get("stats", {})
     files = data.get("files", {})
     parts = [
-        f"Job: {job}",
-        f"Статус: {'✅' if status == 'ok' else '❌'} ({status})",
+        f"{job}: {'✅' if status == 'ok' else '❌'} {status}",
         f"Длительность: {dur}s",
     ]
     if files:
         parts.append(f"Файл: {files.get('csv_date','')}")
     if stats:
         parts.append(
-            "Статистика: "
-            f"processed={stats.get('cars_total_processed')}, "
-            f"inserted={stats.get('cars_inserted')}, "
-            f"updated={stats.get('cars_updated')}, "
-            f"deactivated={stats.get('cars_deactivated')}, "
-            f"no_photos={stats.get('cars_without_photos')}"
+            "Всего: {processed}, добавлено: {ins}, обновлено: {upd}, снято: {deact}, без фото: {no_photo}".format(
+                processed=stats.get("cars_total_processed", "—"),
+                ins=stats.get("cars_inserted", "—"),
+                upd=stats.get("cars_updated", "—"),
+                deact=stats.get("cars_deactivated", "—"),
+                no_photo=stats.get("cars_without_photos", "—"),
+            )
         )
     if data.get("errors"):
         parts.append("Ошибки:\n" + "\n".join(data["errors"]))
