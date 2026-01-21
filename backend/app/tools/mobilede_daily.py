@@ -46,7 +46,12 @@ def download_file(for_date: dt.date, dest: Path) -> None:
                     f.write(chunk)
 
 
-def run_import(file_path: Path, trigger: str = "auto-daily", limit: int | None = None) -> None:
+def run_import(
+    file_path: Path,
+    trigger: str = "auto-daily",
+    limit: int | None = None,
+    allow_deactivate: bool = False,
+) -> None:
     cmd = [
         sys.executable,
         "-m",
@@ -56,6 +61,8 @@ def run_import(file_path: Path, trigger: str = "auto-daily", limit: int | None =
         "--trigger",
         trigger,
     ]
+    if not allow_deactivate:
+        cmd.append("--skip-deactivate")
     if limit:
         cmd += ["--limit", str(limit)]
     subprocess.run(cmd, check=True)
@@ -112,6 +119,11 @@ def main() -> None:
                     help="Optional limit for import (debug)")
     ap.add_argument("--skip-cache", action="store_true",
                     help="Skip price_rub_cached update")
+    ap.add_argument(
+        "--allow-deactivate",
+        action="store_true",
+        help="Allow deactivating missing cars (only for full/verified feeds)",
+    )
     args = ap.parse_args()
 
     if args.date:
@@ -124,7 +136,7 @@ def main() -> None:
     rotate_backups(DOWNLOAD_DIR, keep=args.keep)
 
     if not args.skip_import:
-        run_import(target, trigger="auto-daily", limit=args.limit)
+        run_import(target, trigger="auto-daily", limit=args.limit, allow_deactivate=args.allow_deactivate)
         if not args.skip_cache:
             update_price_cache()
 

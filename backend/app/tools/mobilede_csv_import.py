@@ -89,7 +89,10 @@ def main() -> None:
 
         deactivated = 0
         if not args.skip_deactivate:
-            deactivated = service.deactivate_missing_by_last_seen(source, run.started_at)
+            if seen_total == 0:
+                print("Skip deactivation: zero rows imported (likely empty/failed feed).")
+            else:
+                deactivated = service.deactivate_missing_by_last_seen(source, run.started_at)
 
         # Record per-source stats
         prs = ParserRunSource(
