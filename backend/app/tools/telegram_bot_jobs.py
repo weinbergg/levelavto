@@ -26,9 +26,24 @@ def load_last(path: str) -> Optional[dict]:
 def format_status(job: str, data: Optional[dict]) -> str:
     if not data:
         return f"{JOB_LABELS.get(job, job)}: нет данных"
-    status = data.get("status", "unknown")
+    status = data.get("status")
     dur = data.get("duration_sec", 0)
     stats = data.get("stats", {})
+    if status is None:
+        # legacy mobilede_last.json shape
+        if any(k in data for k in ("seen", "inserted", "updated", "deactivated")):
+            status = "ok" if data.get("seen") else "unknown"
+            stats = {
+                "cars_total_processed": data.get("seen"),
+                "cars_inserted": data.get("inserted"),
+                "cars_updated": data.get("updated"),
+                "cars_deactivated": data.get("deactivated"),
+                "cars_without_photos": data.get("no_photo"),
+            }
+        else:
+            status = "unknown"
+    if not stats and isinstance(data.get("stats"), dict):
+        stats = data.get("stats", {})
     files = data.get("files", {})
     parts = [
         f"{JOB_LABELS.get(job, job)}",
