@@ -715,7 +715,10 @@ def main() -> None:
             return
         q = update.callback_query
         data = q.data
-        await q.answer()
+        try:
+            await q.answer()
+        except Exception:
+            pass
         if data == "status":
             await q.message.reply_text(format_status())
         elif data == "start_parse":

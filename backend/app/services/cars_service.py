@@ -733,6 +733,57 @@ class CarsService:
         )
         total = self._count_cache.get(count_key)
         total_t0 = time.perf_counter()
+        if total is not None:
+            if total == 0 and self._can_fast_count(
+                region=region,
+                country=country,
+                brand=brand,
+                model=model,
+                lines=lines,
+                source_key=source_key,
+                q=q,
+                generation=generation,
+                color=color,
+                price_min=price_min,
+                price_max=price_max,
+                year_min=year_min,
+                year_max=year_max,
+                mileage_min=mileage_min,
+                mileage_max=mileage_max,
+                reg_year_min=reg_year_min,
+                reg_month_min=reg_month_min,
+                reg_year_max=reg_year_max,
+                reg_month_max=reg_month_max,
+                body_type=body_type,
+                engine_type=engine_type,
+                transmission=transmission,
+                drive_type=drive_type,
+                num_seats=num_seats,
+                doors_count=doors_count,
+                emission_class=emission_class,
+                efficiency_class=efficiency_class,
+                climatisation=climatisation,
+                airbags=airbags,
+                interior_design=interior_design,
+                air_suspension=air_suspension,
+                price_rating_label=price_rating_label,
+                owners_count=owners_count,
+                power_hp_min=power_hp_min,
+                power_hp_max=power_hp_max,
+                engine_cc_min=engine_cc_min,
+                engine_cc_max=engine_cc_max,
+                condition=condition,
+                kr_type=kr_type,
+            ):
+                fast_total = self._fast_count(
+                    region=region or "",
+                    country=country,
+                    brand=brand,
+                    model=model,
+                )
+                if fast_total is not None and fast_total > 0:
+                    total = fast_total
+                    self._count_cache[count_key] = total
         if total is None:
             total = None
             if self._can_fast_count(
