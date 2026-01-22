@@ -46,8 +46,15 @@ def format_status(job: str, data: Optional[dict]) -> str:
         stats = data.get("stats", {})
     files = data.get("files", {})
     label = JOB_LABELS.get(job, job)
+    icon = "⚪"
+    if status == "ok":
+        icon = "✅"
+    elif status == "running":
+        icon = "⏳"
+    elif status in ("fail", "error"):
+        icon = "❌"
     parts = [
-        f"{label}: {'✅' if status == 'ok' else '❌'} {status}",
+        f"{label}: {icon} {status}",
         f"Длительность: {dur}s",
     ]
     if files:

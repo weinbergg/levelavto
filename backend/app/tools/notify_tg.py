@@ -17,8 +17,15 @@ def format_message(job: str, data: dict) -> str:
     dur = data.get("duration_sec", 0)
     stats = data.get("stats", {})
     files = data.get("files", {})
+    icon = "⚪"
+    if status == "ok":
+        icon = "✅"
+    elif status == "running":
+        icon = "⏳"
+    elif status in ("fail", "error"):
+        icon = "❌"
     parts = [
-        f"{job}: {'✅' if status == 'ok' else '❌'} {status}",
+        f"{job}: {icon} {status}",
         f"Длительность: {dur}s",
     ]
     if files:
