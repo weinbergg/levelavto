@@ -15,6 +15,10 @@ RESULT_FILE="$LOG_DIR/emavto_last.json"
 STATUS="ok"
 ERR=""
 
+if [[ -f "${EMAVTO_STOP_FILE:-/tmp/emavto_stop}" ]]; then
+  rm -f "${EMAVTO_STOP_FILE:-/tmp/emavto_stop}"
+fi
+
 cat >"$RESULT_FILE" <<EOF
 {
   "job": "emavto",

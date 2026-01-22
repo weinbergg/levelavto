@@ -55,10 +55,10 @@ emavto_klg:
   query_params: {}
   defaults:
     currency: "USD"
-    list_rps: 1.2
+    list_rps: 1.5
     list_concurrency: 2
-    detail_rps: 0.6
-    detail_concurrency: 1
+    detail_rps: 1.2
+    detail_concurrency: 2
     max_pages_full: 200
     max_pages_incremental: 15
   pagination:

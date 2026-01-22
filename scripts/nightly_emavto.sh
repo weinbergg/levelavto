@@ -11,8 +11,13 @@ PAGES="${CHUNK_PAGES:-10}"
 PAUSE="${CHUNK_PAUSE_SEC:-60}"
 RUNTIME="${CHUNK_MAX_RUNTIME_SEC:-3600}"
 TOTAL="${CHUNK_TOTAL_PAGES:-0}"
+STOP_FILE="${EMAVTO_STOP_FILE:-/tmp/emavto_stop}"
 
 echo "[nightly] start $(date -Iseconds) pages=${PAGES} pause=${PAUSE}s runtime=${RUNTIME}s total=${TOTAL}"
+
+if [[ -f "${STOP_FILE}" ]]; then
+  rm -f "${STOP_FILE}"
+fi
 
 docker compose exec web python -m backend.app.tools.emavto_chunk_runner \
   --chunk-pages "${PAGES}" \
@@ -24,4 +29,3 @@ docker compose exec web python -m backend.app.tools.emavto_chunk_runner \
   --start-page 1
 
 echo "[nightly] done $(date -Iseconds)"
-
