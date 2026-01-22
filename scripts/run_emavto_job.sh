@@ -15,6 +15,17 @@ RESULT_FILE="$LOG_DIR/emavto_last.json"
 STATUS="ok"
 ERR=""
 
+DOCKER_BIN="${DOCKER_BIN:-/usr/bin/docker}"
+DOCKER_CMD="${DOCKER_CMD:-${DOCKER_BIN} compose}"
+
+run_web_python() {
+  if command -v "${DOCKER_BIN}" >/dev/null 2>&1; then
+    ${DOCKER_CMD} exec -T web python "$@"
+  else
+    python "$@"
+  fi
+}
+
 if [[ -f "${EMAVTO_STOP_FILE:-/tmp/emavto_stop}" ]]; then
   rm -f "${EMAVTO_STOP_FILE:-/tmp/emavto_stop}"
 fi
@@ -38,7 +49,7 @@ cat >"$RESULT_FILE" <<EOF
 }
 EOF
 
-python -m backend.app.tools.notify_tg --job emavto --result "$RESULT_FILE" || true
+run_web_python -m backend.app.tools.notify_tg --job emavto --result "$RESULT_FILE" || true
 
 {
   echo "[emavto] start ${START_TS}"
@@ -68,6 +79,6 @@ cat >"$RESULT_FILE" <<EOF
 }
 EOF
 
-python -m backend.app.tools.notify_tg --job emavto --result "$RESULT_FILE" || true
+run_web_python -m backend.app.tools.notify_tg --job emavto --result "$RESULT_FILE" || true
 
 echo "[emavto] done status=${STATUS} duration=${DUR}s"

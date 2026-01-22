@@ -6,6 +6,9 @@
 
 set -euo pipefail
 
+DOCKER_BIN="${DOCKER_BIN:-/usr/bin/docker}"
+DOCKER_CMD="${DOCKER_CMD:-${DOCKER_BIN} compose}"
+
 # Allow overriding via env/cron
 PAGES="${CHUNK_PAGES:-10}"
 PAUSE="${CHUNK_PAUSE_SEC:-60}"
@@ -19,7 +22,7 @@ if [[ -f "${STOP_FILE}" ]]; then
   rm -f "${STOP_FILE}"
 fi
 
-docker compose exec web python -m backend.app.tools.emavto_chunk_runner \
+${DOCKER_CMD} exec -T web python -m backend.app.tools.emavto_chunk_runner \
   --chunk-pages "${PAGES}" \
   --pause-sec "${PAUSE}" \
   --max-runtime-sec "${RUNTIME}" \
