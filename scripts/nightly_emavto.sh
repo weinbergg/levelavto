@@ -28,7 +28,6 @@ ${DOCKER_CMD} exec -T web python -m backend.app.tools.emavto_chunk_runner \
   --max-runtime-sec "${RUNTIME}" \
   --total-pages "${TOTAL}" \
   --mode incremental \
-  --backfill-missing \
   --start-page 1
 
 echo "[nightly] done $(date -Iseconds)"
