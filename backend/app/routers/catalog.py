@@ -3,12 +3,9 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from ..db import get_db
 from ..services.cars_service import CarsService, normalize_brand
-from ..schemas import CarOut, CarDetailOut
-from ..models import Car, CarImage, Source
-from sqlalchemy import select, func
-from ..utils.localization import display_body, display_color
+from ..schemas import CarDetailOut
 from ..utils.country_map import resolve_display_country
-from ..utils.taxonomy import ru_color, normalize_color, color_hex, normalize_fuel, ru_fuel, ru_transmission
+from ..utils.taxonomy import normalize_fuel, ru_fuel, ru_transmission
 import os
 import time
 import logging
@@ -114,65 +111,36 @@ def list_cars(
         sort=sort,
         page=page,
         page_size=page_size,
+        light=True,
     )
     t1 = time.perf_counter()
-    # compute images_count per car (single grouped query)
-    if items:
-        ids = [c.id for c in items]
-        counts = db.execute(
-            select(CarImage.car_id, func.count()).where(
-                CarImage.car_id.in_(ids)).group_by(CarImage.car_id)
-        ).all()
-        counts_map = {cid: cnt for cid, cnt in counts}
-        image_rows = db.execute(
-            select(CarImage.car_id, CarImage.url)
-            .where(CarImage.car_id.in_(ids))
-            .order_by(CarImage.car_id.asc(), CarImage.position.asc(), CarImage.id.asc())
-        ).all()
-        images_map: dict[int, list[str]] = {}
-        for car_id, url in image_rows:
-            if not url:
-                continue
-            bucket = images_map.setdefault(car_id, [])
-            if len(bucket) >= 6:
-                continue
-            bucket.append(url)
-    else:
-        counts_map = {}
-        images_map = {}
     t2 = time.perf_counter()
-    # map source_id -> key
-    src_rows = db.execute(
-        select(Car.source_id, Source.key).join(Source, Car.source_id == Source.id)
-    ).all()
-    source_map = {sid: skey for sid, skey in src_rows}
     payload_items = []
+    eu_sources = set(service._source_ids_for_europe())
+    kr_sources = set(service._source_ids_for_hints(service.KOREA_SOURCE_HINTS))
     for c in items:
-        co = CarOut.model_validate(c).model_dump()
-        src_key = source_map.get(c.source_id, "") if c.source_id else ""
-        display_code, display_label = resolve_display_country(c, source_key=src_key)
-        co["display_country_code"] = display_code
-        co["display_country_label"] = display_label
-        co["display_body_type"] = display_body(co.get("body_type")) or co.get("body_type")
-        engine_raw = co.get("engine_type")
-        engine_norm = normalize_fuel(engine_raw)
-        co["display_engine_type"] = ru_fuel(engine_raw) or ru_fuel(engine_norm) or engine_raw
-        trans_raw = co.get("transmission")
-        co["display_transmission"] = ru_transmission(trans_raw) or trans_raw
-        raw_color = co.get("color")
-        norm_color = normalize_color(raw_color)
-        co["display_color"] = ru_color(raw_color) or ru_color(norm_color) or display_color(raw_color) or raw_color
-        if raw_color:
-            co["color_hex"] = color_hex(norm_color)
-        co["images_count"] = counts_map.get(c.id, 0)
-        co["images"] = images_map.get(c.id, []) if images_map else []
-        # pricing and calc summary
-        co["pricing"] = service.price_info(c)
-        if c.total_price_rub_cached is not None:
-            co["calc_total_rub"] = float(c.total_price_rub_cached)
-        if c.calc_breakdown_json:
-            co["calc_breakdown"] = c.calc_breakdown_json
-        payload_items.append(co)
+        country_raw = (c.get("country") or "").upper() if isinstance(c, dict) else ""
+        source_id = c.get("source_id") if isinstance(c, dict) else None
+        if source_id in kr_sources or country_raw.startswith("KR"):
+            region_val = "KR"
+        elif source_id in eu_sources or (country_raw and not country_raw.startswith("KR")):
+            region_val = "EU"
+        else:
+            region_val = None
+        payload_items.append(
+            {
+                "id": c.get("id"),
+                "brand": c.get("brand"),
+                "model": c.get("model"),
+                "year": c.get("year"),
+                "mileage": c.get("mileage"),
+                "total_price_rub_cached": c.get("total_price_rub_cached"),
+                "price_rub_cached": c.get("price_rub_cached"),
+                "thumbnail_url": c.get("thumbnail_url"),
+                "country": c.get("country"),
+                "region": region_val,
+            }
+        )
     t3 = time.perf_counter()
     if timing_enabled:
         request.state.api_parts = {

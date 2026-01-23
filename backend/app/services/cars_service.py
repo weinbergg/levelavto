@@ -443,7 +443,8 @@ class CarsService:
         sort: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
-    ) -> Tuple[List[Car], int]:
+        light: bool = False,
+    ) -> Tuple[List[Car] | List[dict], int]:
         conditions = [self._available_expr()]
         if region and not country:
             if region.upper() == "KR":
@@ -924,15 +925,38 @@ class CarsService:
             (and_(Car.thumbnail_url.is_not(None), Car.thumbnail_url != ""), 1),
             else_=0,
         ).desc()
-        stmt = (
-            select(Car)
-            .where(where_expr)
-            .order_by(thumb_rank, *order_clause)
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )
+        if light:
+            stmt = (
+                select(
+                    Car.id,
+                    Car.brand,
+                    Car.model,
+                    Car.year,
+                    Car.mileage,
+                    Car.total_price_rub_cached,
+                    Car.price_rub_cached,
+                    Car.thumbnail_url,
+                    Car.country,
+                    Car.source_id,
+                )
+                .where(where_expr)
+                .order_by(thumb_rank, *order_clause)
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+        else:
+            stmt = (
+                select(Car)
+                .where(where_expr)
+                .order_by(thumb_rank, *order_clause)
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
         items_t0 = time.perf_counter()
-        items = list(self.db.execute(stmt).scalars().all())
+        if light:
+            items = list(self.db.execute(stmt).mappings().all())
+        else:
+            items = list(self.db.execute(stmt).scalars().all())
         elapsed_items = time.perf_counter() - items_t0
         if elapsed_items > 2:
             self.logger.warning(
