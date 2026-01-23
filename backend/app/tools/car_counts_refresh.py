@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import Any
 from datetime import datetime, timezone
 import argparse
@@ -8,7 +7,7 @@ from sqlalchemy import case, func, select, text, or_, Integer
 from sqlalchemy.orm import Session
 
 from ..models import Car, Source
-from ..services.cars_service import normalize_brand, CarsService
+from ..services.cars_service import CarsService
 from ..utils.country_map import normalize_country_code
 from ..db import SessionLocal
 
@@ -97,131 +96,98 @@ def refresh_counts(db: Session) -> int:
     body_expr = func.lower(func.trim(Car.body_type))
     drive_expr = func.lower(func.trim(Car.drive_type))
 
-    stmt = (
-        select(
-            region_case.label("region"),
-            country_case.label("country"),
-            Car.brand,
-            Car.model,
-            color_expr.label("color"),
-            engine_expr.label("engine_type"),
-            transmission_expr.label("transmission"),
-            body_expr.label("body_type"),
-            drive_expr.label("drive_type"),
-            price_bucket.label("price_bucket"),
-            mileage_bucket.label("mileage_bucket"),
-            reg_year_expr.label("reg_year"),
-            func.count().label("total"),
-        )
-        .select_from(Car)
-        .join(Source, Source.id == Car.source_id)
-        .where(func.coalesce(Car.is_available, True).is_(True))
-        .group_by(
-            region_case,
-            country_case,
-            Car.brand,
-            Car.model,
-            color_expr,
-            engine_expr,
-            transmission_expr,
-            body_expr,
-            drive_expr,
-            price_bucket,
-            mileage_bucket,
-            reg_year_expr,
-        )
-    )
-
-    rows = db.execute(stmt).all()
-    aggregated: dict[tuple[str, str | None, str | None, str | None], int] = defaultdict(int)
-    for (
-        region,
-        country,
-        brand,
-        model,
-        color,
-        engine_type,
-        transmission,
-        body_type,
-        drive_type,
-        price_bucket,
-        mileage_bucket,
-        reg_year,
-        total,
-    ) in rows:
-        region = (region or "EU").upper()
-        country_norm = normalize_country_code(country) if country else None
-        brand_norm = normalize_brand(brand).strip() if brand else None
-        model_norm = model.strip() if model else None
-        total = int(total)
-
-        key = (
-            region,
-            country_norm,
-            brand_norm,
-            model_norm,
-            (color or None),
-            (engine_type or None),
-            (transmission or None),
-            (body_type or None),
-            (drive_type or None),
-            price_bucket or None,
-            mileage_bucket or None,
-            reg_year if reg_year else None,
-        )
-        aggregated[key] += total
-
     now = datetime.now(timezone.utc)
-    db.execute(text("DELETE FROM car_counts"))
-    if not aggregated:
-        db.commit()
-        return 0
-
-    values = []
-    for k, v in aggregated.items():
-        values.append(
-            {
-                "region": k[0],
-                "country": k[1],
-                "brand": k[2],
-                "model": k[3],
-                "color": k[4],
-                "engine_type": k[5],
-                "transmission": k[6],
-                "body_type": k[7],
-                "drive_type": k[8],
-                "price_bucket": k[9],
-                "mileage_bucket": k[10],
-                "reg_year": k[11],
-                "total": v,
-                "updated_at": now,
-            }
-        )
     db.execute(
         text(
             """
-            INSERT INTO car_counts (
-                region, country, brand, model, color, engine_type, transmission,
-                body_type, drive_type, price_bucket, mileage_bucket, reg_year, total, updated_at
-            )
-            VALUES (
-                :region, :country, :brand, :model, :color, :engine_type, :transmission,
-                :body_type, :drive_type, :price_bucket, :mileage_bucket, :reg_year, :total, :updated_at
-            )
+            TRUNCATE car_counts_core,
+                     car_counts_brand,
+                     car_counts_model,
+                     car_counts_color,
+                     car_counts_engine_type,
+                     car_counts_transmission,
+                     car_counts_body_type,
+                     car_counts_drive_type,
+                     car_counts_price_bucket,
+                     car_counts_mileage_bucket,
+                     car_counts_reg_year
             """
-        ),
-        values,
+        )
     )
+
+    base_sql = """
+        SELECT
+            {region_case} AS region,
+            {country_case} AS country,
+            cars.brand AS brand,
+            cars.model AS model,
+            {color_expr} AS color,
+            {engine_expr} AS engine_type,
+            {transmission_expr} AS transmission,
+            {body_expr} AS body_type,
+            {drive_expr} AS drive_type,
+            {price_bucket} AS price_bucket,
+            {mileage_bucket} AS mileage_bucket,
+            {reg_year_expr} AS reg_year
+        FROM cars
+        JOIN sources ON sources.id = cars.source_id
+        WHERE COALESCE(cars.is_available, true)
+    """.format(
+        region_case=str(region_case.compile(compile_kwargs={"literal_binds": True})),
+        country_case=str(country_case.compile(compile_kwargs={"literal_binds": True})),
+        color_expr=str(color_expr.compile(compile_kwargs={"literal_binds": True})),
+        engine_expr=str(engine_expr.compile(compile_kwargs={"literal_binds": True})),
+        transmission_expr=str(transmission_expr.compile(compile_kwargs={"literal_binds": True})),
+        body_expr=str(body_expr.compile(compile_kwargs={"literal_binds": True})),
+        drive_expr=str(drive_expr.compile(compile_kwargs={"literal_binds": True})),
+        price_bucket=str(price_bucket.compile(compile_kwargs={"literal_binds": True})),
+        mileage_bucket=str(mileage_bucket.compile(compile_kwargs={"literal_binds": True})),
+        reg_year_expr=str(reg_year_expr.compile(compile_kwargs={"literal_binds": True})),
+    )
+
+    def insert_group(table: str, cols: list[str], where: str = "") -> None:
+        cols_sql = ", ".join(cols)
+        where_sql = f"WHERE {where}" if where else ""
+        db.execute(
+            text(
+                f"""
+                INSERT INTO {table} ({cols_sql}, total, updated_at)
+                SELECT {cols_sql}, COUNT(*), :now
+                FROM ({base_sql}) AS base
+                {where_sql}
+                GROUP BY {cols_sql}
+                """
+            ),
+            {"now": now},
+        )
+
+    insert_group("car_counts_core", ["region", "country"])
+    insert_group("car_counts_brand", ["region", "country", "brand"], "brand IS NOT NULL AND brand <> ''")
+    insert_group(
+        "car_counts_model",
+        ["region", "country", "brand", "model"],
+        "brand IS NOT NULL AND brand <> '' AND model IS NOT NULL AND model <> ''",
+    )
+    insert_group("car_counts_color", ["region", "country", "brand", "color"], "brand IS NOT NULL AND brand <> '' AND color IS NOT NULL AND color <> ''")
+    insert_group("car_counts_engine_type", ["region", "country", "brand", "engine_type"], "brand IS NOT NULL AND brand <> '' AND engine_type IS NOT NULL AND engine_type <> ''")
+    insert_group("car_counts_transmission", ["region", "country", "brand", "transmission"], "brand IS NOT NULL AND brand <> '' AND transmission IS NOT NULL AND transmission <> ''")
+    insert_group("car_counts_body_type", ["region", "country", "brand", "body_type"], "brand IS NOT NULL AND brand <> '' AND body_type IS NOT NULL AND body_type <> ''")
+    insert_group("car_counts_drive_type", ["region", "country", "brand", "drive_type"], "brand IS NOT NULL AND brand <> '' AND drive_type IS NOT NULL AND drive_type <> ''")
+    insert_group("car_counts_price_bucket", ["region", "country", "brand", "price_bucket"], "brand IS NOT NULL AND brand <> '' AND price_bucket IS NOT NULL AND price_bucket <> ''")
+    insert_group("car_counts_mileage_bucket", ["region", "country", "brand", "mileage_bucket"], "brand IS NOT NULL AND brand <> '' AND mileage_bucket IS NOT NULL AND mileage_bucket <> ''")
+    insert_group("car_counts_reg_year", ["region", "country", "reg_year"], "reg_year IS NOT NULL")
+
     db.commit()
-    return len(values)
+    count = db.execute(text("SELECT COUNT(*) FROM car_counts_core")).scalar_one()
+    return int(count or 0)
 
 
 def _report(db: Session) -> None:
-    rows = db.execute(text("SELECT region, SUM(total) FROM car_counts GROUP BY region ORDER BY region")).all()
+    rows = db.execute(text("SELECT region, SUM(total) FROM car_counts_core GROUP BY region ORDER BY region")).all()
     print("car_counts by region:")
     for region, total in rows:
         print(f"  {region}: {int(total or 0)}")
-    rows = db.execute(text("SELECT country, SUM(total) FROM car_counts GROUP BY country ORDER BY SUM(total) DESC LIMIT 10")).all()
+    rows = db.execute(text("SELECT country, SUM(total) FROM car_counts_core GROUP BY country ORDER BY SUM(total) DESC LIMIT 10")).all()
     print("car_counts top countries:")
     for country, total in rows:
         print(f"  {country}: {int(total or 0)}")

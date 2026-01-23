@@ -234,16 +234,37 @@ class CarsService:
             country_norm = None
         if country_norm == "KR" and region_norm not in (None, "KR"):
             return None
-        stmt = text(
-            """
-            SELECT COALESCE(SUM(total), 0) AS total
-            FROM car_counts
-            WHERE (:region IS NULL OR region = :region)
-              AND (:country IS NULL OR country = :country)
-              AND (:brand IS NULL OR brand = :brand)
-              AND (:model IS NULL OR model = :model)
-            """
-        )
+        brand_variants_list = brand_variants(brand_norm) if brand_norm else []
+        if model_norm and brand_norm:
+            stmt = text(
+                """
+                SELECT COALESCE(SUM(total), 0) AS total
+                FROM car_counts_model
+                WHERE (:region IS NULL OR region = :region)
+                  AND (:country IS NULL OR country = :country)
+                  AND brand = ANY(:brand_variants)
+                  AND model = :model
+                """
+            )
+        elif brand_norm:
+            stmt = text(
+                """
+                SELECT COALESCE(SUM(total), 0) AS total
+                FROM car_counts_brand
+                WHERE (:region IS NULL OR region = :region)
+                  AND (:country IS NULL OR country = :country)
+                  AND brand = ANY(:brand_variants)
+                """
+            )
+        else:
+            stmt = text(
+                """
+                SELECT COALESCE(SUM(total), 0) AS total
+                FROM car_counts_core
+                WHERE (:region IS NULL OR region = :region)
+                  AND (:country IS NULL OR country = :country)
+                """
+            )
         try:
             row = self.db.execute(
                 stmt,
@@ -252,6 +273,7 @@ class CarsService:
                     "country": country_norm,
                     "brand": brand_norm or None,
                     "model": model_norm or None,
+                    "brand_variants": brand_variants_list or [brand_norm] if brand_norm else None,
                 },
             ).first()
         except Exception:
@@ -269,23 +291,24 @@ class CarsService:
         return clauses
 
     def facet_counts(self, *, field: str, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
-        cols = {
-            "region": "region",
-            "country": "country",
-            "brand": "brand",
-            "model": "model",
-            "color": "color",
-            "engine_type": "engine_type",
-            "transmission": "transmission",
-            "body_type": "body_type",
-            "drive_type": "drive_type",
-            "price_bucket": "price_bucket",
-            "mileage_bucket": "mileage_bucket",
-            "reg_year": "reg_year",
+        table_map = {
+            "region": ("car_counts_core", "region", {"region"}),
+            "country": ("car_counts_core", "country", {"region"}),
+            "brand": ("car_counts_brand", "brand", {"region", "country"}),
+            "model": ("car_counts_model", "model", {"region", "country", "brand"}),
+            "color": ("car_counts_color", "color", {"region", "country", "brand"}),
+            "engine_type": ("car_counts_engine_type", "engine_type", {"region", "country", "brand"}),
+            "transmission": ("car_counts_transmission", "transmission", {"region", "country", "brand"}),
+            "body_type": ("car_counts_body_type", "body_type", {"region", "country", "brand"}),
+            "drive_type": ("car_counts_drive_type", "drive_type", {"region", "country", "brand"}),
+            "price_bucket": ("car_counts_price_bucket", "price_bucket", {"region", "country", "brand"}),
+            "mileage_bucket": ("car_counts_mileage_bucket", "mileage_bucket", {"region", "country", "brand"}),
+            "reg_year": ("car_counts_reg_year", "reg_year", {"region", "country"}),
         }
-        if field not in cols:
+        if field not in table_map:
             return []
 
+        table, col, allowed_filters = table_map[field]
         params: Dict[str, Any] = {}
         filters_norm = {
             "region": filters.get("region"),
@@ -304,8 +327,23 @@ class CarsService:
         for k, v in filters_norm.items():
             if v is not None and v != "":
                 params[k] = v
+        brand_list = None
+        if params.get("brand"):
+            brand_list = brand_variants(params["brand"])
+            if brand_list:
+                params["brand_variants"] = brand_list
 
-        where_clauses = self._facet_where(cols, params)
+        where_clauses = []
+        for key in allowed_filters:
+            if key == "brand" and brand_list:
+                where_clauses.append("brand = ANY(:brand_variants)")
+                continue
+            if key in params:
+                where_clauses.append(f"{key} = :{key}")
+        if field not in ("region", "country", "brand", "model"):
+            if field in params:
+                where_clauses.append(f"{col} = :{field}")
+
         where_sql = ""
         if where_clauses:
             where_sql = "WHERE " + " AND ".join(where_clauses)
@@ -316,10 +354,10 @@ class CarsService:
 
         query = text(
             f"""
-            SELECT {cols[field]} AS value, SUM(total) AS count
-            FROM car_counts
+            SELECT {col} AS value, SUM(total) AS count
+            FROM {table}
             {where_sql}
-            GROUP BY {cols[field]}
+            GROUP BY {col}
             HAVING SUM(total) > 0
             ORDER BY {order_sql}
             """
@@ -330,6 +368,15 @@ class CarsService:
             if value is None or value == "":
                 continue
             out.append({"value": value, "count": int(count)})
+        if field == "brand":
+            merged: Dict[str, int] = {}
+            for row in out:
+                norm = normalize_brand(row["value"])
+                if not norm:
+                    continue
+                merged[norm] = merged.get(norm, 0) + int(row["count"])
+            out = [{"value": k, "count": v} for k, v in merged.items()]
+            out = sorted(out, key=lambda x: (-x["count"], x["value"].lower()))
         return out
 
     def get_fx_rates(self) -> dict | None:
@@ -1238,14 +1285,14 @@ class CarsService:
         stmt = text(
             """
             SELECT model, SUM(total) AS count
-            FROM car_counts
-            WHERE brand = :brand AND model IS NOT NULL AND model <> ''
+            FROM car_counts_model
+            WHERE brand = ANY(:brand_variants) AND model IS NOT NULL AND model <> ''
             GROUP BY model
             ORDER BY count DESC, model ASC
             LIMIT 200
             """
         )
-        rows = self.db.execute(stmt, {"brand": norm_brand}).all()
+        rows = self.db.execute(stmt, {"brand_variants": brand_variants(norm_brand)}).all()
         models = [{"model": r[0], "count": int(r[1])} for r in rows if r[0]]
 
         def sort_key(item: Dict[str, Any]):

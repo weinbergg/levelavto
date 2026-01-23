@@ -9,8 +9,12 @@ from sqlalchemy import select, func
 from ..utils.localization import display_body, display_color
 from ..utils.country_map import resolve_display_country
 from ..utils.taxonomy import ru_color, normalize_color, color_hex, normalize_fuel, ru_fuel, ru_transmission
+import os
+import time
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/cars")
@@ -64,6 +68,8 @@ def list_cars(
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
+    timing_enabled = os.environ.get("CAR_API_TIMING", "0") == "1"
+    t0 = time.perf_counter()
     items, total = service.list_cars(
         region=region,
         country=country,
@@ -108,6 +114,7 @@ def list_cars(
         page=page,
         page_size=page_size,
     )
+    t1 = time.perf_counter()
     # compute images_count per car (single grouped query)
     if items:
         ids = [c.id for c in items]
@@ -132,6 +139,7 @@ def list_cars(
     else:
         counts_map = {}
         images_map = {}
+    t2 = time.perf_counter()
     # map source_id -> key
     src_rows = db.execute(
         select(Car.source_id, Source.key).join(Source, Car.source_id == Source.id)
@@ -159,16 +167,21 @@ def list_cars(
         co["images"] = images_map.get(c.id, []) if images_map else []
         # pricing and calc summary
         co["pricing"] = service.price_info(c)
-        calc = service.ensure_calc_cache(c)
-        if calc:
-            co["calc_total_rub"] = calc.get("total_rub")
-            co["calc_breakdown"] = calc.get("breakdown")
-            co["calc_used_price"] = {
-                "amount": calc.get("used_price"),
-                "currency": calc.get("used_currency"),
-                "vat_reclaimable": calc.get("vat_reclaim"),
-            }
+        if c.total_price_rub_cached is not None:
+            co["calc_total_rub"] = float(c.total_price_rub_cached)
+        if c.calc_breakdown_json:
+            co["calc_breakdown"] = c.calc_breakdown_json
         payload_items.append(co)
+    t3 = time.perf_counter()
+    if timing_enabled:
+        logger.info(
+            "cars_api_timing list=%.3f images=%.3f serialize=%.3f total=%.3f page_size=%s",
+            (t1 - t0),
+            (t2 - t1),
+            (t3 - t2),
+            (t3 - t0),
+            page_size,
+        )
     return {
         "items": payload_items,
         "total": total,
