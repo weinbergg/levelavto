@@ -686,7 +686,8 @@
             <button class="thumb-nav thumb-nav--next" type="button" data-thumb-next aria-label="Следующее фото">›</button>
           `
           : ''
-        const more = (car.images_count && car.images_count > 1 && car.thumbnail_url) ? `<span class="more-badge">+${car.images_count - 1} фото</span>` : ''
+        const photosCount = car.photos_count ?? car.images_count
+        const more = (photosCount && photosCount > 1 && car.thumbnail_url) ? `<span class="more-badge">+${photosCount - 1} фото</span>` : ''
         const gross = car.pricing?.gross_eur
         const net = car.pricing?.net_eur
         const vatInfo = car.pricing?.vat_reclaimable
@@ -1664,7 +1665,8 @@
           const card = document.createElement('a')
           card.href = `/car/${car.id}`
           card.className = 'car-card'
-          const thumb = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
+        const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
+        const thumb = thumbRaw ? thumbRaw.replace('rule=mo-1024', 'rule=mo-480') : ''
           const price = car.price != null ? formatPrice(car.price, car.currency, fx) : ''
           card.innerHTML = `
             <div class="thumb-wrap">

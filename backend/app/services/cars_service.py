@@ -938,6 +938,9 @@ class CarsService:
                     Car.thumbnail_url,
                     Car.country,
                     Car.source_id,
+                    Car.color,
+                    Car.engine_cc,
+                    Car.power_hp,
                 )
                 .where(where_expr)
                 .order_by(thumb_rank, *order_clause)

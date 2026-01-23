@@ -5,7 +5,9 @@ from ..db import get_db
 from ..services.cars_service import CarsService, normalize_brand
 from ..schemas import CarDetailOut
 from ..utils.country_map import resolve_display_country, normalize_country_code
-from ..utils.taxonomy import normalize_fuel, ru_fuel, ru_transmission
+from ..utils.taxonomy import normalize_fuel, ru_fuel, ru_transmission, color_hex
+from ..models.car_image import CarImage
+from sqlalchemy import select, func
 import os
 import time
 import logging
@@ -114,6 +116,19 @@ def list_cars(
         light=True,
     )
     t1 = time.perf_counter()
+    image_counts = {}
+    if items:
+        ids = [c.get("id") for c in items if c.get("id")]
+        if ids:
+            rows = (
+                db.execute(
+                    select(CarImage.car_id, func.count(CarImage.id))
+                    .where(CarImage.car_id.in_(ids))
+                    .group_by(CarImage.car_id)
+                )
+                .all()
+            )
+            image_counts = {car_id: int(cnt) for car_id, cnt in rows}
     t2 = time.perf_counter()
     payload_items = []
     eu_sources = set(service._source_ids_for_europe())
@@ -131,6 +146,7 @@ def list_cars(
             region_val = "EU"
         else:
             region_val = "EU" if country_norm else None
+        img_count = image_counts.get(c.get("id"), 0)
         payload_items.append(
             {
                 "id": c.get("id"),
@@ -143,6 +159,12 @@ def list_cars(
                 "thumbnail_url": c.get("thumbnail_url"),
                 "country": country_norm or country_raw,
                 "region": region_val,
+                "color": c.get("color"),
+                "color_hex": color_hex(c.get("color")),
+                "engine_cc": c.get("engine_cc"),
+                "power_hp": c.get("power_hp"),
+                "images_count": img_count,
+                "photos_count": img_count,
             }
         )
     t3 = time.perf_counter()
