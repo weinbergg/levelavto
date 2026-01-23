@@ -207,3 +207,57 @@ def list_models_for_brand(brand: str, db: Session = Depends(get_db)):
     normalized = normalize_brand(brand)
     models = service.models_for_brand(normalized)
     return {"brand": normalized, "models": models}
+
+
+@router.get("/filters/options")
+def filter_options(
+    region: Optional[str] = Query(default=None),
+    country: Optional[str] = Query(default=None),
+    brand: Optional[str] = Query(default=None),
+    model: Optional[str] = Query(default=None),
+    color: Optional[str] = Query(default=None),
+    engine_type: Optional[str] = Query(default=None),
+    transmission: Optional[str] = Query(default=None),
+    body_type: Optional[str] = Query(default=None),
+    drive_type: Optional[str] = Query(default=None),
+    price_bucket: Optional[str] = Query(default=None),
+    mileage_bucket: Optional[str] = Query(default=None),
+    reg_year: Optional[int] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    service = CarsService(db)
+    base_filters = {
+        "region": region,
+        "country": country,
+        "brand": brand,
+        "model": model,
+        "color": color,
+        "engine_type": engine_type,
+        "transmission": transmission,
+        "body_type": body_type,
+        "drive_type": drive_type,
+        "price_bucket": price_bucket,
+        "mileage_bucket": mileage_bucket,
+        "reg_year": reg_year,
+    }
+
+    def facet(field: str):
+        filters = dict(base_filters)
+        filters[field] = None
+        return service.facet_counts(field=field, filters=filters)
+
+    fields = [
+        "region",
+        "country",
+        "brand",
+        "model",
+        "color",
+        "engine_type",
+        "transmission",
+        "body_type",
+        "drive_type",
+        "price_bucket",
+        "mileage_bucket",
+        "reg_year",
+    ]
+    return {field: facet(field) for field in fields}

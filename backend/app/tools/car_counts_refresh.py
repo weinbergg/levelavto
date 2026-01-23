@@ -115,7 +115,7 @@ def refresh_counts(db: Session) -> int:
         )
         .select_from(Car)
         .join(Source, Source.id == Car.source_id)
-        .where(Car.is_available.is_(True))
+        .where(func.coalesce(Car.is_available, True).is_(True))
         .group_by(
             region_case,
             country_case,

@@ -17,6 +17,16 @@ ERR=""
 
 DOCKER_BIN="${DOCKER_BIN:-/usr/bin/docker}"
 DOCKER_CMD="${DOCKER_CMD:-${DOCKER_BIN} compose}"
+LOCK_DIR="${EMAVTO_LOCK_DIR:-/tmp/emavto_job.lock}"
+
+if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
+  echo "[emavto] already running, lock exists at ${LOCK_DIR}"
+  exit 0
+fi
+cleanup() {
+  rmdir "${LOCK_DIR}" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 run_web_python() {
   if command -v "${DOCKER_BIN}" >/dev/null 2>&1; then

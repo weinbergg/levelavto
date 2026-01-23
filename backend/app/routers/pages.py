@@ -139,7 +139,7 @@ def _build_filter_context(
     generations = (
         db.execute(
             select(func.distinct(Car.generation))
-            .where(Car.is_available.is_(True), Car.generation.is_not(None))
+            .where(func.coalesce(Car.is_available, True).is_(True), Car.generation.is_not(None))
             .order_by(Car.generation.asc())
         )
         .scalars()

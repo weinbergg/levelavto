@@ -62,6 +62,9 @@ class CarsService:
         self.db = db
         self.logger = logging.getLogger(__name__)
 
+    def _available_expr(self):
+        return func.coalesce(Car.is_available, True).is_(True)
+
     EU_COUNTRIES = {
         "DE", "AT", "FR", "IT", "ES", "NL", "BE", "PL", "CZ", "SE", "FI",
         "NO", "DK", "PT", "GR", "CH", "LU", "IE", "GB", "HU", "SK", "SI",
@@ -92,7 +95,7 @@ class CarsService:
     def available_eu_countries(self) -> List[str]:
         rows = self.db.execute(
             select(func.distinct(Car.country))
-            .where(Car.is_available.is_(True), Car.country.is_not(None))
+            .where(self._available_expr(), Car.country.is_not(None))
         ).scalars().all()
         countries: List[str] = []
         seen = set()
@@ -108,7 +111,7 @@ class CarsService:
     def has_korea(self) -> bool:
         rows = self.db.execute(
             select(func.distinct(Car.country))
-            .where(Car.is_available.is_(True), Car.country.is_not(None))
+            .where(self._available_expr(), Car.country.is_not(None))
         ).scalars().all()
         for c in rows:
             code = normalize_country_code(c)
@@ -394,7 +397,7 @@ class CarsService:
         page: int = 1,
         page_size: int = 20,
     ) -> Tuple[List[Car], int]:
-        conditions = [Car.is_available.is_(True)]
+        conditions = [self._available_expr()]
         if region and not country:
             if region.upper() == "KR":
                 country = "KR"
@@ -1037,90 +1040,64 @@ class CarsService:
         return self.db.execute(stmt).scalar_one_or_none()
 
     def brands(self, country: Optional[str] = None) -> List[str]:
-        conditions = [Car.is_available.is_(True)]
-        if country:
-            conditions.append(Car.country == country)
-        stmt = select(func.distinct(Car.brand)).where(
-            and_(*conditions)).order_by(Car.brand.asc())
-        raw = [row[0] for row in self.db.execute(stmt).all() if row[0]]
-        merged: Dict[str, None] = {}
-        for val in raw:
-            norm = normalize_brand(val)
-            if not norm:
+        filters: Dict[str, Any] = {"country": country} if country else {}
+        rows = self.facet_counts(field="brand", filters=filters)
+        brands = []
+        seen: set[str] = set()
+        for row in rows:
+            val = row.get("value")
+            if not val:
                 continue
-            merged[norm] = None
-        return sorted(merged.keys(), key=lambda v: v.lower())
+            norm = normalize_brand(val)
+            if not norm or norm in seen:
+                continue
+            brands.append(norm)
+            seen.add(norm)
+        return sorted(brands, key=lambda v: v.lower())
 
     def brand_stats(self) -> List[Dict[str, Any]]:
-        stmt = (
-            select(Car.brand, func.count().label("count"))
-            .where(Car.is_available.is_(True), Car.brand.is_not(None))
-            .group_by(Car.brand)
-            .order_by(func.count().desc(), Car.brand.asc())
-        )
-        rows = self.db.execute(stmt).all()
-        merged: Dict[str, int] = {}
-        for brand, count in rows:
-            if not brand:
-                continue
-            norm = normalize_brand(brand)
-            if not norm:
-                continue
-            merged[norm] = merged.get(norm, 0) + int(count)
-        out = [{"brand": b, "count": c} for b, c in merged.items()]
-        return sorted(out, key=lambda x: (-x["count"], x["brand"].lower()))
+        rows = self.facet_counts(field="brand", filters={})
+        return [
+            {"brand": normalize_brand(r["value"]), "count": int(r["count"])}
+            for r in rows
+            if r.get("value")
+        ]
 
     def body_type_stats(self) -> List[Dict[str, Any]]:
-        stmt = (
-            select(Car.body_type, func.count().label("count"))
-            .where(Car.is_available.is_(True), Car.body_type.is_not(None))
-            .group_by(Car.body_type)
-            .order_by(func.count().desc(), Car.body_type.asc())
-        )
-        rows = self.db.execute(stmt).all()
-        return [{"body_type": r[0], "count": int(r[1])} for r in rows if r[0]]
+        rows = self.facet_counts(field="body_type", filters={})
+        return [{"body_type": r["value"], "count": int(r["count"])} for r in rows if r.get("value")]
 
     def transmissions(self) -> List[str]:
         stmt = (
             select(func.distinct(Car.transmission))
-            .where(Car.is_available.is_(True), Car.transmission.is_not(None))
+            .where(self._available_expr(), Car.transmission.is_not(None))
             .order_by(Car.transmission.asc())
         )
         return [row[0] for row in self.db.execute(stmt).all() if row[0]]
 
     def transmission_options(self) -> List[Dict[str, Any]]:
-        stmt = (
-            select(Car.transmission, func.count().label("count"))
-            .where(Car.is_available.is_(True), Car.transmission.is_not(None))
-            .group_by(Car.transmission)
-            .order_by(func.count().desc(), Car.transmission.asc())
-        )
-        rows = self.db.execute(stmt).all()
+        rows = self.facet_counts(field="transmission", filters={})
         out: List[Dict[str, Any]] = []
-        for val, cnt in rows:
+        for row in rows:
+            val = row.get("value")
             if not val:
                 continue
             label = ru_transmission(val) or val
-            out.append({"value": val, "label": label, "count": int(cnt)})
+            out.append({"value": val, "label": label, "count": int(row.get("count") or 0)})
         return out
 
     def engine_types(self) -> List[Dict[str, Any]]:
-        stmt = (
-            select(Car.engine_type, func.count().label("count"))
-            .where(Car.is_available.is_(True), Car.engine_type.is_not(None))
-            .group_by(Car.engine_type)
-            .order_by(func.count().desc(), Car.engine_type.asc())
-        )
-        rows = self.db.execute(stmt).all()
+        rows = self.facet_counts(field="engine_type", filters={})
         agg: Dict[str, Dict[str, Any]] = {}
-        for val, cnt in rows:
+        for row in rows:
+            val = row.get("value")
             if not val:
                 continue
             norm = normalize_fuel(val) or val.strip().lower()
             label = ru_fuel(val) or ru_fuel(norm) or val
             if norm not in agg:
                 agg[norm] = {"value": norm, "label": label, "count": 0}
-            agg[norm]["count"] += int(cnt)
+            agg[norm]["count"] += int(row.get("count") or 0)
         return sorted(agg.values(), key=lambda x: x["count"], reverse=True)
 
     def payload_values(
@@ -1133,7 +1110,7 @@ class CarsService:
             return []
         stmt = (
             select(Car.source_payload)
-            .where(Car.is_available.is_(True), Car.source_payload.is_not(None))
+            .where(self._available_expr(), Car.source_payload.is_not(None))
         )
         if source_ids is None:
             stmt = stmt.join(Source, Car.source_id == Source.id).where(Source.key == "mobile_de")
@@ -1179,7 +1156,7 @@ class CarsService:
             return {}
         stmt = (
             select(Car.source_payload)
-            .where(Car.is_available.is_(True), Car.source_payload.is_not(None))
+            .where(self._available_expr(), Car.source_payload.is_not(None))
         )
         if source_ids is None:
             stmt = stmt.join(Source, Car.source_id == Source.id).where(Source.key == "mobile_de")
@@ -1234,7 +1211,7 @@ class CarsService:
         stmt = (
             select(Car.id)
             .where(
-                Car.is_available.is_(True),
+                self._available_expr(),
                 Car.source_payload.is_not(None),
                 or_(
                     payload_text.like("%air suspension%"),
@@ -1283,21 +1260,16 @@ class CarsService:
         return data
 
     def drive_types(self) -> List[Dict[str, Any]]:
-        stmt = (
-            select(Car.drive_type, func.count().label("count"))
-            .where(Car.is_available.is_(True), Car.drive_type.is_not(None))
-            .group_by(Car.drive_type)
-            .order_by(func.count().desc(), Car.drive_type.asc())
-        )
-        rows = self.db.execute(stmt).all()
+        rows = self.facet_counts(field="drive_type", filters={})
         out: List[Dict[str, Any]] = []
         mapping = {"awd": "Полный", "4wd": "Полный", "fwd": "Передний", "rwd": "Задний"}
-        for val, cnt in rows:
+        for row in rows:
+            val = row.get("value")
             if not val:
                 continue
-            key = val.strip().lower()
+            key = str(val).strip().lower()
             label = mapping.get(key, val)
-            out.append({"value": val, "label": label, "count": int(cnt)})
+            out.append({"value": val, "label": label, "count": int(row.get("count") or 0)})
         return out
 
     def recommended_auto(
@@ -1313,7 +1285,7 @@ class CarsService:
         Подбор рекомендуемых без ручных списков: возраст, цена, пробег.
         Возраст считаем по registration_year/month, иначе по year.
         """
-        conditions = [Car.is_available.is_(True)]
+        conditions = [self._available_expr()]
         now_year = func.extract("year", func.now())
         now_month = func.extract("month", func.now())
 
@@ -1355,7 +1327,7 @@ class CarsService:
     def colors(self) -> List[Dict[str, Any]]:
         stmt = (
             select(Car.color, func.count().label("count"))
-            .where(Car.is_available.is_(True), Car.color.is_not(None))
+            .where(self._available_expr(), Car.color.is_not(None))
             .group_by(Car.color)
         )
         rows = self.db.execute(stmt).all()
@@ -1407,7 +1379,7 @@ class CarsService:
             .where(
                 FeaturedCar.placement == placement,
                 FeaturedCar.is_active.is_(True),
-                Car.is_available.is_(True),
+                self._available_expr(),
             )
             .order_by(FeaturedCar.position.asc(), Car.created_at.desc(), Car.id.desc())
             .limit(limit)
@@ -1419,7 +1391,7 @@ class CarsService:
         fallback_stmt = (
             select(Car)
             .where(
-                Car.is_available.is_(True),
+                self._available_expr(),
                 Car.thumbnail_url.is_not(None),
                 Car.thumbnail_url != "",
             )
@@ -1432,7 +1404,7 @@ class CarsService:
         stmt = (
             select(Car)
             .where(
-                Car.is_available.is_(True),
+                self._available_expr(),
                 Car.thumbnail_url.is_not(None),
                 Car.thumbnail_url != "",
             )
@@ -1442,7 +1414,7 @@ class CarsService:
         return list(self.db.execute(stmt).scalars().all())
 
     def total_cars(self, source_keys: Optional[List[str]] = None) -> int:
-        conditions = [Car.is_available.is_(True)]
+        conditions = [self._available_expr()]
         if source_keys:
             src_ids = self.db.execute(select(Source.id).where(
                 Source.key.in_(source_keys))).scalars().all()
@@ -1490,7 +1462,7 @@ class CarsService:
     def mark_unavailable_except(self, source: Source, external_ids: List[str]) -> int:
         # Mark cars from this source that are not in the latest external_ids as unavailable
         stmt = select(Car).where((Car.source_id == source.id)
-                                 & (Car.is_available.is_(True)))
+                                 & (self._available_expr()))
         cars = self.db.execute(stmt).scalars().all()
         changed = 0
         external_set = set(external_ids)
@@ -1506,7 +1478,7 @@ class CarsService:
         if not query:
             return []
         q = query.strip()
-        stmt = select(Car).where(Car.is_available.is_(True))
+        stmt = select(Car).where(self._available_expr())
         conds = []
         try:
             cid = int(q)
