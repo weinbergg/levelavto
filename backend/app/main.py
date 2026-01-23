@@ -58,6 +58,15 @@ def create_app() -> FastAPI:
                     total,
                 )
         response.headers["X-Process-Time"] = f"{total:.3f}"
+        if os.environ.get("HTML_TIMING", "0") == "1" and request.url.path in {"/", "/catalog"}:
+            parts = getattr(request.state, "html_parts", None) or {}
+            logger.info(
+                "html_timing id=%s path=%s total_ms=%.1f parts=%s",
+                req_id,
+                request.url.path,
+                total * 1000,
+                parts,
+            )
         return response
 
     app.include_router(pages_router)

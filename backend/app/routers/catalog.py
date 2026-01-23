@@ -4,7 +4,7 @@ from typing import Optional, List
 from ..db import get_db
 from ..services.cars_service import CarsService, normalize_brand
 from ..schemas import CarDetailOut
-from ..utils.country_map import resolve_display_country
+from ..utils.country_map import resolve_display_country, normalize_country_code
 from ..utils.taxonomy import normalize_fuel, ru_fuel, ru_transmission
 import os
 import time
@@ -118,15 +118,19 @@ def list_cars(
     payload_items = []
     eu_sources = set(service._source_ids_for_europe())
     kr_sources = set(service._source_ids_for_hints(service.KOREA_SOURCE_HINTS))
+    eu_countries = set(service.EU_COUNTRIES)
     for c in items:
-        country_raw = (c.get("country") or "").upper() if isinstance(c, dict) else ""
+        country_raw = c.get("country") if isinstance(c, dict) else None
+        country_norm = normalize_country_code(country_raw) if country_raw else None
         source_id = c.get("source_id") if isinstance(c, dict) else None
-        if source_id in kr_sources or country_raw.startswith("KR"):
+        if country_norm == "KR" or (country_norm and country_norm.startswith("KR")) or source_id in kr_sources:
             region_val = "KR"
-        elif source_id in eu_sources or (country_raw and not country_raw.startswith("KR")):
+        elif country_norm == "RU":
+            region_val = "RU"
+        elif country_norm in eu_countries or source_id in eu_sources:
             region_val = "EU"
         else:
-            region_val = None
+            region_val = "EU" if country_norm else None
         payload_items.append(
             {
                 "id": c.get("id"),
@@ -137,7 +141,7 @@ def list_cars(
                 "total_price_rub_cached": c.get("total_price_rub_cached"),
                 "price_rub_cached": c.get("price_rub_cached"),
                 "thumbnail_url": c.get("thumbnail_url"),
-                "country": c.get("country"),
+                "country": country_norm or country_raw,
                 "region": region_val,
             }
         )
