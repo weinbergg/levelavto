@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = Field(default="autodealer")
     DB_NAME: str = Field(default="autodealer")
     DB_SYNC_ECHO: bool = Field(default=False)
+    DB_POOL_SIZE: int = Field(default=10)
+    DB_MAX_OVERFLOW: int = Field(default=20)
+    DB_POOL_TIMEOUT: int = Field(default=30)
 
     PARSER_USER_AGENT: str = Field(
         default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"

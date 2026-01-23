@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from ..db import get_db
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/cars")
 def list_cars(
+    request: Request,
     region: Optional[str] = Query(default=None),
     country: Optional[str] = Query(default=None),
     brand: Optional[str] = Query(default=None),
@@ -174,14 +175,12 @@ def list_cars(
         payload_items.append(co)
     t3 = time.perf_counter()
     if timing_enabled:
-        logger.info(
-            "cars_api_timing list=%.3f images=%.3f serialize=%.3f total=%.3f page_size=%s",
-            (t1 - t0),
-            (t2 - t1),
-            (t3 - t2),
-            (t3 - t0),
-            page_size,
-        )
+        request.state.api_parts = {
+            "list": (t1 - t0),
+            "images": (t2 - t1),
+            "serialize": (t3 - t2),
+            "items": len(payload_items),
+        }
     return {
         "items": payload_items,
         "total": total,

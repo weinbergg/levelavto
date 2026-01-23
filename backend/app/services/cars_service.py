@@ -520,14 +520,11 @@ class CarsService:
                     conds.append(Car.source_id.in_(kr_sources))
                 conditions.append(and_(or_(*conds)))
         if brand:
-            # case-insensitive contains (brand may have variants/extra symbols)
             b = normalize_brand(brand).strip().strip(".,;")
             if b:
                 variants = brand_variants(b)
                 if variants:
-                    brand_field = func.lower(func.trim(Car.brand))
-                    brand_conds = [brand_field.like(func.lower(f"%{v}%")) for v in variants]
-                    conditions.append(or_(*brand_conds))
+                    conditions.append(Car.brand.in_(variants))
         if q:
             tokens = [t for t in re.split(r"[\\s,]+", q.strip().lower()) if t]
             payload_text = func.lower(cast(Car.source_payload, String))
@@ -583,15 +580,12 @@ class CarsService:
             if token_groups:
                 conditions.append(and_(*token_groups))
         if model:
-            like = f"%{model.strip()}%"
-            # match by model field; if brand is not specified, also try brand+model text
-            model_expr = func.lower(Car.model).like(func.lower(like))
-            if not brand:
-                concat_expr = func.lower(func.concat(
-                    Car.brand, " ", Car.model)).like(func.lower(like))
-                conditions.append(or_(model_expr, concat_expr))
-            else:
-                conditions.append(model_expr)
+            model_value = model.strip()
+            if model_value:
+                if not brand:
+                    conditions.append(Car.model == model_value)
+                else:
+                    conditions.append(Car.model == model_value)
         if num_seats:
             conditions.append(
                 func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "num_seats")
