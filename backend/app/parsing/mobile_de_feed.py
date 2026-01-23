@@ -86,7 +86,7 @@ class MobileDeFeedParser:
             yield CarParsed(
                 source_key=self.config.key,
                 external_id=str(row.inner_id),
-                country=row.seller_country or self.config.country or "DE",
+                country=(row.seller_country or self.config.country or "DE").upper(),
                 brand=(row.mark or None),
                 model=(row.model or None),
                 variant=(row.sub_title or None),

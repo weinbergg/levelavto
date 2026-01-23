@@ -82,17 +82,28 @@
               step="1"
             />
           </div>
-          {% if transmissions and transmissions|length > 0 %}
           <div class="field">
-            <label for="home-transmission">Трансмиссия</label>
-            <select id="home-transmission" name="transmission">
-              <option value="">Любая</option>
-              {% for t in transmissions %}
-              <option value="{{ t.value }}">{{ t.label }}</option>
-              {% endfor %}
-            </select>
+            <label for="home-reg-year-min">Поставлен на учёт с, год</label>
+            <input
+              id="home-reg-year-min"
+              name="reg_year_min"
+              type="number"
+              inputmode="numeric"
+              min="1900"
+              step="1"
+            />
           </div>
-          {% endif %}
+          <div class="field">
+            <label for="home-reg-year-max">Поставлен на учёт по, год</label>
+            <input
+              id="home-reg-year-max"
+              name="reg_year_max"
+              type="number"
+              inputmode="numeric"
+              min="1900"
+              step="1"
+            />
+          </div>
         </div>
         <div class="inline-actions">
           <button type="submit" class="btn btn-primary" id="home-submit">
@@ -103,7 +114,7 @@
           </button>
           <div class="links">
             <a href="#" id="home-reset">{{ home.search.reset_label }}</a>
-            <a href="/search">{{ home.search.catalog_label }}</a>
+            <a href="/search" id="home-advanced-link">{{ home.search.catalog_label }}</a>
           </div>
         </div>
       </form>

@@ -246,7 +246,7 @@
           <button class="btn btn-ghost" id="resetFilters" type="button">Сбросить</button>
         </div>
         <div class="filters-extra">
-          <a class="btn btn-secondary" href="/search">Расширенный поиск</a>
+          <a class="btn btn-secondary" id="catalog-advanced-link" href="/search">Расширенный поиск</a>
         </div>
         {% for line in params.getlist('line') %}
         <input type="hidden" name="line" value="{{ line }}">

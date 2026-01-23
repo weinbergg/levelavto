@@ -869,6 +869,7 @@
     const initialSort = urlParams.get('sort') || 'price_asc'
     const modelSelect = qs('#model-select')
     const brandSelect = qs('#brand')
+    const advancedLink = qs('#catalog-advanced-link')
     normalizeBrandOptions(brandSelect)
     if (DEBUG_FILTERS) {
       const debugCount = sessionStorage.getItem('homeCountParams')
@@ -922,10 +923,19 @@
       bindRegionSelect(filtersForm)
       const ctrls = qsa('input, select', filtersForm)
       let debounce
+      const updateAdvancedLink = () => {
+        if (!advancedLink) return
+        const params = collectParams(1)
+        params.delete('page')
+        params.delete('page_size')
+        const qs = params.toString()
+        advancedLink.href = qs ? `/search?${qs}` : '/search'
+      }
       const trigger = () => {
         clearTimeout(debounce)
         debounce = setTimeout(() => {
           loadCars(1)
+          updateAdvancedLink()
         }, 250)
       }
       ctrls.forEach((el) => {
@@ -942,8 +952,10 @@
           const val = sortTopbar.value
           if (sortSelect) sortSelect.value = val
           loadCars(1)
+          updateAdvancedLink()
         })
       }
+      updateAdvancedLink()
     }
     const toggle = qs('#filtersToggle')
     const panel = qs('#filtersPanel')
@@ -1160,6 +1172,7 @@
     const regionSlot = qs('#home-region-slot')
     const regionSlotSelect = qs('#home-region-slot-select')
     const regionSlotLabel = qs('#home-region-slot-label')
+    const advancedLink = qs('#home-advanced-link')
     const homeCountries = window.HOME_COUNTRIES || []
     normalizeBrandOptions(brandSelect)
     let lastTotal = null
@@ -1209,7 +1222,7 @@
     function buildHomeParams(withPaging = false) {
       const data = new FormData(form)
       const params = new URLSearchParams()
-      const numericKeys = ['price_max', 'mileage_max']
+      const numericKeys = ['price_max', 'mileage_max', 'reg_year_min', 'reg_year_max']
       const skipKeys = ['region_extra']
       let regionVal = ''
       for (const [k, v] of data.entries()) {
@@ -1281,6 +1294,7 @@
           animateCount(countEl, total)
           lastTotal = total
           initialAnimation = false
+          updateAdvancedLink()
           if (DEBUG_FILTERS) {
             sessionStorage.setItem('homeCountParams', params.toString())
           }
@@ -1289,6 +1303,13 @@
           console.warn('home count', e)
         }
       }, 250)
+    }
+
+    function updateAdvancedLink() {
+      if (!advancedLink) return
+      const params = buildHomeParams(false)
+      const qs = params.toString()
+      advancedLink.href = qs ? `/search?${qs}` : '/search'
     }
 
     function updateRegionSlot() {
@@ -1334,6 +1355,7 @@
         regionSlotSelect.name = 'region_extra'
         regionSlotSelect.disabled = true
       }
+      updateAdvancedLink()
     }
 
     const ctrls = qsa('input, select', form)
@@ -1377,6 +1399,7 @@
       updateRegionSlot()
     }
     updateCount()
+    updateAdvancedLink()
   }
 
   function initAdvancedSearch() {

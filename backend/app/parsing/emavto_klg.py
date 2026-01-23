@@ -141,7 +141,7 @@ class EmAvtoKlgParser(BaseParser):
                 car = CarParsed(
                     source_key=self.config.key,
                     external_id=task["external_id"],
-                    country=self.config.country,
+                    country=(self.config.country or "KR").upper(),
                     brand=task["brand"],
                     model=task["model"],
                     year=task["year"],
@@ -230,7 +230,7 @@ class EmAvtoKlgParser(BaseParser):
             car = CarParsed(
                 source_key=self.config.key,
                 external_id=task["external_id"],
-                country=self.config.country,
+                country=(self.config.country or "KR").upper(),
                 brand=task["brand"],
                 model=task["model"],
                 year=task["year"],
@@ -307,7 +307,7 @@ class EmAvtoKlgParser(BaseParser):
                 car = CarParsed(
                     source_key=self.config.key,
                     external_id=external_id or f"emavto_klg_{page}_{idx}",
-                    country=self.config.country,
+                    country=(self.config.country or "KR").upper(),
                     brand=brand,
                     model=model,
                     year=year,

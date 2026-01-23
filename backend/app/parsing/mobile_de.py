@@ -195,7 +195,7 @@ class MobileDeParser(BaseParser):
                 CarParsed(
                     source_key=self.config.key,
                     external_id=external_id or f"mobile_de_offline_{idx}",
-                    country=self.config.country,
+                    country=(self.config.country or "DE").upper(),
                     brand=brand,
                     model=model,
                     year=year,
@@ -255,5 +255,4 @@ class MobileDeParser(BaseParser):
             items.extend(batch_items)
             self._delay()
         return items
-
 

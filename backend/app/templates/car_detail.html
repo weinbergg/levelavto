@@ -129,6 +129,12 @@
           {% endif %} {% if car.vin %}
           <div class="chip">VIN: {{ car.vin }}</div>
           {% endif %}
+          {% if car.power_hp %}
+          <div class="chip">Мощность: {{ car.power_hp }} л.с.</div>
+          {% endif %}
+          {% if car.engine_cc %}
+          <div class="chip">Объём: {{ car.engine_cc }} см³</div>
+          {% endif %}
         </div>
         {% if car_details and car_details|length > 0 %}
         <div class="detail-state card">
