@@ -135,6 +135,7 @@ def list_cars(
     eu_sources = set(service._source_ids_for_europe())
     kr_sources = set(service._source_ids_for_hints(service.KOREA_SOURCE_HINTS))
     eu_countries = set(service.EU_COUNTRIES)
+    thumb_replaced = 0
     for c in items:
         country_raw = c.get("country") if isinstance(c, dict) else None
         country_norm = normalize_country_code(country_raw) if country_raw else None
@@ -150,7 +151,10 @@ def list_cars(
         img_count = image_counts.get(c.get("id"), 0)
         thumb_url = c.get("thumbnail_url")
         if isinstance(thumb_url, str) and "rule=mo-" in thumb_url:
-            thumb_url = re.sub(r"rule=mo-\\d+", "rule=mo-480", thumb_url)
+            new_thumb = re.sub(r"(rule=mo-)\\d+(\\.jpg)?", r"\\g<1>480\\2", thumb_url)
+            if new_thumb != thumb_url:
+                thumb_replaced += 1
+                thumb_url = new_thumb
         payload_items.append(
             {
                 "id": c.get("id"),
@@ -178,6 +182,7 @@ def list_cars(
             "images": (t2 - t1),
             "serialize": (t3 - t2),
             "items": len(payload_items),
+            "thumb_replaced": thumb_replaced,
         }
     return {
         "items": payload_items,
