@@ -23,10 +23,12 @@ def list_cars(
     region: Optional[str] = Query(default=None),
     country: Optional[str] = Query(default=None),
     brand: Optional[str] = Query(default=None),
-    line: Optional[List[str]] = Query(default=None, description="Advanced search lines brand|model|variant"),
+    line: Optional[List[str]] = Query(
+        default=None, description="Advanced search lines brand|model|variant"),
     source: Optional[str | List[str]] = Query(
         default=None, description="Source key, e.g., mobile_de or emavto_klg"),
-    q: Optional[str] = Query(default=None, description="Free-text brand/model search"),
+    q: Optional[str] = Query(
+        default=None, description="Free-text brand/model search"),
     model: Optional[str] = Query(default=None),
     generation: Optional[str] = Query(default=None),
     color: Optional[str] = Query(default=None),
@@ -54,7 +56,8 @@ def list_cars(
     year_max: Optional[int] = Query(default=None),
     mileage_min: Optional[int] = Query(default=None),
     mileage_max: Optional[int] = Query(default=None),
-    kr_type: Optional[str] = Query(default=None, description="KR_INTERNAL|KR_IMPORT"),
+    kr_type: Optional[str] = Query(
+        default=None, description="KR_INTERNAL|KR_IMPORT"),
     reg_year_min: Optional[int] = Query(default=None),
     reg_month_min: Optional[int] = Query(default=None),
     reg_year_max: Optional[int] = Query(default=None),
@@ -138,7 +141,8 @@ def list_cars(
     thumb_replaced = 0
     for c in items:
         country_raw = c.get("country") if isinstance(c, dict) else None
-        country_norm = normalize_country_code(country_raw) if country_raw else None
+        country_norm = normalize_country_code(
+            country_raw) if country_raw else None
         source_id = c.get("source_id") if isinstance(c, dict) else None
         if country_norm == "KR" or (country_norm and country_norm.startswith("KR")) or source_id in kr_sources:
             region_val = "KR"
@@ -151,7 +155,8 @@ def list_cars(
         img_count = image_counts.get(c.get("id"), 0)
         thumb_url = c.get("thumbnail_url")
         if isinstance(thumb_url, str) and "rule=mo-" in thumb_url:
-            new_thumb = re.sub(r"(rule=mo-)\\d+(\\.jpg)?", r"\\g<1>480\\2", thumb_url)
+            new_thumb = re.sub(r"(rule=mo-)\d+(\.jpg)?",
+                               r"\g<1>480\2", thumb_url)
             if new_thumb != thumb_url:
                 thumb_replaced += 1
                 thumb_url = new_thumb
@@ -205,8 +210,10 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     display_code, display_label = resolve_display_country(car)
     detail.display_country_code = display_code
     detail.display_country_label = display_label
-    detail.display_engine_type = ru_fuel(car.engine_type) or ru_fuel(normalize_fuel(car.engine_type)) or car.engine_type
-    detail.display_transmission = ru_transmission(car.transmission) or car.transmission
+    detail.display_engine_type = ru_fuel(car.engine_type) or ru_fuel(
+        normalize_fuel(car.engine_type)) or car.engine_type
+    detail.display_transmission = ru_transmission(
+        car.transmission) or car.transmission
     return detail.model_dump()
 
 
