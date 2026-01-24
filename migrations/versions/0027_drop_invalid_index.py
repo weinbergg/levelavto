@@ -15,8 +15,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # remove invalid/unused index if present
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_cars_country_brand_avail")
+    # DROP INDEX CONCURRENTLY must run вне транзакции
+    ctx = op.get_context()
+    with ctx.autocommit_block():
+        op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_cars_country_brand_avail")
 
 
 def downgrade() -> None:
