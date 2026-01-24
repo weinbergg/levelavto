@@ -8,6 +8,7 @@ from ..utils.country_map import resolve_display_country, normalize_country_code
 from ..utils.taxonomy import normalize_fuel, ru_fuel, ru_transmission, color_hex
 from ..models.car_image import CarImage
 from sqlalchemy import select, func
+import re
 import os
 import time
 import logging
@@ -147,6 +148,9 @@ def list_cars(
         else:
             region_val = "EU" if country_norm else None
         img_count = image_counts.get(c.get("id"), 0)
+        thumb_url = c.get("thumbnail_url")
+        if isinstance(thumb_url, str) and "rule=mo-" in thumb_url:
+            thumb_url = re.sub(r"rule=mo-\\d+", "rule=mo-480", thumb_url)
         payload_items.append(
             {
                 "id": c.get("id"),
@@ -156,7 +160,7 @@ def list_cars(
                 "mileage": c.get("mileage"),
                 "total_price_rub_cached": c.get("total_price_rub_cached"),
                 "price_rub_cached": c.get("price_rub_cached"),
-                "thumbnail_url": c.get("thumbnail_url"),
+                "thumbnail_url": thumb_url,
                 "country": country_norm or country_raw,
                 "region": region_val,
                 "color": c.get("color"),
