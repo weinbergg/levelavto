@@ -17,7 +17,12 @@ from ..services.content_service import ContentService
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, exists
 from cachetools import TTLCache
-from ..utils.redis_cache import redis_get_json, redis_set_json
+from ..utils.redis_cache import (
+    redis_get_json,
+    redis_set_json,
+    build_filter_ctx_key,
+    build_total_cars_key,
+)
 from ..models import Car, Source, CarImage
 from ..auth import get_current_user
 from urllib.parse import quote
@@ -115,40 +120,19 @@ def _build_filter_context(
     include_payload: bool = True,
     params: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    cache_key = None
-    if not params:
-        cache_key = ("home", include_payload)
-    else:
-        cache_key = (
-            str(params.get("region") or ""),
-            str(params.get("country") or ""),
-            str(params.get("brand") or ""),
-            str(params.get("model") or ""),
-            str(params.get("color") or ""),
-            str(params.get("engine_type") or ""),
-            str(params.get("transmission") or ""),
-            str(params.get("body_type") or ""),
-            str(params.get("drive_type") or ""),
-            str(params.get("reg_year") or ""),
-            include_payload,
-        )
-    cache_source = "none"
-    if cache_key is not None:
-        redis_key = f"filter_ctx:{cache_key}"
-        cached = redis_get_json(redis_key)
-        if cached:
-            cache_source = "redis"
-            if os.environ.get("HTML_TIMING", "0") == "1":
-                print(f"FILTER_CTX_CACHE hit=1 source={cache_source}", flush=True)
-            return cached
-        cached = _FILTER_CTX_CACHE.get(cache_key)
-        if cached:
-            cache_source = "process"
-            if os.environ.get("HTML_TIMING", "0") == "1":
-                print(f"FILTER_CTX_CACHE hit=1 source={cache_source}", flush=True)
-            return cached
+    redis_key = build_filter_ctx_key(params, include_payload)
+    cached = redis_get_json(redis_key)
+    if cached:
         if os.environ.get("HTML_TIMING", "0") == "1":
-            print("FILTER_CTX_CACHE hit=0 source=none", flush=True)
+            print("FILTER_CTX_CACHE hit=1 source=redis", flush=True)
+        return cached
+    cached = _FILTER_CTX_CACHE.get(redis_key)
+    if cached:
+        if os.environ.get("HTML_TIMING", "0") == "1":
+            print("FILTER_CTX_CACHE hit=1 source=fallback", flush=True)
+        return cached
+    if os.environ.get("HTML_TIMING", "0") == "1":
+        print("FILTER_CTX_CACHE hit=0 source=fallback", flush=True)
     timing_enabled = os.environ.get("HTML_TIMING", "0") == "1"
     t_ctx = time.perf_counter()
     regions = service.available_regions()
@@ -390,9 +374,8 @@ def _build_filter_context(
         "price_rating_labels_kr": price_rating_labels_kr,
         "has_air_suspension": has_air_suspension,
     }
-    if cache_key is not None:
-        _FILTER_CTX_CACHE[cache_key] = ctx
-        redis_set_json(f"filter_ctx:{cache_key}", ctx, ttl_sec=900)
+    _FILTER_CTX_CACHE[redis_key] = ctx
+    redis_set_json(redis_key, ctx, ttl_sec=900)
     return ctx
 
 
@@ -573,7 +556,7 @@ def _home_context(
     ]
     t0 = time.perf_counter()
     total_cars = None
-    total_cache_key = "total_cars:all"
+    total_cache_key = build_total_cars_key()
     cached_total = redis_get_json(total_cache_key)
     if cached_total is not None:
         total_cars = cached_total
@@ -584,10 +567,10 @@ def _home_context(
         if cached_total is not None:
             total_cars = cached_total
             if timing_enabled:
-                print("TOTAL_CARS_CACHE hit=1 source=process", flush=True)
+                print("TOTAL_CARS_CACHE hit=1 source=fallback", flush=True)
     if total_cars is None:
         if timing_enabled:
-            print("TOTAL_CARS_CACHE hit=0 source=none", flush=True)
+            print("TOTAL_CARS_CACHE hit=0 source=fallback", flush=True)
         total_cars = service.total_cars()
         _TOTAL_CARS_CACHE[total_cache_key] = total_cars
         redis_set_json(total_cache_key, total_cars, ttl_sec=600)
@@ -804,7 +787,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "contact_ig",
         ])
     total_cars = None
-    total_cache_key = "total_cars:all"
+    total_cache_key = build_total_cars_key()
     cached_total = redis_get_json(total_cache_key)
     if cached_total is not None:
         total_cars = cached_total

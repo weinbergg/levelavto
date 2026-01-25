@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Dict, Tuple
 
 import redis
 
@@ -24,7 +24,7 @@ def get_redis() -> Optional[redis.Redis]:
                 url,
                 decode_responses=True,
                 socket_connect_timeout=0.2,
-                socket_timeout=0.3,
+                socket_timeout=0.5,
                 retry_on_timeout=False,
                 health_check_interval=30,
             )
@@ -35,6 +35,38 @@ def get_redis() -> Optional[redis.Redis]:
             _redis_client = None
             return None
     return _redis_client
+
+
+def build_filter_ctx_key(params: Optional[Dict[str, Any]], include_payload: bool) -> str:
+    if not params:
+        key = ("home", include_payload)
+    else:
+        key = (
+            str(params.get("region") or ""),
+            str(params.get("country") or ""),
+            str(params.get("brand") or ""),
+            str(params.get("model") or ""),
+            str(params.get("color") or ""),
+            str(params.get("engine_type") or ""),
+            str(params.get("transmission") or ""),
+            str(params.get("body_type") or ""),
+            str(params.get("drive_type") or ""),
+            str(params.get("reg_year") or ""),
+            include_payload,
+        )
+    return f"filter_ctx:{key}"
+
+
+def build_total_cars_key(params: Optional[Dict[str, Any]] = None) -> str:
+    if not params:
+        return "total_cars:all"
+    key = (
+        str(params.get("region") or ""),
+        str(params.get("country") or ""),
+        str(params.get("brand") or ""),
+        str(params.get("model") or ""),
+    )
+    return f"total_cars:{key}"
 
 
 def redis_get_json(key: str) -> Optional[Any]:
