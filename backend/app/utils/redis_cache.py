@@ -20,11 +20,11 @@ def get_redis() -> Optional[redis.Redis]:
         return None
     if _redis_client is None:
         try:
-            _redis_client = redis.Redis(
-                from_url=url,
+            _redis_client = redis.from_url(
+                url,
                 decode_responses=True,
-                socket_connect_timeout=0.3,
-                socket_timeout=0.5,
+                socket_connect_timeout=0.2,
+                socket_timeout=0.3,
                 retry_on_timeout=False,
                 health_check_interval=30,
             )

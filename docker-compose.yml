@@ -41,6 +41,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./:/app
     command: >
@@ -52,8 +54,15 @@ services:
   redis:
     image: redis:7-alpine
     container_name: autodealer_redis
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
     expose:
       - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
 
 volumes:
   db_data:
