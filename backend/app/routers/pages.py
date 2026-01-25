@@ -17,6 +17,7 @@ from ..services.content_service import ContentService
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, exists
 from cachetools import TTLCache
+from ..utils.redis_cache import redis_get_json, redis_set_json
 from ..models import Car, Source, CarImage
 from ..auth import get_current_user
 from urllib.parse import quote
@@ -38,6 +39,7 @@ from ..utils.home_content import build_home_content
 router = APIRouter()
 logger = logging.getLogger(__name__)
 _FILTER_CTX_CACHE: TTLCache = TTLCache(maxsize=64, ttl=600)
+_TOTAL_CARS_CACHE: TTLCache = TTLCache(maxsize=32, ttl=300)
 RECOMMENDED_PLACEMENT = "recommended"
 MONTHS_RU = [
     "январь",
@@ -130,14 +132,23 @@ def _build_filter_context(
             str(params.get("reg_year") or ""),
             include_payload,
         )
+    cache_source = "none"
     if cache_key is not None:
+        redis_key = f"filter_ctx:{cache_key}"
+        cached = redis_get_json(redis_key)
+        if cached:
+            cache_source = "redis"
+            if os.environ.get("HTML_TIMING", "0") == "1":
+                print(f"FILTER_CTX_CACHE hit=1 source={cache_source}", flush=True)
+            return cached
         cached = _FILTER_CTX_CACHE.get(cache_key)
         if cached:
+            cache_source = "process"
             if os.environ.get("HTML_TIMING", "0") == "1":
-                print("FILTER_CTX_CACHE hit=1", flush=True)
+                print(f"FILTER_CTX_CACHE hit=1 source={cache_source}", flush=True)
             return cached
         if os.environ.get("HTML_TIMING", "0") == "1":
-            print("FILTER_CTX_CACHE hit=0", flush=True)
+            print("FILTER_CTX_CACHE hit=0 source=none", flush=True)
     timing_enabled = os.environ.get("HTML_TIMING", "0") == "1"
     t_ctx = time.perf_counter()
     regions = service.available_regions()
@@ -381,6 +392,7 @@ def _build_filter_context(
     }
     if cache_key is not None:
         _FILTER_CTX_CACHE[cache_key] = ctx
+        redis_set_json(f"filter_ctx:{cache_key}", ctx, ttl_sec=900)
     return ctx
 
 
@@ -560,7 +572,25 @@ def _home_context(
         for c in countries_list
     ]
     t0 = time.perf_counter()
-    total_cars = service.total_cars()
+    total_cars = None
+    total_cache_key = "total_cars:all"
+    cached_total = redis_get_json(total_cache_key)
+    if cached_total is not None:
+        total_cars = cached_total
+        if timing_enabled:
+            print("TOTAL_CARS_CACHE hit=1 source=redis", flush=True)
+    else:
+        cached_total = _TOTAL_CARS_CACHE.get(total_cache_key)
+        if cached_total is not None:
+            total_cars = cached_total
+            if timing_enabled:
+                print("TOTAL_CARS_CACHE hit=1 source=process", flush=True)
+    if total_cars is None:
+        if timing_enabled:
+            print("TOTAL_CARS_CACHE hit=0 source=none", flush=True)
+        total_cars = service.total_cars()
+        _TOTAL_CARS_CACHE[total_cache_key] = total_cars
+        redis_set_json(total_cache_key, total_cars, ttl_sec=600)
     _stage("total_cars_ms", t0)
     context = {
         "request": request,
@@ -773,12 +803,25 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "contact_wa",
             "contact_ig",
         ])
+    total_cars = None
+    total_cache_key = "total_cars:all"
+    cached_total = redis_get_json(total_cache_key)
+    if cached_total is not None:
+        total_cars = cached_total
+    else:
+        cached_total = _TOTAL_CARS_CACHE.get(total_cache_key)
+        if cached_total is not None:
+            total_cars = cached_total
+    if total_cars is None:
+        total_cars = service.total_cars()
+        _TOTAL_CARS_CACHE[total_cache_key] = total_cars
+        redis_set_json(total_cache_key, total_cars, ttl_sec=600)
     return templates.TemplateResponse(
         "search.html",
         {
             "request": request,
             "user": getattr(request.state, "user", None),
-            "total_cars": service.total_cars(),
+            "total_cars": total_cars,
             "brands": filter_ctx["brands"],
             "regions": filter_ctx["regions"],
             "countries": filter_ctx["countries"],

@@ -16,6 +16,7 @@ itsdangerous==2.1.2
 encar==0.1.4
 python-telegram-bot==21.6
 cachetools==5.3.3
+redis==5.0.8
 
 
 pandas==2.2.3

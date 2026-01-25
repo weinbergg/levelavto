@@ -47,6 +47,13 @@ services:
       sh -c "gunicorn backend.app.main:app -k uvicorn.workers.UvicornWorker -w ${WEB_CONCURRENCY:-4} -t 60 --bind 0.0.0.0:8000"
     environment:
     - HTML_TIMING=${HTML_TIMING:-0}
+    - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+
+  redis:
+    image: redis:7-alpine
+    container_name: autodealer_redis
+    expose:
+      - "6379"
 
 volumes:
   db_data:
