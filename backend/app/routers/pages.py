@@ -776,7 +776,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
 def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
     templates = request.app.state.templates
     service = CarsService(db)
-    filter_ctx = _build_filter_context(service, db, include_payload=True, params=dict(request.query_params))
+    filter_ctx = _build_filter_context(service, db, include_payload=False, params=dict(request.query_params))
     contact_content = ContentService(db).content_map(
         [
             "contact_phone",

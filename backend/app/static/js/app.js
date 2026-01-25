@@ -688,53 +688,10 @@
           : ''
         const photosCount = car.photos_count ?? car.images_count
         const more = (photosCount && photosCount > 1 && car.thumbnail_url) ? `<span class="more-badge">+${photosCount - 1} фото</span>` : ''
-        const gross = car.pricing?.gross_eur
-        const net = car.pricing?.net_eur
-        const vatInfo = car.pricing?.vat_reclaimable
-        const isKR = String(car.display_country_code || car.country || '').toUpperCase().startsWith('KR')
-        const grossLine = gross != null ? `BRUTTO: ${Number(gross).toLocaleString('ru-RU')} €` : null
-        const netLine = net != null ? `NET: ${Number(net).toLocaleString('ru-RU')} €` : null
-        const vatLine = vatInfo != null ? (vatInfo ? 'НДС: возмещается' : 'НДС: не возмещается') : null
+        const displayRub = car.total_price_rub_cached ?? car.price_rub_cached
+        const calcLine = `<div class="price-main">${displayRub != null ? formatRub(displayRub) : '—'}</div>`
         const priceLines = []
-        const grossRub = gross != null ? priceToRub(gross, 'EUR', fx) : null
-        const netRub = net != null ? priceToRub(net, 'EUR', fx) : null
-        const rawRub = car.price != null ? priceToRub(car.price, car.currency, fx) : null
-        const baseRub = [grossRub, netRub, rawRub].find((v) => Number.isFinite(v))
-        let primaryBase = ''
-        let calcLine = ''
-        let footnote = ''
-        if (isKR) {
-          const krRub = car.calc_total_rub ?? car.price_rub_cached ?? baseRub
-          if (krRub != null) {
-            primaryBase = formatRub(krRub)
-          } else if (car.price != null) {
-            primaryBase = `${Number(car.price).toLocaleString('ru-RU')} ${car.currency || ''}`.trim()
-          }
-          if (primaryBase) {
-            calcLine = `<div class="price-main">${primaryBase}</div>`
-          }
-        } else {
-          if (car.calc_total_rub != null) {
-            primaryBase = formatRub(car.calc_total_rub)
-          } else if (baseRub != null) {
-            primaryBase = `${formatRub(baseRub)} *`
-          } else if (grossLine) {
-            primaryBase = `${grossLine} *`
-          } else if (netLine) {
-            primaryBase = `${netLine} *`
-          } else if (car.price != null) {
-            primaryBase = `${Number(car.price).toLocaleString('ru-RU')} ${car.currency || ''}`.trim() + ' *'
-          }
-          if (grossLine && !primaryBase.startsWith('BRUTTO')) priceLines.push(grossLine)
-          if (netLine && !primaryBase.startsWith('NET')) priceLines.push(netLine)
-          if (vatLine) priceLines.push(vatLine)
-          if (primaryBase) {
-            calcLine = `<div class="price-main">${primaryBase}</div>`
-          }
-          if (primaryBase.includes('*')) {
-            footnote = `<div class="price-sub muted">* Итог в РФ уточняйте — свяжитесь с нами</div>`
-          }
-        }
+        const footnote = ''
         const metaLine = [car.year, car.display_engine_type || car.engine_type].filter(Boolean).join(' · ')
         const colorDot = (hex, raw) => {
           if (!hex) return ''
@@ -1457,6 +1414,65 @@
       }
     }
 
+    const payloadMap = {
+      num_seats: 'seats_options',
+      doors_count: 'doors_options',
+      owners_count: 'owners_options',
+      emission_class: 'emission_classes',
+      efficiency_class: 'efficiency_classes',
+      climatisation: 'climatisation_options',
+      airbags: 'airbags_options',
+      interior_design: 'interior_design_options',
+      price_rating_label: 'price_rating_labels',
+    }
+
+    const applyPayloadOptions = (data) => {
+      if (!data) return
+      qsa('[data-region-options]', form).forEach((select) => {
+        const name = select.getAttribute('name') || ''
+        const base = payloadMap[name]
+        if (!base) return
+        const eu = Array.isArray(data[`${base}_eu`]) ? data[`${base}_eu`] : []
+        const kr = Array.isArray(data[`${base}_kr`]) ? data[`${base}_kr`] : []
+        select.dataset.optionsEu = JSON.stringify(eu)
+        select.dataset.optionsKr = JSON.stringify(kr)
+        const label = select.closest('label')
+        if (label) {
+          label.dataset.hasEu = eu.length ? '1' : '0'
+          label.dataset.hasKr = kr.length ? '1' : '0'
+        }
+      })
+      qsa('.advanced-section', form).forEach((section) => {
+        let hasEu = false
+        let hasKr = false
+        qsa('[data-region-options]', section).forEach((select) => {
+          const eu = parseOptions(select.dataset.optionsEu)
+          const kr = parseOptions(select.dataset.optionsKr)
+          if (eu.length) hasEu = true
+          if (kr.length) hasKr = true
+        })
+        section.dataset.hasEu = hasEu ? '1' : '0'
+        section.dataset.hasKr = hasKr ? '1' : '0'
+      })
+      updateRegionFilters()
+    }
+
+    const loadPayloadOptions = async () => {
+      const params = new URLSearchParams()
+      const region = regionSelect?.value || ''
+      const country = regionEuSelect?.value || ''
+      if (region) params.set('region', region)
+      if (country) params.set('country', country)
+      try {
+        const res = await fetch(`/api/filter_payload?${params.toString()}`)
+        if (!res.ok) return
+        const data = await res.json()
+        applyPayloadOptions(data)
+      } catch (e) {
+        console.warn('filter payload', e)
+      }
+    }
+
     const updateRegionFilters = () => {
       const region = regionSelect?.value || ''
       const showFor = (el) => {
@@ -1626,10 +1642,10 @@
       clearTimeout(debounce)
       debounce = setTimeout(async () => {
         try {
-      const params = buildParams(true)
-      const res = await fetch(`/api/cars?${params.toString()}`)
-      if (!res.ok) return
-      const data = await res.json()
+          const params = buildParams(true)
+          const res = await fetch(`/api/cars?${params.toString()}`)
+          if (!res.ok) return
+          const data = await res.json()
           animateCount(countEl, data.total || 0)
         } catch (e) {
           console.warn('advanced count', e)
@@ -1665,9 +1681,10 @@
           const card = document.createElement('a')
           card.href = `/car/${car.id}`
           card.className = 'car-card'
-        const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
-        const thumb = thumbRaw ? thumbRaw.replace('rule=mo-1024', 'rule=mo-480') : ''
-          const price = car.price != null ? formatPrice(car.price, car.currency, fx) : ''
+          const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
+          const thumb = thumbRaw ? thumbRaw.replace('rule=mo-1024', 'rule=mo-480') : ''
+          const displayRub = car.total_price_rub_cached ?? car.price_rub_cached
+          const price = displayRub != null ? formatRub(displayRub) : '—'
           card.innerHTML = `
             <div class="thumb-wrap">
               <img class="thumb" src="${thumb}" alt="" loading="lazy" decoding="async" />
@@ -1737,6 +1754,7 @@
     bindRegionSelect(form)
     updateRegionSub()
     updateRegionFilters()
+    loadPayloadOptions()
     bindRegMonthState(form)
     bindColorChips(form, scheduleCount)
     bindOtherColorsToggle(form)
@@ -1747,6 +1765,7 @@
     })
     regionSelect?.addEventListener('change', () => {
       updateRegionSub()
+      loadPayloadOptions()
       updateRegionFilters()
       scheduleCount()
     })

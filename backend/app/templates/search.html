@@ -284,7 +284,6 @@
 
       {% set interior_has_eu = interior_design_options_eu and interior_design_options_eu|length > 0 %}
       {% set interior_has_kr = interior_design_options_kr and interior_design_options_kr|length > 0 %}
-      {% if interior_has_eu or interior_has_kr %}
       <section class="advanced-section" id="advanced-interior" data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">
         <h2 class="advanced-section__title">Интерьер</h2>
         <div class="search-filters">
@@ -305,11 +304,9 @@
           </div>
         </div>
       </section>
-      {% endif %}
 
       {% set details_has_eu = (seats_options_eu and seats_options_eu|length > 0) or (doors_options_eu and doors_options_eu|length > 0) or (owners_options_eu and owners_options_eu|length > 0) or (climatisation_options_eu and climatisation_options_eu|length > 0) or (airbags_options_eu and airbags_options_eu|length > 0) or (emission_classes_eu and emission_classes_eu|length > 0) or (efficiency_classes_eu and efficiency_classes_eu|length > 0) or (price_rating_labels_eu and price_rating_labels_eu|length > 0) %}
       {% set details_has_kr = (seats_options_kr and seats_options_kr|length > 0) or (doors_options_kr and doors_options_kr|length > 0) or (owners_options_kr and owners_options_kr|length > 0) or (climatisation_options_kr and climatisation_options_kr|length > 0) or (airbags_options_kr and airbags_options_kr|length > 0) or (emission_classes_kr and emission_classes_kr|length > 0) or (efficiency_classes_kr and efficiency_classes_kr|length > 0) or (price_rating_labels_kr and price_rating_labels_kr|length > 0) %}
-      {% if details_has_eu or details_has_kr %}
       <section class="advanced-section" id="advanced-details" data-has-eu="{{ 1 if details_has_eu else 0 }}" data-has-kr="{{ 1 if details_has_kr else 0 }}">
         <h2 class="advanced-section__title">Детали предложения</h2>
         <div class="search-filters">
@@ -437,7 +434,6 @@
           </div>
         </div>
       </section>
-      {% endif %}
 
       <div class="advanced-actions">
         <button type="submit" class="btn btn-primary" id="advanced-submit">

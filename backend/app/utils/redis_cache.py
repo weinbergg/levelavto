@@ -69,6 +69,18 @@ def build_total_cars_key(params: Optional[Dict[str, Any]] = None) -> str:
     return f"total_cars:{key}"
 
 
+def build_filter_payload_key(params: Optional[Dict[str, Any]] = None) -> str:
+    if not params:
+        return "filter_payload:all"
+    key = (
+        str(params.get("region") or ""),
+        str(params.get("country") or ""),
+        str(params.get("brand") or ""),
+        str(params.get("model") or ""),
+    )
+    return f"filter_payload:{key}"
+
+
 def redis_get_json(key: str) -> Optional[Any]:
     client = get_redis()
     if client is None:

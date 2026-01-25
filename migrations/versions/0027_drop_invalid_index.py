@@ -15,10 +15,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # DROP INDEX CONCURRENTLY must run вне транзакции
-    ctx = op.get_context()
-    with ctx.autocommit_block():
-        op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_cars_country_brand_avail")
+    # Invalid index: drop without CONCURRENTLY to avoid transactional errors in alembic
+    op.execute("DROP INDEX IF EXISTS idx_cars_country_brand_avail")
 
 
 def downgrade() -> None:

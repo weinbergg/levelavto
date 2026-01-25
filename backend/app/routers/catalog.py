@@ -6,6 +6,7 @@ from ..services.cars_service import CarsService, normalize_brand
 from ..schemas import CarDetailOut
 from ..utils.country_map import resolve_display_country, normalize_country_code
 from ..utils.taxonomy import normalize_fuel, ru_fuel, ru_transmission, color_hex
+from ..utils.redis_cache import redis_get_json, redis_set_json, build_filter_payload_key
 from ..models.car_image import CarImage
 from sqlalchemy import select, func
 import re
@@ -283,3 +284,63 @@ def filter_options(
         "reg_year",
     ]
     return {field: facet(field) for field in fields}
+
+
+@router.get("/filter_payload")
+def filter_payload(
+    request: Request,
+    region: Optional[str] = Query(default=None),
+    country: Optional[str] = Query(default=None),
+    brand: Optional[str] = Query(default=None),
+    model: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    service = CarsService(db)
+    timing_enabled = os.environ.get("CAR_API_TIMING", "0") == "1"
+    cache_key = build_filter_payload_key(
+        {"region": region, "country": country, "brand": brand, "model": model}
+    )
+    cached = redis_get_json(cache_key)
+    if cached:
+        if timing_enabled:
+            print("FILTER_PAYLOAD_CACHE hit=1 source=redis payload_total_ms=0.0", flush=True)
+        return cached
+    start = time.perf_counter()
+    payload_keys = [
+        "num_seats",
+        "doors_count",
+        "owners_count",
+        "emission_class",
+        "efficiency_class",
+        "climatisation",
+        "airbags",
+        "interior_design",
+        "price_rating_label",
+    ]
+    eu_payload = service.payload_values_bulk(payload_keys, source_ids=service.source_ids_for_region("EU"))
+    kr_payload = service.payload_values_bulk(payload_keys, source_ids=service.source_ids_for_region("KR"))
+    data = {
+        "seats_options_eu": eu_payload.get("num_seats", []),
+        "doors_options_eu": eu_payload.get("doors_count", []),
+        "owners_options_eu": eu_payload.get("owners_count", []),
+        "emission_classes_eu": eu_payload.get("emission_class", []),
+        "efficiency_classes_eu": eu_payload.get("efficiency_class", []),
+        "climatisation_options_eu": eu_payload.get("climatisation", []),
+        "airbags_options_eu": eu_payload.get("airbags", []),
+        "interior_design_options_eu": eu_payload.get("interior_design", []),
+        "price_rating_labels_eu": eu_payload.get("price_rating_label", []),
+        "seats_options_kr": kr_payload.get("num_seats", []),
+        "doors_options_kr": kr_payload.get("doors_count", []),
+        "owners_options_kr": kr_payload.get("owners_count", []),
+        "emission_classes_kr": kr_payload.get("emission_class", []),
+        "efficiency_classes_kr": kr_payload.get("efficiency_class", []),
+        "climatisation_options_kr": kr_payload.get("climatisation", []),
+        "airbags_options_kr": kr_payload.get("airbags", []),
+        "interior_design_options_kr": kr_payload.get("interior_design", []),
+        "price_rating_labels_kr": kr_payload.get("price_rating_label", []),
+    }
+    redis_set_json(cache_key, data, ttl_sec=3600)
+    total_ms = (time.perf_counter() - start) * 1000
+    if timing_enabled:
+        print(f"FILTER_PAYLOAD_CACHE hit=0 source=fallback payload_total_ms={total_ms:.2f}", flush=True)
+    return data
