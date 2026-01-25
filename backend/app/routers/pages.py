@@ -16,6 +16,7 @@ from ..utils.recommended_config import load_config
 from ..services.content_service import ContentService
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, exists
+from cachetools import TTLCache
 from ..models import Car, Source, CarImage
 from ..auth import get_current_user
 from urllib.parse import quote
@@ -36,6 +37,7 @@ from ..utils.home_content import build_home_content
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+_FILTER_CTX_CACHE: TTLCache = TTLCache(maxsize=64, ttl=600)
 RECOMMENDED_PLACEMENT = "recommended"
 MONTHS_RU = [
     "январь",
@@ -111,7 +113,36 @@ def _build_filter_context(
     include_payload: bool = True,
     params: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    cache_key = None
+    if not params:
+        cache_key = ("home", include_payload)
+    else:
+        cache_key = (
+            str(params.get("region") or ""),
+            str(params.get("country") or ""),
+            str(params.get("brand") or ""),
+            str(params.get("model") or ""),
+            str(params.get("color") or ""),
+            str(params.get("engine_type") or ""),
+            str(params.get("transmission") or ""),
+            str(params.get("body_type") or ""),
+            str(params.get("drive_type") or ""),
+            str(params.get("reg_year") or ""),
+            include_payload,
+        )
+    if cache_key is not None:
+        cached = _FILTER_CTX_CACHE.get(cache_key)
+        if cached:
+            if os.environ.get("HTML_TIMING", "0") == "1":
+                print("FILTER_CTX_CACHE hit=1", flush=True)
+            return cached
+        if os.environ.get("HTML_TIMING", "0") == "1":
+            print("FILTER_CTX_CACHE hit=0", flush=True)
+    timing_enabled = os.environ.get("HTML_TIMING", "0") == "1"
+    t_ctx = time.perf_counter()
     regions = service.available_regions()
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=regions ms={(time.perf_counter()-t_ctx)*1000:.2f}", flush=True)
     params = params or {}
     facet_filters = {
         "region": params.get("region"),
@@ -126,20 +157,30 @@ def _build_filter_context(
         "reg_year": int(params["reg_year"]) if params.get("reg_year") else None,
     }
 
+    t0 = time.perf_counter()
     eu_countries = [c["value"] for c in service.facet_counts(field="country", filters=facet_filters)]
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=countries ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     eu_source_ids = service.source_ids_for_region("EU")
     kr_source_ids = service.source_ids_for_region("KR")
     has_air_suspension = False
+    t0 = time.perf_counter()
     reg_years = [int(r["value"]) for r in service.facet_counts(field="reg_year", filters=facet_filters)]
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=reg_years ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     reg_months = (
         [{"value": i + 1, "label": MONTHS_RU[i]} for i in range(12)]
         if reg_years
         else []
     )
+    t0 = time.perf_counter()
     price_max = db.execute(select(func.max(Car.price_rub_cached))).scalar_one_or_none()
     if price_max is None:
         price_max = db.execute(select(func.max(Car.price))).scalar_one_or_none()
     mileage_max = db.execute(select(func.max(Car.mileage))).scalar_one_or_none()
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=max_price_mileage ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
+    t0 = time.perf_counter()
     generations = (
         db.execute(
             select(func.distinct(Car.generation))
@@ -150,6 +191,9 @@ def _build_filter_context(
         .all()
     )
     generations = [g for g in generations if g]
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=generations ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
+    t0 = time.perf_counter()
     colors = service.facet_counts(field="color", filters=facet_filters)
     colors = [
         {
@@ -161,11 +205,14 @@ def _build_filter_context(
         for c in colors
         if c.get("value")
     ]
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=colors ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     basic_set = set(BASIC_COLORS)
     basic_by_value = {c["value"]: c for c in colors if c.get("value") in basic_set}
     colors_basic = [basic_by_value[c] for c in BASIC_COLORS if c in basic_by_value]
     colors_other = [c for c in colors if c.get("value") not in basic_set]
     countries_sorted = sorted(eu_countries)
+    t0 = time.perf_counter()
     body_types = []
     for row in service.facet_counts(field="body_type", filters=facet_filters):
         val = row.get("value")
@@ -173,6 +220,8 @@ def _build_filter_context(
             continue
         label = ru_body(val) or display_body(val) or val
         body_types.append({"value": val, "label": label, "count": row.get("count")})
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=body_types ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     if include_payload:
         payload_keys = [
             "num_seats",
@@ -185,8 +234,11 @@ def _build_filter_context(
             "interior_design",
             "price_rating_label",
         ]
+        t0 = time.perf_counter()
         eu_payload = service.payload_values_bulk(payload_keys, source_ids=eu_source_ids)
         kr_payload = service.payload_values_bulk(payload_keys, source_ids=kr_source_ids)
+        if timing_enabled:
+            print(f"FILTER_CTX_STAGE name=payload_values ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
         seats_options = []
         doors_options = []
         owners_options = []
@@ -243,13 +295,45 @@ def _build_filter_context(
         interior_design_options_kr = []
         price_rating_labels_kr = []
     kr_types = []
+    t0 = time.perf_counter()
     if service.has_korea():
         kr_types = [
             {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
             {"value": "KR_IMPORT", "label": "Корея (импорт)"},
         ]
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=kr_types ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
 
-    return {
+    t0 = time.perf_counter()
+    brands = [
+        b["value"]
+        for b in service.facet_counts(field="brand", filters=facet_filters)
+        if b.get("value")
+    ]
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=brands ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
+    t0 = time.perf_counter()
+    engine_types = [
+        {"value": v["value"], "label": ru_fuel(v["value"]) or v["value"], "count": v["count"]}
+        for v in service.facet_counts(field="engine_type", filters=facet_filters)
+    ]
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=engine_types ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
+    t0 = time.perf_counter()
+    transmissions = [
+        {"value": v["value"], "label": ru_transmission(v["value"]) or v["value"], "count": v["count"]}
+        for v in service.facet_counts(field="transmission", filters=facet_filters)
+    ]
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=transmissions ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
+    t0 = time.perf_counter()
+    drive_types = [
+        {"value": v["value"], "label": v["value"], "count": v["count"]}
+        for v in service.facet_counts(field="drive_type", filters=facet_filters)
+    ]
+    if timing_enabled:
+        print(f"FILTER_CTX_STAGE name=drive_types ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
+    ctx = {
         "regions": regions,
         "countries": countries_sorted,
         "country_labels": {**{c: country_label_ru(c) for c in countries_sorted}, "EU": "Европа", "KR": "Корея"},
@@ -262,23 +346,10 @@ def _build_filter_context(
         "colors_basic": colors_basic,
         "colors_other": colors_other,
         "body_types": body_types,
-        "brands": [
-            b["value"]
-            for b in service.facet_counts(field="brand", filters=facet_filters)
-            if b.get("value")
-        ],
-        "engine_types": [
-            {"value": v["value"], "label": ru_fuel(v["value"]) or v["value"], "count": v["count"]}
-            for v in service.facet_counts(field="engine_type", filters=facet_filters)
-        ],
-        "transmissions": [
-            {"value": v["value"], "label": ru_transmission(v["value"]) or v["value"], "count": v["count"]}
-            for v in service.facet_counts(field="transmission", filters=facet_filters)
-        ],
-        "drive_types": [
-            {"value": v["value"], "label": v["value"], "count": v["count"]}
-            for v in service.facet_counts(field="drive_type", filters=facet_filters)
-        ],
+        "brands": brands,
+        "engine_types": engine_types,
+        "transmissions": transmissions,
+        "drive_types": drive_types,
         "seats_options": seats_options,
         "doors_options": doors_options,
         "owners_options": owners_options,
@@ -308,6 +379,9 @@ def _build_filter_context(
         "price_rating_labels_kr": price_rating_labels_kr,
         "has_air_suspension": has_air_suspension,
     }
+    if cache_key is not None:
+        _FILTER_CTX_CACHE[cache_key] = ctx
+    return ctx
 
 
 def _home_context(
