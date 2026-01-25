@@ -379,11 +379,13 @@ class CarsService:
             out = sorted(out, key=lambda x: (-x["count"], x["value"].lower()))
         return out
 
-    def get_fx_rates(self) -> dict | None:
+    def get_fx_rates(self, *, allow_fetch: bool = True) -> dict | None:
         now = time.time()
         ttl_sec = 3600
         if self._fx_cache and self._fx_cache_ts and now - self._fx_cache_ts < ttl_sec:
             return self._fx_cache
+        if not allow_fetch:
+            return self._fx_cache or {}
         eur_env = float(os.environ.get("EURO_RATE", "95.0"))
         usd_env = float(os.environ.get("USD_RATE", "85.0"))
         eur, usd = eur_env, usd_env

@@ -317,14 +317,20 @@ def _home_context(
     extra: Optional[Dict[str, Any]] = None,
     timing: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
+    timing_enabled = os.environ.get("HTML_TIMING", "0") == "1"
+    def _stage(name: str, started_at: float):
+        if timing is None:
+            return
+        ms = (time.perf_counter() - started_at) * 1000
+        timing[name] = ms
+        if timing_enabled:
+            print(f"HOME_STAGE name={name} ms={ms:.2f}", flush=True)
     t0 = time.perf_counter()
     brand_stats = service.brand_stats()
-    if timing is not None:
-        timing["brand_stats_ms"] = (time.perf_counter() - t0) * 1000
+    _stage("brand_stats_ms", t0)
     t0 = time.perf_counter()
     body_type_stats = service.body_type_stats()
-    if timing is not None:
-        timing["body_type_stats_ms"] = (time.perf_counter() - t0) * 1000
+    _stage("body_type_stats_ms", t0)
     reco_cfg = load_config()
     t0 = time.perf_counter()
     recommended = service.recommended_auto(
@@ -334,8 +340,7 @@ def _home_context(
         mileage_max=reco_cfg.get("mileage_max"),
         limit=12,
     )
-    if timing is not None:
-        timing["recommended_ms"] = (time.perf_counter() - t0) * 1000
+    _stage("recommended_ms", t0)
     for car in recommended:
         code, label = resolve_display_country(car)
         car.display_country_code = code
@@ -357,12 +362,10 @@ def _home_context(
             "contact_ig",
         ])
     home_content = build_home_content(content)
-    if timing is not None:
-        timing["content_ms"] = (time.perf_counter() - t0) * 1000
+    _stage("content_ms", t0)
     t0 = time.perf_counter()
-    fx_rates = service.get_fx_rates() or {}
-    if timing is not None:
-        timing["fx_rates_ms"] = (time.perf_counter() - t0) * 1000
+    fx_rates = service.get_fx_rates(allow_fetch=False) or {}
+    _stage("fx_rates_ms", t0)
     # медиа лежат рядом с корнем проекта: /code/фото-видео
     media_root = Path(__file__).resolve().parents[3] / "фото-видео"
     video_dir = media_root / "видео"
@@ -377,8 +380,7 @@ def _home_context(
                 hero_videos.append(f"/media/{prefix}/{p.name}")
     if len(hero_videos) > 1:
         hero_videos = [hero_videos[1]]
-    if timing is not None:
-        timing["hero_videos_ms"] = (time.perf_counter() - t0) * 1000
+    _stage("hero_videos_ms", t0)
 
     t0 = time.perf_counter()
     collage_images = []
@@ -431,8 +433,7 @@ def _home_context(
                 if len(collage_display) >= 60:
                     break
             rng.shuffle(pool)
-    if timing is not None:
-        timing["collage_ms"] = (time.perf_counter() - t0) * 1000
+    _stage("collage_ms", t0)
 
     # brand logos: map brands that have logo files in static/img/brand-logos
     static_root = Path(__file__).resolve().parent.parent / \
@@ -477,8 +478,7 @@ def _home_context(
 
     t0 = time.perf_counter()
     filter_ctx = _build_filter_context(service, db, include_payload=False, params={})
-    if timing is not None:
-        timing["filter_ctx_ms"] = (time.perf_counter() - t0) * 1000
+    _stage("filter_ctx_ms", t0)
     country_labels = filter_ctx.get("country_labels") or {}
     countries_list = filter_ctx.get("countries") or []
     countries_with_labels = [
@@ -487,8 +487,7 @@ def _home_context(
     ]
     t0 = time.perf_counter()
     total_cars = service.total_cars()
-    if timing is not None:
-        timing["total_cars_ms"] = (time.perf_counter() - t0) * 1000
+    _stage("total_cars_ms", t0)
     context = {
         "request": request,
         "user": getattr(request.state, "user", None),
@@ -528,9 +527,16 @@ def index(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
     templates = request.app.state.templates
     service = CarsService(db)
     timing: Dict[str, float] = {}
+    t_start = time.perf_counter()
     ctx = _home_context(request, service, db, timing=timing)
+    timing["total_ms"] = (time.perf_counter() - t_start) * 1000
     if os.environ.get("HTML_TIMING", "0") == "1":
         request.state.html_parts = {"route": "home", **timing}
+        print(
+            "HOME_TIMING "
+            + " ".join(f"{k}={v:.2f}" for k, v in timing.items()),
+            flush=True,
+        )
         logger.info("HOME_TIMING %s", request.state.html_parts)
     return templates.TemplateResponse("home.html", ctx)
 
@@ -598,9 +604,16 @@ def submit_lead(
         status["message"] = "Спасибо! Мы свяжемся с вами в ближайшее время."
     extra = {"lead_status": status}
     timing: Dict[str, float] = {}
+    t_start = time.perf_counter()
     ctx = _home_context(request, service, db, extra, timing=timing)
+    timing["total_ms"] = (time.perf_counter() - t_start) * 1000
     if os.environ.get("HTML_TIMING", "0") == "1":
         request.state.html_parts = {"route": "home", **timing}
+        print(
+            "HOME_TIMING "
+            + " ".join(f"{k}={v:.2f}" for k, v in timing.items()),
+            flush=True,
+        )
         logger.info("HOME_TIMING %s", request.state.html_parts)
     return templates.TemplateResponse("home.html", ctx)
 
@@ -610,11 +623,12 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     templates = request.app.state.templates
     service = CarsService(db)
     timing: Dict[str, float] = {}
+    t_start = time.perf_counter()
     t0 = time.perf_counter()
     filter_ctx = _build_filter_context(service, db, include_payload=False, params=dict(request.query_params))
     timing["filter_ctx_ms"] = (time.perf_counter() - t0) * 1000
     t0 = time.perf_counter()
-    fx_rates = service.get_fx_rates() or {}
+    fx_rates = service.get_fx_rates(allow_fetch=False) or {}
     timing["fx_rates_ms"] = (time.perf_counter() - t0) * 1000
     t0 = time.perf_counter()
     contact_content = ContentService(db).content_map(
@@ -627,8 +641,14 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "contact_ig",
         ])
     timing["content_ms"] = (time.perf_counter() - t0) * 1000
+    timing["total_ms"] = (time.perf_counter() - t_start) * 1000
     if os.environ.get("HTML_TIMING", "0") == "1":
         request.state.html_parts = {"route": "catalog", **timing}
+        print(
+            "CATALOG_TIMING "
+            + " ".join(f"{k}={v:.2f}" for k, v in timing.items()),
+            flush=True,
+        )
         logger.info("CATALOG_TIMING %s", request.state.html_parts)
 
     return templates.TemplateResponse(
