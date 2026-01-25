@@ -1,4 +1,5 @@
 import time
+import logging
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
@@ -34,6 +35,7 @@ from ..utils.home_content import build_home_content
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 RECOMMENDED_PLACEMENT = "recommended"
 MONTHS_RU = [
     "январь",
@@ -529,6 +531,7 @@ def index(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
     ctx = _home_context(request, service, db, timing=timing)
     if os.environ.get("HTML_TIMING", "0") == "1":
         request.state.html_parts = {"route": "home", **timing}
+        logger.info("HOME_TIMING %s", request.state.html_parts)
     return templates.TemplateResponse("home.html", ctx)
 
 
@@ -598,6 +601,7 @@ def submit_lead(
     ctx = _home_context(request, service, db, extra, timing=timing)
     if os.environ.get("HTML_TIMING", "0") == "1":
         request.state.html_parts = {"route": "home", **timing}
+        logger.info("HOME_TIMING %s", request.state.html_parts)
     return templates.TemplateResponse("home.html", ctx)
 
 
@@ -609,6 +613,9 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     t0 = time.perf_counter()
     filter_ctx = _build_filter_context(service, db, include_payload=False, params=dict(request.query_params))
     timing["filter_ctx_ms"] = (time.perf_counter() - t0) * 1000
+    t0 = time.perf_counter()
+    fx_rates = service.get_fx_rates() or {}
+    timing["fx_rates_ms"] = (time.perf_counter() - t0) * 1000
     t0 = time.perf_counter()
     contact_content = ContentService(db).content_map(
         [
@@ -622,6 +629,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     timing["content_ms"] = (time.perf_counter() - t0) * 1000
     if os.environ.get("HTML_TIMING", "0") == "1":
         request.state.html_parts = {"route": "catalog", **timing}
+        logger.info("CATALOG_TIMING %s", request.state.html_parts)
 
     return templates.TemplateResponse(
         "catalog.html",
@@ -645,7 +653,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "transmissions": filter_ctx["transmissions"],
             "drive_types": filter_ctx["drive_types"],
             "has_air_suspension": filter_ctx["has_air_suspension"],
-            "fx_rates": service.get_fx_rates() or {},
+            "fx_rates": fx_rates,
             "content": contact_content,
             "contact_phone": contact_content.get("contact_phone"),
             "contact_email": contact_content.get("contact_email"),

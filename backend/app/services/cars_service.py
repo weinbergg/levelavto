@@ -381,22 +381,28 @@ class CarsService:
 
     def get_fx_rates(self) -> dict | None:
         now = time.time()
-        if self._fx_cache and self._fx_cache_ts and now - self._fx_cache_ts < 3600:
+        ttl_sec = 3600
+        if self._fx_cache and self._fx_cache_ts and now - self._fx_cache_ts < ttl_sec:
             return self._fx_cache
         eur_env = float(os.environ.get("EURO_RATE", "95.0"))
         usd_env = float(os.environ.get("USD_RATE", "85.0"))
         eur, usd = eur_env, usd_env
+        cached = self._fx_cache
         try:
             res = requests.get(
-                "https://www.cbr-xml-daily.ru/daily_json.js", timeout=1.5)
+                "https://www.cbr-xml-daily.ru/daily_json.js",
+                timeout=(0.3, 0.7),
+            )
             data = res.json()
             eur = float(data["Valute"]["EUR"]["Value"])
             usd = float(data["Valute"]["USD"]["Value"])
+            self._fx_cache = {"EUR": eur, "USD": usd, "RUB": 1.0}
+            self._fx_cache_ts = now
+            return self._fx_cache
         except Exception:
-            pass
-        self._fx_cache = {"EUR": eur, "USD": usd, "RUB": 1.0}
-        self._fx_cache_ts = now
-        return self._fx_cache
+            if cached:
+                return cached
+            return {}
 
     def list_cars(
         self,
