@@ -1,6 +1,6 @@
 """add idx_cars_country_brand_model_avail
 
-Revision ID: 0028_add_idx_country_brand_model_avail
+Revision ID: 0028_idx_country_brand_model
 Revises: 0027_drop_invalid_index
 Create Date: 2026-01-24
 """
@@ -9,7 +9,7 @@ from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision = "0028_add_idx_country_brand_model_avail"
+revision = "0028_idx_country_brand_model"
 down_revision = "0027_drop_invalid_index"
 branch_labels = None
 depends_on = None
