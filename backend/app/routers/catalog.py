@@ -121,6 +121,8 @@ def list_cars(
         light=True,
     )
     t1 = time.perf_counter()
+    if items and not isinstance(items[0], dict):
+        items = [dict(row) for row in items]
     image_counts = {}
     if items:
         ids = [c.get("id") for c in items if c.get("id")]
