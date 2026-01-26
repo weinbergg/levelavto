@@ -763,15 +763,16 @@
         const wrap = card.querySelector('.thumb-wrap')
         if (wrap) wrap.classList.add('thumb-loading')
         if (img) {
-          img.style.opacity = '0'
-          img.addEventListener('load', () => {
+          const finalize = () => {
             img.style.opacity = '1'
             if (wrap) wrap.classList.remove('thumb-loading')
-          })
-          img.addEventListener('error', () => {
-            img.style.opacity = '1'
-            if (wrap) wrap.classList.remove('thumb-loading')
-          })
+          }
+          if (img.complete && img.naturalWidth > 0) {
+            finalize()
+          } else {
+            img.addEventListener('load', finalize)
+            img.addEventListener('error', finalize)
+          }
         }
         if (hasGallery && img) {
           let index = 0
@@ -1131,6 +1132,7 @@
     const submitBtn = qs('#home-submit')
     const countEl = qs('#home-count')
     const badgeCountEl = qs('#home-badge-count')
+    const countEls = qsa('[data-home-count]')
     const regionSelect = qs('#home-region')
     const regionSlot = qs('#home-region-slot')
     const regionSlotSelect = qs('#home-region-slot-select')
@@ -1260,6 +1262,12 @@
           }
           animateCount(countEl, total)
           if (badgeCountEl) animateCount(badgeCountEl, total)
+          if (countEls.length) {
+            countEls.forEach((el) => {
+              if (el === countEl || el === badgeCountEl) return
+              animateCount(el, total)
+            })
+          }
           lastTotal = total
           initialAnimation = false
           updateAdvancedLink()

@@ -109,7 +109,7 @@
           <button type="submit" class="btn btn-primary" id="home-submit">
             <span class="label">{{ home.search.submit_label }}</span>
             <span class="sep">·</span>
-            <span id="home-count" data-count="{{ total_cars }}">{{ total_cars }}</span>
+            <span id="home-count" data-count="{{ total_cars }}" data-home-count>{{ total_cars }}</span>
             <span class="suffix">{{ home.search.submit_suffix }}</span>
           </button>
           <div class="links">
@@ -123,7 +123,7 @@
 
   <div class="la-container hero-grid">
     <div class="hero-text">
-      <div class="stats-badge"><span id="home-badge-count" data-count="{{ total_cars }}">{{ total_cars }}</span> {{ home.hero.stats_suffix }}</div>
+      <div class="stats-badge"><span id="home-badge-count" data-count="{{ total_cars }}" data-home-count>{{ total_cars }}</span> {{ home.hero.stats_suffix }}</div>
       <h1>{{ home.hero.title }}</h1>
       <p class="subtitle">{{ home.hero.subtitle }}</p>
       <div class="benefits">
