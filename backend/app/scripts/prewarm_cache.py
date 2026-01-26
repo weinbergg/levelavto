@@ -9,8 +9,10 @@ from backend.app.utils.redis_cache import (
     redis_set_json,
     build_filter_ctx_key,
     build_total_cars_key,
+    build_cars_count_key,
     build_filter_payload_key,
     normalize_filter_params,
+    normalize_count_params,
 )
 
 
@@ -93,6 +95,18 @@ def main() -> None:
         total = service.total_cars()
         redis_set_json(build_total_cars_key(), total, ttl_sec=600)
         print(f"[prewarm] total_cars={total}")
+        count_keys = [
+            {},
+            {"region": "EU"},
+            {"region": "EU", "country": "DE"},
+            {"region": "KR"},
+        ]
+        for params in count_keys:
+            normalized = normalize_count_params(params)
+            count = service.count_cars(**normalized)
+            count_key = build_cars_count_key(normalized)
+            redis_set_json(count_key, int(count), ttl_sec=600)
+            print(f"[prewarm] cars_count key={count_key} value={count}")
     print(f"[prewarm] done in {(time.perf_counter()-started)*1000:.2f} ms")
 
 

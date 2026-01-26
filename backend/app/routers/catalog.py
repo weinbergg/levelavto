@@ -6,7 +6,14 @@ from ..services.cars_service import CarsService, normalize_brand
 from ..schemas import CarDetailOut
 from ..utils.country_map import resolve_display_country, normalize_country_code
 from ..utils.taxonomy import normalize_fuel, ru_fuel, ru_transmission, color_hex
-from ..utils.redis_cache import redis_get_json, redis_set_json, build_filter_payload_key, normalize_filter_params
+from ..utils.redis_cache import (
+    redis_get_json,
+    redis_set_json,
+    build_filter_payload_key,
+    normalize_filter_params,
+    build_cars_count_key,
+    normalize_count_params,
+)
 from ..models.car_image import CarImage
 from sqlalchemy import select, func
 import re
@@ -198,6 +205,96 @@ def list_cars(
         "page": page,
         "page_size": page_size,
     }
+
+
+@router.get("/cars_count")
+def cars_count(
+    request: Request,
+    region: Optional[str] = Query(default=None),
+    country: Optional[str] = Query(default=None),
+    brand: Optional[str] = Query(default=None),
+    model: Optional[str] = Query(default=None),
+    color: Optional[str] = Query(default=None),
+    engine_type: Optional[str] = Query(default=None),
+    transmission: Optional[str] = Query(default=None),
+    body_type: Optional[str] = Query(default=None),
+    drive_type: Optional[str] = Query(default=None),
+    kr_type: Optional[str] = Query(default=None),
+    price_min: Optional[float] = Query(default=None),
+    price_max: Optional[float] = Query(default=None),
+    power_hp_min: Optional[float] = Query(default=None),
+    power_hp_max: Optional[float] = Query(default=None),
+    engine_cc_min: Optional[int] = Query(default=None),
+    engine_cc_max: Optional[int] = Query(default=None),
+    year_min: Optional[int] = Query(default=None),
+    year_max: Optional[int] = Query(default=None),
+    mileage_min: Optional[int] = Query(default=None),
+    mileage_max: Optional[int] = Query(default=None),
+    reg_year_min: Optional[int] = Query(default=None),
+    reg_year_max: Optional[int] = Query(default=None),
+    condition: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    service = CarsService(db)
+    params = {
+        "region": region,
+        "country": country,
+        "brand": brand,
+        "model": model,
+        "color": color,
+        "engine_type": engine_type,
+        "transmission": transmission,
+        "body_type": body_type,
+        "drive_type": drive_type,
+        "kr_type": kr_type,
+        "price_min": price_min,
+        "price_max": price_max,
+        "power_hp_min": power_hp_min,
+        "power_hp_max": power_hp_max,
+        "engine_cc_min": engine_cc_min,
+        "engine_cc_max": engine_cc_max,
+        "year_min": year_min,
+        "year_max": year_max,
+        "mileage_min": mileage_min,
+        "mileage_max": mileage_max,
+        "reg_year_min": reg_year_min,
+        "reg_year_max": reg_year_max,
+        "condition": condition,
+    }
+    normalized = normalize_count_params(params)
+    cache_key = build_cars_count_key(normalized)
+    cached = redis_get_json(cache_key)
+    if cached is not None:
+        print("CARS_COUNT_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
+        return {"count": int(cached)}
+    print("CARS_COUNT_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
+    total = service.count_cars(
+        region=region,
+        country=country,
+        brand=brand,
+        model=model,
+        color=color,
+        engine_type=engine_type,
+        transmission=transmission,
+        body_type=body_type,
+        drive_type=drive_type,
+        kr_type=kr_type,
+        price_min=price_min,
+        price_max=price_max,
+        power_hp_min=power_hp_min,
+        power_hp_max=power_hp_max,
+        engine_cc_min=engine_cc_min,
+        engine_cc_max=engine_cc_max,
+        year_min=year_min,
+        year_max=year_max,
+        mileage_min=mileage_min,
+        mileage_max=mileage_max,
+        reg_year_min=reg_year_min,
+        reg_year_max=reg_year_max,
+        condition=condition,
+    )
+    redis_set_json(cache_key, int(total), ttl_sec=600)
+    return {"count": int(total)}
 
 
 @router.get("/cars/{car_id}")

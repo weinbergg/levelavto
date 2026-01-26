@@ -678,7 +678,7 @@
         card.href = `/car/${car.id}`
         card.className = 'car-card'
         const images = Array.isArray(car.images) && car.images.length ? car.images : (car.thumbnail_url ? [car.thumbnail_url] : [])
-        const thumbSrc = images[0] || ''
+        const thumbSrc = images[0] || '/static/img/no-photo.svg'
         const hasGallery = images.length > 1
         const navControls = hasGallery
           ? `
@@ -734,6 +734,10 @@
               alt=""
               loading="lazy"
               decoding="async"
+              referrerpolicy="no-referrer"
+              data-thumb="${thumbSrc}"
+              data-id="${car.id}"
+              onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
               fetchpriority="low"
               width="320"
               height="200"
@@ -1126,6 +1130,7 @@
     const modelSelect = qs('#home-model')
     const submitBtn = qs('#home-submit')
     const countEl = qs('#home-count')
+    const badgeCountEl = qs('#home-badge-count')
     const regionSelect = qs('#home-region')
     const regionSlot = qs('#home-region-slot')
     const regionSlotSelect = qs('#home-region-slot-select')
@@ -1240,16 +1245,21 @@
         pendingController?.abort()
         pendingController = new AbortController()
         try {
-          const params = buildHomeParams(true)
-          const res = await fetch(`/api/cars?${params.toString()}`, { signal: pendingController.signal })
+          const params = buildHomeParams(false)
+          const res = await fetch(`/api/cars_count?${params.toString()}`, { signal: pendingController.signal })
           if (!res.ok) return
           const data = await res.json()
-          const total = Number(data.total || 0)
+          const total = Number(data.count || 0)
           if (initialAnimation) {
             countEl.dataset.count = '0'
             countEl.textContent = '0'
+            if (badgeCountEl) {
+              badgeCountEl.dataset.count = '0'
+              badgeCountEl.textContent = '0'
+            }
           }
           animateCount(countEl, total)
+          if (badgeCountEl) animateCount(badgeCountEl, total)
           lastTotal = total
           initialAnimation = false
           updateAdvancedLink()
@@ -1682,12 +1692,12 @@
           card.href = `/car/${car.id}`
           card.className = 'car-card'
           const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
-          const thumb = thumbRaw ? thumbRaw.replace('rule=mo-1024', 'rule=mo-480') : ''
+          const thumb = thumbRaw ? thumbRaw.replace('rule=mo-1024', 'rule=mo-480') : '/static/img/no-photo.svg'
           const displayRub = car.total_price_rub_cached ?? car.price_rub_cached
           const price = displayRub != null ? formatRub(displayRub) : '—'
           card.innerHTML = `
             <div class="thumb-wrap">
-              <img class="thumb" src="${thumb}" alt="" loading="lazy" decoding="async" />
+              <img class="thumb" src="${thumb}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-thumb="${thumb}" data-id="${car.id}" onerror="this.onerror=null;this.src='/static/img/no-photo.svg';" />
             </div>
             <div class="car-card__body">
               <div>

@@ -21,8 +21,9 @@ from ..utils.redis_cache import (
     redis_get_json,
     redis_set_json,
     build_filter_ctx_key,
-    build_total_cars_key,
     normalize_filter_params,
+    build_cars_count_key,
+    normalize_count_params,
 )
 from ..models import Car, Source, CarImage
 from ..auth import get_current_user
@@ -46,6 +47,27 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 _FILTER_CTX_CACHE: TTLCache = TTLCache(maxsize=64, ttl=600)
 _TOTAL_CARS_CACHE: TTLCache = TTLCache(maxsize=32, ttl=300)
+
+
+def _get_cars_count(service: CarsService, params: Dict[str, Any], timing_enabled: bool) -> int:
+    normalized = normalize_count_params(params)
+    cache_key = build_cars_count_key(normalized)
+    cached = redis_get_json(cache_key)
+    if cached is not None:
+        if timing_enabled:
+            print(f"CARS_COUNT_CACHE hit=1 source=redis key={cache_key}", flush=True)
+        return int(cached)
+    cached = _TOTAL_CARS_CACHE.get(cache_key)
+    if cached is not None:
+        if timing_enabled:
+            print(f"CARS_COUNT_CACHE hit=1 source=fallback key={cache_key}", flush=True)
+        return int(cached)
+    if timing_enabled:
+        print(f"CARS_COUNT_CACHE hit=0 source=fallback key={cache_key}", flush=True)
+    total = service.count_cars(**normalized)
+    _TOTAL_CARS_CACHE[cache_key] = int(total)
+    redis_set_json(cache_key, int(total), ttl_sec=600)
+    return int(total)
 RECOMMENDED_PLACEMENT = "recommended"
 MONTHS_RU = [
     "январь",
@@ -556,25 +578,7 @@ def _home_context(
         for c in countries_list
     ]
     t0 = time.perf_counter()
-    total_cars = None
-    total_cache_key = build_total_cars_key()
-    cached_total = redis_get_json(total_cache_key)
-    if cached_total is not None:
-        total_cars = cached_total
-        if timing_enabled:
-            print("TOTAL_CARS_CACHE hit=1 source=redis", flush=True)
-    else:
-        cached_total = _TOTAL_CARS_CACHE.get(total_cache_key)
-        if cached_total is not None:
-            total_cars = cached_total
-            if timing_enabled:
-                print("TOTAL_CARS_CACHE hit=1 source=fallback", flush=True)
-    if total_cars is None:
-        if timing_enabled:
-            print("TOTAL_CARS_CACHE hit=0 source=fallback", flush=True)
-        total_cars = service.total_cars()
-        _TOTAL_CARS_CACHE[total_cache_key] = total_cars
-        redis_set_json(total_cache_key, total_cars, ttl_sec=600)
+    total_cars = _get_cars_count(service, {}, timing_enabled)
     _stage("total_cars_ms", t0)
     context = {
         "request": request,
@@ -800,19 +804,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "contact_wa",
             "contact_ig",
         ])
-    total_cars = None
-    total_cache_key = build_total_cars_key()
-    cached_total = redis_get_json(total_cache_key)
-    if cached_total is not None:
-        total_cars = cached_total
-    else:
-        cached_total = _TOTAL_CARS_CACHE.get(total_cache_key)
-        if cached_total is not None:
-            total_cars = cached_total
-    if total_cars is None:
-        total_cars = service.total_cars()
-        _TOTAL_CARS_CACHE[total_cache_key] = total_cars
-        redis_set_json(total_cache_key, total_cars, ttl_sec=600)
+    total_cars = _get_cars_count(service, params, timing_enabled)
     if timing_enabled:
         total_ms = (time.perf_counter() - t0) * 1000
         print(

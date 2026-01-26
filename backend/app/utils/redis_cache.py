@@ -69,6 +69,14 @@ def build_total_cars_key(params: Optional[Dict[str, Any]] = None) -> str:
     return f"total_cars:{key}"
 
 
+def build_cars_count_key(params: Optional[Dict[str, Any]] = None) -> str:
+    if not params:
+        return "cars_count:all"
+    cleaned = normalize_count_params(params)
+    items = tuple(sorted((str(k), str(v)) for k, v in cleaned.items()))
+    return f"cars_count:{items}"
+
+
 def build_filter_payload_key(params: Optional[Dict[str, Any]] = None) -> str:
     if not params:
         return "filter_payload:all"
@@ -95,6 +103,47 @@ def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str
         "body_type",
         "drive_type",
         "reg_year",
+    ]
+    cleaned: Dict[str, Any] = {}
+    for key in keys:
+        val = params.get(key)
+        if val is None:
+            continue
+        if isinstance(val, str):
+            val = val.strip()
+            if not val:
+                continue
+        cleaned[key] = val
+    return cleaned
+
+
+def normalize_count_params(params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    if not params:
+        return {}
+    keys = [
+        "region",
+        "country",
+        "brand",
+        "model",
+        "color",
+        "engine_type",
+        "transmission",
+        "body_type",
+        "drive_type",
+        "kr_type",
+        "price_min",
+        "price_max",
+        "mileage_min",
+        "mileage_max",
+        "reg_year_min",
+        "reg_year_max",
+        "year_min",
+        "year_max",
+        "engine_cc_min",
+        "engine_cc_max",
+        "power_hp_min",
+        "power_hp_max",
+        "condition",
     ]
     cleaned: Dict[str, Any] = {}
     for key in keys:

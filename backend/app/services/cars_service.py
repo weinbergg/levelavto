@@ -1499,6 +1499,63 @@ class CarsService:
         stmt = select(func.count()).select_from(Car).where(and_(*conditions))
         return self.db.execute(stmt).scalar_one()
 
+    def count_cars(
+        self,
+        *,
+        region: Optional[str] = None,
+        country: Optional[str] = None,
+        brand: Optional[str] = None,
+        model: Optional[str] = None,
+        color: Optional[str] = None,
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        power_hp_min: Optional[float] = None,
+        power_hp_max: Optional[float] = None,
+        engine_cc_min: Optional[int] = None,
+        engine_cc_max: Optional[int] = None,
+        year_min: Optional[int] = None,
+        year_max: Optional[int] = None,
+        mileage_min: Optional[int] = None,
+        mileage_max: Optional[int] = None,
+        kr_type: Optional[str] = None,
+        reg_year_min: Optional[int] = None,
+        reg_year_max: Optional[int] = None,
+        body_type: Optional[str] = None,
+        engine_type: Optional[str] = None,
+        transmission: Optional[str] = None,
+        drive_type: Optional[str] = None,
+        condition: Optional[str] = None,
+    ) -> int:
+        _, total = self.list_cars(
+            region=region,
+            country=country,
+            brand=brand,
+            model=model,
+            color=color,
+            price_min=price_min,
+            price_max=price_max,
+            power_hp_min=power_hp_min,
+            power_hp_max=power_hp_max,
+            engine_cc_min=engine_cc_min,
+            engine_cc_max=engine_cc_max,
+            year_min=year_min,
+            year_max=year_max,
+            mileage_min=mileage_min,
+            mileage_max=mileage_max,
+            kr_type=kr_type,
+            reg_year_min=reg_year_min,
+            reg_year_max=reg_year_max,
+            body_type=body_type,
+            engine_type=engine_type,
+            transmission=transmission,
+            drive_type=drive_type,
+            condition=condition,
+            page=1,
+            page_size=1,
+            light=True,
+        )
+        return int(total)
+
     def price_info(self, car: Car) -> Dict[str, Any]:
         payload = car.source_payload or {}
         price_gross = payload.get("price_eur")
