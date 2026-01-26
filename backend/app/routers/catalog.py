@@ -6,7 +6,7 @@ from ..services.cars_service import CarsService, normalize_brand
 from ..schemas import CarDetailOut
 from ..utils.country_map import resolve_display_country, normalize_country_code
 from ..utils.taxonomy import normalize_fuel, ru_fuel, ru_transmission, color_hex
-from ..utils.redis_cache import redis_get_json, redis_set_json, build_filter_payload_key
+from ..utils.redis_cache import redis_get_json, redis_set_json, build_filter_payload_key, normalize_filter_params
 from ..models.car_image import CarImage
 from sqlalchemy import select, func
 import re
@@ -297,9 +297,10 @@ def filter_payload(
 ):
     service = CarsService(db)
     timing_enabled = os.environ.get("CAR_API_TIMING", "0") == "1"
-    cache_key = build_filter_payload_key(
+    params = normalize_filter_params(
         {"region": region, "country": country, "brand": brand, "model": model}
     )
+    cache_key = build_filter_payload_key(params)
     cached = redis_get_json(cache_key)
     if cached:
         if timing_enabled:

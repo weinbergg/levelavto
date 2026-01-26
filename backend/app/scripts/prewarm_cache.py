@@ -10,13 +10,15 @@ from backend.app.utils.redis_cache import (
     build_filter_ctx_key,
     build_total_cars_key,
     build_filter_payload_key,
+    normalize_filter_params,
 )
 
 
 def _prewarm_filter(service: CarsService, params: Dict[str, Any], include_payload: bool) -> Tuple[str, float]:
     started = time.perf_counter()
-    ctx = _build_filter_context(service, service.db, include_payload=include_payload, params=params)
-    cache_key = build_filter_ctx_key(params, include_payload)
+    normalized = normalize_filter_params(params)
+    ctx = _build_filter_context(service, service.db, include_payload=include_payload, params=normalized)
+    cache_key = build_filter_ctx_key(normalized, include_payload)
     redis_set_json(cache_key, ctx, ttl_sec=900)
     return cache_key, (time.perf_counter() - started) * 1000
 
@@ -84,7 +86,8 @@ def main() -> None:
             "price_rating_labels_kr": kr_payload.get("price_rating_label", []),
         }
         for params in payload_sets:
-            payload_key = build_filter_payload_key(params)
+            normalized = normalize_filter_params(params)
+            payload_key = build_filter_payload_key(normalized)
             redis_set_json(payload_key, payload_data, ttl_sec=3600)
             print(f"[prewarm] filter_payload key={payload_key}")
         total = service.total_cars()

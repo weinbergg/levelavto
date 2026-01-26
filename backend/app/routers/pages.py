@@ -22,6 +22,7 @@ from ..utils.redis_cache import (
     redis_set_json,
     build_filter_ctx_key,
     build_total_cars_key,
+    normalize_filter_params,
 )
 from ..models import Car, Source, CarImage
 from ..auth import get_current_user
@@ -776,7 +777,20 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
 def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
     templates = request.app.state.templates
     service = CarsService(db)
-    filter_ctx = _build_filter_context(service, db, include_payload=False, params=dict(request.query_params))
+    timing_enabled = os.environ.get("HTML_TIMING", "0") == "1"
+    t0 = time.perf_counter()
+    raw_params = dict(request.query_params)
+    params = normalize_filter_params(raw_params)
+    cache_key = build_filter_ctx_key(params, include_payload=False)
+    cached = redis_get_json(cache_key)
+    cache_hit = 0
+    cache_source = "fallback"
+    if cached:
+        filter_ctx = cached
+        cache_hit = 1
+        cache_source = "redis"
+    else:
+        filter_ctx = _build_filter_context(service, db, include_payload=False, params=params)
     contact_content = ContentService(db).content_map(
         [
             "contact_phone",
@@ -799,6 +813,12 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
         total_cars = service.total_cars()
         _TOTAL_CARS_CACHE[total_cache_key] = total_cars
         redis_set_json(total_cache_key, total_cars, ttl_sec=600)
+    if timing_enabled:
+        total_ms = (time.perf_counter() - t0) * 1000
+        print(
+            f"SEARCH_TIMING total_ms={total_ms:.2f} filter_ctx_hit={cache_hit} filter_ctx_source={cache_source} filter_ctx_key={cache_key}",
+            flush=True,
+        )
     return templates.TemplateResponse(
         "search.html",
         {

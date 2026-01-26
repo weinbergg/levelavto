@@ -81,6 +81,34 @@ def build_filter_payload_key(params: Optional[Dict[str, Any]] = None) -> str:
     return f"filter_payload:{key}"
 
 
+def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    if not params:
+        return {}
+    keys = [
+        "region",
+        "country",
+        "brand",
+        "model",
+        "color",
+        "engine_type",
+        "transmission",
+        "body_type",
+        "drive_type",
+        "reg_year",
+    ]
+    cleaned: Dict[str, Any] = {}
+    for key in keys:
+        val = params.get(key)
+        if val is None:
+            continue
+        if isinstance(val, str):
+            val = val.strip()
+            if not val:
+                continue
+        cleaned[key] = val
+    return cleaned
+
+
 def redis_get_json(key: str) -> Optional[Any]:
     client = get_redis()
     if client is None:
