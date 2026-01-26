@@ -761,7 +761,7 @@
         `
         const img = card.querySelector('img.thumb')
         const wrap = card.querySelector('.thumb-wrap')
-        if (wrap) wrap.classList.add('thumb-loading')
+        if (wrap) wrap.classList.remove('thumb-loading')
         if (img) {
           const finalize = () => {
             img.style.opacity = '1'
@@ -772,6 +772,7 @@
           } else {
             img.addEventListener('load', finalize)
             img.addEventListener('error', finalize)
+            requestAnimationFrame(finalize)
           }
         }
         if (hasGallery && img) {

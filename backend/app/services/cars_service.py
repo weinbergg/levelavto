@@ -933,6 +933,7 @@ class CarsService:
             (and_(Car.thumbnail_url.is_not(None), Car.thumbnail_url != ""), 1),
             else_=0,
         ).desc()
+        use_thumb_rank = not light or sort not in ("price_asc", "price_desc")
         if light:
             stmt = (
                 select(
@@ -951,7 +952,7 @@ class CarsService:
                     Car.power_hp,
                 )
                 .where(where_expr)
-                .order_by(thumb_rank, *order_clause)
+                .order_by(*(([thumb_rank] if use_thumb_rank else [])), *order_clause)
                 .offset((page - 1) * page_size)
                 .limit(page_size)
             )

@@ -192,13 +192,25 @@ def list_cars(
         )
     t3 = time.perf_counter()
     if timing_enabled:
-        request.state.api_parts = {
-            "list": (t1 - t0),
-            "images": (t2 - t1),
-            "serialize": (t3 - t2),
+        parts = {
+            "list_ms": (t1 - t0) * 1000,
+            "photos_ms": (t2 - t1) * 1000,
+            "map_ms": (t3 - t2) * 1000,
+            "total_ms": (t3 - t0) * 1000,
             "items": len(payload_items),
             "thumb_replaced": thumb_replaced,
         }
+        print(
+            "API_CARS_TIMING db_ms={list_ms:.2f} photos_ms={photos_ms:.2f} map_ms={map_ms:.2f} total_ms={total_ms:.2f} sort={sort} filters=({region},{country},{brand},{model})".format(
+                sort=sort,
+                region=region,
+                country=country,
+                brand=brand,
+                model=model,
+                **parts,
+            ),
+            flush=True,
+        )
     return {
         "items": payload_items,
         "total": total,
