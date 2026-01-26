@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 from typing import Any, Optional, Dict, Tuple
 
 import redis
@@ -8,12 +9,31 @@ import redis
 
 logger = logging.getLogger(__name__)
 _redis_client: Optional[redis.Redis] = None
-_redis_disabled = False
+_redis_disabled_until: float = 0.0
+_redis_write_disabled_until: float = 0.0
+_redis_write_disabled_reason: Optional[str] = None
+
+
+def _now() -> float:
+    return time.time()
+
+
+def _mark_redis_disabled(reason: str, seconds: int = 60) -> None:
+    global _redis_disabled_until
+    _redis_disabled_until = _now() + seconds
+    logger.warning("redis disabled for %ss: %s", seconds, reason)
+
+
+def _mark_redis_write_disabled(reason: str, seconds: int = 300) -> None:
+    global _redis_write_disabled_until, _redis_write_disabled_reason
+    _redis_write_disabled_until = _now() + seconds
+    _redis_write_disabled_reason = reason
+    logger.warning("redis write disabled for %ss: %s", seconds, reason)
 
 
 def get_redis() -> Optional[redis.Redis]:
-    global _redis_client, _redis_disabled
-    if _redis_disabled:
+    global _redis_client, _redis_disabled_until
+    if _redis_disabled_until and _redis_disabled_until > _now():
         return None
     url = os.getenv("REDIS_URL")
     if not url:
@@ -31,7 +51,7 @@ def get_redis() -> Optional[redis.Redis]:
             _redis_client.ping()
         except Exception as exc:
             logger.warning("redis unavailable: %s", exc)
-            _redis_disabled = True
+            _mark_redis_disabled(str(exc))
             _redis_client = None
             return None
     return _redis_client
@@ -173,6 +193,12 @@ def redis_get_json(key: str) -> Optional[Any]:
 
 
 def redis_set_json(key: str, value: Any, ttl_sec: int) -> bool:
+    global _redis_write_disabled_until, _redis_write_disabled_reason
+    if _redis_write_disabled_until and _redis_write_disabled_until > _now():
+        logger.warning(
+            "redis write skipped (disabled): %s", _redis_write_disabled_reason or "unknown"
+        )
+        return False
     client = get_redis()
     if client is None:
         return False
@@ -180,5 +206,8 @@ def redis_set_json(key: str, value: Any, ttl_sec: int) -> bool:
         client.setex(key, ttl_sec, json.dumps(value, ensure_ascii=False))
         return True
     except Exception as exc:
+        msg = str(exc)
+        if "MISCONF" in msg or "No space left on device" in msg or "ENOSPC" in msg:
+            _mark_redis_write_disabled(msg, seconds=300)
         logger.warning("redis set failed: %s", exc)
         return False

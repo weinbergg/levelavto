@@ -28,7 +28,7 @@ def _prewarm_filter(service: CarsService, params: Dict[str, Any], include_payloa
 def main() -> None:
     started = time.perf_counter()
     if not redis_set_json("prewarm_ping", {"ok": True}, ttl_sec=60):
-        print("[prewarm] redis unavailable")
+        print("[prewarm] redis unavailable or write-disabled")
         raise SystemExit(2)
     with SessionLocal() as db:
         service = CarsService(db)
