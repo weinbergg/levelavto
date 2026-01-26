@@ -55,6 +55,12 @@ services:
     environment:
     - HTML_TIMING=${HTML_TIMING:-0}
     - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/ > /dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
     logging:
       driver: json-file
       options:

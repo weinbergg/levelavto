@@ -6,213 +6,74 @@
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
 \f0\fs24 \cf0 root@cv5704357:/opt/levelavto# git pull\
-docker compose build web\
-docker compose up -d --force-recreate web\
-docker compose exec -T web python -m backend.app.scripts.prewarm_cache\
-remote: Enumerating objects: 19, done.\
-remote: Counting objects: 100% (19/19), done.\
+remote: Enumerating objects: 8, done.\
+remote: Counting objects: 100% (8/8), done.\
 remote: Compressing objects: 100% (2/2), done.\
-remote: Total 10 (delta 7), reused 10 (delta 7), pack-reused 0 (from 0)\
-Unpacking objects: 100% (10/10), 996 bytes | 110.00 KiB/s, done.\
+remote: Total 5 (delta 3), reused 5 (delta 3), pack-reused 0 (from 0)\
+Unpacking objects: 100% (5/5), 719 bytes | 239.00 KiB/s, done.\
 From github.com:weinbergg/levelavto\
-   dd1d8dc..c626c51  main       -> origin/main\
-Updating dd1d8dc..c626c51\
+   074b4d4..8e38206  main       -> origin/main\
+Updating 074b4d4..8e38206\
 Fast-forward\
- backend/app/static/js/app.js    | 22 +++++++++++++++-------\
- backend/app/templates/base.html |  2 +-\
- backend/app/templates/home.html |  4 ++--\
- 3 files changed, 18 insertions(+), 10 deletions(-)\
-[+] Building 4.3s (13/13) FINISHED                                                                                                             \
- => [internal] load local bake definitions                                                                                                0.0s\
- => => reading from stdin 480B                                                                                                            0.0s\
- => [internal] load build definition from Dockerfile                                                                                      0.0s\
- => => transferring dockerfile: 553B                                                                                                      0.0s\
- => [internal] load metadata for docker.io/library/python:3.11-slim                                                                       1.0s\
- => [internal] load .dockerignore                                                                                                         0.0s\
- => => transferring context: 285B                                                                                                         0.0s\
- => [1/6] FROM docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.0s\
- => => resolve docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.0s\
- => [internal] load build context                                                                                                         0.2s\
- => => transferring context: 301.74kB                                                                                                     0.1s\
- => CACHED [2/6] WORKDIR /app                                                                                                             0.0s\
- => CACHED [3/6] RUN apt-get update && apt-get install -y --no-install-recommends     build-essential curl libpq-dev &&     rm -rf /var/  0.0s\
- => CACHED [4/6] COPY backend/requirements.txt /app/backend/requirements.txt                                                              0.0s\
- => CACHED [5/6] RUN pip install --upgrade pip && pip install -r /app/backend/requirements.txt                                            0.0s\
- => [6/6] COPY . /app                                                                                                                     0.6s\
- => exporting to image                                                                                                                    2.1s\
- => => exporting layers                                                                                                                   1.7s\
- => => exporting manifest sha256:e4de1879e854b295f52012214f4abcd38c04af5e9a598bc5db72bdf54e6ccd2b                                         0.0s\
- => => exporting config sha256:a42c41057fc54f6f60fbf3ff5e70f5e9619c5a4b608c15e03def0f13615e4e64                                           0.0s\
- => => exporting attestation manifest sha256:fd9884015ab41cd6a07f5b1f35f9a4b89055e5407f93d1d1c524fea7fe7264f3                             0.0s\
- => => exporting manifest list sha256:2faec6c117f09cee90769fd14c38f4d66707ac2ff156862433567aab7276c226                                    0.0s\
- => => naming to docker.io/library/levelavto-web:latest                                                                                   0.0s\
- => => unpacking to docker.io/library/levelavto-web:latest                                                                                0.4s\
- => resolving provenance for metadata file                                                                                                0.0s\
-[+] up 3/3\
- \uc0\u10004  Container autodealer_db    Healthy                                                                                                    11.1s \
- \uc0\u10004  Container autodealer_redis Healthy                                                                                                    11.1s \
- \uc0\u10004  Container autodealer_web   Recreated                                                                                                  10.6s \
-FILTER_CTX_CACHE hit=0 source=fallback\
-FILTER_CTX_STAGE name=regions ms=9348.52\
-FILTER_CTX_STAGE name=countries ms=5.84\
-FILTER_CTX_STAGE name=reg_years ms=4.00\
-FILTER_CTX_STAGE name=max_price_mileage ms=4.44\
-FILTER_CTX_STAGE name=generations ms=4191.03\
-FILTER_CTX_STAGE name=colors ms=270.02\
-FILTER_CTX_STAGE name=body_types ms=4.46\
-FILTER_CTX_STAGE name=kr_types ms=4275.06\
-FILTER_CTX_STAGE name=brands ms=3.80\
-FILTER_CTX_STAGE name=engine_types ms=2.45\
-FILTER_CTX_STAGE name=transmissions ms=2.15\
-FILTER_CTX_STAGE name=drive_types ms=2.11\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] filter_ctx key=filter_ctx:('home', False) ms=18280.79\
-FILTER_CTX_CACHE hit=0 source=fallback\
-FILTER_CTX_STAGE name=regions ms=8946.19\
-FILTER_CTX_STAGE name=countries ms=3.30\
-FILTER_CTX_STAGE name=reg_years ms=1.49\
-FILTER_CTX_STAGE name=max_price_mileage ms=1.32\
-FILTER_CTX_STAGE name=generations ms=4411.37\
-FILTER_CTX_STAGE name=colors ms=255.40\
-FILTER_CTX_STAGE name=body_types ms=2.55\
-FILTER_CTX_STAGE name=kr_types ms=4761.44\
-FILTER_CTX_STAGE name=brands ms=1.56\
-FILTER_CTX_STAGE name=engine_types ms=1.21\
-FILTER_CTX_STAGE name=transmissions ms=0.82\
-FILTER_CTX_STAGE name=drive_types ms=1.21\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] filter_ctx key=filter_ctx:('EU', '', '', '', '', '', '', '', '', '', False) ms=18539.49\
-FILTER_CTX_CACHE hit=0 source=fallback\
-FILTER_CTX_STAGE name=regions ms=8890.30\
-FILTER_CTX_STAGE name=countries ms=0.87\
-FILTER_CTX_STAGE name=reg_years ms=1.79\
-FILTER_CTX_STAGE name=max_price_mileage ms=1.28\
-FILTER_CTX_STAGE name=generations ms=4459.83\
-FILTER_CTX_STAGE name=colors ms=272.61\
-FILTER_CTX_STAGE name=body_types ms=2.75\
-FILTER_CTX_STAGE name=kr_types ms=4289.83\
-FILTER_CTX_STAGE name=brands ms=1.57\
-FILTER_CTX_STAGE name=engine_types ms=1.79\
-FILTER_CTX_STAGE name=transmissions ms=1.42\
-FILTER_CTX_STAGE name=drive_types ms=1.56\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] filter_ctx key=filter_ctx:('EU', 'DE', '', '', '', '', '', '', '', '', False) ms=18056.73\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-FILTER_CTX_CACHE hit=0 source=fallback\
-FILTER_CTX_STAGE name=regions ms=8690.59\
-FILTER_CTX_STAGE name=countries ms=0.85\
-FILTER_CTX_STAGE name=reg_years ms=0.86\
-FILTER_CTX_STAGE name=max_price_mileage ms=1.27\
-FILTER_CTX_STAGE name=generations ms=4424.99\
-FILTER_CTX_STAGE name=colors ms=15.35\
-FILTER_CTX_STAGE name=body_types ms=0.77\
-FILTER_CTX_STAGE name=kr_types ms=4400.03\
-FILTER_CTX_STAGE name=brands ms=4.27\
-FILTER_CTX_STAGE name=engine_types ms=2.31\
-FILTER_CTX_STAGE name=transmissions ms=1.35\
-FILTER_CTX_STAGE name=drive_types ms=1.29\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] filter_ctx key=filter_ctx:('KR', '', '', '', '', '', '', '', '', '', False) ms=17550.29\
-FILTER_CTX_CACHE hit=0 source=fallback\
-FILTER_CTX_STAGE name=regions ms=8236.41\
-FILTER_CTX_STAGE name=countries ms=1.38\
-FILTER_CTX_STAGE name=reg_years ms=1.49\
-FILTER_CTX_STAGE name=max_price_mileage ms=2.87\
-FILTER_CTX_STAGE name=generations ms=3918.85\
-FILTER_CTX_STAGE name=colors ms=319.09\
-FILTER_CTX_STAGE name=body_types ms=2.58\
-FILTER_CTX_STAGE name=payload_values ms=18368.16\
-FILTER_CTX_STAGE name=kr_types ms=4559.37\
-FILTER_CTX_STAGE name=brands ms=2.23\
-FILTER_CTX_STAGE name=engine_types ms=1.79\
-FILTER_CTX_STAGE name=transmissions ms=2.18\
-FILTER_CTX_STAGE name=drive_types ms=2.73\
-[prewarm] filter_ctx key=filter_ctx:('EU', 'DE', '', '', '', '', '', '', '', '', True) ms=35556.22\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-FILTER_CTX_CACHE hit=0 source=fallback\
-FILTER_CTX_STAGE name=regions ms=8729.94\
-FILTER_CTX_STAGE name=countries ms=0.67\
-FILTER_CTX_STAGE name=reg_years ms=1.10\
-FILTER_CTX_STAGE name=max_price_mileage ms=1.13\
-FILTER_CTX_STAGE name=generations ms=4188.52\
-FILTER_CTX_STAGE name=colors ms=287.58\
-FILTER_CTX_STAGE name=body_types ms=2.86\
-FILTER_CTX_STAGE name=payload_values ms=18554.87\
-FILTER_CTX_STAGE name=kr_types ms=4198.60\
-FILTER_CTX_STAGE name=brands ms=2.34\
-FILTER_CTX_STAGE name=engine_types ms=1.67\
-FILTER_CTX_STAGE name=transmissions ms=1.39\
-FILTER_CTX_STAGE name=drive_types ms=1.23\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] filter_ctx key=filter_ctx:('EU', '', '', '', '', '', '', '', '', '', True) ms=36121.65\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-FILTER_CTX_CACHE hit=0 source=fallback\
-FILTER_CTX_STAGE name=regions ms=9112.32\
-FILTER_CTX_STAGE name=countries ms=1.27\
-FILTER_CTX_STAGE name=reg_years ms=1.67\
-FILTER_CTX_STAGE name=max_price_mileage ms=3.34\
-FILTER_CTX_STAGE name=generations ms=4502.57\
-FILTER_CTX_STAGE name=colors ms=2.98\
-FILTER_CTX_STAGE name=body_types ms=0.81\
-FILTER_CTX_STAGE name=payload_values ms=19471.33\
-FILTER_CTX_STAGE name=kr_types ms=4333.48\
-FILTER_CTX_STAGE name=brands ms=2.02\
-FILTER_CTX_STAGE name=engine_types ms=1.83\
-FILTER_CTX_STAGE name=transmissions ms=0.80\
-FILTER_CTX_STAGE name=drive_types ms=0.76\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] filter_ctx key=filter_ctx:('KR', '', '', '', '', '', '', '', '', '', True) ms=37445.29\
-[prewarm] filter_payload key=filter_payload:('EU', '', '', '')\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] filter_payload key=filter_payload:('EU', 'DE', '', '')\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] filter_payload key=filter_payload:('KR', '', '', '')\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] total_cars=2159795\
-list_slow total=4.741s sort=None page=1 size=1 filters=(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] cars_count key=cars_count:all value=1967120\
-list_slow total=4.704s sort=None page=1 size=1 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:(('region', 'EU'),) value=1862890\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-list_slow total=4.800s sort=None page=1 size=1 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:(('country', 'DE'), ('region', 'EU')) value=1550114\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-list_slow total=4.693s sort=None page=1 size=1 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:(('region', 'KR'),) value=104230\
-redis set failed: MISCONF Errors writing to the AOF file: No space left on device\
-[prewarm] done in 224558.78 ms\
-root@cv5704357:/opt/levelavto# curl -s "http://localhost:8000/api/cars?region=EU&country=DE&sort=price_asc&page_size=3" \\\
-| jq '.items[] | \{id,thumbnail_url,photos_count,total_price_rub_cached\}'\
-\
-curl -s "http://localhost:8000/api/cars_count?region=EU&country=DE" | jq\
-\{\
-  "id": 1460883,\
-  "thumbnail_url": "https://img.classistatic.de/api/v1/mo-prod/images/08/08b962f7-5492-492d-afaa-8600bec0d5f3?rule=mo-480.jpg",\
-  "photos_count": 1,\
-  "total_price_rub_cached": 917760.7\
-\}\
-\{\
-  "id": 1457612,\
-  "thumbnail_url": "https://img.classistatic.de/api/v1/mo-prod/images/0b/0b53a133-f571-4db3-83ad-451294ebaddf?rule=mo-480.jpg",\
-  "photos_count": 4,\
-  "total_price_rub_cached": 934824.12\
-\}\
-\{\
-  "id": 1330703,\
-  "thumbnail_url": "https://img.classistatic.de/api/v1/mo-prod/images/44/44ea6335-915a-4ce3-8367-a7bcaa366f9a?rule=mo-480.jpg",\
-  "photos_count": 3,\
-  "total_price_rub_cached": 934824.12\
-\}\
-\{\
-  "count": 1550114\
-\}\
+ docker-compose.yml                    | 36 ++++++++++++++++++++++++++++++++++++\
+ scripts/maintenance_docker_cleanup.sh | 13 +++++++++++++\
+ 2 files changed, 49 insertions(+)\
+ create mode 100644 scripts/maintenance_docker_cleanup.sh\
+root@cv5704357:/opt/levelavto# df -h\
+docker system df\
+docker builder prune -af\
+Filesystem      Size  Used Avail Use% Mounted on\
+tmpfs           392M  1.4M  391M   1% /run\
+/dev/sda1        79G   71G  4.5G  95% /\
+tmpfs           2.0G     0  2.0G   0% /dev/shm\
+tmpfs           5.0M     0  5.0M   0% /run/lock\
+tmpfs           392M   12K  392M   1% /run/user/0\
+overlay          79G   71G  4.5G  95% /var/lib/docker/rootfs/overlayfs/3a45ff769dda45429d5a272b53d83966a17ca93db3fa710e8750a72986d01f16\
+overlay          79G   71G  4.5G  95% /var/lib/docker/rootfs/overlayfs/7ec2a2a8313c0d845702af2791107607b70ebadf408199e1bcefbef59ea90012\
+overlay          79G   71G  4.5G  95% /var/lib/docker/rootfs/overlayfs/a1aad756f5d4c8048c92c498e0492d6c779494dc9584a00ea5fa18998313ddb7\
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE\
+Images          3         3         1.586GB   1.586GB (100%)\
+Containers      3         3         32.77kB   0B (0%)\
+Local Volumes   2         2         33.52GB   0B (0%)\
+Build Cache     0         0         0B        0B\
+Total:  0B\
+root@cv5704357:/opt/levelavto# docker compose up -d --force-recreate\
+[+] up 4/4\
+dependency failed to start: container autodealer_web has no healthcheck configured                                                       22.2s \
+root@cv5704357:/opt/levelavto# docker compose exec -T redis redis-cli INFO persistence | egrep "aof_enabled|appendonly|save|aof_last_write_status"Container autodealer_web     Waiting                                                                                                  21.7s \
+current_save_keys_processed:0\
+current_save_keys_total:0\
+rdb_changes_since_last_save:0\
+rdb_bgsave_in_progress:0\
+rdb_last_save_time:1769431105\
+rdb_last_bgsave_status:ok\
+rdb_last_bgsave_time_sec:-1\
+rdb_current_bgsave_time_sec:-1\
+rdb_saves:0\
+aof_enabled:0\
+aof_last_write_status:ok\
+root@cv5704357:/opt/levelavto# docker compose run --rm prewarm\
+[+]  3/3t 3/3\
+ \uc0\u10004  Container autodealer_redis Running                                                                                                     0.0s \
+ \uc0\u10004  Container autodealer_db    Running                                                                                                     0.0s \
+ \uc0\u10004  Container autodealer_web   Running                                                                                                     0.0s \
+[+]  3/3r autodealer_db Waiting \
+ \uc0\u10004  Container autodealer_redis Healthy                                                                                                     0.5s \
+ \uc0\u10004  Container autodealer_db    Healthy                                                                                                     0.5s \
+ \uc0\u10004  Container autodealer_web   Running                                                                                                     0.0s \
+Container autodealer_redis Waiting \
+Container autodealer_web Waiting \
+Container autodealer_redis Healthy \
+Container autodealer_web Error dependency web failed to start\
+dependency failed to start: container autodealer_web has no healthcheck configured\
 root@cv5704357:/opt/levelavto# curl -s -o /dev/null -w "HOME %\{time_total\}s\\n" http://localhost:8000/\
-curl -s -o /dev/null -w "CAT  %\{time_total\}s\\n" "http://localhost:8000/catalog?region=EU&country=DE"\
-HOME 22.383831s\
-CAT  18.420759s\
+curl -s -o /dev/null -w "CAT %\{time_total\}s\\n" "http://localhost:8000/catalog?region=EU&country=DE"\
+curl -s -o /dev/null -w "SEARCH %\{time_total\}s\\n" http://localhost:8000/search\
+^C\
+^C\
+^C\
+root@cv5704357:/opt/levelavto# docker compose logs --tail=200 web | rg -i "FILTER_CTX_CACHE|FILTER_PAYLOAD_CACHE|REDIS_WRITE_DISABLED|MISCONF"\
+autodealer_web  | FILTER_CTX_CACHE hit=0 source=fallback\
+autodealer_web  | FILTER_CTX_CACHE hit=0 source=fallback\
+autodealer_web  | FILTER_CTX_CACHE hit=0 source=fallback\
 root@cv5704357:/opt/levelavto# }
