@@ -678,7 +678,14 @@
         card.href = `/car/${car.id}`
         card.className = 'car-card'
         const images = Array.isArray(car.images) && car.images.length ? car.images : (car.thumbnail_url ? [car.thumbnail_url] : [])
-        const thumbSrc = images[0] || '/static/img/no-photo.svg'
+        const normalizeThumb = (src) => {
+          if (!src) return '/static/img/no-photo.svg'
+          if (src.startsWith('//')) return `https:${src}`
+          if (src.startsWith('http://')) return src.replace('http://', 'https://')
+          if (src.startsWith('https://') || src.startsWith('/')) return src
+          return '/static/img/no-photo.svg'
+        }
+        const thumbSrc = normalizeThumb(images[0])
         const hasGallery = images.length > 1
         const navControls = hasGallery
           ? `
@@ -1701,7 +1708,10 @@
           card.href = `/car/${car.id}`
           card.className = 'car-card'
           const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
-          const thumb = thumbRaw ? thumbRaw.replace('rule=mo-1024', 'rule=mo-480') : '/static/img/no-photo.svg'
+          let thumb = thumbRaw ? thumbRaw.replace('rule=mo-1024', 'rule=mo-480') : '/static/img/no-photo.svg'
+          if (thumb.startsWith('//')) thumb = `https:${thumb}`
+          else if (thumb.startsWith('http://')) thumb = thumb.replace('http://', 'https://')
+          else if (!(thumb.startsWith('https://') || thumb.startsWith('/'))) thumb = '/static/img/no-photo.svg'
           const displayRub = car.total_price_rub_cached ?? car.price_rub_cached
           const price = displayRub != null ? formatRub(displayRub) : '—'
           card.innerHTML = `

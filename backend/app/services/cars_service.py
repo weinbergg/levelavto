@@ -63,7 +63,7 @@ class CarsService:
         self.logger = logging.getLogger(__name__)
 
     def _available_expr(self):
-        return func.coalesce(Car.is_available, True).is_(True)
+        return Car.is_available.is_(True)
 
     EU_COUNTRIES = {
         "DE", "AT", "FR", "IT", "ES", "NL", "BE", "PL", "CZ", "SE", "FI",
@@ -498,12 +498,12 @@ class CarsService:
                     kr_conds.append(Car.source_id.in_(kr_sources))
                 conditions.append(or_(*kr_conds))
             elif c:
-                conditions.append(func.upper(Car.country) == c)
+                conditions.append(Car.country == c)
         if region:
             r = region.upper()
             if r == "KR":
                 kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-                conds = [func.upper(Car.country).like("KR%")]
+                conds = [Car.country.like("KR%")]
                 if kr_sources:
                     conds.append(Car.source_id.in_(kr_sources))
                 conditions.append(or_(*conds))
@@ -964,6 +964,12 @@ class CarsService:
                 .offset((page - 1) * page_size)
                 .limit(page_size)
             )
+        if os.environ.get("CAR_API_TIMING", "0") == "1" and os.environ.get("CAR_API_SQL", "0") == "1":
+            try:
+                compiled = stmt.compile(compile_kwargs={"literal_binds": True})
+                print(f"API_CARS_SQL {compiled}", flush=True)
+            except Exception:
+                self.logger.exception("api_cars_sql_failed")
         items_t0 = time.perf_counter()
         if light:
             items = list(self.db.execute(stmt).mappings().all())
