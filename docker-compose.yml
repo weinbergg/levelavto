@@ -28,6 +28,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   web:
     build:
@@ -50,6 +55,11 @@ services:
     environment:
     - HTML_TIMING=${HTML_TIMING:-0}
     - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
@@ -74,6 +84,32 @@ services:
       interval: 5s
       timeout: 2s
       retries: 20
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  prewarm:
+    image: levelavto-web:latest
+    container_name: autodealer_prewarm
+    env_file:
+      - .env
+    depends_on:
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python -m backend.app.scripts.prewarm_cache"
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+    restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   db_data:
