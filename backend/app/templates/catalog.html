@@ -286,7 +286,45 @@
         <div id="activeFilters" class="active-filters"></div>
       </div>
       <div id="spinner" class="spinner" style="display:none;">Загрузка…</div>
-      <div id="cards" class="cards"></div>
+      <div id="cards" class="cards">
+        {% if initial_items and initial_items|length > 0 %}
+          {% for car in initial_items %}
+            <a class="car-card" href="/car/{{ car.id }}">
+              <div class="thumb-wrap">
+                <img
+                  class="thumb"
+                  src="{{ car.thumbnail_url or '/static/img/no-photo.svg' }}"
+                  loading="lazy"
+                  decoding="async"
+                  referrerpolicy="no-referrer"
+                  alt=""
+                  data-thumb="{{ car.thumbnail_url or '/static/img/no-photo.svg' }}"
+                  data-id="{{ car.id }}"
+                  onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
+                  width="320"
+                  height="200"
+                />
+              </div>
+              <div class="car-card__body">
+                <div>
+                  <div class="car-card__title">{{ car.brand or '' }} {{ car.model or '' }}</div>
+                  {% if car.year %}
+                    <div class="car-card__meta">{{ car.year }}</div>
+                  {% endif %}
+                </div>
+                <div class="car-card__price">
+                  {% set price_val = car.total_price_rub_cached or car.price_rub_cached %}
+                  {% if price_val %}
+                    <div class="price-main">{{ '{:,.0f}'.format(price_val).replace(',', ' ') }} ₽</div>
+                  {% else %}
+                    <div class="price-main">—</div>
+                  {% endif %}
+                </div>
+              </div>
+            </a>
+          {% endfor %}
+        {% endif %}
+      </div>
       <div class="pagination">
         <button class="btn" id="prevPage">‹</button>
         <div id="pageNumbers" class="page-numbers"></div>

@@ -578,7 +578,10 @@ def _home_context(
         for c in countries_list
     ]
     t0 = time.perf_counter()
-    total_cars = _get_cars_count(service, {}, timing_enabled)
+    count_params = normalize_filter_params(dict(request.query_params))
+    if not count_params.get("region"):
+        count_params["region"] = "EU"
+    total_cars = _get_cars_count(service, count_params, timing_enabled)
     _stage("total_cars_ms", t0)
     context = {
         "request": request,
@@ -719,6 +722,58 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     t0 = time.perf_counter()
     filter_ctx = _build_filter_context(service, db, include_payload=False, params=dict(request.query_params))
     timing["filter_ctx_ms"] = (time.perf_counter() - t0) * 1000
+    qp = request.query_params
+    params = dict(qp)
+    def _int_val(key: str) -> Optional[int]:
+        raw = params.get(key)
+        if raw is None or raw == "":
+            return None
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+    def _float_val(key: str) -> Optional[float]:
+        raw = params.get(key)
+        if raw is None or raw == "":
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+    initial_items: List[dict] = []
+    try:
+        items, _ = service.list_cars(
+            region=params.get("region"),
+            country=params.get("country"),
+            kr_type=params.get("kr_type"),
+            brand=params.get("brand"),
+            model=params.get("model"),
+            generation=params.get("generation"),
+            color=params.get("color"),
+            price_min=_float_val("price_min"),
+            price_max=_float_val("price_max"),
+            mileage_min=_int_val("mileage_min"),
+            mileage_max=_int_val("mileage_max"),
+            reg_year_min=_int_val("reg_year_min"),
+            reg_month_min=_int_val("reg_month_min"),
+            reg_year_max=_int_val("reg_year_max"),
+            reg_month_max=_int_val("reg_month_max"),
+            body_type=params.get("body_type"),
+            engine_type=params.get("engine_type"),
+            transmission=params.get("transmission"),
+            drive_type=params.get("drive_type"),
+            condition=params.get("condition"),
+            lines=qp.getlist("line") if hasattr(qp, "getlist") else None,
+            q=params.get("q"),
+            sort=params.get("sort") or "price_asc",
+            page=1,
+            page_size=12,
+            light=True,
+        )
+        if isinstance(items, list):
+            initial_items = items
+    except Exception:
+        logger.exception("catalog_initial_items_failed")
     t0 = time.perf_counter()
     fx_rates = service.get_fx_rates(allow_fetch=False) or {}
     timing["fx_rates_ms"] = (time.perf_counter() - t0) * 1000
@@ -765,6 +820,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "transmissions": filter_ctx["transmissions"],
             "drive_types": filter_ctx["drive_types"],
             "has_air_suspension": filter_ctx["has_air_suspension"],
+            "initial_items": initial_items,
             "fx_rates": fx_rates,
             "content": contact_content,
             "contact_phone": contact_content.get("contact_phone"),
