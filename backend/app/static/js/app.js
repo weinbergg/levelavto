@@ -83,8 +83,15 @@
 
   function applyThumbFallback(img) {
     if (!img) return
-    const raw = img.getAttribute('src') || img.dataset.thumb || ''
-    const normalized = normalizeThumbUrl(raw)
+    const rawSrc = img.getAttribute('src') || ''
+    const rawData = img.dataset.thumb || ''
+    let normalized = normalizeThumbUrl(rawSrc)
+    if (normalized === '/static/img/no-photo.svg' && rawData) {
+      const dataNormalized = normalizeThumbUrl(rawData)
+      if (dataNormalized !== '/static/img/no-photo.svg') {
+        normalized = dataNormalized
+      }
+    }
     if (img.getAttribute('src') !== normalized) {
       img.setAttribute('src', normalized)
     }
