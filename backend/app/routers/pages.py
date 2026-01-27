@@ -807,13 +807,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     if cid in first_urls and first_urls[cid]:
                         c["thumbnail_url"] = first_urls[cid]
                     thumb = _normalize_thumb(c.get("thumbnail_url"))
-                    if thumb and "rule=mo-" in thumb:
-                        c["thumbnail_url"] = re.sub(
-                            r"(rule=mo-)\d+(\.jpg)?",
-                            r"\g<1>480\2",
-                            thumb,
-                        )
-                    elif thumb:
+                    if thumb:
                         c["thumbnail_url"] = thumb
     except Exception:
         logger.exception("catalog_initial_items_failed")

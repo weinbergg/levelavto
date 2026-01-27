@@ -193,11 +193,7 @@ def list_cars(
         raw_thumb = _normalize_thumb(c.get("thumbnail_url"))
         thumb_url = raw_thumb or image_first.get(c.get("id"))
         if isinstance(thumb_url, str) and "rule=mo-" in thumb_url:
-            new_thumb = re.sub(r"(rule=mo-)\d+(\.jpg)?",
-                               r"\g<1>480\2", thumb_url)
-            if new_thumb != thumb_url:
-                thumb_replaced += 1
-                thumb_url = new_thumb
+            thumb_replaced += 1
         payload_items.append(
             {
                 "id": c.get("id"),
