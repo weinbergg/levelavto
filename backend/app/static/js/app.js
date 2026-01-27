@@ -749,8 +749,10 @@
           const img = card.querySelector('img.thumb')
           if (img) {
             const src = normalizeThumbUrl(item.thumbnail_url || '')
-            img.dataset.thumb = src
-            img.setAttribute('src', src)
+            if (src !== '/static/img/no-photo.svg') {
+              img.dataset.thumb = src
+              img.setAttribute('src', src)
+            }
             applyThumbFallback(img)
           }
         })
@@ -1922,6 +1924,7 @@
     const main = qs('.detail-hero__main')
     const img = qs('#primaryImage')
     if (!main || !img) return
+    window.__detailGalleryHandled = true
     let images = []
     try {
       images = JSON.parse(main.dataset.images || '[]')
@@ -1929,10 +1932,23 @@
       images = []
     }
     if (!Array.isArray(images) || images.length < 2) return
+    images = images.map((u) => normalizeThumbUrl(u)).filter((u) => u && u !== '/static/img/no-photo.svg')
+    if (images.length < 2) return
     let idx = Math.max(0, images.indexOf(img.getAttribute('src')))
     const setImage = (nextIdx) => {
       idx = (nextIdx + images.length) % images.length
-      img.src = images[idx]
+      const nextSrc = images[idx]
+      if (nextSrc && nextSrc !== '/static/img/no-photo.svg') {
+        img.src = nextSrc
+      }
+    }
+    if (!img.dataset.fallbackBound) {
+      img.dataset.fallbackBound = '1'
+      img.onerror = () => {
+        if (img.dataset.fallbackApplied === '1') return
+        img.dataset.fallbackApplied = '1'
+        img.src = '/static/img/no-photo.svg'
+      }
     }
     const prevBtn = qs('[data-detail-prev]')
     const nextBtn = qs('[data-detail-next]')

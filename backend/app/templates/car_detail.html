@@ -226,7 +226,8 @@
       }
       // кнопки уже инициализируются в app.js (initDetailActions)
 
-      // gallery navigation
+      // gallery navigation (skip if app.js handled)
+      if (window.__detailGalleryHandled) return
       const mainWrap = document.querySelector('.detail-hero__main')
       if (mainWrap && !mainWrap.dataset.bound) {
         let startX = null
@@ -240,10 +241,21 @@
         }
         const imgEl = document.getElementById('primaryImage')
         const thumbs = Array.from(document.querySelectorAll('.detail-hero__thumbs .thumb'))
+        const normalize = (u) => {
+          const val = String(u || '').trim()
+          if (!val) return ''
+          if (val.startsWith('//')) return `https:${val}`
+          if (val.startsWith('http://')) return val.replace('http://', 'https://')
+          if (val.startsWith('https://') || val.startsWith('/')) return val
+          if (val.startsWith('api/v1/mo-prod/images/')) return `https://img.classistatic.de/${val}`
+          if (val.startsWith('img.classistatic.de/')) return `https://${val}`
+          return ''
+        }
         const setImg = (next) => {
           if (!imgEl || !imgs.length) return
           idx = (next + imgs.length) % imgs.length
-          imgEl.src = imgs[idx]
+          const nextSrc = normalize(imgs[idx])
+          if (nextSrc) imgEl.src = nextSrc
           thumbs.forEach((t, i) => t.classList.toggle('active', i === idx))
         }
         const prevBtn = document.querySelector('[data-detail-prev]')
