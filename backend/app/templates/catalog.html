@@ -286,7 +286,7 @@
         <div id="activeFilters" class="active-filters"></div>
       </div>
       <div id="spinner" class="spinner" style="display:none;">Загрузка…</div>
-      <div id="cards" class="cards">
+      <div id="cards" class="cards" data-ssr="{{ 1 if initial_items and initial_items|length > 0 else 0 }}" data-ssr-params="{{ request.url.query }}">
         {% if initial_items and initial_items|length > 0 %}
           {% for car in initial_items %}
             <a class="car-card" href="/car/{{ car.id }}">

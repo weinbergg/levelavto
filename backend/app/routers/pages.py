@@ -797,6 +797,10 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             flush=True,
         )
         logger.info("CATALOG_TIMING %s", request.state.html_parts)
+    print(
+        f"CATALOG_SSR items={len(initial_items)} region={params.get('region')} country={params.get('country')} sort={params.get('sort') or 'price_asc'}",
+        flush=True,
+    )
 
     return templates.TemplateResponse(
         "catalog.html",

@@ -70,6 +70,41 @@
       .replace(/'/g, '&#39;')
   }
 
+  function normalizeThumbUrl(src) {
+    const val = String(src || '').trim()
+    if (!val) return '/static/img/no-photo.svg'
+    if (val.startsWith('//')) return `https:${val}`
+    if (val.startsWith('http://')) return val.replace('http://', 'https://')
+    if (val.startsWith('https://') || val.startsWith('/')) return val
+    return '/static/img/no-photo.svg'
+  }
+
+  function applyThumbFallback(img) {
+    if (!img) return
+    const raw = img.getAttribute('src') || img.dataset.thumb || ''
+    const normalized = normalizeThumbUrl(raw)
+    if (img.getAttribute('src') !== normalized) {
+      img.setAttribute('src', normalized)
+    }
+    if (!img.getAttribute('referrerpolicy')) {
+      img.setAttribute('referrerpolicy', 'no-referrer')
+    }
+    if (!img.getAttribute('loading')) {
+      img.setAttribute('loading', 'lazy')
+    }
+    if (!img.getAttribute('decoding')) {
+      img.setAttribute('decoding', 'async')
+    }
+    if (!img.dataset.fallbackBound) {
+      img.dataset.fallbackBound = '1'
+      img.onerror = () => {
+        if (img.dataset.fallbackApplied === '1') return
+        img.dataset.fallbackApplied = '1'
+        img.src = '/static/img/no-photo.svg'
+      }
+    }
+  }
+
   function diffParams(a, b) {
     const out = {}
     const keys = new Set([...a.keys(), ...b.keys()])
@@ -607,11 +642,18 @@
     const pageInfo = qs('#pageInfo')
     const resultCount = qs('#resultCount')
     if (!spinner || !cards) return
+    const paramsPreview = collectParams(page)
+    const ssrEnabled = cards.dataset.ssr === '1'
+    const ssrParams = cards.dataset.ssrParams || ''
+    const hasSSR = ssrEnabled && cards.querySelector('.car-card')
+    const reuseSSR = page === 1 && hasSSR && ssrParams === paramsPreview.toString()
     spinner.style.display = 'block'
-    renderSkeleton(cards)
+    if (!reuseSSR) {
+      renderSkeleton(cards)
+    }
     try {
       const fx = await getFx()
-      const params = collectParams(page)
+      const params = paramsPreview
       const reqId = ++catalogReqId
       catalogController?.abort()
       catalogController = new AbortController()
@@ -667,9 +709,20 @@
         }
       }
 
-      cards.innerHTML = ''
+      if (!reuseSSR) {
+        cards.innerHTML = ''
+      }
       if (!Array.isArray(data.items) || !data.items.length) {
         renderEmpty(cards)
+        return
+      }
+
+      if (reuseSSR) {
+        bindFavoriteButtons(cards)
+        window.__page = data.page
+        window.__pageSize = data.page_size
+        window.__total = data.total
+        cards.dataset.ssr = '0'
         return
       }
 
@@ -678,14 +731,7 @@
         card.href = `/car/${car.id}`
         card.className = 'car-card'
         const images = Array.isArray(car.images) && car.images.length ? car.images : (car.thumbnail_url ? [car.thumbnail_url] : [])
-        const normalizeThumb = (src) => {
-          if (!src) return '/static/img/no-photo.svg'
-          if (src.startsWith('//')) return `https:${src}`
-          if (src.startsWith('http://')) return src.replace('http://', 'https://')
-          if (src.startsWith('https://') || src.startsWith('/')) return src
-          return '/static/img/no-photo.svg'
-        }
-        const thumbSrc = normalizeThumb(images[0])
+        const thumbSrc = normalizeThumbUrl(images[0])
         const hasGallery = images.length > 1
         const navControls = hasGallery
           ? `
@@ -785,10 +831,10 @@
         if (hasGallery && img) {
           let index = 0
           const updateThumb = () => {
-            const nextSrc = images[index] || ''
-            if (!nextSrc) return
-            img.src = nextSrc
-            img.srcset = `${nextSrc} 1x`
+          const nextSrc = normalizeThumbUrl(images[index] || '')
+          if (!nextSrc) return
+          img.src = nextSrc
+          img.srcset = `${nextSrc} 1x`
           }
           const onNav = (delta) => {
             index = (index + delta + images.length) % images.length
@@ -834,6 +880,9 @@
       sessionStorage.removeItem('catalogScroll')
     }
     applyQueryToFilters()
+    qsa('#cards img.thumb').forEach((img) => {
+      applyThumbFallback(img)
+    })
     const urlParams = new URLSearchParams(window.location.search)
     const initialPage = Number(urlParams.get('page') || 1)
     const initialModelParam = urlParams.get('model') || ''
