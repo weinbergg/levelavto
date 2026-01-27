@@ -1,5 +1,6 @@
 import time
 import logging
+import re
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
@@ -770,8 +771,50 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             page_size=12,
             light=True,
         )
+        def _normalize_thumb(url: str | None) -> str | None:
+            if not url or not isinstance(url, str):
+                return None
+            raw = url.strip()
+            if not raw:
+                return None
+            if raw.startswith("//"):
+                return f"https:{raw}"
+            if raw.startswith("http://"):
+                return raw.replace("http://", "https://", 1)
+            if raw.startswith("https://"):
+                return raw
+            # handle relative classistatic paths
+            if raw.startswith("/api/v1/mo-prod/images/"):
+                return f"https://img.classistatic.de{raw}"
+            if raw.startswith("api/v1/mo-prod/images/"):
+                return f"https://img.classistatic.de/{raw}"
+            return None
+
         if isinstance(items, list):
             initial_items = items
+            ids = [c.get("id") for c in initial_items if isinstance(c, dict) and c.get("id")]
+            if ids:
+                rows = db.execute(
+                    select(CarImage.car_id, func.min(CarImage.url))
+                    .where(CarImage.car_id.in_(ids))
+                    .group_by(CarImage.car_id)
+                ).all()
+                first_urls = {car_id: _normalize_thumb(url) for car_id, url in rows if url}
+                for c in initial_items:
+                    if not isinstance(c, dict):
+                        continue
+                    cid = c.get("id")
+                    if cid in first_urls and first_urls[cid]:
+                        c["thumbnail_url"] = first_urls[cid]
+                    thumb = _normalize_thumb(c.get("thumbnail_url"))
+                    if thumb and "rule=mo-" in thumb:
+                        c["thumbnail_url"] = re.sub(
+                            r"(rule=mo-)\d+(\.jpg)?",
+                            r"\g<1>480\2",
+                            thumb,
+                        )
+                    elif thumb:
+                        c["thumbnail_url"] = thumb
     except Exception:
         logger.exception("catalog_initial_items_failed")
     t0 = time.perf_counter()

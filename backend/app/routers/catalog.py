@@ -131,6 +131,7 @@ def list_cars(
     if items and not isinstance(items[0], dict):
         items = [dict(row) for row in items]
     image_counts = {}
+    image_first = {}
     if items:
         ids = [c.get("id") for c in items if c.get("id")]
         if ids:
@@ -143,6 +144,15 @@ def list_cars(
                 .all()
             )
             image_counts = {car_id: int(cnt) for car_id, cnt in rows}
+            rows = (
+                db.execute(
+                    select(CarImage.car_id, func.min(CarImage.url))
+                    .where(CarImage.car_id.in_(ids))
+                    .group_by(CarImage.car_id)
+                )
+                .all()
+            )
+            image_first = {car_id: url for car_id, url in rows if url}
     t2 = time.perf_counter()
     payload_items = []
     eu_sources = set(service._source_ids_for_europe())
@@ -163,7 +173,7 @@ def list_cars(
         else:
             region_val = "EU" if country_norm else None
         img_count = image_counts.get(c.get("id"), 0)
-        thumb_url = c.get("thumbnail_url")
+        thumb_url = image_first.get(c.get("id")) or c.get("thumbnail_url")
         if isinstance(thumb_url, str) and "rule=mo-" in thumb_url:
             new_thumb = re.sub(r"(rule=mo-)\d+(\.jpg)?",
                                r"\g<1>480\2", thumb_url)

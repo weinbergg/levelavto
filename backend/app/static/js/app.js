@@ -76,6 +76,8 @@
     if (val.startsWith('//')) return `https:${val}`
     if (val.startsWith('http://')) return val.replace('http://', 'https://')
     if (val.startsWith('https://') || val.startsWith('/')) return val
+    if (val.startsWith('api/v1/mo-prod/images/')) return `https://img.classistatic.de/${val}`
+    if (val.startsWith('img.classistatic.de/')) return `https://${val}`
     return '/static/img/no-photo.svg'
   }
 
@@ -718,6 +720,22 @@
       }
 
       if (reuseSSR) {
+        const itemsById = new Map()
+        data.items.forEach((it) => {
+          if (it && it.id != null) itemsById.set(String(it.id), it)
+        })
+        qsa('#cards .car-card').forEach((card) => {
+          const id = card.getAttribute('data-id')
+          if (!id || !itemsById.has(id)) return
+          const item = itemsById.get(id)
+          const img = card.querySelector('img.thumb')
+          if (img) {
+            const src = normalizeThumbUrl(item.thumbnail_url || '')
+            img.dataset.thumb = src
+            img.setAttribute('src', src)
+            applyThumbFallback(img)
+          }
+        })
         bindFavoriteButtons(cards)
         window.__page = data.page
         window.__pageSize = data.page_size
