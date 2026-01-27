@@ -84,6 +84,17 @@
   function applyThumbFallback(img) {
     if (!img) return
     const rawSrc = img.getAttribute('src') || ''
+    if (rawSrc.startsWith('https://img.classistatic.de/')) {
+      if (!img.dataset.fallbackBound) {
+        img.dataset.fallbackBound = '1'
+        img.onerror = () => {
+          if (img.dataset.fallbackApplied === '1') return
+          img.dataset.fallbackApplied = '1'
+          img.src = '/static/img/no-photo.svg'
+        }
+      }
+      return
+    }
     const rawData = img.dataset.thumb || ''
     let normalized = normalizeThumbUrl(rawSrc)
     if (normalized === '/static/img/no-photo.svg' && rawData) {
@@ -856,8 +867,10 @@
         if (hasGallery && img) {
           let index = 0
           const updateThumb = () => {
-          const nextSrc = normalizeThumbUrl(images[index] || '')
-          if (!nextSrc) return
+          let nextSrc = normalizeThumbUrl(images[index] || '')
+          if (!(nextSrc.startsWith('https://') || nextSrc.startsWith('/'))) {
+            nextSrc = '/static/img/no-photo.svg'
+          }
           img.src = nextSrc
           img.srcset = `${nextSrc} 1x`
           }
@@ -1782,10 +1795,7 @@
           card.href = `/car/${car.id}`
           card.className = 'car-card'
           const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
-          let thumb = thumbRaw ? thumbRaw.replace('rule=mo-1024', 'rule=mo-480') : '/static/img/no-photo.svg'
-          if (thumb.startsWith('//')) thumb = `https:${thumb}`
-          else if (thumb.startsWith('http://')) thumb = thumb.replace('http://', 'https://')
-          else if (!(thumb.startsWith('https://') || thumb.startsWith('/'))) thumb = '/static/img/no-photo.svg'
+          let thumb = normalizeThumbUrl(thumbRaw)
           const displayRub = car.total_price_rub_cached ?? car.price_rub_cached
           const price = displayRub != null ? formatRub(displayRub) : '—'
           card.innerHTML = `
