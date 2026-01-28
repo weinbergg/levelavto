@@ -734,7 +734,9 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     timing: Dict[str, float] = {}
     t_start = time.perf_counter()
     t0 = time.perf_counter()
-    filter_ctx = _build_filter_context(service, db, include_payload=False, params=dict(request.query_params))
+    raw_params = dict(request.query_params)
+    ctx_params = normalize_filter_params(raw_params)
+    filter_ctx = _build_filter_context(service, db, include_payload=False, params=ctx_params)
     timing["filter_ctx_ms"] = (time.perf_counter() - t0) * 1000
     def _limit_list(value: Any, limit: int) -> Any:
         if isinstance(value, list) and limit > 0:
