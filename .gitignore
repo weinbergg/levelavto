@@ -24,6 +24,7 @@ backend/app/static/img/legacy/
 *.webarchive
 *.xml
 *.xlsx
+*.rtf
 
 # local ops notes
 ops_cheatsheet.md
@@ -45,4 +46,3 @@ htmlcov/
 .cursor/
 .env.local
 *.dump
-

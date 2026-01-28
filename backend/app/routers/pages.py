@@ -736,6 +736,17 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     t0 = time.perf_counter()
     filter_ctx = _build_filter_context(service, db, include_payload=False, params=dict(request.query_params))
     timing["filter_ctx_ms"] = (time.perf_counter() - t0) * 1000
+    def _limit_list(value: Any, limit: int) -> Any:
+        if isinstance(value, list) and limit > 0:
+            return value[:limit]
+        return value
+    brands_ssr = _limit_list(filter_ctx.get("brands", []), 400)
+    generations_ssr = _limit_list(filter_ctx.get("generations", []), 200)
+    colors_basic_ssr = _limit_list(filter_ctx.get("colors_basic", []), 16)
+    colors_other_ssr = _limit_list(filter_ctx.get("colors_other", []), 64)
+    engine_types_ssr = _limit_list(filter_ctx.get("engine_types", []), 50)
+    transmissions_ssr = _limit_list(filter_ctx.get("transmissions", []), 50)
+    drive_types_ssr = _limit_list(filter_ctx.get("drive_types", []), 50)
     qp = request.query_params
     params = dict(qp)
     def _int_val(key: str) -> Optional[int]:
@@ -862,7 +873,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         {
             "request": request,
             "user": getattr(request.state, "user", None),
-            "brands": filter_ctx["brands"],
+            "brands": brands_ssr,
             "regions": filter_ctx["regions"],
             "countries": filter_ctx["countries"],
             "country_labels": filter_ctx["country_labels"],
@@ -871,13 +882,13 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "reg_months": filter_ctx["reg_months"],
             "price_options": filter_ctx["price_options"],
             "mileage_options": filter_ctx["mileage_options"],
-            "generations": filter_ctx["generations"],
-            "colors_basic": filter_ctx["colors_basic"],
-            "colors_other": filter_ctx["colors_other"],
+            "generations": generations_ssr,
+            "colors_basic": colors_basic_ssr,
+            "colors_other": colors_other_ssr,
             "body_types": filter_ctx["body_types"],
-            "engine_types": filter_ctx["engine_types"],
-            "transmissions": filter_ctx["transmissions"],
-            "drive_types": filter_ctx["drive_types"],
+            "engine_types": engine_types_ssr,
+            "transmissions": transmissions_ssr,
+            "drive_types": drive_types_ssr,
             "has_air_suspension": filter_ctx["has_air_suspension"],
             "initial_items": initial_items,
             "fx_rates": fx_rates,
