@@ -140,6 +140,45 @@
     }
   }
 
+  function setSelectOptions(select, items, { emptyLabel = 'Все', valueKey = 'value', labelKey = 'label' } = {}) {
+    if (!select) return
+    const current = select.value
+    select.innerHTML = ''
+    const emptyOpt = document.createElement('option')
+    emptyOpt.value = ''
+    emptyOpt.textContent = emptyLabel
+    select.appendChild(emptyOpt)
+    ;(items || []).forEach((item) => {
+      const value = item?.[valueKey] ?? item
+      if (value == null || value === '') return
+      const label = item?.[labelKey] ?? value
+      const opt = document.createElement('option')
+      opt.value = value
+      opt.textContent = label
+      select.appendChild(opt)
+    })
+    if (current) {
+      const match = Array.from(select.options).find((o) => o.value === current)
+      if (match) select.value = current
+    }
+  }
+
+  function renderColorChips(container, colors) {
+    if (!container) return
+    container.innerHTML = ''
+    ;(colors || []).forEach((c) => {
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = 'color-chip'
+      btn.dataset.color = c.value
+      btn.dataset.label = c.label
+      btn.title = c.label
+      btn.setAttribute('aria-label', c.label)
+      if (c.hex) btn.style.setProperty('--chip-color', c.hex)
+      container.appendChild(btn)
+    })
+  }
+
   function diffParams(a, b) {
     const out = {}
     const keys = new Set([...a.keys(), ...b.keys()])
@@ -944,8 +983,53 @@
     const initialSort = urlParams.get('sort') || 'price_asc'
     const modelSelect = qs('#model-select')
     const brandSelect = qs('#brand')
+    const generationSelect = qs('#generation')
     const advancedLink = qs('#catalog-advanced-link')
     normalizeBrandOptions(brandSelect)
+    let filtersLoading = false
+    const loadCatalogFilterBase = async () => {
+      if (filtersLoading) return
+      filtersLoading = true
+      try {
+        const params = new URLSearchParams()
+        const region = qs('[name="region"]')?.value || ''
+        const euCountry = qs('[name="eu_country"]')?.value || ''
+        const countryHidden = qs('#country')?.value || ''
+        if (region) params.set('region', region)
+        if (region === 'EU' && euCountry) params.set('country', euCountry)
+        if (!region && countryHidden) params.set('country', countryHidden)
+        const res = await fetch(`/api/filter_ctx_base?${params.toString()}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setSelectOptions(qs('#brand'), data.brands || [], { emptyLabel: 'Все' })
+        setSelectOptions(qs('#body_type'), data.body_types || [], { emptyLabel: 'Любой' })
+        setSelectOptions(qs('[name="engine_type"]'), data.engine_types || [], { emptyLabel: 'Любое' })
+        setSelectOptions(qs('[name="transmission"]'), data.transmissions || [], { emptyLabel: 'Любая' })
+        setSelectOptions(qs('[name="drive_type"]'), data.drive_types || [], { emptyLabel: 'Любой' })
+        setSelectOptions(qs('#reg-year-min'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
+        setSelectOptions(qs('#reg-year-max'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
+        const euSelect = qs('#eu-country')
+        setSelectOptions(euSelect, data.countries || [], { emptyLabel: 'Все страны' })
+        const regionSelectEl = qs('#region')
+        if (regionSelectEl && Array.isArray(data.regions) && data.regions.length) {
+          setSelectOptions(regionSelectEl, data.regions.map((r) => ({ value: r, label: (data.country_labels || {})[r] || r })), { emptyLabel: 'Все регионы' })
+        }
+        const basic = qs('.color-swatches--basic')
+        const extra = qs('#colors-extra-catalog')
+        renderColorChips(basic, data.colors_basic || [])
+        renderColorChips(extra, data.colors_other || [])
+        const filtersForm = qs('#filters')
+        if (filtersForm) {
+          bindColorChips(filtersForm, () => loadCars(1))
+          bindOtherColorsToggle(filtersForm)
+          syncColorChips(filtersForm)
+        }
+      } catch (e) {
+        console.warn('filters base', e)
+      } finally {
+        filtersLoading = false
+      }
+    }
     if (DEBUG_FILTERS) {
       const debugCount = sessionStorage.getItem('homeCountParams')
       const debugSubmit = sessionStorage.getItem('homeSubmitParams')
@@ -996,6 +1080,7 @@
       bindOtherColorsToggle(filtersForm)
       bindRegMonthState(filtersForm)
       bindRegionSelect(filtersForm)
+      loadCatalogFilterBase()
       const ctrls = qsa('input, select', filtersForm)
       let debounce
       const updateAdvancedLink = () => {
@@ -1013,10 +1098,18 @@
           updateAdvancedLink()
         }, 250)
       }
+      const reloadBase = () => {
+        clearTimeout(debounce)
+        debounce = setTimeout(() => {
+          loadCatalogFilterBase()
+        }, 200)
+      }
       ctrls.forEach((el) => {
         el.addEventListener('change', trigger)
         el.addEventListener('input', trigger)
       })
+      qs('#region')?.addEventListener('change', reloadBase)
+      qs('#eu-country')?.addEventListener('change', reloadBase)
       // apply initial sort/generation if present
       const sortSelect = qs('#sortHidden', filtersForm)
       if (sortSelect && initialSort) sortSelect.value = initialSort
@@ -1076,6 +1169,26 @@
     }
     brandSelect?.addEventListener('change', () => {
       updateCatalogModels().then(() => loadCars(1))
+    })
+    modelSelect?.addEventListener('change', async () => {
+      if (!generationSelect) return
+      const params = new URLSearchParams()
+      const region = qs('[name="region"]')?.value || ''
+      const euCountry = qs('[name="eu_country"]')?.value || ''
+      const countryHidden = qs('#country')?.value || ''
+      if (region) params.set('region', region)
+      if (region === 'EU' && euCountry) params.set('country', euCountry)
+      if (!region && countryHidden) params.set('country', countryHidden)
+      if (brandSelect?.value) params.set('brand', normalizeBrand(brandSelect.value))
+      if (modelSelect.value) params.set('model', modelSelect.value)
+      try {
+        const res = await fetch(`/api/filter_ctx_model?${params.toString()}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setSelectOptions(generationSelect, data.generations || [], { emptyLabel: 'Любое', labelKey: 'value', valueKey: 'value' })
+      } catch (e) {
+        console.warn('filter model', e)
+      }
     })
     const loadInitial = async () => {
       if (brandSelect && brandSelect.value) {

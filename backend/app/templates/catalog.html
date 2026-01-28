@@ -89,7 +89,6 @@
                 <input type="number" name="mileage_max" inputmode="numeric" min="0" step="1" value="{{ params.get('mileage_max','') }}" placeholder="до">
               </label>
             </div>
-            {% if body_types and body_types|length > 0 %}
             <label>Кузов
               <select name="body_type" id="body_type">
                 <option value="">Любой</option>
@@ -98,8 +97,6 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if generations %}
             <label>Поколение
               <select name="generation" id="generation">
                 <option value="">Любое</option>
@@ -108,10 +105,7 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if (colors_basic and colors_basic|length > 0) or (colors_other and colors_other|length > 0) %}
             <label class="field--full">Цвет кузова
-              {% if colors_basic and colors_basic|length > 0 %}
               <div class="color-swatches color-swatches--basic" data-color-chips>
                 {% for c in colors_basic %}
                 <button
@@ -125,8 +119,6 @@
                 ></button>
                 {% endfor %}
               </div>
-              {% endif %}
-              {% if colors_other and colors_other|length > 0 %}
               <button
                 type="button"
                 class="btn btn-ghost btn-small color-toggle"
@@ -149,11 +141,8 @@
                 ></button>
                 {% endfor %}
               </div>
-              {% endif %}
               <input type="hidden" name="color" value="{{ params.get('color','') }}">
             </label>
-            {% endif %}
-            {% if reg_years %}
             <label class="reg-range">Поставлен на учёт с / по
               <div class="reg-range__inputs">
                 <div class="reg-range__col">
@@ -186,8 +175,6 @@
                 </div>
               </div>
             </label>
-            {% endif %}
-            {% if engine_types and engine_types|length > 0 %}
             <label>Топливо
               <select name="engine_type">
                 <option value="">Любое</option>
@@ -196,8 +183,6 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if transmissions and transmissions|length > 0 %}
             <label>Трансмиссия
               <select name="transmission">
                 <option value="">Любая</option>
@@ -206,8 +191,6 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if drive_types and drive_types|length > 0 %}
             <label>Привод
               <select name="drive_type">
                 <option value="">Любой</option>
@@ -216,7 +199,6 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
             <div class="filters-range">
               <label>Мощность от, л.с
                 <input type="number" name="power_hp_min" inputmode="numeric" min="0" step="10" value="{{ params.get('power_hp_min','') }}">

@@ -109,6 +109,39 @@ def build_filter_payload_key(params: Optional[Dict[str, Any]] = None) -> str:
     return f"filter_payload:{key}"
 
 
+def build_filter_ctx_base_key(params: Optional[Dict[str, Any]] = None) -> str:
+    if not params:
+        return "filter_ctx_base:all"
+    key = (
+        str(params.get("region") or ""),
+        str(params.get("country") or ""),
+    )
+    return f"filter_ctx_base:{key}"
+
+
+def build_filter_ctx_brand_key(params: Optional[Dict[str, Any]] = None) -> str:
+    if not params:
+        return "filter_ctx_brand:all"
+    key = (
+        str(params.get("region") or ""),
+        str(params.get("country") or ""),
+        str(params.get("brand") or ""),
+    )
+    return f"filter_ctx_brand:{key}"
+
+
+def build_filter_ctx_model_key(params: Optional[Dict[str, Any]] = None) -> str:
+    if not params:
+        return "filter_ctx_model:all"
+    key = (
+        str(params.get("region") or ""),
+        str(params.get("country") or ""),
+        str(params.get("brand") or ""),
+        str(params.get("model") or ""),
+    )
+    return f"filter_ctx_model:{key}"
+
+
 def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     if not params:
         return {}

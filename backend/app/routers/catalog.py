@@ -4,12 +4,23 @@ from typing import Optional, List
 from ..db import get_db
 from ..services.cars_service import CarsService, normalize_brand
 from ..schemas import CarDetailOut
-from ..utils.country_map import resolve_display_country, normalize_country_code
-from ..utils.taxonomy import normalize_fuel, ru_fuel, ru_transmission, color_hex
+from ..utils.country_map import resolve_display_country, normalize_country_code, country_label_ru
+from ..utils.taxonomy import (
+    normalize_fuel,
+    ru_fuel,
+    ru_transmission,
+    color_hex,
+    normalize_color,
+    ru_color,
+    is_color_base,
+)
 from ..utils.redis_cache import (
     redis_get_json,
     redis_set_json,
     build_filter_payload_key,
+    build_filter_ctx_base_key,
+    build_filter_ctx_brand_key,
+    build_filter_ctx_model_key,
     normalize_filter_params,
     build_cars_count_key,
     normalize_count_params,
@@ -419,6 +430,162 @@ def filter_options(
         "reg_year",
     ]
     return {field: facet(field) for field in fields}
+
+
+def _split_colors(raw_colors: List[dict]) -> tuple[list[dict], list[dict]]:
+    normalized = []
+    for c in raw_colors:
+        value = (c.get("value") or "").strip()
+        if not value:
+            continue
+        norm = normalize_color(value) or value
+        label = ru_color(norm) or value
+        hex_value = color_hex(norm)
+        normalized.append({"value": norm, "label": label, "hex": hex_value, "count": c.get("count", 0)})
+    basic: list[dict] = []
+    other: list[dict] = []
+    for c in normalized:
+        if is_color_base(c["value"]):
+            basic.append(c)
+        else:
+            other.append(c)
+    return basic, other
+
+
+@router.get("/filter_ctx_base")
+def filter_ctx_base(
+    request: Request,
+    region: Optional[str] = Query(default=None),
+    country: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    service = CarsService(db)
+    params = normalize_filter_params({"region": region, "country": country})
+    cache_key = build_filter_ctx_base_key(params)
+    cached = redis_get_json(cache_key)
+    if cached:
+        print("FILTER_CTX_BASE_CACHE hit=1 source=redis", flush=True)
+        return cached
+    print("FILTER_CTX_BASE_CACHE hit=0 source=fallback", flush=True)
+    base_filters = {"region": params.get("region"), "country": params.get("country")}
+    regions = [r["value"] for r in service.facet_counts(field="region", filters={})]
+    countries = [
+        c["value"]
+        for c in service.facet_counts(field="country", filters={"region": params.get("region")})
+        if c.get("value")
+    ]
+    country_labels = {**{c: country_label_ru(c) for c in countries}, "EU": "Европа", "KR": "Корея"}
+    kr_types = []
+    if "KR" in regions:
+        kr_types = [
+            {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
+            {"value": "KR_IMPORT", "label": "Корея (импорт)"},
+        ]
+    brands = [
+        {"value": b["value"], "label": b["value"], "count": b.get("count", 0)}
+        for b in service.facet_counts(field="brand", filters=base_filters)
+    ]
+    reg_years = [int(r["value"]) for r in service.facet_counts(field="reg_year", filters=base_filters) if r.get("value")]
+    engine_types = [
+        {"value": v["value"], "label": ru_fuel(v["value"]) or v["value"], "count": v.get("count", 0)}
+        for v in service.facet_counts(field="engine_type", filters=base_filters)
+    ]
+    transmissions = [
+        {"value": v["value"], "label": ru_transmission(v["value"]) or v["value"], "count": v.get("count", 0)}
+        for v in service.facet_counts(field="transmission", filters=base_filters)
+    ]
+    drive_types = [
+        {"value": v["value"], "label": v["value"], "count": v.get("count", 0)}
+        for v in service.facet_counts(field="drive_type", filters=base_filters)
+    ]
+    body_types = [
+        {"value": v["value"], "label": v["value"], "count": v.get("count", 0)}
+        for v in service.facet_counts(field="body_type", filters=base_filters)
+    ]
+    colors_basic, colors_other = _split_colors(service.facet_counts(field="color", filters=base_filters))
+    payload = {
+        "regions": regions,
+        "countries": countries,
+        "country_labels": country_labels,
+        "kr_types": kr_types,
+        "brands": brands,
+        "body_types": body_types,
+        "engine_types": engine_types,
+        "transmissions": transmissions,
+        "drive_types": drive_types,
+        "colors_basic": colors_basic,
+        "colors_other": colors_other,
+        "reg_years": reg_years,
+        "reg_months": [{"value": i + 1, "label": m} for i, m in enumerate(["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"])],
+    }
+    redis_set_json(cache_key, payload, ttl_sec=21600)
+    return payload
+
+
+@router.get("/filter_ctx_brand")
+def filter_ctx_brand(
+    request: Request,
+    region: Optional[str] = Query(default=None),
+    country: Optional[str] = Query(default=None),
+    brand: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    service = CarsService(db)
+    params = normalize_filter_params({"region": region, "country": country, "brand": brand})
+    cache_key = build_filter_ctx_brand_key(params)
+    cached = redis_get_json(cache_key)
+    if cached:
+        print("FILTER_CTX_BRAND_CACHE hit=1 source=redis", flush=True)
+        return cached
+    print("FILTER_CTX_BRAND_CACHE hit=0 source=fallback", flush=True)
+    filters = {"region": params.get("region"), "country": params.get("country"), "brand": params.get("brand")}
+    models = [
+        m["value"]
+        for m in service.facet_counts(field="model", filters=filters)
+        if m.get("value")
+    ]
+    payload = {"models": models}
+    redis_set_json(cache_key, payload, ttl_sec=21600)
+    return payload
+
+
+@router.get("/filter_ctx_model")
+def filter_ctx_model(
+    request: Request,
+    region: Optional[str] = Query(default=None),
+    country: Optional[str] = Query(default=None),
+    brand: Optional[str] = Query(default=None),
+    model: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    service = CarsService(db)
+    params = normalize_filter_params({"region": region, "country": country, "brand": brand, "model": model})
+    cache_key = build_filter_ctx_model_key(params)
+    cached = redis_get_json(cache_key)
+    if cached:
+        print("FILTER_CTX_MODEL_CACHE hit=1 source=redis", flush=True)
+        return cached
+    print("FILTER_CTX_MODEL_CACHE hit=0 source=fallback", flush=True)
+    from ..models import Car
+    stmt = (
+        select(func.distinct(Car.generation))
+        .where(Car.generation.is_not(None))
+        .where(Car.is_available.is_(True))
+    )
+    if params.get("brand"):
+        stmt = stmt.where(Car.brand == params.get("brand"))
+    if params.get("model"):
+        stmt = stmt.where(Car.model == params.get("model"))
+    if params.get("country"):
+        stmt = stmt.where(func.upper(Car.country) == params.get("country"))
+    elif params.get("region") == "EU":
+        stmt = stmt.where(func.upper(Car.country).in_(service.EU_COUNTRIES))
+    elif params.get("region") == "KR":
+        stmt = stmt.where(func.upper(Car.country) == "KR")
+    gens = service.db.execute(stmt).scalars().all()
+    payload = {"generations": [g for g in gens if g]}
+    redis_set_json(cache_key, payload, ttl_sec=3600)
+    return payload
 
 
 @router.get("/filter_payload")

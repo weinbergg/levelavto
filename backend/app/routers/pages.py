@@ -736,19 +736,19 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     t0 = time.perf_counter()
     raw_params = dict(request.query_params)
     ctx_params = normalize_filter_params(raw_params)
-    filter_ctx = _build_filter_context(service, db, include_payload=False, params=ctx_params)
-    timing["filter_ctx_ms"] = (time.perf_counter() - t0) * 1000
-    def _limit_list(value: Any, limit: int) -> Any:
-        if isinstance(value, list) and limit > 0:
-            return value[:limit]
-        return value
-    brands_ssr = _limit_list(filter_ctx.get("brands", []), 400)
-    generations_ssr = _limit_list(filter_ctx.get("generations", []), 200)
-    colors_basic_ssr = _limit_list(filter_ctx.get("colors_basic", []), 16)
-    colors_other_ssr = _limit_list(filter_ctx.get("colors_other", []), 64)
-    engine_types_ssr = _limit_list(filter_ctx.get("engine_types", []), 50)
-    transmissions_ssr = _limit_list(filter_ctx.get("transmissions", []), 50)
-    drive_types_ssr = _limit_list(filter_ctx.get("drive_types", []), 50)
+    region_param = ctx_params.get("region")
+    regions = [r["value"] for r in service.facet_counts(field="region", filters={})]
+    country_filters = {"region": region_param} if region_param else {}
+    countries = [c["value"] for c in service.facet_counts(field="country", filters=country_filters)]
+    country_labels = {**{c: country_label_ru(c) for c in countries}, "EU": "Европа", "KR": "Корея"}
+    kr_types = []
+    if "KR" in regions:
+        kr_types = [
+            {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
+            {"value": "KR_IMPORT", "label": "Корея (импорт)"},
+        ]
+    reg_months = [{"value": i + 1, "label": MONTHS_RU[i]} for i in range(12)]
+    timing["base_ctx_ms"] = (time.perf_counter() - t0) * 1000
     qp = request.query_params
     params = dict(qp)
     def _int_val(key: str) -> Optional[int]:
@@ -853,16 +853,16 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     timing["content_ms"] = (time.perf_counter() - t0) * 1000
     timing["total_ms"] = (time.perf_counter() - t_start) * 1000
     request.state.perf = {
-        "db_ms": float(timing.get("filter_ctx_ms", 0)),
+        "db_ms": float(timing.get("base_ctx_ms", 0)),
         "redis_ms": float(timing.get("fx_rates_ms", 0)),
     }
     if os.environ.get("HTML_TIMING", "0") == "1":
         request.state.html_parts = {"route": "catalog", **timing}
         print(
-            "CATALOG_TIMING "
-            + " ".join(f"{k}={v:.2f}" for k, v in timing.items()),
-            flush=True,
-        )
+        "CATALOG_TIMING "
+        + " ".join(f"{k}={v:.2f}" for k, v in timing.items()),
+        flush=True,
+    )
         logger.info("CATALOG_TIMING %s", request.state.html_parts)
     print(
         f"CATALOG_SSR items={len(initial_items)} region={params.get('region')} country={params.get('country')} sort={params.get('sort') or 'price_asc'}",
@@ -875,23 +875,23 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         {
             "request": request,
             "user": getattr(request.state, "user", None),
-            "brands": brands_ssr,
-            "regions": filter_ctx["regions"],
-            "countries": filter_ctx["countries"],
-            "country_labels": filter_ctx["country_labels"],
-            "kr_types": filter_ctx["kr_types"],
-            "reg_years": filter_ctx["reg_years"],
-            "reg_months": filter_ctx["reg_months"],
-            "price_options": filter_ctx["price_options"],
-            "mileage_options": filter_ctx["mileage_options"],
-            "generations": generations_ssr,
-            "colors_basic": colors_basic_ssr,
-            "colors_other": colors_other_ssr,
-            "body_types": filter_ctx["body_types"],
-            "engine_types": engine_types_ssr,
-            "transmissions": transmissions_ssr,
-            "drive_types": drive_types_ssr,
-            "has_air_suspension": filter_ctx["has_air_suspension"],
+            "brands": [],
+            "regions": regions,
+            "countries": countries,
+            "country_labels": country_labels,
+            "kr_types": kr_types,
+            "reg_years": [],
+            "reg_months": reg_months,
+            "price_options": [],
+            "mileage_options": [],
+            "generations": [],
+            "colors_basic": [],
+            "colors_other": [],
+            "body_types": [],
+            "engine_types": [],
+            "transmissions": [],
+            "drive_types": [],
+            "has_air_suspension": False,
             "initial_items": initial_items,
             "fx_rates": fx_rates,
             "content": contact_content,
