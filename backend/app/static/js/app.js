@@ -1515,31 +1515,22 @@
 
     function buildHomeParams(withPaging = false) {
       const params = new URLSearchParams()
-      const regionVal = regionSelect?.value || ''
-      if (regionVal) params.set('region', regionVal)
-      if (regionVal === 'EU') {
-        const countryVal = regionSlotSelect?.value || ''
-        if (countryVal) params.set('country', countryVal)
-      } else if (regionVal === 'KR') {
-        params.set('country', 'KR')
-        const slotVal = regionSlotSelect?.value || ''
-        if (slotVal === 'KR_INTERNAL') params.set('kr_type', 'KR_INTERNAL')
-        else if (slotVal === 'KR_IMPORT') params.set('kr_type', 'KR_IMPORT')
+      const fd = new FormData(form)
+      for (const [k, v] of fd.entries()) {
+        if (v == null) continue
+        const val = String(v).trim()
+        if (!val) continue
+        if (k === 'region' || k === 'country') {
+          params.append(k, val.toUpperCase())
+          continue
+        }
+        if (k === 'brand') {
+          const norm = normalizeBrand(val)
+          if (norm) params.append(k, norm)
+          continue
+        }
+        params.append(k, val)
       }
-      const brandVal = normalizeBrand(brandSelect?.value || '')
-      if (brandVal) params.set('brand', brandVal)
-      const modelVal = modelSelect?.value || ''
-      if (modelVal) params.set('model', modelVal)
-      const numField = (id, key) => {
-        const el = qs(id)
-        if (!el) return
-        const n = Number(el.value || '')
-        if (Number.isFinite(n) && n > 0) params.set(key, String(n))
-      }
-      numField('#home-price-max', 'price_max')
-      numField('#home-mileage-max', 'mileage_max')
-      numField('#home-reg-year-min', 'reg_year_min')
-      numField('#home-reg-year-max', 'reg_year_max')
       if (withPaging) {
         params.set('page', '1')
         params.set('page_size', '1')
@@ -1620,6 +1611,9 @@
       if (!regionSlot || !regionSlotSelect || !regionSlotLabel) return
       regionSlotSelect.disabled = false
       regionSlotSelect.innerHTML = ''
+      const params = new URLSearchParams(window.location.search)
+      const storedCountry = params.get('country') || ''
+      const storedKr = params.get('kr_type') || ''
       if (val === 'EU') {
         regionSlotLabel.textContent = 'Страна (Европа)'
         const optAll = document.createElement('option')
@@ -1628,12 +1622,15 @@
         regionSlotSelect.appendChild(optAll)
         homeCountries.forEach((c) => {
           const opt = document.createElement('option')
-          const val = c.value || c
-          opt.value = val
-          opt.textContent = c.label || val
+          const code = (c.value || c || '').toString()
+          opt.value = code
+          opt.textContent = c.label || code
           regionSlotSelect.appendChild(opt)
         })
         regionSlotSelect.name = 'country'
+        if (storedCountry) {
+          regionSlotSelect.value = storedCountry.toUpperCase()
+        }
       } else if (val === 'KR') {
         regionSlotLabel.textContent = 'Корея (тип)'
         const optAny = document.createElement('option')
@@ -1649,13 +1646,16 @@
         optImp.textContent = 'Корея (импорт)'
         regionSlotSelect.appendChild(optImp)
         regionSlotSelect.name = 'kr_type'
+        if (storedKr) {
+          regionSlotSelect.value = storedKr.toUpperCase()
+        }
       } else {
         regionSlotLabel.textContent = 'Страна / Тип'
         const opt = document.createElement('option')
         opt.value = ''
         opt.textContent = '—'
         regionSlotSelect.appendChild(opt)
-        regionSlotSelect.name = 'region_extra'
+        regionSlotSelect.removeAttribute('name')
         regionSlotSelect.disabled = true
       }
       updateAdvancedLink()
