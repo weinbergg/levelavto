@@ -41,6 +41,7 @@ from ..utils.taxonomy import (
 )
 normalize_color = _normalize_color
 from ..utils.country_map import country_label_ru, resolve_display_country
+from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
 from ..utils.home_content import build_home_content
 
 
@@ -798,23 +799,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             light=True,
         )
         def _normalize_thumb(url: str | None) -> str | None:
-            if not url or not isinstance(url, str):
-                return None
-            raw = url.strip()
-            if not raw:
-                return None
-            if raw.startswith("//"):
-                return f"https:{raw}"
-            if raw.startswith("http://"):
-                return raw.replace("http://", "https://", 1)
-            if raw.startswith("https://"):
-                return raw
-            # handle relative classistatic paths
-            if raw.startswith("/api/v1/mo-prod/images/"):
-                return f"https://img.classistatic.de{raw}"
-            if raw.startswith("api/v1/mo-prod/images/"):
-                return f"https://img.classistatic.de/{raw}"
-            return None
+            return normalize_classistatic_url(url)
 
         if isinstance(items, list):
             initial_items = items
@@ -834,7 +819,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                         c["thumbnail_url"] = first_urls[cid]
                     thumb = _normalize_thumb(c.get("thumbnail_url"))
                     if thumb:
-                        c["thumbnail_url"] = thumb
+                        c["thumbnail_url"] = pick_classistatic_thumb(thumb)
     except Exception:
         logger.exception("catalog_initial_items_failed")
     t0 = time.perf_counter()
@@ -1016,6 +1001,20 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         code, label = resolve_display_country(car)
         car.display_country_code = code
         car.display_country_label = label
+        if getattr(car, "images", None):
+            for im in car.images:
+                try:
+                    normalized = normalize_classistatic_url(getattr(im, "url", None))
+                    if normalized:
+                        im.url = normalized
+                except Exception:
+                    continue
+        try:
+            normalized_thumb = normalize_classistatic_url(getattr(car, "thumbnail_url", None))
+            if normalized_thumb:
+                car.thumbnail_url = normalized_thumb
+        except Exception:
+            pass
     details = []
     options = []
     calc = None

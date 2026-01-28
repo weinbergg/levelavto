@@ -85,6 +85,11 @@
       .replace(/'/g, '&#39;')
   }
 
+  function buildCatalogUrl(params) {
+    const qs = params.toString()
+    return qs ? `/catalog?${qs}` : '/catalog'
+  }
+
   function normalizeThumbUrl(src, opts = {}) {
     const val = String(src || '').trim()
     if (!val) return '/static/img/no-photo.svg'
@@ -93,7 +98,15 @@
     if (url.startsWith('http://')) url = url.replace('http://', 'https://')
     if (url.startsWith('api/v1/mo-prod/images/')) url = `https://img.classistatic.de/${url}`
     if (url.startsWith('img.classistatic.de/')) url = `https://${url}`
-    if (!(url.startsWith('https://') || url.startsWith('/'))) return '/static/img/no-photo.svg'
+    if (!url.startsWith('https://') && !url.startsWith('/')) {
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (uuidRe.test(url)) {
+        const prefix = url.slice(0, 2)
+        url = `https://img.classistatic.de/api/v1/mo-prod/images/${prefix}/${url}?rule=mo-1024.jpg`
+      } else {
+        return '/static/img/no-photo.svg'
+      }
+    }
     // Keep original classistatic rule to avoid 404 on some sizes.
     return url
   }
@@ -190,6 +203,10 @@
   }
 
   const DEBUG_FILTERS = localStorage.getItem('debugFilters') === '1'
+  if (DEBUG_FILTERS) {
+    const testUrl = buildCatalogUrl(new URLSearchParams({ brand: 'Cadillac', model: 'CT6' }))
+    console.assert(testUrl.includes('brand=Cadillac') && testUrl.includes('model=CT6'), 'buildCatalogUrl failed', testUrl)
+  }
 
   function normalizeBrand(value) {
     const raw = String(value || '').trim()
@@ -1583,8 +1600,9 @@
       const params = buildHomeParams(false)
       if (DEBUG_FILTERS) {
         sessionStorage.setItem('homeSubmitParams', params.toString())
+        console.info('filters:home submit', params.toString())
       }
-      window.location.href = `/catalog?${params.toString()}`
+      window.location.href = buildCatalogUrl(params)
     })
     window.addEventListener('pageshow', (e) => {
       if (!e.persisted) return
@@ -1878,7 +1896,13 @@
       } else if (countryHidden && countryHidden.value) {
         params.set('country', countryHidden.value)
       }
-      buildLines().forEach((line) => params.append('line', line))
+      const lines = buildLines()
+      lines.forEach((line) => params.append('line', line))
+      if (!params.get('brand') && lines.length === 1) {
+        const first = parseLine(lines[0])
+        if (first.brand) params.set('brand', first.brand)
+        if (first.model) params.set('model', first.model)
+      }
       if (withPaging) {
         params.set('page', '1')
         params.set('page_size', '1')
@@ -1965,7 +1989,8 @@
         const data = await res.json()
         if (data.total && data.total > 0) {
           const redirectParams = buildParams(false)
-          window.location.href = `/catalog?${redirectParams.toString()}`
+          if (DEBUG_FILTERS) console.info('filters:advanced submit', redirectParams.toString())
+          window.location.href = buildCatalogUrl(redirectParams)
           return
         }
         if (messageEl) {

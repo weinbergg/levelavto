@@ -14,6 +14,7 @@ from ..utils.taxonomy import (
     ru_color,
     is_color_base,
 )
+from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
 from ..utils.redis_cache import (
     redis_get_json,
     redis_set_json,
@@ -144,22 +145,7 @@ def list_cars(
     image_counts = {}
     image_first = {}
     def _normalize_thumb(url: str | None) -> str | None:
-        if not url or not isinstance(url, str):
-            return None
-        raw = url.strip()
-        if not raw:
-            return None
-        if raw.startswith("//"):
-            return f"https:{raw}"
-        if raw.startswith("http://"):
-            return raw.replace("http://", "https://", 1)
-        if raw.startswith("https://"):
-            return raw
-        if raw.startswith("/api/v1/mo-prod/images/"):
-            return f"https://img.classistatic.de{raw}"
-        if raw.startswith("api/v1/mo-prod/images/"):
-            return f"https://img.classistatic.de/{raw}"
-        return None
+        return normalize_classistatic_url(url)
     if items:
         ids = [c.get("id") for c in items if c.get("id")]
         if ids:
@@ -203,6 +189,7 @@ def list_cars(
         img_count = image_counts.get(c.get("id"), 0)
         raw_thumb = _normalize_thumb(c.get("thumbnail_url"))
         thumb_url = raw_thumb or image_first.get(c.get("id"))
+        thumb_url = pick_classistatic_thumb(thumb_url)
         if isinstance(thumb_url, str) and "rule=mo-" in thumb_url:
             thumb_replaced += 1
         payload_items.append(
