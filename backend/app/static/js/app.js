@@ -150,26 +150,37 @@
     }
   }
 
-  function setSelectOptions(select, items, { emptyLabel = 'Все', valueKey = 'value', labelKey = 'label' } = {}) {
+  function setSelectOptions(select, items, { emptyLabel = 'Все', valueKey = 'value', labelKey = 'label', keepValue = '' } = {}) {
     if (!select) return
     const current = select.value
+    const preserve = String(keepValue || current || '').trim()
+    const hasPreserve = Boolean(preserve)
     select.innerHTML = ''
     const emptyOpt = document.createElement('option')
     emptyOpt.value = ''
     emptyOpt.textContent = emptyLabel
     select.appendChild(emptyOpt)
+    if (hasPreserve) {
+      const opt = document.createElement('option')
+      opt.value = preserve
+      opt.textContent = preserve
+      opt.dataset.preserved = '1'
+      select.appendChild(opt)
+    }
     ;(items || []).forEach((item) => {
       const value = item?.[valueKey] ?? item
       if (value == null || value === '') return
+      if (hasPreserve && String(value) === preserve) return
       const label = item?.[labelKey] ?? value
       const opt = document.createElement('option')
       opt.value = value
       opt.textContent = label
       select.appendChild(opt)
     })
-    if (current) {
-      const match = Array.from(select.options).find((o) => o.value === current)
-      if (match) select.value = current
+    if (current || hasPreserve) {
+      const target = hasPreserve ? preserve : current
+      const match = Array.from(select.options).find((o) => o.value === target)
+      if (match) select.value = target
     }
   }
 
@@ -1022,7 +1033,8 @@
         const res = await fetch(`/api/filter_ctx_base?${params.toString()}`)
         if (!res.ok) return
         const data = await res.json()
-        setSelectOptions(qs('#brand'), data.brands || [], { emptyLabel: 'Все' })
+        const brandCurrent = qs('#brand')?.value || ''
+        setSelectOptions(qs('#brand'), data.brands || [], { emptyLabel: 'Все', keepValue: brandCurrent })
         setSelectOptions(qs('#body_type'), data.body_types || [], { emptyLabel: 'Любой' })
         setSelectOptions(qs('[name="engine_type"]'), data.engine_types || [], { emptyLabel: 'Любое' })
         setSelectOptions(qs('[name="transmission"]'), data.transmissions || [], { emptyLabel: 'Любая' })
@@ -1030,7 +1042,8 @@
         setSelectOptions(qs('#reg-year-min'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         setSelectOptions(qs('#reg-year-max'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         const euSelect = qs('#eu-country')
-        setSelectOptions(euSelect, data.countries || [], { emptyLabel: 'Все страны' })
+        const euCurrent = euSelect?.value || ''
+        setSelectOptions(euSelect, data.countries || [], { emptyLabel: 'Все страны', keepValue: euCurrent })
         const regionSelectEl = qs('#region')
         if (regionSelectEl && Array.isArray(data.regions) && data.regions.length) {
           setSelectOptions(regionSelectEl, data.regions.map((r) => ({ value: r, label: (data.country_labels || {})[r] || r })), { emptyLabel: 'Все регионы' })

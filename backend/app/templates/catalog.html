@@ -279,6 +279,7 @@
                   loading="lazy"
                   decoding="async"
                   referrerpolicy="no-referrer"
+                  {% if loop.index0 < 2 %}fetchpriority="high"{% endif %}
                   alt=""
                   data-thumb="{{ car.thumbnail_url or '/static/img/no-photo.svg' }}"
                   data-id="{{ car.id }}"

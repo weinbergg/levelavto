@@ -8,75 +8,91 @@
 \f0\fs24 \cf0 root@cv5704357:/opt/levelavto# git pull\
 docker compose build web\
 docker compose up -d --force-recreate web\
-docker compose run --rm prewarm\
-curl -s "http://localhost:8000/catalog?region=EU&country=DE" | rg -n "img\\\\.classistatic\\\\.de" | head\
-curl -s "http://localhost:8000/catalog?region=EU&country=DE" | rg -o 'src="[^"]+"' | head -n 30\
-Already up to date.\
-[+] Building 2.8s (13/13) FINISHED                                                                                                             \
+remote: Enumerating objects: 30, done.\
+remote: Counting objects: 100% (30/30), done.\
+remote: Compressing objects: 100% (3/3), done.\
+Unpacking objects: 100% (16/16), 4.38 KiB | 299.00 KiB/s, done.\
+remote: Total 16 (delta 12), reused 16 (delta 12), pack-reused 0 (from 0)\
+From github.com:weinbergg/levelavto\
+   f5a803b..67b16b8  main       -> origin/main\
+Updating f5a803b..67b16b8\
+Fast-forward\
+ backend/app/routers/catalog.py   |  19 +++---------------\
+ backend/app/routers/favorites.py |   7 ++++---\
+ backend/app/routers/pages.py     |  35 ++++++++++++++++----------------\
+ backend/app/static/js/app.js     |  33 +++++++++++++++++++++++++++----\
+ backend/app/templates/base.html  |   2 +-\
+ backend/app/utils/thumbs.py      | 111 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\
+ vps.rtf                          | 106 +++++++++++++++++++++++++++++++++++++++++++++++++++++++------------------------------------------\
+ 7 files changed, 225 insertions(+), 88 deletions(-)\
+ create mode 100644 backend/app/utils/thumbs.py\
+[+] Building 4.3s (13/13) FINISHED                                                                                                             \
  => [internal] load local bake definitions                                                                                                0.0s\
  => => reading from stdin 480B                                                                                                            0.0s\
  => [internal] load build definition from Dockerfile                                                                                      0.0s\
  => => transferring dockerfile: 553B                                                                                                      0.0s\
- => [internal] load metadata for docker.io/library/python:3.11-slim                                                                       0.5s\
+ => [internal] load metadata for docker.io/library/python:3.11-slim                                                                       1.0s\
  => [internal] load .dockerignore                                                                                                         0.0s\
  => => transferring context: 285B                                                                                                         0.0s\
  => [1/6] FROM docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.0s\
  => => resolve docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.0s\
- => [internal] load build context                                                                                                         0.1s\
- => => transferring context: 121.55kB                                                                                                     0.1s\
+ => [internal] load build context                                                                                                         0.2s\
+ => => transferring context: 418.50kB                                                                                                     0.1s\
  => CACHED [2/6] WORKDIR /app                                                                                                             0.0s\
  => CACHED [3/6] RUN apt-get update && apt-get install -y --no-install-recommends     build-essential curl libpq-dev &&     rm -rf /var/  0.0s\
  => CACHED [4/6] COPY backend/requirements.txt /app/backend/requirements.txt                                                              0.0s\
  => CACHED [5/6] RUN pip install --upgrade pip && pip install -r /app/backend/requirements.txt                                            0.0s\
- => [6/6] COPY . /app                                                                                                                     0.3s\
- => exporting to image                                                                                                                    1.8s\
- => => exporting layers                                                                                                                   1.4s\
- => => exporting manifest sha256:09babb265e63748361dadecc5d7671cb4ea8841a7025d602b1f1d2576da88e1d                                         0.0s\
- => => exporting config sha256:9827d5f7afb37e942a9dcd7fad5b8ba037814df6527bc15a2e5351ce234bf24e                                           0.0s\
- => => exporting attestation manifest sha256:d3df33dde0e6f1ef9d4ec5bcc26d3dae65a8decf1a4c4dab7b7893f5fbb5f25a                             0.0s\
- => => exporting manifest list sha256:cf6558c6b97ed28e53af31481dd5e75205502fe5300aacd6c341769187a3213b                                    0.0s\
+ => [6/6] COPY . /app                                                                                                                     0.7s\
+ => exporting to image                                                                                                                    2.0s\
+ => => exporting layers                                                                                                                   1.6s\
+ => => exporting manifest sha256:daeefcb97f5e7dd057d2fb31d8f57b026159d42e889ae778a220bdec7b8f7b57                                         0.0s\
+ => => exporting config sha256:b17f33d088c6d27ebaf02f056bedc6f190041655e9a47cfd291ad53aca9f19c6                                           0.0s\
+ => => exporting attestation manifest sha256:83f55a559e4717009bced9357d330b9e498c129303a1936cb985aea87ab9be5e                             0.0s\
+ => => exporting manifest list sha256:efca5410b65e3e927da272ca28bb2f3482efb8ab2ad6daa72f47576065dc7c4c                                    0.0s\
  => => naming to docker.io/library/levelavto-web:latest                                                                                   0.0s\
- => => unpacking to docker.io/library/levelavto-web:latest                                                                                0.3s\
+ => => unpacking to docker.io/library/levelavto-web:latest                                                                                0.4s\
  => resolving provenance for metadata file                                                                                                0.0s\
-[+] build 1/1\
 [+] up 3/3\
- \uc0\u10004  Container autodealer_redis Healthy                                                                                                    10.9s \
- \uc0\u10004  Container autodealer_db    Healthy                                                                                                    10.9s \
- \uc0\u10004  Container autodealer_web   Recreated                                                                                                  10.4s \
+ \uc0\u10004  Container autodealer_redis Healthy                                                                                                    11.2s \
+ \uc0\u10004  Container autodealer_db    Healthy                                                                                                    11.2s \
+ \uc0\u10004  Container autodealer_web   Recreated                                                                                                  10.6s \
+root@cv5704357:/opt/levelavto# docker compose run --rm prewarm\
 [+]  3/3t 3/3\
  \uc0\u10004  Container autodealer_redis Running                                                                                                     0.0s \
  \uc0\u10004  Container autodealer_db    Running                                                                                                     0.0s \
  \uc0\u10004  Container autodealer_web   Running                                                                                                     0.0s \
-[+]  3/3r autodealer_redis Waiting \
+[+]  3/3r autodealer_db Waiting \
  \uc0\u10004  Container autodealer_redis Healthy                                                                                                     0.5s \
  \uc0\u10004  Container autodealer_db    Healthy                                                                                                     0.5s \
  \uc0\u10004  Container autodealer_web   Running                                                                                                     0.0s \
-Container autodealer_redis Waiting \
 Container autodealer_web Waiting \
+Container autodealer_redis Waiting \
 Container autodealer_redis Healthy \
 Container autodealer_web Healthy \
-Container levelavto-prewarm-run-413a89e44e4e Creating \
-Container levelavto-prewarm-run-413a89e44e4e Created \
-[prewarm] filter_ctx key=filter_ctx:('home', False) ms=145.34\
-[prewarm] filter_ctx key=filter_ctx:('EU', '', '', '', '', '', '', '', '', '', False) ms=24987.62\
-[prewarm] filter_ctx key=filter_ctx:('EU', 'DE', '', '', '', '', '', '', '', '', False) ms=24705.48\
-[prewarm] filter_ctx key=filter_ctx:('KR', '', '', '', '', '', '', '', '', '', False) ms=24147.43\
-[prewarm] filter_ctx key=filter_ctx:('EU', 'DE', '', '', '', '', '', '', '', '', True) ms=42898.91\
-[prewarm] filter_ctx key=filter_ctx:('EU', '', '', '', '', '', '', '', '', '', True) ms=41825.57\
-[prewarm] filter_ctx key=filter_ctx:('KR', '', '', '', '', '', '', '', '', '', True) ms=42653.92\
+Container levelavto-prewarm-run-85ef77e5c950 Creating \
+Container levelavto-prewarm-run-85ef77e5c950 Created \
+[prewarm] filter_ctx key=filter_ctx:('home', False) ms=162.82\
+[prewarm] filter_ctx key=filter_ctx:('EU', '', '', '', '', '', '', '', '', '', False) ms=27348.58\
+[prewarm] filter_ctx key=filter_ctx:('EU', 'DE', '', '', '', '', '', '', '', '', False) ms=26082.96\
+[prewarm] filter_ctx key=filter_ctx:('KR', '', '', '', '', '', '', '', '', '', False) ms=24847.35\
+[prewarm] filter_ctx key=filter_ctx:('EU', 'DE', '', '', '', '', '', '', '', '', True) ms=47474.52\
+[prewarm] filter_ctx key=filter_ctx:('EU', '', '', '', '', '', '', '', '', '', True) ms=45548.98\
+[prewarm] filter_ctx key=filter_ctx:('KR', '', '', '', '', '', '', '', '', '', True) ms=44984.48\
 [prewarm] filter_payload key=filter_payload:('EU', '', '', '')\
 [prewarm] filter_payload key=filter_payload:('EU', 'DE', '', '')\
 [prewarm] filter_payload key=filter_payload:('KR', '', '', '')\
 [prewarm] total_cars=2217905\
-list_slow total=6.271s sort=None page=1 size=1 filters=(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=6.358s sort=None page=1 size=1 filters=(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_count key=cars_count:all value=1967120\
-list_slow total=6.176s sort=None page=1 size=1 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=6.337s sort=None page=1 size=1 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_count key=cars_count:(('region', 'EU'),) value=1862890\
-list_slow total=6.159s sort=None page=1 size=1 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=6.273s sort=None page=1 size=1 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_count key=cars_count:(('country', 'DE'), ('region', 'EU')) value=1550114\
-list_slow total=6.013s sort=None page=1 size=1 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=6.107s sort=None page=1 size=1 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_count key=cars_count:(('region', 'KR'),) value=104230\
-[prewarm] done in 250481.52 ms\
+[prewarm] done in 268841.17 ms\
+root@cv5704357:/opt/levelavto# curl -s "http://localhost:8000/catalog?region=EU&country=DE" | rg -n "img\\\\.classistatic\\\\.de" | head\
+curl -s "http://localhost:8000/catalog?region=EU&country=DE" | rg -o 'src="[^"]+"' | head -n 20\
 474:                  src="https://img.classistatic.de/api/v1/mo-prod/images/44/44ea6335-915a-4ce3-8367-a7bcaa366f9a?rule=mo-1024.jpg"\
 479:                  data-thumb="https://img.classistatic.de/api/v1/mo-prod/images/44/44ea6335-915a-4ce3-8367-a7bcaa366f9a?rule=mo-1024.jpg"\
 506:                  src="https://img.classistatic.de/api/v1/mo-prod/images/0b/0b53a133-f571-4db3-83ad-451294ebaddf?rule=mo-1024.jpg"\
@@ -101,5 +117,16 @@ src="https://img.classistatic.de/api/v1/mo-prod/images/c5/c5c5f2c0-a2e5-4eff-b0d
 src="https://img.classistatic.de/api/v1/mo-prod/images/f9/f9cf8c55-b1c3-44b8-a6fe-eafdee82cee2?rule=mo-1024.jpg"\
 src="https://img.classistatic.de/api/v1/mo-prod/images/8a/8aa0c226-d99b-4626-ad15-59abc5df8a34?rule=mo-1024.jpg"\
 src="https://img.classistatic.de/api/v1/mo-prod/images/7b/7b3fda41-443a-47c5-b540-32d9c88ab69e?rule=mo-1024.jpg"\
-src="/static/js/app.js?v=27"\
+src="/static/js/app.js?v=28"\
+root@cv5704357:/opt/levelavto# curl -I "http://localhost:8000/static/img/no-photo.svg"\
+HTTP/1.1 200 OK\
+date: Wed, 28 Jan 2026 12:12:50 GMT\
+server: uvicorn\
+content-type: image/svg+xml\
+content-length: 549\
+last-modified: Mon, 26 Jan 2026 09:01:33 GMT\
+etag: "5e0c5f04d940b7cc803b4ff6d574f36b"\
+x-process-time: 0.003\
+cache-control: public, max-age=31536000, immutable\
+\
 root@cv5704357:/opt/levelavto# }
