@@ -99,23 +99,18 @@
   function applyThumbFallback(img) {
     if (!img) return
     const rawSrc = img.getAttribute('src') || ''
-    if (rawSrc.startsWith('https://img.classistatic.de/')) {
-      if (!img.dataset.fallbackBound) {
-        img.dataset.fallbackBound = '1'
-        img.onerror = () => {
-          if (img.dataset.fallbackApplied === '1') return
-          img.dataset.fallbackApplied = '1'
-          img.src = '/static/img/no-photo.svg'
-        }
-      }
-      return
-    }
     const rawData = img.dataset.thumb || ''
     let normalized = normalizeThumbUrl(rawSrc)
     if (normalized === '/static/img/no-photo.svg' && rawData) {
       const dataNormalized = normalizeThumbUrl(rawData)
       if (dataNormalized !== '/static/img/no-photo.svg') {
         normalized = dataNormalized
+      }
+    }
+    if (normalized === '/static/img/no-photo.svg' && rawSrc) {
+      const trimmed = String(rawSrc || '').trim()
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+        normalized = trimmed
       }
     }
     if (img.getAttribute('src') !== normalized) {
@@ -2092,7 +2087,8 @@
     thumbs.forEach((btn, i) => {
       btn.addEventListener('click', () => {
         idx = i
-        img.src = images[idx]
+        const nextSrc = normalizeThumbUrl(images[idx] || '')
+        if (nextSrc) img.src = nextSrc
       })
     })
     let startX = null
