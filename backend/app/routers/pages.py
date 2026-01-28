@@ -626,6 +626,16 @@ def index(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
     t_start = time.perf_counter()
     ctx = _home_context(request, service, db, timing=timing)
     timing["total_ms"] = (time.perf_counter() - t_start) * 1000
+    request.state.perf = {
+        "db_ms": float(
+            timing.get("brand_stats_ms", 0)
+            + timing.get("body_type_stats_ms", 0)
+            + timing.get("filter_ctx_ms", 0)
+            + timing.get("total_cars_ms", 0)
+            + timing.get("recommended_ms", 0)
+        ),
+        "redis_ms": float(timing.get("fx_rates_ms", 0)),
+    }
     if os.environ.get("HTML_TIMING", "0") == "1":
         request.state.html_parts = {"route": "home", **timing}
         print(
@@ -634,7 +644,10 @@ def index(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
             flush=True,
         )
         logger.info("HOME_TIMING %s", request.state.html_parts)
-    return templates.TemplateResponse("home.html", ctx)
+    t_render = time.perf_counter()
+    resp = templates.TemplateResponse("home.html", ctx)
+    request.state.perf["render_ms"] = (time.perf_counter() - t_render) * 1000
+    return resp
 
 
 @router.post("/lead")
@@ -826,6 +839,10 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         ])
     timing["content_ms"] = (time.perf_counter() - t0) * 1000
     timing["total_ms"] = (time.perf_counter() - t_start) * 1000
+    request.state.perf = {
+        "db_ms": float(timing.get("filter_ctx_ms", 0)),
+        "redis_ms": float(timing.get("fx_rates_ms", 0)),
+    }
     if os.environ.get("HTML_TIMING", "0") == "1":
         request.state.html_parts = {"route": "catalog", **timing}
         print(
@@ -839,7 +856,8 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         flush=True,
     )
 
-    return templates.TemplateResponse(
+    t_render = time.perf_counter()
+    resp = templates.TemplateResponse(
         "catalog.html",
         {
             "request": request,
@@ -872,6 +890,8 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "contact_ig": contact_content.get("contact_ig"),
         },
     )
+    request.state.perf["render_ms"] = (time.perf_counter() - t_render) * 1000
+    return resp
 
 
 @router.get("/search")
@@ -902,13 +922,18 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "contact_ig",
         ])
     total_cars = _get_cars_count(service, params, timing_enabled)
+    request.state.perf = {
+        "db_ms": float((time.perf_counter() - t0) * 1000),
+        "redis_ms": 0.0,
+    }
     if timing_enabled:
         total_ms = (time.perf_counter() - t0) * 1000
         print(
             f"SEARCH_TIMING total_ms={total_ms:.2f} filter_ctx_hit={cache_hit} filter_ctx_source={cache_source} filter_ctx_key={cache_key}",
             flush=True,
         )
-    return templates.TemplateResponse(
+    t_render = time.perf_counter()
+    resp = templates.TemplateResponse(
         "search.html",
         {
             "request": request,
@@ -965,6 +990,8 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "contact_ig": contact_content.get("contact_ig"),
         },
     )
+    request.state.perf["render_ms"] = (time.perf_counter() - t_render) * 1000
+    return resp
 
 
 @router.get("/car/{car_id}")

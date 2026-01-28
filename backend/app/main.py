@@ -37,6 +37,11 @@ def create_app() -> FastAPI:
         req_id = uuid.uuid4().hex[:8]
         response = await call_next(request)
         total = time.perf_counter() - t0
+        response.headers["X-Process-Time"] = f"{total:.3f}"
+        if request.url.path.startswith("/static/"):
+            response.headers.setdefault(
+                "Cache-Control", "public, max-age=31536000, immutable"
+            )
         if os.environ.get("CAR_API_TIMING", "0") == "1":
             parts = getattr(request.state, "api_parts", None)
             if parts:
@@ -57,7 +62,6 @@ def create_app() -> FastAPI:
                     request.url.path,
                     total,
                 )
-        response.headers["X-Process-Time"] = f"{total:.3f}"
         if os.environ.get("HTML_TIMING", "0") == "1" and request.url.path in {"/", "/catalog"}:
             parts = getattr(request.state, "html_parts", None) or {}
             logger.info(
@@ -66,6 +70,18 @@ def create_app() -> FastAPI:
                 request.url.path,
                 total * 1000,
                 parts,
+            )
+        if os.environ.get("REQ_TIMING", "0") == "1":
+            perf = getattr(request.state, "perf", {}) or {}
+            db_ms = perf.get("db_ms", 0.0)
+            redis_ms = perf.get("redis_ms", 0.0)
+            render_ms = perf.get("render_ms", 0.0)
+            response.headers["Server-Timing"] = (
+                f"app;dur={total*1000:.1f},db;dur={db_ms:.1f},redis;dur={redis_ms:.1f},render;dur={render_ms:.1f}"
+            )
+            print(
+                f"REQ_TIMING path={request.url.path} status={response.status_code} total_ms={total*1000:.1f} db_ms={db_ms:.1f} redis_ms={redis_ms:.1f} render_ms={render_ms:.1f}",
+                flush=True,
             )
         return response
 

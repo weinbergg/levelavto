@@ -1,6 +1,21 @@
 ;(function () {
   const qs = (s, el = document) => el.querySelector(s)
   const qsa = (s, el = document) => Array.from(el.querySelectorAll(s))
+  if (window.DEBUG_PERF && !window.__fetchWrapped) {
+    window.__fetchWrapped = true
+    const origFetch = window.fetch.bind(window)
+    const seen = new Map()
+    window.fetch = async (...args) => {
+      const url = (args[0] && args[0].toString) ? args[0].toString() : String(args[0] || '')
+      const start = performance.now()
+      const res = await origFetch(...args)
+      const ms = performance.now() - start
+      const cnt = (seen.get(url) || 0) + 1
+      seen.set(url, cnt)
+      console.log(`[fetch] ${res.status} ${ms.toFixed(1)}ms count=${cnt} url=${url}`)
+      return res
+    }
+  }
 
   // --- FX rates (RUB) ---
   let fxCache = { loaded: false, rates: {} }

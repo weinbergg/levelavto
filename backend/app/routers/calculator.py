@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
@@ -6,6 +6,7 @@ from ..services.calculator import calculate_import_cost, get_eur_rate
 from ..services.calculator_config_service import CalculatorConfigService
 from ..services.calculator_extractor import CalculatorExtractor
 from ..services.cars_service import CarsService
+from ..services.calc_debug import build_calc_debug
 from fastapi import UploadFile, File
 import tempfile
 import json
@@ -126,6 +127,20 @@ def calc_endpoint(payload: CalcRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/calc_debug")
+def calc_debug_endpoint(
+    car_id: int = Query(..., ge=1),
+    eur_rate: Optional[float] = Query(default=None),
+    usd_rate: Optional[float] = Query(default=None),
+    scenario: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return build_calc_debug(db, car_id=car_id, eur_rate=eur_rate, usd_rate=usd_rate, scenario=scenario)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/calculator/config/current")
