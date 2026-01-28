@@ -150,37 +150,26 @@
     }
   }
 
-  function setSelectOptions(select, items, { emptyLabel = 'Все', valueKey = 'value', labelKey = 'label', keepValue = '' } = {}) {
+  function setSelectOptions(select, items, { emptyLabel = 'Все', valueKey = 'value', labelKey = 'label' } = {}) {
     if (!select) return
     const current = select.value
-    const preserve = String(keepValue || current || '').trim()
-    const hasPreserve = Boolean(preserve)
     select.innerHTML = ''
     const emptyOpt = document.createElement('option')
     emptyOpt.value = ''
     emptyOpt.textContent = emptyLabel
     select.appendChild(emptyOpt)
-    if (hasPreserve) {
-      const opt = document.createElement('option')
-      opt.value = preserve
-      opt.textContent = preserve
-      opt.dataset.preserved = '1'
-      select.appendChild(opt)
-    }
     ;(items || []).forEach((item) => {
       const value = item?.[valueKey] ?? item
       if (value == null || value === '') return
-      if (hasPreserve && String(value) === preserve) return
       const label = item?.[labelKey] ?? value
       const opt = document.createElement('option')
       opt.value = value
       opt.textContent = label
       select.appendChild(opt)
     })
-    if (current || hasPreserve) {
-      const target = hasPreserve ? preserve : current
-      const match = Array.from(select.options).find((o) => o.value === target)
-      if (match) select.value = target
+    if (current) {
+      const match = Array.from(select.options).find((o) => o.value === current)
+      if (match) select.value = current
     }
   }
 
@@ -278,6 +267,50 @@
     })
     syncColorChips(form)
     syncRegMonthState(form)
+  }
+
+  function parseSelectedFilters() {
+    const params = new URLSearchParams(window.location.search)
+    const selected = new URLSearchParams()
+    params.forEach((value, key) => {
+      if (!value) return
+      let next = value
+      if (key === 'region' || key === 'country') {
+        next = String(value).trim().toUpperCase()
+      }
+      if (key === 'brand') {
+        next = normalizeBrand(value)
+      }
+      selected.append(key, next)
+    })
+    return selected
+  }
+
+  function syncFormFromSelected(form, selected) {
+    if (!form || !selected) return
+    selected.forEach((value, key) => {
+      if (key === 'line') return
+      const field = form.elements[key]
+      if (!field) return
+      const nextValue = key === 'brand' ? normalizeBrand(value) : value
+      if (field.tagName === 'SELECT') {
+        const matched = setSelectValueInsensitive(field, nextValue)
+        if (!matched) field.value = nextValue
+      } else {
+        field.value = nextValue
+      }
+    })
+    syncColorChips(form)
+    syncRegMonthState(form)
+  }
+
+  function updateCatalogUrlFromParams(params) {
+    if (!params) return
+    params.delete('page')
+    params.delete('page_size')
+    const qs = params.toString()
+    const next = qs ? `/catalog?${qs}` : '/catalog'
+    window.history.replaceState(null, '', next)
   }
 
   function syncColorChips(scope) {
@@ -1005,7 +1038,9 @@
       })
       sessionStorage.removeItem('catalogScroll')
     }
-    applyQueryToFilters()
+    const filtersForm = qs('#filters')
+    let selectedFilters = parseSelectedFilters()
+    syncFormFromSelected(filtersForm, selectedFilters)
     qsa('#cards img.thumb').forEach((img) => {
       applyThumbFallback(img)
     })
@@ -1024,17 +1059,16 @@
       filtersLoading = true
       try {
         const params = new URLSearchParams()
-        const region = qs('[name="region"]')?.value || ''
-        const euCountry = qs('[name="eu_country"]')?.value || ''
-        const countryHidden = qs('#country')?.value || ''
+        const region = selectedFilters.get('region') || ''
+        const euCountry = selectedFilters.get('country') || ''
+        const countryHidden = selectedFilters.get('country') || ''
         if (region) params.set('region', region)
         if (region === 'EU' && euCountry) params.set('country', euCountry)
         if (!region && countryHidden) params.set('country', countryHidden)
         const res = await fetch(`/api/filter_ctx_base?${params.toString()}`)
         if (!res.ok) return
         const data = await res.json()
-        const brandCurrent = qs('#brand')?.value || ''
-        setSelectOptions(qs('#brand'), data.brands || [], { emptyLabel: 'Все', keepValue: brandCurrent })
+        setSelectOptions(qs('#brand'), data.brands || [], { emptyLabel: 'Все', labelKey: 'label', valueKey: 'value' })
         setSelectOptions(qs('#body_type'), data.body_types || [], { emptyLabel: 'Любой' })
         setSelectOptions(qs('[name="engine_type"]'), data.engine_types || [], { emptyLabel: 'Любое' })
         setSelectOptions(qs('[name="transmission"]'), data.transmissions || [], { emptyLabel: 'Любая' })
@@ -1042,21 +1076,20 @@
         setSelectOptions(qs('#reg-year-min'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         setSelectOptions(qs('#reg-year-max'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         const euSelect = qs('#eu-country')
-        const euCurrent = euSelect?.value || ''
-        setSelectOptions(euSelect, data.countries || [], { emptyLabel: 'Все страны', keepValue: euCurrent })
+        setSelectOptions(euSelect, data.countries || [], { emptyLabel: 'Все страны', labelKey: 'label', valueKey: 'value' })
         const regionSelectEl = qs('#region')
         if (regionSelectEl && Array.isArray(data.regions) && data.regions.length) {
-          setSelectOptions(regionSelectEl, data.regions.map((r) => ({ value: r, label: (data.country_labels || {})[r] || r })), { emptyLabel: 'Все регионы' })
+          setSelectOptions(regionSelectEl, data.regions, { emptyLabel: 'Все регионы', labelKey: 'label', valueKey: 'value' })
         }
         const basic = qs('.color-swatches--basic')
         const extra = qs('#colors-extra-catalog')
         renderColorChips(basic, data.colors_basic || [])
         renderColorChips(extra, data.colors_other || [])
-        const filtersForm = qs('#filters')
         if (filtersForm) {
           bindColorChips(filtersForm, () => loadCars(1))
           bindOtherColorsToggle(filtersForm)
           syncColorChips(filtersForm)
+          syncFormFromSelected(filtersForm, selectedFilters)
         }
       } catch (e) {
         console.warn('filters base', e)
@@ -1128,6 +1161,9 @@
       const trigger = () => {
         clearTimeout(debounce)
         debounce = setTimeout(() => {
+          const params = collectParams(1)
+          updateCatalogUrlFromParams(params)
+          selectedFilters = new URLSearchParams(params)
           loadCars(1)
           updateAdvancedLink()
         }, 250)
@@ -1135,6 +1171,9 @@
       const reloadBase = () => {
         clearTimeout(debounce)
         debounce = setTimeout(() => {
+          const params = collectParams(1)
+          updateCatalogUrlFromParams(params)
+          selectedFilters = new URLSearchParams(params)
           loadCatalogFilterBase()
         }, 200)
       }
@@ -1176,7 +1215,7 @@
       if (e.key === 'Escape') setFiltersOpen(false)
     })
 
-    async function updateCatalogModels() {
+    async function updateCatalogModels({ keepModel } = {}) {
       if (!brandSelect || !modelSelect) return
       const brand = brandSelect.value
       const normBrand = normalizeBrand(brand)
@@ -1188,21 +1227,31 @@
       }
       modelSelect.disabled = true
       modelSelect.innerHTML = '<option value=\"\">Загрузка…</option>'
-      const models = await fetchModels(normBrand)
+      const region = selectedFilters.get('region') || qs('[name="region"]')?.value || ''
+      const country = selectedFilters.get('country') || qs('[name="eu_country"]')?.value || qs('#country')?.value || ''
+      const models = await fetchCatalogModels({ region, country, brand: normBrand })
       modelSelect.innerHTML = '<option value=\"\">Все</option>'
-      models.forEach(({ model }) => {
+      models.forEach((m) => {
+        const value = m.value || m.model || m
+        if (!value) return
         const opt = document.createElement('option')
-        opt.value = model
-        opt.textContent = model
+        opt.value = value
+        opt.textContent = m.label || value
         modelSelect.appendChild(opt)
       })
-      if (initialModelParam) {
-        setSelectValueInsensitive(modelSelect, initialModelParam)
+      const targetModel = keepModel || initialModelParam
+      if (targetModel) {
+        setSelectValueInsensitive(modelSelect, targetModel)
       }
       modelSelect.disabled = false
     }
     brandSelect?.addEventListener('change', () => {
-      updateCatalogModels().then(() => loadCars(1))
+      updateCatalogModels().then(() => {
+        const params = collectParams(1)
+        updateCatalogUrlFromParams(params)
+        selectedFilters = new URLSearchParams(params)
+        loadCars(1)
+      })
     })
     modelSelect?.addEventListener('change', async () => {
       if (!generationSelect) return
@@ -1219,14 +1268,15 @@
         const res = await fetch(`/api/filter_ctx_model?${params.toString()}`)
         if (!res.ok) return
         const data = await res.json()
-        setSelectOptions(generationSelect, data.generations || [], { emptyLabel: 'Любое', labelKey: 'value', valueKey: 'value' })
+        setSelectOptions(generationSelect, data.generations || [], { emptyLabel: 'Любое', labelKey: 'label', valueKey: 'value' })
       } catch (e) {
         console.warn('filter model', e)
       }
     })
     const loadInitial = async () => {
+      if (filtersForm) syncFormFromSelected(filtersForm, selectedFilters)
       if (brandSelect && brandSelect.value) {
-        await updateCatalogModels()
+        await updateCatalogModels({ keepModel: selectedFilters.get('model') || '' })
       }
       loadCars(initialPage)
     }
@@ -1361,6 +1411,23 @@
       return data.models || []
     } catch (e) {
       console.error('models', e)
+      return []
+    }
+  }
+
+  async function fetchCatalogModels({ region, country, brand }) {
+    if (!brand) return []
+    try {
+      const params = new URLSearchParams()
+      if (region) params.set('region', region)
+      if (country) params.set('country', country)
+      params.set('brand', normalizeBrand(brand))
+      const res = await fetch(`/api/filter_ctx_brand?${params.toString()}`)
+      if (!res.ok) return []
+      const data = await res.json()
+      return data.models || []
+    } catch (e) {
+      console.warn('models ctx', e)
       return []
     }
   }
@@ -1897,18 +1964,18 @@
       const countryHidden = form.elements['country']
       const euSel = form.elements['eu_country']
       const krSel = form.elements['kr_type']
-      if (regionSel && regionSel.value) {
-        params.set('region', regionSel.value)
-        if (regionSel.value === 'EU' && euSel && euSel.value) {
-          params.set('country', euSel.value)
-        }
-        if (regionSel.value === 'KR') {
-          params.set('country', 'KR')
-          if (krSel && krSel.value) params.set('kr_type', krSel.value)
-        }
-      } else if (countryHidden && countryHidden.value) {
-        params.set('country', countryHidden.value)
+    if (regionSel && regionSel.value) {
+      params.set('region', String(regionSel.value).toUpperCase())
+      if (regionSel.value === 'EU' && euSel && euSel.value) {
+        params.set('country', String(euSel.value).toUpperCase())
       }
+      if (regionSel.value === 'KR') {
+        params.set('country', 'KR')
+        if (krSel && krSel.value) params.set('kr_type', krSel.value)
+      }
+    } else if (countryHidden && countryHidden.value) {
+      params.set('country', String(countryHidden.value).toUpperCase())
+    }
       const lines = buildLines()
       lines.forEach((line) => params.append('line', line))
       if (!params.get('brand') && lines.length === 1) {

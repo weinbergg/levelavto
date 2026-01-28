@@ -37,6 +37,23 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _sort_by_label(items: list[dict]) -> list[dict]:
+    return sorted(items, key=lambda x: (x.get("label") or x.get("value") or "").strip().casefold())
+
+
+def _region_label(code: str | None) -> str:
+    if not code:
+        return ""
+    key = code.upper()
+    if key == "EU":
+        return "Европа"
+    if key == "KR":
+        return "Корея"
+    if key == "RU":
+        return "Россия"
+    return key
+
+
 @router.get("/cars")
 def list_cars(
     request: Request,
@@ -455,40 +472,60 @@ def filter_ctx_base(
         return cached
     print("FILTER_CTX_BASE_CACHE hit=0 source=fallback", flush=True)
     base_filters = {"region": params.get("region"), "country": params.get("country")}
-    regions = [r["value"] for r in service.facet_counts(field="region", filters={})]
-    countries = [
+    regions_raw = [r["value"] for r in service.facet_counts(field="region", filters={}) if r.get("value")]
+    regions = _sort_by_label([{"value": r, "label": _region_label(r)} for r in regions_raw])
+    countries_raw = [
         c["value"]
         for c in service.facet_counts(field="country", filters={"region": params.get("region")})
         if c.get("value")
     ]
-    country_labels = {**{c: country_label_ru(c) for c in countries}, "EU": "Европа", "KR": "Корея"}
+    countries = _sort_by_label([{"value": c, "label": country_label_ru(c) or c} for c in countries_raw])
+    country_labels = {**{c: country_label_ru(c) or c for c in countries_raw}, "EU": "Европа", "KR": "Корея"}
     kr_types = []
-    if "KR" in regions:
+    if any(r["value"] == "KR" for r in regions):
         kr_types = [
             {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
             {"value": "KR_IMPORT", "label": "Корея (импорт)"},
         ]
-    brands = [
-        {"value": b["value"], "label": b["value"], "count": b.get("count", 0)}
-        for b in service.facet_counts(field="brand", filters=base_filters)
-    ]
-    reg_years = [int(r["value"]) for r in service.facet_counts(field="reg_year", filters=base_filters) if r.get("value")]
-    engine_types = [
-        {"value": v["value"], "label": ru_fuel(v["value"]) or v["value"], "count": v.get("count", 0)}
-        for v in service.facet_counts(field="engine_type", filters=base_filters)
-    ]
-    transmissions = [
-        {"value": v["value"], "label": ru_transmission(v["value"]) or v["value"], "count": v.get("count", 0)}
-        for v in service.facet_counts(field="transmission", filters=base_filters)
-    ]
-    drive_types = [
-        {"value": v["value"], "label": v["value"], "count": v.get("count", 0)}
-        for v in service.facet_counts(field="drive_type", filters=base_filters)
-    ]
-    body_types = [
-        {"value": v["value"], "label": v["value"], "count": v.get("count", 0)}
-        for v in service.facet_counts(field="body_type", filters=base_filters)
-    ]
+    brands = _sort_by_label(
+        [
+            {"value": b["value"], "label": b["value"], "count": b.get("count", 0)}
+            for b in service.facet_counts(field="brand", filters=base_filters)
+            if b.get("value")
+        ]
+    )
+    reg_years = sorted(
+        [int(r["value"]) for r in service.facet_counts(field="reg_year", filters=base_filters) if r.get("value")],
+        reverse=True,
+    )
+    engine_types = _sort_by_label(
+        [
+            {"value": v["value"], "label": ru_fuel(v["value"]) or v["value"], "count": v.get("count", 0)}
+            for v in service.facet_counts(field="engine_type", filters=base_filters)
+            if v.get("value")
+        ]
+    )
+    transmissions = _sort_by_label(
+        [
+            {"value": v["value"], "label": ru_transmission(v["value"]) or v["value"], "count": v.get("count", 0)}
+            for v in service.facet_counts(field="transmission", filters=base_filters)
+            if v.get("value")
+        ]
+    )
+    drive_types = _sort_by_label(
+        [
+            {"value": v["value"], "label": v["value"], "count": v.get("count", 0)}
+            for v in service.facet_counts(field="drive_type", filters=base_filters)
+            if v.get("value")
+        ]
+    )
+    body_types = _sort_by_label(
+        [
+            {"value": v["value"], "label": v["value"], "count": v.get("count", 0)}
+            for v in service.facet_counts(field="body_type", filters=base_filters)
+            if v.get("value")
+        ]
+    )
     colors_basic, colors_other = _split_colors(service.facet_counts(field="color", filters=base_filters))
     payload = {
         "regions": regions,
@@ -525,12 +562,15 @@ def filter_ctx_brand(
         print("FILTER_CTX_BRAND_CACHE hit=1 source=redis", flush=True)
         return cached
     print("FILTER_CTX_BRAND_CACHE hit=0 source=fallback", flush=True)
-    filters = {"region": params.get("region"), "country": params.get("country"), "brand": params.get("brand")}
-    models = [
-        m["value"]
-        for m in service.facet_counts(field="model", filters=filters)
-        if m.get("value")
-    ]
+    brand_norm = normalize_brand(params.get("brand")).strip() if params.get("brand") else None
+    filters = {"region": params.get("region"), "country": params.get("country"), "brand": brand_norm}
+    models = _sort_by_label(
+        [
+            {"value": m["value"], "label": m["value"], "count": m.get("count", 0)}
+            for m in service.facet_counts(field="model", filters=filters)
+            if m.get("value")
+        ]
+    )
     payload = {"models": models}
     redis_set_json(cache_key, payload, ttl_sec=21600)
     return payload
@@ -560,7 +600,7 @@ def filter_ctx_model(
         .where(Car.is_available.is_(True))
     )
     if params.get("brand"):
-        stmt = stmt.where(Car.brand == params.get("brand"))
+        stmt = stmt.where(Car.brand == normalize_brand(params.get("brand")).strip())
     if params.get("model"):
         stmt = stmt.where(Car.model == params.get("model"))
     if params.get("country"):
@@ -569,8 +609,9 @@ def filter_ctx_model(
         stmt = stmt.where(func.upper(Car.country).in_(service.EU_COUNTRIES))
     elif params.get("region") == "KR":
         stmt = stmt.where(func.upper(Car.country) == "KR")
-    gens = service.db.execute(stmt).scalars().all()
-    payload = {"generations": [g for g in gens if g]}
+    gens = [g for g in service.db.execute(stmt).scalars().all() if g]
+    generations = _sort_by_label([{"value": g, "label": g} for g in gens])
+    payload = {"generations": generations}
     redis_set_json(cache_key, payload, ttl_sec=3600)
     return payload
 
