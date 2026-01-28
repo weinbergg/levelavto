@@ -5,6 +5,7 @@ import base64
 import datetime as dt
 import os
 import subprocess
+import shutil
 import sys
 from pathlib import Path
 
@@ -15,7 +16,9 @@ HOST = os.getenv("MOBILEDE_HOST", "https://parsers1-valdez.auto-parser.ru")
 LOGIN = os.getenv("MOBILEDE_LOGIN") or os.getenv("MOBILEDE_USER")
 PASSWORD = os.getenv("MOBILEDE_PASSWORD") or os.getenv("MOBILEDE_PASS")
 FILENAME = "mobilede_active_offers.csv"
-DOWNLOAD_DIR = Path("/app/tmp")
+DOWNLOAD_DIR = Path(os.getenv("MOBILEDE_TMP_DIR", "/app/tmp"))
+KEEP_CSV = os.getenv("KEEP_CSV", "0") == "1"
+MIN_FREE_GB = int(os.getenv("MOBILEDE_MIN_FREE_GB", "20"))
 
 
 def rotate_backups(directory: Path, keep: int = 5) -> None:
@@ -34,6 +37,14 @@ def rotate_backups(directory: Path, keep: int = 5) -> None:
 def download_file(for_date: dt.date, dest: Path) -> None:
     if not LOGIN or not PASSWORD:
         raise RuntimeError("MOBILEDE_LOGIN/MOBILEDE_PASSWORD must be set in environment")
+    try:
+        usage = shutil.disk_usage(dest.parent)
+        if usage.free < MIN_FREE_GB * 1024 * 1024 * 1024:
+            raise RuntimeError(
+                f"Not enough disk space in {dest.parent}: need {MIN_FREE_GB}GB free"
+            )
+    except Exception as exc:
+        raise RuntimeError(f"Disk space check failed: {exc}") from exc
     url = f"{HOST}/mobilede/{for_date:%Y-%m-%d}/{FILENAME}"
     auth_header = base64.b64encode(f"{LOGIN}:{PASSWORD}".encode()).decode()
     headers = {"authorization": f"Basic {auth_header}"}
@@ -133,12 +144,18 @@ def main() -> None:
 
     target = DOWNLOAD_DIR / f"mobilede_active_offers_{run_date:%Y-%m-%d}.csv"
     download_file(run_date, target)
-    rotate_backups(DOWNLOAD_DIR, keep=args.keep)
+    if KEEP_CSV:
+        rotate_backups(DOWNLOAD_DIR, keep=args.keep)
 
     if not args.skip_import:
         run_import(target, trigger="auto-daily", limit=args.limit, allow_deactivate=args.allow_deactivate)
         if not args.skip_cache:
             update_price_cache()
+        if not KEEP_CSV:
+            try:
+                target.unlink()
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

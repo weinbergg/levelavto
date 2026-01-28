@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/css/styles.css?v=20" />
     {% block head_extra %}{% endblock %}
   </head>
-  <body>
+  <body data-auth="{{ 1 if user else 0 }}">
     <header class="header">
       <div class="header__bar header__bar--single">
         <div class="la-container">
@@ -166,7 +166,7 @@
       </div>
     </footer>
     <button id="backToTop" class="back-to-top" type="button" aria-label="Наверх">↑</button>
-    <script src="/static/js/app.js?v=25"></script>
+    <script src="/static/js/app.js?v=27"></script>
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>

@@ -85,24 +85,26 @@
       .replace(/'/g, '&#39;')
   }
 
-  function normalizeThumbUrl(src) {
+  function normalizeThumbUrl(src, opts = {}) {
     const val = String(src || '').trim()
     if (!val) return '/static/img/no-photo.svg'
-    if (val.startsWith('//')) return `https:${val}`
-    if (val.startsWith('http://')) return val.replace('http://', 'https://')
-    if (val.startsWith('https://') || val.startsWith('/')) return val
-    if (val.startsWith('api/v1/mo-prod/images/')) return `https://img.classistatic.de/${val}`
-    if (val.startsWith('img.classistatic.de/')) return `https://${val}`
-    return '/static/img/no-photo.svg'
+    let url = val
+    if (url.startsWith('//')) url = `https:${url}`
+    if (url.startsWith('http://')) url = url.replace('http://', 'https://')
+    if (url.startsWith('api/v1/mo-prod/images/')) url = `https://img.classistatic.de/${url}`
+    if (url.startsWith('img.classistatic.de/')) url = `https://${url}`
+    if (!(url.startsWith('https://') || url.startsWith('/'))) return '/static/img/no-photo.svg'
+    // Keep original classistatic rule to avoid 404 on some sizes.
+    return url
   }
 
   function applyThumbFallback(img) {
     if (!img) return
     const rawSrc = img.getAttribute('src') || ''
     const rawData = img.dataset.thumb || ''
-    let normalized = normalizeThumbUrl(rawSrc)
+    let normalized = normalizeThumbUrl(rawSrc, { thumb: true })
     if (normalized === '/static/img/no-photo.svg' && rawData) {
-      const dataNormalized = normalizeThumbUrl(rawData)
+      const dataNormalized = normalizeThumbUrl(rawData, { thumb: true })
       if (dataNormalized !== '/static/img/no-photo.svg') {
         normalized = dataNormalized
       }
@@ -647,7 +649,10 @@
   // -------- favorites --------
   const favoriteIds = new Set()
 
+  const isAuthed = document.body?.dataset?.auth === '1'
+
   async function loadFavoritesState() {
+    if (!isAuthed) return
     try {
       const res = await fetch('/api/favorites')
       if (!res.ok) return
@@ -669,6 +674,10 @@
   }
 
   async function toggleFavorite(btn) {
+    if (!isAuthed) {
+      alert('Войдите, чтобы сохранять избранное')
+      return
+    }
     const carId = Number(btn.dataset.carId)
     if (!carId) return
     const isActive = favoriteIds.has(carId)
@@ -797,7 +806,7 @@
           const item = itemsById.get(id)
           const img = card.querySelector('img.thumb')
           if (img) {
-            const src = normalizeThumbUrl(item.thumbnail_url || '')
+            const src = normalizeThumbUrl(item.thumbnail_url || '', { thumb: true })
             if (src !== '/static/img/no-photo.svg') {
               img.dataset.thumb = src
               img.setAttribute('src', src)
@@ -818,7 +827,7 @@
         card.href = `/car/${car.id}`
         card.className = 'car-card'
         const images = Array.isArray(car.images) && car.images.length ? car.images : (car.thumbnail_url ? [car.thumbnail_url] : [])
-        const thumbSrc = normalizeThumbUrl(images[0])
+        const thumbSrc = normalizeThumbUrl(images[0], { thumb: true })
         const hasGallery = images.length > 1
         const navControls = hasGallery
           ? `
@@ -918,7 +927,7 @@
         if (hasGallery && img) {
           let index = 0
           const updateThumb = () => {
-          let nextSrc = normalizeThumbUrl(images[index] || '')
+          let nextSrc = normalizeThumbUrl(images[index] || '', { thumb: true })
           if (!(nextSrc.startsWith('https://') || nextSrc.startsWith('/'))) {
             nextSrc = '/static/img/no-photo.svg'
           }
@@ -1360,9 +1369,12 @@
     const advancedLink = qs('#home-advanced-link')
     const homeCountries = window.HOME_COUNTRIES || []
     normalizeBrandOptions(brandSelect)
+    qsa('.cards-highlights img.thumb').forEach((img) => applyThumbFallback(img))
     let lastTotal = null
     let initialAnimation = true
     let pendingController = null
+    let lastCountKey = ''
+    let isInitializing = true
 
     if (resetBtn) {
       resetBtn.addEventListener('click', (e) => {
@@ -1405,38 +1417,32 @@
     })
 
     function buildHomeParams(withPaging = false) {
-      const data = new FormData(form)
       const params = new URLSearchParams()
-      const numericKeys = ['price_max', 'mileage_max', 'reg_year_min', 'reg_year_max']
-      const skipKeys = ['region_extra']
-      let regionVal = ''
-      for (const [k, v] of data.entries()) {
-        if (k === 'region') regionVal = v
-        if (!v) continue
-        if (skipKeys.includes(k)) continue
-        if (k === 'brand') {
-          const norm = normalizeBrand(v)
-          if (norm) {
-            params.append(k, norm)
-          }
-          continue
-        }
-        if (numericKeys.includes(k)) {
-          const n = Number(v)
-          if (Number.isFinite(n)) {
-            params.append(k, String(n))
-          }
-          continue
-        }
-        params.append(k, v)
-      }
-      if (regionVal === 'KR') {
+      const regionVal = regionSelect?.value || ''
+      if (regionVal) params.set('region', regionVal)
+      if (regionVal === 'EU') {
+        const countryVal = regionSlotSelect?.value || ''
+        if (countryVal) params.set('country', countryVal)
+      } else if (regionVal === 'KR') {
         params.set('country', 'KR')
         const slotVal = regionSlotSelect?.value || ''
         if (slotVal === 'KR_INTERNAL') params.set('kr_type', 'KR_INTERNAL')
         else if (slotVal === 'KR_IMPORT') params.set('kr_type', 'KR_IMPORT')
-        else params.delete('kr_type')
       }
+      const brandVal = normalizeBrand(brandSelect?.value || '')
+      if (brandVal) params.set('brand', brandVal)
+      const modelVal = modelSelect?.value || ''
+      if (modelVal) params.set('model', modelVal)
+      const numField = (id, key) => {
+        const el = qs(id)
+        if (!el) return
+        const n = Number(el.value || '')
+        if (Number.isFinite(n) && n > 0) params.set(key, String(n))
+      }
+      numField('#home-price-max', 'price_max')
+      numField('#home-mileage-max', 'mileage_max')
+      numField('#home-reg-year-min', 'reg_year_min')
+      numField('#home-reg-year-max', 'reg_year_max')
       if (withPaging) {
         params.set('page', '1')
         params.set('page_size', '1')
@@ -1460,14 +1466,18 @@
     }
 
     let debounce
-    const updateCount = () => {
+    const updateCount = (force = false) => {
       if (!countEl) return
+      if (!force && isInitializing) return
       clearTimeout(debounce)
       debounce = setTimeout(async () => {
         pendingController?.abort()
         pendingController = new AbortController()
         try {
           const params = buildHomeParams(false)
+          const key = params.toString()
+          if (!force && key === lastCountKey) return
+          lastCountKey = key
           const res = await fetch(`/api/cars_count?${params.toString()}`, { signal: pendingController.signal })
           if (!res.ok) return
           const data = await res.json()
@@ -1576,9 +1586,10 @@
       }
       window.location.href = `/catalog?${params.toString()}`
     })
-    window.addEventListener('pageshow', () => {
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted) return
       initialAnimation = true
-      updateCount()
+      updateCount(true)
     })
     // bootstrap region slot
     if (regionSelect && regionSelect.value) {
@@ -1594,7 +1605,8 @@
     } else {
       updateRegionSlot()
     }
-    updateCount()
+    isInitializing = false
+    updateCount(true)
     updateAdvancedLink()
   }
 
@@ -1920,7 +1932,7 @@
           card.href = `/car/${car.id}`
           card.className = 'car-card'
           const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
-          let thumb = normalizeThumbUrl(thumbRaw)
+          let thumb = normalizeThumbUrl(thumbRaw, { thumb: true })
           const displayRub = car.total_price_rub_cached ?? car.price_rub_cached
           const price = displayRub != null ? formatRub(displayRub) : '—'
           card.innerHTML = `
