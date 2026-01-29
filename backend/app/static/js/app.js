@@ -1032,7 +1032,6 @@
 
   function initCatalog() {
     if (!qs('#cards')) return
-    // restore scroll position when coming back from detail
     const saved = sessionStorage.getItem('catalogScroll')
     if (saved) {
       requestAnimationFrame(() => {
@@ -1041,8 +1040,8 @@
       sessionStorage.removeItem('catalogScroll')
     }
     const filtersForm = qs('#filters')
-    let selectedFilters = parseSelectedFilters()
-    syncFormFromSelected(filtersForm, selectedFilters)
+    const selectedFilters = parseSelectedFilters()
+    if (filtersForm) syncFormFromSelected(filtersForm, selectedFilters)
     qsa('#cards img.thumb').forEach((img) => {
       applyThumbFallback(img)
     })
@@ -1055,19 +1054,16 @@
     const generationSelect = qs('#generation')
     const advancedLink = qs('#catalog-advanced-link')
     normalizeBrandOptions(brandSelect)
-    let filtersLoading = false
+
     const loadCatalogFilterBase = async () => {
-      if (filtersLoading) return
-      filtersLoading = true
+      if (!filtersForm) return
       try {
         const params = new URLSearchParams()
-        const region = selectedFilters.get('region') || ''
-        const euCountry = selectedFilters.get('country') || ''
-        const countryHidden = selectedFilters.get('country') || ''
+        const region = qs('#region')?.value || selectedFilters.get('region') || ''
+        const euCountry = qs('#eu-country')?.value || selectedFilters.get('country') || ''
         if (region) params.set('region', region)
         if (region === 'EU' && euCountry) params.set('country', euCountry)
-        if (!region && countryHidden) params.set('country', countryHidden)
-        if (DEBUG_FILTERS) console.info('filters:catalog base', params.toString())
+        if (DEBUG_FILTERS) console.info('catalog: region changed -> fetching ctx', params.toString())
         const res = await fetch(`/api/filter_ctx_base?${params.toString()}`)
         if (!res.ok) return
         const data = await res.json()
@@ -1088,18 +1084,17 @@
         const extra = qs('#colors-extra-catalog')
         renderColorChips(basic, data.colors_basic || [])
         renderColorChips(extra, data.colors_other || [])
-        if (filtersForm) {
-          bindColorChips(filtersForm, () => loadCars(1))
-          bindOtherColorsToggle(filtersForm)
-          syncColorChips(filtersForm)
-          syncFormFromSelected(filtersForm, selectedFilters)
+        if (DEBUG_FILTERS) {
+          console.info('catalog: ctx loaded countries=' + (data.countries || []).length + ' kr_types=' + (data.kr_types || []).length)
         }
+        bindColorChips(filtersForm, () => loadCars(1))
+        bindOtherColorsToggle(filtersForm)
+        syncColorChips(filtersForm)
       } catch (e) {
         console.warn('filters base', e)
-      } finally {
-        filtersLoading = false
       }
     }
+
     if (DEBUG_FILTERS) {
       const debugCount = sessionStorage.getItem('homeCountParams')
       const debugSubmit = sessionStorage.getItem('homeSubmitParams')
@@ -1118,6 +1113,7 @@
         sessionStorage.removeItem('homeSubmitParams')
       }
     }
+
     qs('#resetFilters')?.addEventListener('click', (e) => {
       e.preventDefault()
       const form = qs('#filters')
@@ -1143,8 +1139,7 @@
       const p = Math.min(max, (window.__page || 1) + 1)
       loadCars(p)
     })
-    // auto-apply filters on change / typing
-    const filtersForm = qs('#filters')
+
     if (filtersForm) {
       bindColorChips(filtersForm, () => loadCars(1))
       bindOtherColorsToggle(filtersForm)
@@ -1166,27 +1161,17 @@
         debounce = setTimeout(() => {
           const params = collectParams(1)
           updateCatalogUrlFromParams(params)
-          selectedFilters = new URLSearchParams(params)
+          if (DEBUG_FILTERS) console.info('catalog: loadCars params', params.toString())
           loadCars(1)
           updateAdvancedLink()
         }, 250)
-      }
-      const reloadBase = () => {
-        clearTimeout(debounce)
-        debounce = setTimeout(() => {
-          const params = collectParams(1)
-          updateCatalogUrlFromParams(params)
-          selectedFilters = new URLSearchParams(params)
-          loadCatalogFilterBase()
-        }, 200)
       }
       ctrls.forEach((el) => {
         el.addEventListener('change', trigger)
         el.addEventListener('input', trigger)
       })
-      qs('#region')?.addEventListener('change', reloadBase)
-      qs('#eu-country')?.addEventListener('change', reloadBase)
-      // apply initial sort/generation if present
+      qs('#region')?.addEventListener('change', loadCatalogFilterBase)
+      qs('#eu-country')?.addEventListener('change', loadCatalogFilterBase)
       const sortSelect = qs('#sortHidden', filtersForm)
       if (sortSelect && initialSort) sortSelect.value = initialSort
       const sortTopbar = qs('#sort-select')
@@ -1201,6 +1186,7 @@
       }
       updateAdvancedLink()
     }
+
     const toggle = qs('#filtersToggle')
     const panel = qs('#filtersPanel')
     const overlay = qs('#filtersOverlay')
@@ -1218,23 +1204,23 @@
       if (e.key === 'Escape') setFiltersOpen(false)
     })
 
-    async function updateCatalogModels({ keepModel } = {}) {
+    async function updateCatalogModels() {
       if (!brandSelect || !modelSelect) return
       const brand = brandSelect.value
       const normBrand = normalizeBrand(brand)
       modelSelect.innerHTML = ''
       if (!normBrand) {
         modelSelect.disabled = true
-        modelSelect.innerHTML = '<option value=\"\">Все</option>'
+        modelSelect.innerHTML = '<option value="">Все</option>'
         return
       }
       modelSelect.disabled = true
-      modelSelect.innerHTML = '<option value=\"\">Загрузка…</option>'
-      const region = selectedFilters.get('region') || qs('[name="region"]')?.value || ''
-      const country = selectedFilters.get('country') || qs('[name="eu_country"]')?.value || qs('#country')?.value || ''
-      if (DEBUG_FILTERS) console.info('filters:catalog brand', { region, country, brand: normBrand })
-      const models = await fetchCatalogModels({ region, country, brand: normBrand })
-      modelSelect.innerHTML = '<option value=\"\">Все</option>'
+      modelSelect.innerHTML = '<option value="">Загрузка…</option>'
+      const region = qs('[name="region"]')?.value || ''
+      const country = qs('[name="eu_country"]')?.value || qs('#country')?.value || ''
+      const krType = qs('[name="kr_type"]')?.value || ''
+      const models = await fetchModels({ brand: normBrand, region, country, krType })
+      modelSelect.innerHTML = '<option value="">Все</option>'
       models.forEach((m) => {
         const value = m.value || m.model || m
         if (!value) return
@@ -1243,19 +1229,13 @@
         opt.textContent = m.label || value
         modelSelect.appendChild(opt)
       })
-      const targetModel = keepModel || initialModelParam
-      if (targetModel) {
-        setSelectValueInsensitive(modelSelect, targetModel)
+      if (initialModelParam) {
+        setSelectValueInsensitive(modelSelect, initialModelParam)
       }
       modelSelect.disabled = false
     }
     brandSelect?.addEventListener('change', () => {
-      updateCatalogModels().then(() => {
-        const params = collectParams(1)
-        updateCatalogUrlFromParams(params)
-        selectedFilters = new URLSearchParams(params)
-        loadCars(1)
-      })
+      updateCatalogModels().then(() => loadCars(1))
     })
     modelSelect?.addEventListener('change', async () => {
       if (!generationSelect) return
@@ -1268,8 +1248,8 @@
       if (!region && countryHidden) params.set('country', countryHidden)
       if (brandSelect?.value) params.set('brand', normalizeBrand(brandSelect.value))
       if (modelSelect.value) params.set('model', modelSelect.value)
+      if (DEBUG_FILTERS) console.info('catalog: model ctx', params.toString())
       try {
-        if (DEBUG_FILTERS) console.info('filters:catalog model', params.toString())
         const res = await fetch(`/api/filter_ctx_model?${params.toString()}`)
         if (!res.ok) return
         const data = await res.json()
@@ -1279,15 +1259,13 @@
       }
     })
     const loadInitial = async () => {
-      if (filtersForm) syncFormFromSelected(filtersForm, selectedFilters)
       if (brandSelect && brandSelect.value) {
-        await updateCatalogModels({ keepModel: selectedFilters.get('model') || '' })
+        await updateCatalogModels()
       }
       loadCars(initialPage)
     }
     loadInitial()
   }
-
   function initNav() {
     const burgers = qsa('.header__burger')
     const drawer = qs('#headerDrawer')
@@ -1476,12 +1454,8 @@
     const advancedLink = qs('#home-advanced-link')
     const homeCountries = window.HOME_COUNTRIES || []
     normalizeBrandOptions(brandSelect)
-    qsa('.cards-highlights img.thumb').forEach((img) => applyThumbFallback(img))
-    let lastTotal = null
     let initialAnimation = true
     let pendingController = null
-    let lastCountKey = ''
-    let isInitializing = true
 
     if (resetBtn) {
       resetBtn.addEventListener('click', (e) => {
@@ -1529,22 +1503,37 @@
     })
 
     function buildHomeParams(withPaging = false) {
+      const data = new FormData(form)
       const params = new URLSearchParams()
-      const fd = new FormData(form)
-      for (const [k, v] of fd.entries()) {
-        if (v == null) continue
-        const val = String(v).trim()
-        if (!val) continue
-        if (k === 'region' || k === 'country') {
-          params.append(k, val.toUpperCase())
-          continue
-        }
+      const numericKeys = ['price_max', 'mileage_max', 'reg_year_min', 'reg_year_max']
+      const skipKeys = ['region_extra']
+      let regionVal = ''
+      for (const [k, v] of data.entries()) {
+        if (k === 'region') regionVal = v
+        if (!v) continue
+        if (skipKeys.includes(k)) continue
         if (k === 'brand') {
-          const norm = normalizeBrand(val)
-          if (norm) params.append(k, norm)
+          const norm = normalizeBrand(v)
+          if (norm) {
+            params.append(k, norm)
+          }
           continue
         }
-        params.append(k, val)
+        if (numericKeys.includes(k)) {
+          const n = Number(v)
+          if (Number.isFinite(n)) {
+            params.append(k, String(n))
+          }
+          continue
+        }
+        params.append(k, v)
+      }
+      if (regionVal === 'KR') {
+        params.set('country', 'KR')
+        const slotVal = regionSlotSelect?.value || ''
+        if (slotVal === 'KR_INTERNAL') params.set('kr_type', 'KR_INTERNAL')
+        else if (slotVal === 'KR_IMPORT') params.set('kr_type', 'KR_IMPORT')
+        else params.delete('kr_type')
       }
       if (withPaging) {
         params.set('page', '1')
@@ -1569,18 +1558,15 @@
     }
 
     let debounce
-    const updateCount = (force = false) => {
+    const updateCount = () => {
       if (!countEl) return
-      if (!force && isInitializing) return
       clearTimeout(debounce)
       debounce = setTimeout(async () => {
         pendingController?.abort()
         pendingController = new AbortController()
         try {
           const params = buildHomeParams(false)
-          const key = params.toString()
-          if (!force && key === lastCountKey) return
-          lastCountKey = key
+          if (DEBUG_FILTERS) console.info('home: count request', params.toString())
           const res = await fetch(`/api/cars_count?${params.toString()}`, { signal: pendingController.signal })
           if (!res.ok) return
           const data = await res.json()
@@ -1601,7 +1587,6 @@
               animateCount(el, total)
             })
           }
-          lastTotal = total
           initialAnimation = false
           updateAdvancedLink()
           if (DEBUG_FILTERS) {
@@ -1626,9 +1611,6 @@
       if (!regionSlot || !regionSlotSelect || !regionSlotLabel) return
       regionSlotSelect.disabled = false
       regionSlotSelect.innerHTML = ''
-      const params = new URLSearchParams(window.location.search)
-      const storedCountry = params.get('country') || ''
-      const storedKr = params.get('kr_type') || ''
       if (val === 'EU') {
         regionSlotLabel.textContent = 'Страна (Европа)'
         const optAll = document.createElement('option')
@@ -1637,15 +1619,12 @@
         regionSlotSelect.appendChild(optAll)
         homeCountries.forEach((c) => {
           const opt = document.createElement('option')
-          const code = (c.value || c || '').toString()
-          opt.value = code
-          opt.textContent = c.label || code
+          const val = c.value || c
+          opt.value = val
+          opt.textContent = c.label || val
           regionSlotSelect.appendChild(opt)
         })
         regionSlotSelect.name = 'country'
-        if (storedCountry) {
-          regionSlotSelect.value = storedCountry.toUpperCase()
-        }
       } else if (val === 'KR') {
         regionSlotLabel.textContent = 'Корея (тип)'
         const optAny = document.createElement('option')
@@ -1661,9 +1640,6 @@
         optImp.textContent = 'Корея (импорт)'
         regionSlotSelect.appendChild(optImp)
         regionSlotSelect.name = 'kr_type'
-        if (storedKr) {
-          regionSlotSelect.value = storedKr.toUpperCase()
-        }
       } else {
         regionSlotLabel.textContent = 'Страна / Тип'
         const opt = document.createElement('option')
@@ -1673,6 +1649,8 @@
         regionSlotSelect.removeAttribute('name')
         regionSlotSelect.disabled = true
       }
+      if (DEBUG_FILTERS) console.info('home: region changed -> fetching ctx', val)
+      if (DEBUG_FILTERS) console.info('home: ctx loaded countries=' + homeCountries.length + ' kr_types=' + (val == 'KR' ? 2 : 0))
       updateAdvancedLink()
     }
 
@@ -1699,15 +1677,12 @@
       }
       window.location.href = buildCatalogUrl(params)
     })
-    window.addEventListener('pageshow', (e) => {
-      if (!e.persisted) return
+    window.addEventListener('pageshow', () => {
       initialAnimation = true
-      updateCount(true)
+      updateCount()
     })
-    // bootstrap region slot
     if (regionSelect && regionSelect.value) {
       updateRegionSlot()
-      // preselect from params
       const params = new URLSearchParams(window.location.search)
       const euVal = params.get('country')
       const krVal = params.get('kr_type')
@@ -1718,11 +1693,9 @@
     } else {
       updateRegionSlot()
     }
-    isInitializing = false
-    updateCount(true)
+    updateCount()
     updateAdvancedLink()
   }
-
   function initAdvancedSearch() {
     const form = qs('#advanced-search-form')
     if (!form) return

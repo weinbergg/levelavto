@@ -4,25 +4,35 @@ from typing import Dict, Any, List, Tuple
 
 from backend.app.db import SessionLocal
 from backend.app.services.cars_service import CarsService
-from backend.app.routers.pages import _build_filter_context
+from backend.app.routers.catalog import filter_ctx_base, filter_ctx_brand, filter_ctx_model
 from backend.app.utils.redis_cache import (
     redis_set_json,
-    build_filter_ctx_key,
     build_total_cars_key,
     build_cars_count_key,
-    build_filter_payload_key,
     normalize_filter_params,
     normalize_count_params,
 )
 
 
-def _prewarm_filter(service: CarsService, params: Dict[str, Any], include_payload: bool) -> Tuple[str, float]:
+def _prewarm_base(db, params: Dict[str, Any]) -> Tuple[str, float]:
     started = time.perf_counter()
     normalized = normalize_filter_params(params)
-    ctx = _build_filter_context(service, service.db, include_payload=include_payload, params=normalized)
-    cache_key = build_filter_ctx_key(normalized, include_payload)
-    redis_set_json(cache_key, ctx, ttl_sec=900)
-    return cache_key, (time.perf_counter() - started) * 1000
+    payload = filter_ctx_base(None, normalized.get("region"), normalized.get("country"), db=db)
+    return f"filter_ctx_base:{normalized}", (time.perf_counter() - started) * 1000
+
+
+def _prewarm_brand(db, params: Dict[str, Any]) -> Tuple[str, float]:
+    started = time.perf_counter()
+    normalized = normalize_filter_params(params)
+    payload = filter_ctx_brand(None, normalized.get("region"), normalized.get("country"), normalized.get("brand"), db=db)
+    return f"filter_ctx_brand:{normalized}", (time.perf_counter() - started) * 1000
+
+
+def _prewarm_model(db, params: Dict[str, Any]) -> Tuple[str, float]:
+    started = time.perf_counter()
+    normalized = normalize_filter_params(params)
+    payload = filter_ctx_model(None, normalized.get("region"), normalized.get("country"), normalized.get("brand"), normalized.get("model"), db=db)
+    return f"filter_ctx_model:{normalized}", (time.perf_counter() - started) * 1000
 
 
 def main() -> None:
@@ -32,66 +42,30 @@ def main() -> None:
         raise SystemExit(2)
     with SessionLocal() as db:
         service = CarsService(db)
-        tasks: List[Tuple[Dict[str, Any], bool]] = [
-            ({}, False),
-            ({"region": "EU"}, False),
-            ({"region": "EU", "country": "DE"}, False),
-            ({"region": "KR"}, False),
-            ({"region": "EU", "country": "DE"}, True),
-            ({"region": "EU"}, True),
-            ({"region": "KR"}, True),
-        ]
-        # optional RU if needed
-        if os.getenv("INCLUDE_RU_PREWARM") == "1":
-            tasks.append(({"region": "RU"}, False))
-            tasks.append(({"region": "RU"}, True))
-        for params, include_payload in tasks:
-            key, ms = _prewarm_filter(service, params, include_payload)
-            print(f"[prewarm] filter_ctx key={key} ms={ms:.2f}")
-        # payload facets (cached heavy values)
-        payload_sets = [
+        base_tasks: List[Dict[str, Any]] = [
+            {},
             {"region": "EU"},
             {"region": "EU", "country": "DE"},
             {"region": "KR"},
         ]
-        payload_keys = [
-            "num_seats",
-            "doors_count",
-            "owners_count",
-            "emission_class",
-            "efficiency_class",
-            "climatisation",
-            "airbags",
-            "interior_design",
-            "price_rating_label",
+        if os.getenv("INCLUDE_RU_PREWARM") == "1":
+            base_tasks.append({"region": "RU"})
+        for params in base_tasks:
+            key, ms = _prewarm_base(db, params)
+            print(f"[prewarm] filter_ctx_base key={key} ms={ms:.2f}")
+        brand_tasks = [
+            {"region": "EU", "country": "DE", "brand": "BMW"},
+            {"region": "EU", "country": "AT", "brand": "Cadillac"},
         ]
-        eu_payload = service.payload_values_bulk(payload_keys, source_ids=service.source_ids_for_region("EU"))
-        kr_payload = service.payload_values_bulk(payload_keys, source_ids=service.source_ids_for_region("KR"))
-        payload_data = {
-            "seats_options_eu": eu_payload.get("num_seats", []),
-            "doors_options_eu": eu_payload.get("doors_count", []),
-            "owners_options_eu": eu_payload.get("owners_count", []),
-            "emission_classes_eu": eu_payload.get("emission_class", []),
-            "efficiency_classes_eu": eu_payload.get("efficiency_class", []),
-            "climatisation_options_eu": eu_payload.get("climatisation", []),
-            "airbags_options_eu": eu_payload.get("airbags", []),
-            "interior_design_options_eu": eu_payload.get("interior_design", []),
-            "price_rating_labels_eu": eu_payload.get("price_rating_label", []),
-            "seats_options_kr": kr_payload.get("num_seats", []),
-            "doors_options_kr": kr_payload.get("doors_count", []),
-            "owners_options_kr": kr_payload.get("owners_count", []),
-            "emission_classes_kr": kr_payload.get("emission_class", []),
-            "efficiency_classes_kr": kr_payload.get("efficiency_class", []),
-            "climatisation_options_kr": kr_payload.get("climatisation", []),
-            "airbags_options_kr": kr_payload.get("airbags", []),
-            "interior_design_options_kr": kr_payload.get("interior_design", []),
-            "price_rating_labels_kr": kr_payload.get("price_rating_label", []),
-        }
-        for params in payload_sets:
-            normalized = normalize_filter_params(params)
-            payload_key = build_filter_payload_key(normalized)
-            redis_set_json(payload_key, payload_data, ttl_sec=3600)
-            print(f"[prewarm] filter_payload key={payload_key}")
+        for params in brand_tasks:
+            key, ms = _prewarm_brand(db, params)
+            print(f"[prewarm] filter_ctx_brand key={key} ms={ms:.2f}")
+        model_tasks = [
+            {"region": "EU", "country": "DE", "brand": "BMW", "model": "X5"},
+        ]
+        for params in model_tasks:
+            key, ms = _prewarm_model(db, params)
+            print(f"[prewarm] filter_ctx_model key={key} ms={ms:.2f}")
         total = service.total_cars()
         redis_set_json(build_total_cars_key(), total, ttl_sec=600)
         print(f"[prewarm] total_cars={total}")

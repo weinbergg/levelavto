@@ -291,9 +291,35 @@
               <div class="car-card__body">
                 <div>
                   <div class="car-card__title">{{ car.brand or '' }} {{ car.model or '' }}</div>
-                  {% if car.year %}
-                    <div class="car-card__meta">{{ car.year }}</div>
+                  {% set meta = [] %}
+                  {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %}
+                  {% if car.engine_type %}{% set _ = meta.append(car.engine_type) %}{% endif %}
+                  {% if meta %}
+                    <div class="car-card__meta">{{ meta|join(' · ') }}</div>
                   {% endif %}
+                  <ul class="specs">
+                    {% if car.mileage %}
+                      <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/mileage.svg" alt=""> {{ '{:,.0f}'.format(car.mileage).replace(',', ' ') }} км</span></li>
+                    {% endif %}
+                    {% if car.power_hp %}
+                      <li><span class="spec-line">Мощность: {{ car.power_hp|round(0) }} л.с.</span></li>
+                    {% endif %}
+                    {% if car.engine_cc %}
+                      <li><span class="spec-line">Объём: {{ '{:,.0f}'.format(car.engine_cc).replace(',', ' ') }} см³</span></li>
+                    {% endif %}
+                    {% if car.transmission %}
+                      <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/drive.svg" alt=""> {{ car.transmission }}</span></li>
+                    {% endif %}
+                    {% if car.body_type %}
+                      <li><span class="spec-line">{{ car.body_type }}</span></li>
+                    {% endif %}
+                    {% if car.color %}
+                      <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt=""> {{ car.color }}</span></li>
+                    {% endif %}
+                    {% if car.country %}
+                      <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt=""> {{ country_labels.get(car.country, car.country) }}</span></li>
+                    {% endif %}
+                  </ul>
                 </div>
                 <div class="car-card__price">
                   {% set price_val = car.total_price_rub_cached or car.price_rub_cached %}

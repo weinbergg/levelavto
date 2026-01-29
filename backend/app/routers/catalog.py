@@ -559,6 +559,27 @@ def filter_ctx_base(
     return payload
 
 
+@router.get("/debug/filter_ctx_base_raw")
+def filter_ctx_base_raw(
+    region: Optional[str] = Query(default=None),
+    country: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    service = CarsService(db)
+    params = normalize_filter_params({"region": region, "country": country})
+    base_filters = {"region": params.get("region"), "country": params.get("country")}
+    regions_raw = service.facet_counts(field="region", filters={})
+    countries_raw = service.facet_counts(field="country", filters={"region": params.get("region")})
+    brands_raw = service.facet_counts(field="brand", filters=base_filters)
+    return {
+        "region_param": params.get("region"),
+        "country_param": params.get("country"),
+        "regions_raw": regions_raw,
+        "countries_raw": countries_raw,
+        "brands_raw": brands_raw,
+    }
+
+
 @router.get("/filter_ctx_brand")
 def filter_ctx_brand(
     request: Request,
