@@ -145,6 +145,9 @@ def build_filter_ctx_model_key(params: Optional[Dict[str, Any]] = None) -> str:
 def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     if not params:
         return {}
+    # Backward-compat: map eu_country -> country (read-only alias).
+    if not params.get("country") and params.get("eu_country"):
+        params = {**params, "country": params.get("eu_country")}
     keys = [
         "region",
         "country",
@@ -169,12 +172,16 @@ def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str
             if key in {"region", "country"}:
                 val = val.upper()
         cleaned[key] = val
+    # Ensure alias is not propagated.
+    cleaned.pop("eu_country", None)
     return cleaned
 
 
 def normalize_count_params(params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     if not params:
         return {}
+    if not params.get("country") and params.get("eu_country"):
+        params = {**params, "country": params.get("eu_country")}
     keys = [
         "region",
         "country",
@@ -212,6 +219,7 @@ def normalize_count_params(params: Optional[Dict[str, Any]] = None) -> Dict[str,
             if key in {"region", "country", "kr_type"}:
                 val = val.upper()
         cleaned[key] = val
+    cleaned.pop("eu_country", None)
     return cleaned
 
 

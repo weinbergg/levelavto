@@ -752,6 +752,11 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     timing["base_ctx_ms"] = (time.perf_counter() - t0) * 1000
     qp = request.query_params
     params = dict(qp)
+    # Backward-compat: map eu_country -> country (read-only alias)
+    if not params.get("country") and params.get("eu_country"):
+        params["country"] = params.get("eu_country")
+    if "eu_country" in params:
+        params.pop("eu_country", None)
     def _int_val(key: str) -> Optional[int]:
         raw = params.get(key)
         if raw is None or raw == "":

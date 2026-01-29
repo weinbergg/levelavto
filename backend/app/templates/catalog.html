@@ -32,7 +32,7 @@
             </label>
             {% endif %}
             <label data-region-panel="eu">Страна (Европа)
-              <select name="eu_country" id="eu-country" data-eu-country>
+              <select name="country" id="country" data-country>
                 <option value="">Все страны</option>
                 {% for c in countries %}
                 <option value="{{ c }}" {% if params.get('country') == c %}selected{% endif %}>{{ country_labels.get(c, c) }}</option>
@@ -49,7 +49,6 @@
               </select>
             </label>
             {% endif %}
-            <input type="hidden" name="country" id="country" value="{{ params.get('country','') }}">
             <label>Состояние
               <select name="condition" id="condition">
                 <option value="">Все</option>

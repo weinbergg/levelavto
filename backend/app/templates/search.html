@@ -67,7 +67,7 @@
               {% endif %}
               <div class="field region-subfield" data-region-sub>
                 <label class="region-sub region-sub--eu" data-region-sub-eu>Страна (Европа)
-                  <select name="eu_country" data-eu-country>
+                  <select name="country" data-country>
                     <option value="">Все страны</option>
                     {% for c in countries %}
                     <option value="{{ c }}" {% if params.get('country') == c %}selected{% endif %}>{{ country_labels.get(c, c) }}</option>
@@ -84,7 +84,6 @@
                 {% endif %}
               </div>
             </div>
-            <input type="hidden" name="country" value="{{ params.get('country', '') }}">
 
             <div class="advanced-row advanced-row--two">
               <label class="field">Кузов

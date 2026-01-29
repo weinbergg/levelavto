@@ -59,6 +59,7 @@ def list_cars(
     request: Request,
     region: Optional[str] = Query(default=None),
     country: Optional[str] = Query(default=None),
+    eu_country: Optional[str] = Query(default=None, alias="eu_country"),
     brand: Optional[str] = Query(default=None),
     line: Optional[List[str]] = Query(
         default=None, description="Advanced search lines brand|model|variant"),
@@ -111,6 +112,8 @@ def list_cars(
     service = CarsService(db)
     timing_enabled = os.environ.get("CAR_API_TIMING", "0") == "1"
     t0 = time.perf_counter()
+    if not country and eu_country:
+        country = eu_country
     items, total = service.list_cars(
         region=region,
         country=country,
@@ -263,6 +266,7 @@ def cars_count(
     request: Request,
     region: Optional[str] = Query(default=None),
     country: Optional[str] = Query(default=None),
+    eu_country: Optional[str] = Query(default=None, alias="eu_country"),
     brand: Optional[str] = Query(default=None),
     model: Optional[str] = Query(default=None),
     color: Optional[str] = Query(default=None),
@@ -287,6 +291,8 @@ def cars_count(
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
+    if not country and eu_country:
+        country = eu_country
     params = {
         "region": region,
         "country": country,

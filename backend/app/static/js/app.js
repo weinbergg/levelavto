@@ -273,10 +273,16 @@
   function parseSelectedFilters() {
     const params = new URLSearchParams(window.location.search)
     const selected = new URLSearchParams()
+    if (!params.get('country') && params.get('eu_country')) {
+      params.set('country', params.get('eu_country'))
+    }
+    if (params.get('eu_country')) {
+      params.delete('eu_country')
+    }
     params.forEach((value, key) => {
       if (!value) return
       let next = value
-      if (key === 'region' || key === 'country') {
+      if (key === 'region' || key === 'country' || key === 'kr_type') {
         next = String(value).trim().toUpperCase()
       }
       if (key === 'brand') {
@@ -417,13 +423,9 @@
     const region = qs('[data-region-select]', scope)
     const euPanel = qs('[data-region-panel="eu"]', scope)
     const krPanel = qs('[data-region-panel="kr"]', scope)
-    const euSelect = qs('[data-eu-country]', scope)
+    const countrySelect = qs('[data-country]', scope)
     const krSelect = qs('[data-kr-type]', scope)
-    const countryHidden = qs('input[name="country"]', scope)
-    if (!region || !countryHidden) return
-    if (!region.value && countryHidden.value) {
-      region.value = countryHidden.value === 'KR' ? 'KR' : 'EU'
-    }
+    if (!region) return
     const togglePanel = (panel, hidden) => {
       if (!panel) return
       const keep = panel.dataset.regionKeep === '1'
@@ -440,16 +442,23 @@
       togglePanel(euPanel, val !== 'EU')
       togglePanel(krPanel, val !== 'KR')
       if (val === 'EU') {
-        const euVal = euSelect?.value || ''
-        countryHidden.value = euVal || ''
+        if (countrySelect) {
+          countrySelect.disabled = false
+        }
       } else if (val === 'KR') {
-        countryHidden.value = 'KR'
+        if (countrySelect) {
+          countrySelect.value = ''
+          countrySelect.disabled = true
+        }
       } else {
-        countryHidden.value = ''
+        if (countrySelect) {
+          countrySelect.value = ''
+          countrySelect.disabled = true
+        }
       }
     }
     region.addEventListener('change', update)
-    euSelect?.addEventListener('change', update)
+    countrySelect?.addEventListener('change', update)
     krSelect?.addEventListener('change', update)
     update()
   }
@@ -512,7 +521,6 @@
       color: 'Цвет',
       q: 'Поиск',
       region: null,
-      eu_country: null,
       kr_type: null,
       interior_color: null,
       interior_material: null,
@@ -669,20 +677,17 @@
     }
     // region-dependent fields
     const regionSel = form.elements['region']
-    const countryHidden = form.elements['country']
-    const euSel = form.elements['eu_country']
+    const countrySel = form.elements['country']
     const krSel = form.elements['kr_type']
     if (regionSel && regionSel.value) {
       params.set('region', regionSel.value)
-      if (regionSel.value === 'EU' && euSel && euSel.value) {
-        params.set('country', euSel.value)
+      if (regionSel.value === 'EU' && countrySel && countrySel.value) {
+        params.set('country', countrySel.value)
       }
       if (regionSel.value === 'KR') {
         params.set('country', 'KR')
         if (krSel && krSel.value) params.set('kr_type', krSel.value)
       }
-    } else if (countryHidden && countryHidden.value) {
-      params.set('country', countryHidden.value)
     }
     params.set('page', String(page || 1))
     params.set('page_size', '12')
@@ -1060,9 +1065,9 @@
       try {
         const params = new URLSearchParams()
         const region = qs('#region')?.value || selectedFilters.get('region') || ''
-        const euCountry = qs('#eu-country')?.value || selectedFilters.get('country') || ''
+        const country = qs('#country')?.value || selectedFilters.get('country') || ''
         if (region) params.set('region', region)
-        if (region === 'EU' && euCountry) params.set('country', euCountry)
+        if (region === 'EU' && country) params.set('country', country)
         if (DEBUG_FILTERS) console.info('catalog: region changed -> fetching ctx', params.toString())
         const res = await fetch(`/api/filter_ctx_base?${params.toString()}`)
         if (!res.ok) return
@@ -1074,8 +1079,8 @@
         setSelectOptions(qs('[name="drive_type"]'), data.drive_types || [], { emptyLabel: 'Любой' })
         setSelectOptions(qs('#reg-year-min'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         setSelectOptions(qs('#reg-year-max'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
-        const euSelect = qs('#eu-country')
-        setSelectOptions(euSelect, data.countries || [], { emptyLabel: 'Все страны', labelKey: 'label', valueKey: 'value' })
+        const countrySelect = qs('#country')
+        setSelectOptions(countrySelect, data.countries || [], { emptyLabel: 'Все страны', labelKey: 'label', valueKey: 'value' })
         const regionSelectEl = qs('#region')
         if (regionSelectEl && Array.isArray(data.regions) && data.regions.length) {
           setSelectOptions(regionSelectEl, data.regions, { emptyLabel: 'Все регионы', labelKey: 'label', valueKey: 'value' })
@@ -1171,7 +1176,7 @@
         el.addEventListener('input', trigger)
       })
       qs('#region')?.addEventListener('change', loadCatalogFilterBase)
-      qs('#eu-country')?.addEventListener('change', loadCatalogFilterBase)
+      qs('#country')?.addEventListener('change', loadCatalogFilterBase)
       const sortSelect = qs('#sortHidden', filtersForm)
       if (sortSelect && initialSort) sortSelect.value = initialSort
       const sortTopbar = qs('#sort-select')
@@ -1217,7 +1222,7 @@
       modelSelect.disabled = true
       modelSelect.innerHTML = '<option value="">Загрузка…</option>'
       const region = qs('[name="region"]')?.value || ''
-      const country = qs('[name="eu_country"]')?.value || qs('#country')?.value || ''
+      const country = qs('[name="country"]')?.value || ''
       const krType = qs('[name="kr_type"]')?.value || ''
       const models = await fetchModels({ brand: normBrand, region, country, krType })
       modelSelect.innerHTML = '<option value="">Все</option>'
@@ -1241,11 +1246,9 @@
       if (!generationSelect) return
       const params = new URLSearchParams()
       const region = qs('[name="region"]')?.value || ''
-      const euCountry = qs('[name="eu_country"]')?.value || ''
-      const countryHidden = qs('#country')?.value || ''
+      const country = qs('[name="country"]')?.value || ''
       if (region) params.set('region', region)
-      if (region === 'EU' && euCountry) params.set('country', euCountry)
-      if (!region && countryHidden) params.set('country', countryHidden)
+      if (region === 'EU' && country) params.set('country', country)
       if (brandSelect?.value) params.set('brand', normalizeBrand(brandSelect.value))
       if (modelSelect.value) params.set('model', modelSelect.value)
       if (DEBUG_FILTERS) console.info('catalog: model ctx', params.toString())
@@ -1700,7 +1703,7 @@
     const regionSelect = qs('[data-region-select]', form)
     const regionSubEu = qs('[data-region-sub-eu]', form)
     const regionSubKr = qs('[data-region-sub-kr]', form)
-    const regionEuSelect = qs('[data-eu-country]', form)
+    const regionEuSelect = qs('[data-country]', form)
     const regionKrSelect = qs('[data-kr-type]', form)
 
     const parseOptions = (raw) => {
@@ -1944,21 +1947,18 @@
       }
       // region-dependent fields
       const regionSel = form.elements['region']
-      const countryHidden = form.elements['country']
-      const euSel = form.elements['eu_country']
+      const countrySel = form.elements['country']
       const krSel = form.elements['kr_type']
-    if (regionSel && regionSel.value) {
-      params.set('region', String(regionSel.value).toUpperCase())
-      if (regionSel.value === 'EU' && euSel && euSel.value) {
-        params.set('country', String(euSel.value).toUpperCase())
+      if (regionSel && regionSel.value) {
+        params.set('region', String(regionSel.value).toUpperCase())
+        if (regionSel.value === 'EU' && countrySel && countrySel.value) {
+          params.set('country', String(countrySel.value).toUpperCase())
+        }
+        if (regionSel.value === 'KR') {
+          params.set('country', 'KR')
+          if (krSel && krSel.value) params.set('kr_type', krSel.value)
+        }
       }
-      if (regionSel.value === 'KR') {
-        params.set('country', 'KR')
-        if (krSel && krSel.value) params.set('kr_type', krSel.value)
-      }
-    } else if (countryHidden && countryHidden.value) {
-      params.set('country', String(countryHidden.value).toUpperCase())
-    }
       const lines = buildLines()
       lines.forEach((line) => params.append('line', line))
       if (!params.get('brand') && lines.length === 1) {
