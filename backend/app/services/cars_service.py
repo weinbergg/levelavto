@@ -1484,6 +1484,33 @@ class CarsService:
         setattr(self, "_models_cache", {**cache, key: {"ts": datetime.utcnow().timestamp(), "data": data}})
         return data
 
+    def models_for_brand_filtered(
+        self,
+        *,
+        region: Optional[str] = None,
+        country: Optional[str] = None,
+        kr_type: Optional[str] = None,
+        brand: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        if not brand:
+            return []
+        norm_brand = normalize_brand(brand).strip()
+        if not norm_brand:
+            return []
+        filters = {
+            "region": region,
+            "country": country,
+            "kr_type": kr_type,
+            "brand": norm_brand,
+        }
+        rows = self._facet_counts_from_cars(field="model", filters=filters)
+        models = [
+            {"value": r["value"], "label": r["value"], "count": int(r.get("count", 0))}
+            for r in rows
+            if r.get("value")
+        ]
+        return sorted(models, key=lambda x: (x.get("label") or x.get("value") or "").strip().casefold())
+
     def drive_types(self) -> List[Dict[str, Any]]:
         rows = self.facet_counts(field="drive_type", filters={})
         out: List[Dict[str, Any]] = []

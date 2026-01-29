@@ -24,14 +24,28 @@ def _prewarm_base(db, params: Dict[str, Any]) -> Tuple[str, float]:
 def _prewarm_brand(db, params: Dict[str, Any]) -> Tuple[str, float]:
     started = time.perf_counter()
     normalized = normalize_filter_params(params)
-    payload = filter_ctx_brand(None, normalized.get("region"), normalized.get("country"), normalized.get("brand"), db=db)
+    payload = filter_ctx_brand(
+        None,
+        normalized.get("region"),
+        normalized.get("country"),
+        normalized.get("kr_type"),
+        normalized.get("brand"),
+        db=db,
+    )
     return f"filter_ctx_brand:{normalized}", (time.perf_counter() - started) * 1000
 
 
 def _prewarm_model(db, params: Dict[str, Any]) -> Tuple[str, float]:
     started = time.perf_counter()
     normalized = normalize_filter_params(params)
-    payload = filter_ctx_model(None, normalized.get("region"), normalized.get("country"), normalized.get("brand"), normalized.get("model"), db=db)
+    payload = filter_ctx_model(
+        None,
+        normalized.get("region"),
+        normalized.get("country"),
+        normalized.get("brand"),
+        normalized.get("model"),
+        db=db,
+    )
     return f"filter_ctx_model:{normalized}", (time.perf_counter() - started) * 1000
 
 

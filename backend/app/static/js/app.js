@@ -1086,6 +1086,7 @@
     const generationSelect = qs('#generation')
     const advancedLink = qs('#catalog-advanced-link')
     normalizeBrandOptions(brandSelect)
+    let initialReapplyDone = false
     const reapplySelected = () => {
       if (!filtersForm) return
       selectedFilters.forEach((value, key) => {
@@ -1100,6 +1101,7 @@
           field.value = nextValue
         }
       })
+      if (DEBUG_FILTERS) console.info('catalog: reapplySelected source=initial')
     }
 
     const loadCatalogFilterBase = async () => {
@@ -1137,7 +1139,6 @@
         bindColorChips(filtersForm, () => loadCars(1))
         bindOtherColorsToggle(filtersForm)
         syncColorChips(filtersForm)
-        reapplySelected()
       } catch (e) {
         console.warn('filters base', e)
       }
@@ -1217,6 +1218,18 @@
         el.addEventListener('change', trigger)
         el.addEventListener('input', trigger)
       })
+      const logChange = (label, el) => {
+        if (!el) return
+        let prev = el.value
+        el.addEventListener('change', () => {
+          const next = el.value
+          if (DEBUG_FILTERS) console.info(`catalog: ${label} change ${prev} -> ${next} source=ui`)
+          prev = next
+        })
+      }
+      logChange('region', qs('#region'))
+      logChange('country', qs('#country'))
+      logChange('kr_type', qs('#kr-type'))
       qs('#region')?.addEventListener('change', loadCatalogFilterBase)
       qs('#country')?.addEventListener('change', loadCatalogFilterBase)
       const sortSelect = qs('#sortHidden', filtersForm)
@@ -1305,7 +1318,10 @@
     })
     const loadInitial = async () => {
       await loadCatalogFilterBase()
-      reapplySelected()
+      if (!initialReapplyDone) {
+        reapplySelected()
+        initialReapplyDone = true
+      }
       if (brandSelect && brandSelect.value) {
         await updateCatalogModels()
         if (initialModelParam) setSelectValueInsensitive(modelSelect, initialModelParam)
@@ -1883,10 +1899,10 @@
       const showKr = region === 'KR' && hasKr
       const showEu = region === 'EU' || (!region && !showKr)
       if (regionSubEu) {
-        regionSubEu.classList.toggle('is-hidden-keep', !showEu)
+        regionSubEu.classList.toggle('is-hidden', !showEu)
       }
       if (regionSubKr) {
-        regionSubKr.classList.toggle('is-hidden-keep', !showKr)
+        regionSubKr.classList.toggle('is-hidden', !showKr)
       }
       if (regionEuSelect) {
         regionEuSelect.disabled = region === 'KR'

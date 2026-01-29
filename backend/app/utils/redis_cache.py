@@ -125,6 +125,7 @@ def build_filter_ctx_brand_key(params: Optional[Dict[str, Any]] = None) -> str:
     key = (
         str(params.get("region") or ""),
         str(params.get("country") or ""),
+        str(params.get("kr_type") or ""),
         str(params.get("brand") or ""),
     )
     return f"filter_ctx_brand:{key}"
@@ -136,6 +137,7 @@ def build_filter_ctx_model_key(params: Optional[Dict[str, Any]] = None) -> str:
     key = (
         str(params.get("region") or ""),
         str(params.get("country") or ""),
+        str(params.get("kr_type") or ""),
         str(params.get("brand") or ""),
         str(params.get("model") or ""),
     )

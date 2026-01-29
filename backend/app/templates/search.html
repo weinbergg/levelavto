@@ -66,7 +66,7 @@
               </label>
               {% endif %}
               <div class="field region-subfield" data-region-sub>
-                <label class="region-sub region-sub--eu" data-region-sub-eu>Страна (Европа)
+                <label class="region-sub region-sub--eu{% if region_value == 'KR' %} is-hidden{% endif %}" data-region-sub-eu>Страна (Европа)
                   <select name="country" data-country>
                     <option value="">Все страны</option>
                     {% for c in countries %}
@@ -75,7 +75,7 @@
                   </select>
                 </label>
                 {% if kr_types %}
-                <label class="region-sub region-sub--kr" data-region-sub-kr>Тип (Корея)
+                <label class="region-sub region-sub--kr{% if region_value != 'KR' %} is-hidden{% endif %}" data-region-sub-kr>Тип (Корея)
                   <select name="kr_type" data-kr-type>
                     <option value="">Корейские</option>
                     <option value="import">Импортные</option>
