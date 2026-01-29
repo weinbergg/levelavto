@@ -159,9 +159,10 @@
     emptyOpt.textContent = emptyLabel
     select.appendChild(emptyOpt)
     ;(items || []).forEach((item) => {
-      const value = item?.[valueKey] ?? item
+      const isObj = item && typeof item === 'object'
+      const value = isObj ? (item[valueKey] ?? item.value) : item
       if (value == null || value === '') return
-      const label = item?.[labelKey] ?? value
+      const label = isObj ? (item[labelKey] ?? item.label ?? value) : value
       const opt = document.createElement('option')
       opt.value = value
       opt.textContent = label
@@ -782,6 +783,7 @@
     const resultCount = qs('#resultCount')
     if (!spinner || !cards) return
     const paramsPreview = collectParams(page)
+    if (DEBUG_FILTERS) console.info('filters:catalog loadCars', paramsPreview.toString())
     const ssrEnabled = cards.dataset.ssr === '1'
     const ssrParams = cards.dataset.ssrParams || ''
     const hasSSR = ssrEnabled && cards.querySelector('.car-card')
@@ -1065,6 +1067,7 @@
         if (region) params.set('region', region)
         if (region === 'EU' && euCountry) params.set('country', euCountry)
         if (!region && countryHidden) params.set('country', countryHidden)
+        if (DEBUG_FILTERS) console.info('filters:catalog base', params.toString())
         const res = await fetch(`/api/filter_ctx_base?${params.toString()}`)
         if (!res.ok) return
         const data = await res.json()
@@ -1229,6 +1232,7 @@
       modelSelect.innerHTML = '<option value=\"\">Загрузка…</option>'
       const region = selectedFilters.get('region') || qs('[name="region"]')?.value || ''
       const country = selectedFilters.get('country') || qs('[name="eu_country"]')?.value || qs('#country')?.value || ''
+      if (DEBUG_FILTERS) console.info('filters:catalog brand', { region, country, brand: normBrand })
       const models = await fetchCatalogModels({ region, country, brand: normBrand })
       modelSelect.innerHTML = '<option value=\"\">Все</option>'
       models.forEach((m) => {
@@ -1265,6 +1269,7 @@
       if (brandSelect?.value) params.set('brand', normalizeBrand(brandSelect.value))
       if (modelSelect.value) params.set('model', modelSelect.value)
       try {
+        if (DEBUG_FILTERS) console.info('filters:catalog model', params.toString())
         const res = await fetch(`/api/filter_ctx_model?${params.toString()}`)
         if (!res.ok) return
         const data = await res.json()
@@ -1402,11 +1407,16 @@
     }
   }
 
-  async function fetchModels(brand) {
+  async function fetchModels({ brand, region, country, krType } = {}) {
     if (!brand) return []
     try {
-      const normalized = normalizeBrand(brand)
-      const res = await fetch(`/api/brands/${encodeURIComponent(normalized)}/models`)
+      const params = new URLSearchParams()
+      if (region) params.set('region', region)
+      if (country) params.set('country', country)
+      if (krType) params.set('kr_type', krType)
+      params.set('brand', normalizeBrand(brand))
+      const res = await fetch(`/api/filter_ctx_brand?${params.toString()}`)
+      if (!res.ok) return []
       const data = await res.json()
       return data.models || []
     } catch (e) {
@@ -1498,12 +1508,17 @@
       }
       modelSelect.disabled = true
       modelSelect.innerHTML = '<option value="">Загрузка…</option>'
-      const models = await fetchModels(brand)
+      const region = regionSelect?.value || ''
+      const country = regionSlotSelect?.name === 'country' ? (regionSlotSelect?.value || '') : ''
+      const krType = regionSlotSelect?.name === 'kr_type' ? (regionSlotSelect?.value || '') : ''
+      const models = await fetchModels({ brand, region, country, krType })
       modelSelect.innerHTML = '<option value="">Все</option>'
-      models.forEach(({ model }) => {
+      models.forEach((m) => {
+        const value = m.value || m.model || m
+        if (!value) return
         const opt = document.createElement('option')
-        opt.value = model
-        opt.textContent = model
+        opt.value = value
+        opt.textContent = m.label || value
         modelSelect.appendChild(opt)
       })
       modelSelect.disabled = false
@@ -1886,7 +1901,10 @@
       }
       modelSelect.disabled = true
       modelSelect.innerHTML = '<option value="">Загрузка…</option>'
-      const models = await fetchModels(brand)
+      const region = regionSelect?.value || ''
+      const country = regionEuSelect?.value || ''
+      const krType = regionKrSelect?.value || ''
+      const models = await fetchModels({ brand, region, country, krType })
       modelSelect.innerHTML = '<option value="">Неважно</option>'
       models.forEach(({ model }) => {
         const opt = document.createElement('option')

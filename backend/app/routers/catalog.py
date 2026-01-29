@@ -466,9 +466,16 @@ def filter_ctx_base(
     service = CarsService(db)
     params = normalize_filter_params({"region": region, "country": country})
     cache_key = build_filter_ctx_base_key(params)
+    t0 = time.perf_counter()
     cached = redis_get_json(cache_key)
     if cached:
         print("FILTER_CTX_BASE_CACHE hit=1 source=redis", flush=True)
+        if os.getenv("FILTER_CTX_DEBUG") == "1":
+            total_ms = (time.perf_counter() - t0) * 1000
+            print(
+                f"FILTER_CTX_BASE ms={total_ms:.2f} regions={len(cached.get('regions', []))} countries={len(cached.get('countries', []))} brands={len(cached.get('brands', []))}",
+                flush=True,
+            )
         return cached
     print("FILTER_CTX_BASE_CACHE hit=0 source=fallback", flush=True)
     base_filters = {"region": params.get("region"), "country": params.get("country")}
@@ -543,6 +550,12 @@ def filter_ctx_base(
         "reg_months": [{"value": i + 1, "label": m} for i, m in enumerate(["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"])],
     }
     redis_set_json(cache_key, payload, ttl_sec=21600)
+    if os.getenv("FILTER_CTX_DEBUG") == "1":
+        total_ms = (time.perf_counter() - t0) * 1000
+        print(
+            f"FILTER_CTX_BASE ms={total_ms:.2f} regions={len(regions)} countries={len(countries)} brands={len(brands)}",
+            flush=True,
+        )
     return payload
 
 
@@ -557,9 +570,13 @@ def filter_ctx_brand(
     service = CarsService(db)
     params = normalize_filter_params({"region": region, "country": country, "brand": brand})
     cache_key = build_filter_ctx_brand_key(params)
+    t0 = time.perf_counter()
     cached = redis_get_json(cache_key)
     if cached:
         print("FILTER_CTX_BRAND_CACHE hit=1 source=redis", flush=True)
+        if os.getenv("FILTER_CTX_DEBUG") == "1":
+            total_ms = (time.perf_counter() - t0) * 1000
+            print(f"FILTER_CTX_BRAND ms={total_ms:.2f} models={len(cached.get('models', []))}", flush=True)
         return cached
     print("FILTER_CTX_BRAND_CACHE hit=0 source=fallback", flush=True)
     brand_norm = normalize_brand(params.get("brand")).strip() if params.get("brand") else None
@@ -573,6 +590,9 @@ def filter_ctx_brand(
     )
     payload = {"models": models}
     redis_set_json(cache_key, payload, ttl_sec=21600)
+    if os.getenv("FILTER_CTX_DEBUG") == "1":
+        total_ms = (time.perf_counter() - t0) * 1000
+        print(f"FILTER_CTX_BRAND ms={total_ms:.2f} models={len(models)}", flush=True)
     return payload
 
 
@@ -588,9 +608,13 @@ def filter_ctx_model(
     service = CarsService(db)
     params = normalize_filter_params({"region": region, "country": country, "brand": brand, "model": model})
     cache_key = build_filter_ctx_model_key(params)
+    t0 = time.perf_counter()
     cached = redis_get_json(cache_key)
     if cached:
         print("FILTER_CTX_MODEL_CACHE hit=1 source=redis", flush=True)
+        if os.getenv("FILTER_CTX_DEBUG") == "1":
+            total_ms = (time.perf_counter() - t0) * 1000
+            print(f"FILTER_CTX_MODEL ms={total_ms:.2f} generations={len(cached.get('generations', []))}", flush=True)
         return cached
     print("FILTER_CTX_MODEL_CACHE hit=0 source=fallback", flush=True)
     from ..models import Car
@@ -613,6 +637,9 @@ def filter_ctx_model(
     generations = _sort_by_label([{"value": g, "label": g} for g in gens])
     payload = {"generations": generations}
     redis_set_json(cache_key, payload, ttl_sec=3600)
+    if os.getenv("FILTER_CTX_DEBUG") == "1":
+        total_ms = (time.perf_counter() - t0) * 1000
+        print(f"FILTER_CTX_MODEL ms={total_ms:.2f} generations={len(generations)}", flush=True)
     return payload
 
 
