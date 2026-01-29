@@ -305,8 +305,9 @@ class CarsService:
             "body_type": Car.body_type,
             "drive_type": Car.drive_type,
             "country": func.upper(Car.country),
-            "reg_year": Car.reg_year,
         }
+        if hasattr(Car, "reg_year"):
+            col_map["reg_year"] = getattr(Car, "reg_year")
         if field == "region":
             eu_sources = self._source_ids_for_europe()
             kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
