@@ -1668,22 +1668,7 @@
       updateCount()
     })
     regionSlotSelect?.addEventListener('change', updateCount)
-    if (form.dataset.submitBound !== '1') {
-      form.dataset.submitBound = '1'
-      form.addEventListener('submit', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      const params = buildHomeParams(false)
-      if (DEBUG_FILTERS) {
-        sessionStorage.setItem('homeSubmitParams', params.toString())
-        console.info('filters:home submit', params.toString())
-      }
-      const url = buildCatalogUrl(params)
-      if (DEBUG_FILTERS) console.info('home: redirect url', url)
-      window.location.assign(url)
-      return false
-    })
-    }
+    // Do not intercept home form submit; use plain GET /catalog with form fields.
     window.addEventListener('pageshow', () => {
       initialAnimation = true
       updateCount()
