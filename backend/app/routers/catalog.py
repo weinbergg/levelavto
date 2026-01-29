@@ -545,11 +545,17 @@ def filter_ctx_base(
     base_filters = {"region": params.get("region"), "country": params.get("country")}
     regions_raw = [r["value"] for r in service.facet_counts(field="region", filters={}) if r.get("value")]
     regions = _sort_by_label([{"value": r, "label": _region_label(r)} for r in regions_raw])
-    countries_raw = [
-        c["value"]
-        for c in service.facet_counts(field="country", filters={"region": params.get("region")})
-        if c.get("value")
-    ]
+    countries_raw = []
+    seen_countries = set()
+    for c in service.facet_counts(field="country", filters={"region": params.get("region")}):
+        raw_val = c.get("value")
+        if not raw_val:
+            continue
+        code = normalize_country_code(raw_val)
+        if not code or code in seen_countries:
+            continue
+        countries_raw.append(code)
+        seen_countries.add(code)
     countries = _sort_by_label([{"value": c, "label": country_label_ru(c) or c} for c in countries_raw])
     country_labels = {**{c: country_label_ru(c) or c for c in countries_raw}, "EU": "Европа", "KR": "Корея"}
     kr_types = []

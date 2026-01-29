@@ -1516,7 +1516,11 @@
     const regionSlotSelect = qs('#home-region-slot-select')
     const regionSlotLabel = qs('#home-region-slot-label')
     const advancedLink = qs('#home-advanced-link')
-    const homeCountries = window.HOME_COUNTRIES || []
+    const homeCountries = (window.HOME_COUNTRIES || []).slice().sort((a, b) => {
+      const av = String(a?.label || a?.value || a || '').toLowerCase()
+      const bv = String(b?.label || b?.value || b || '').toLowerCase()
+      return av.localeCompare(bv, 'ru')
+    })
     normalizeBrandOptions(brandSelect)
     let initialAnimation = true
     let pendingController = null

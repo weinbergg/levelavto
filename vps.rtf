@@ -5,128 +5,776 @@
 \paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
-\f0\fs24 \cf0 root@cv5704357:/opt/levelavto# git pull\
-docker compose build web\
-docker compose up -d --force-recreate web\
-remote: Enumerating objects: 30, done.\
-remote: Counting objects: 100% (30/30), done.\
-remote: Compressing objects: 100% (3/3), done.\
-Unpacking objects: 100% (16/16), 4.38 KiB | 299.00 KiB/s, done.\
-remote: Total 16 (delta 12), reused 16 (delta 12), pack-reused 0 (from 0)\
-From github.com:weinbergg/levelavto\
-   f5a803b..67b16b8  main       -> origin/main\
-Updating f5a803b..67b16b8\
-Fast-forward\
- backend/app/routers/catalog.py   |  19 +++---------------\
- backend/app/routers/favorites.py |   7 ++++---\
- backend/app/routers/pages.py     |  35 ++++++++++++++++----------------\
- backend/app/static/js/app.js     |  33 +++++++++++++++++++++++++++----\
- backend/app/templates/base.html  |   2 +-\
- backend/app/utils/thumbs.py      | 111 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\
- vps.rtf                          | 106 +++++++++++++++++++++++++++++++++++++++++++++++++++++++------------------------------------------\
- 7 files changed, 225 insertions(+), 88 deletions(-)\
- create mode 100644 backend/app/utils/thumbs.py\
-[+] Building 4.3s (13/13) FINISHED                                                                                                             \
- => [internal] load local bake definitions                                                                                                0.0s\
- => => reading from stdin 480B                                                                                                            0.0s\
- => [internal] load build definition from Dockerfile                                                                                      0.0s\
- => => transferring dockerfile: 553B                                                                                                      0.0s\
- => [internal] load metadata for docker.io/library/python:3.11-slim                                                                       1.0s\
- => [internal] load .dockerignore                                                                                                         0.0s\
- => => transferring context: 285B                                                                                                         0.0s\
- => [1/6] FROM docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.0s\
- => => resolve docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.0s\
- => [internal] load build context                                                                                                         0.2s\
- => => transferring context: 418.50kB                                                                                                     0.1s\
- => CACHED [2/6] WORKDIR /app                                                                                                             0.0s\
- => CACHED [3/6] RUN apt-get update && apt-get install -y --no-install-recommends     build-essential curl libpq-dev &&     rm -rf /var/  0.0s\
- => CACHED [4/6] COPY backend/requirements.txt /app/backend/requirements.txt                                                              0.0s\
- => CACHED [5/6] RUN pip install --upgrade pip && pip install -r /app/backend/requirements.txt                                            0.0s\
- => [6/6] COPY . /app                                                                                                                     0.7s\
- => exporting to image                                                                                                                    2.0s\
- => => exporting layers                                                                                                                   1.6s\
- => => exporting manifest sha256:daeefcb97f5e7dd057d2fb31d8f57b026159d42e889ae778a220bdec7b8f7b57                                         0.0s\
- => => exporting config sha256:b17f33d088c6d27ebaf02f056bedc6f190041655e9a47cfd291ad53aca9f19c6                                           0.0s\
- => => exporting attestation manifest sha256:83f55a559e4717009bced9357d330b9e498c129303a1936cb985aea87ab9be5e                             0.0s\
- => => exporting manifest list sha256:efca5410b65e3e927da272ca28bb2f3482efb8ab2ad6daa72f47576065dc7c4c                                    0.0s\
- => => naming to docker.io/library/levelavto-web:latest                                                                                   0.0s\
- => => unpacking to docker.io/library/levelavto-web:latest                                                                                0.4s\
- => resolving provenance for metadata file                                                                                                0.0s\
-[+] up 3/3\
- \uc0\u10004  Container autodealer_redis Healthy                                                                                                    11.2s \
- \uc0\u10004  Container autodealer_db    Healthy                                                                                                    11.2s \
- \uc0\u10004  Container autodealer_web   Recreated                                                                                                  10.6s \
-root@cv5704357:/opt/levelavto# docker compose run --rm prewarm\
-[+]  3/3t 3/3\
- \uc0\u10004  Container autodealer_redis Running                                                                                                     0.0s \
- \uc0\u10004  Container autodealer_db    Running                                                                                                     0.0s \
- \uc0\u10004  Container autodealer_web   Running                                                                                                     0.0s \
-[+]  3/3r autodealer_db Waiting \
- \uc0\u10004  Container autodealer_redis Healthy                                                                                                     0.5s \
- \uc0\u10004  Container autodealer_db    Healthy                                                                                                     0.5s \
- \uc0\u10004  Container autodealer_web   Running                                                                                                     0.0s \
-Container autodealer_web Waiting \
-Container autodealer_redis Waiting \
-Container autodealer_redis Healthy \
-Container autodealer_web Healthy \
-Container levelavto-prewarm-run-85ef77e5c950 Creating \
-Container levelavto-prewarm-run-85ef77e5c950 Created \
-[prewarm] filter_ctx key=filter_ctx:('home', False) ms=162.82\
-[prewarm] filter_ctx key=filter_ctx:('EU', '', '', '', '', '', '', '', '', '', False) ms=27348.58\
-[prewarm] filter_ctx key=filter_ctx:('EU', 'DE', '', '', '', '', '', '', '', '', False) ms=26082.96\
-[prewarm] filter_ctx key=filter_ctx:('KR', '', '', '', '', '', '', '', '', '', False) ms=24847.35\
-[prewarm] filter_ctx key=filter_ctx:('EU', 'DE', '', '', '', '', '', '', '', '', True) ms=47474.52\
-[prewarm] filter_ctx key=filter_ctx:('EU', '', '', '', '', '', '', '', '', '', True) ms=45548.98\
-[prewarm] filter_ctx key=filter_ctx:('KR', '', '', '', '', '', '', '', '', '', True) ms=44984.48\
-[prewarm] filter_payload key=filter_payload:('EU', '', '', '')\
-[prewarm] filter_payload key=filter_payload:('EU', 'DE', '', '')\
-[prewarm] filter_payload key=filter_payload:('KR', '', '', '')\
-[prewarm] total_cars=2217905\
-list_slow total=6.358s sort=None page=1 size=1 filters=(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:all value=1967120\
-list_slow total=6.337s sort=None page=1 size=1 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:(('region', 'EU'),) value=1862890\
-list_slow total=6.273s sort=None page=1 size=1 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:(('country', 'DE'), ('region', 'EU')) value=1550114\
-list_slow total=6.107s sort=None page=1 size=1 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:(('region', 'KR'),) value=104230\
-[prewarm] done in 268841.17 ms\
-root@cv5704357:/opt/levelavto# curl -s "http://localhost:8000/catalog?region=EU&country=DE" | rg -n "img\\\\.classistatic\\\\.de" | head\
-curl -s "http://localhost:8000/catalog?region=EU&country=DE" | rg -o 'src="[^"]+"' | head -n 20\
-474:                  src="https://img.classistatic.de/api/v1/mo-prod/images/44/44ea6335-915a-4ce3-8367-a7bcaa366f9a?rule=mo-1024.jpg"\
-479:                  data-thumb="https://img.classistatic.de/api/v1/mo-prod/images/44/44ea6335-915a-4ce3-8367-a7bcaa366f9a?rule=mo-1024.jpg"\
-506:                  src="https://img.classistatic.de/api/v1/mo-prod/images/0b/0b53a133-f571-4db3-83ad-451294ebaddf?rule=mo-1024.jpg"\
-511:                  data-thumb="https://img.classistatic.de/api/v1/mo-prod/images/0b/0b53a133-f571-4db3-83ad-451294ebaddf?rule=mo-1024.jpg"\
-538:                  src="https://img.classistatic.de/api/v1/mo-prod/images/ee/ee44988d-6eb5-471a-8153-c9174f9545e8?rule=mo-1024.jpg"\
-543:                  data-thumb="https://img.classistatic.de/api/v1/mo-prod/images/ee/ee44988d-6eb5-471a-8153-c9174f9545e8?rule=mo-1024.jpg"\
-570:                  src="https://img.classistatic.de/api/v1/mo-prod/images/08/08b962f7-5492-492d-afaa-8600bec0d5f3?rule=mo-1024.jpg"\
-575:                  data-thumb="https://img.classistatic.de/api/v1/mo-prod/images/08/08b962f7-5492-492d-afaa-8600bec0d5f3?rule=mo-1024.jpg"\
-602:                  src="https://img.classistatic.de/api/v1/mo-prod/images/44/44e043e6-0c59-4290-9e5b-c3d788500396?rule=mo-1024.jpg"\
-607:                  data-thumb="https://img.classistatic.de/api/v1/mo-prod/images/44/44e043e6-0c59-4290-9e5b-c3d788500396?rule=mo-1024.jpg"\
-src="/static/img/logo.svg"\
-src="/static/img/logo.svg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/44/44ea6335-915a-4ce3-8367-a7bcaa366f9a?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/0b/0b53a133-f571-4db3-83ad-451294ebaddf?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/ee/ee44988d-6eb5-471a-8153-c9174f9545e8?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/08/08b962f7-5492-492d-afaa-8600bec0d5f3?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/44/44e043e6-0c59-4290-9e5b-c3d788500396?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/4f/4f5ab638-c31b-4cd2-8fc8-b07f50ab2e82?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/1a/1a136b61-f817-495b-b5ed-a2de46b0f41b?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/a6/a6cbfd49-9817-4e9b-83e0-85cceef9b7f8?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/c5/c5c5f2c0-a2e5-4eff-b0d5-7a1740acb105?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/f9/f9cf8c55-b1c3-44b8-a6fe-eafdee82cee2?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/8a/8aa0c226-d99b-4626-ad15-59abc5df8a34?rule=mo-1024.jpg"\
-src="https://img.classistatic.de/api/v1/mo-prod/images/7b/7b3fda41-443a-47c5-b540-32d9c88ab69e?rule=mo-1024.jpg"\
-src="/static/js/app.js?v=28"\
-root@cv5704357:/opt/levelavto# curl -I "http://localhost:8000/static/img/no-photo.svg"\
-HTTP/1.1 200 OK\
-date: Wed, 28 Jan 2026 12:12:50 GMT\
-server: uvicorn\
-content-type: image/svg+xml\
-content-length: 549\
-last-modified: Mon, 26 Jan 2026 09:01:33 GMT\
-etag: "5e0c5f04d940b7cc803b4ff6d574f36b"\
-x-process-time: 0.003\
-cache-control: public, max-age=31536000, immutable\
+\f0\fs24 \cf0 root@cv5704357:/opt/levelavto# docker compose exec db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select 1;"'\
+ ?column? \
+----------\
+        1\
+(1 row)\
 \
+root@cv5704357:/opt/levelavto# docker compose exec db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\
+select\
+  max(updated_at) as eu_last_update,\
+  count(*) as eu_total\
+from cars\
+where region = '\\''EU'\\'';\
+"'\
+ERROR:  column "region" does not exist\
+LINE 6: where region = 'EU';\
+              ^\
+root@cv5704357:/opt/levelavto# docker compose exec db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\
+select tablename\
+from pg_tables\
+where schemaname = '\\''public'\\''\
+  and tablename ~* '\\''(import|sync|job|batch|run|etl|source|update)'\\'' \
+order by tablename;\
+"'\
+     tablename      \
+--------------------\
+ parser_run_sources\
+ parser_runs\
+ sources\
+(3 rows)\
+\
+root@cv5704357:/opt/levelavto# docker compose exec db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\
+select column_name, data_type\
+from information_schema.columns\
+where table_name = '\\''cars'\\''\
+  and column_name ~* '\\''(price|eur|rub|net|brut|vat|ndc|tax|total|currency|rate)'\\'' \
+order by column_name;\
+"'\
+      column_name       |     data_type     \
+------------------------+-------------------\
+ currency               | character varying\
+ price                  | numeric\
+ price_rub_cached       | numeric\
+ total_price_rub_cached | numeric\
+(4 rows)\
+\
+root@cv5704357:/opt/levelavto# docker compose exec db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -x -c "\
+select\
+  id, region, country, brand, model, year,\
+  price_rub_cached,\
+  total_price_rub_cached,\
+  price_eur, price_net_eur, price_brutto_eur,\
+  vat_percent, vat_included,\
+  updated_at\
+from cars\
+where id = 285235;\
+"'\
+ERROR:  column "region" does not exist\
+LINE 3:   id, region, country, brand, model, year,\
+              ^\
+root@cv5704357:/opt/levelavto# \
+                                                                                                             Table "public.cars"\
+         Column         |            Type             | Collation | Nullable |                                                 Default         \
+                                         | Storage  | Compression | Stats target | Description \
+------------------------+-----------------------------+-----------+----------+-----------------------------------------------------------------\
+-----------------------------------------+----------+-------------+--------------+-------------\
+ id                     | integer                     |           | not null | nextval('cars_id_seq'::regclass)                                \
+                                         | plain    |             |              | \
+ source_id              | integer                     |           | not null |                                                                 \
+                                         | plain    |             |              | \
+ external_id            | character varying(128)      |           | not null |                                                                 \
+                                         | extended |             |              | \
+ country                | character varying(2)        |           | not null |                                                                 \
+                                         | extended |             |              | \
+ brand                  | character varying(80)       |           |          |                                                                 \
+                                         | extended |             |              | \
+ model                  | character varying(120)      |           |          |                                                                 \
+                                         | extended |             |              | \
+ generation             | character varying(120)      |           |          |                                                                 \
+                                         | extended |             |              | \
+ year                   | integer                     |           |          |                                                                 \
+                                         | plain    |             |              | \
+ mileage                | integer                     |           |          |                                                                 \
+                                         | plain    |             |              | \
+ price                  | numeric(12,2)               |           |          |                                                                 \
+                                         | main     |             |              | \
+ currency               | character varying(3)        |           |          |                                                                 \
+                                         | extended |             |              | \
+ body_type              | character varying(80)       |           |          |                                                                 \
+                                         | extended |             |              | \
+ engine_type            | character varying(80)       |           |          |                                                                 \
+                                         | extended |             |              | \
+ transmission           | character varying(80)       |           |          |                                                                 \
+                                         | extended |             |              | \
+ drive_type             | character varying(80)       |           |          |                                                                 \
+                                         | extended |             |              | \
+ color                  | character varying(80)       |           |          |                                                                 \
+                                         | extended |             |              | \
+ vin                    | character varying(64)       |           |          |                                                                 \
+                                         | extended |             |              | \
+ source_url             | character varying(500)      |           |          |                                                                 \
+                                         | extended |             |              | \
+ thumbnail_url          | character varying(500)      |           |          |                                                                 \
+                                         | extended |             |              | \
+ created_at             | timestamp without time zone |           | not null | now()                                                           \
+                                         | plain    |             |              | \
+ updated_at             | timestamp without time zone |           | not null | now()                                                           \
+standard input\
+root@cv5704357:/opt/levelavto# docker compose exec db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\
+select\
+  max(updated_at) as eu_last_update,\
+  count(*) as eu_total\
+from cars\
+where region = '\\''EU'\\'';\
+"'\
+docker compose exec db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\
+select tablename\
+from pg_tables\
+where schemaname = '\\''public'\\''\
+  and tablename ~* '\\''(import|sync|job|batch|run|etl|source|update)'\\'' \
+order by tablename;\
+"'\
+docker compose exec db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\
+select column_name, data_type\
+from information_schema.columns\
+where table_name = '\\''cars'\\''\
+  and column_name ~* '\\''(price|eur|rub|net|brut|vat|ndc|tax|total|currency|rate)'\\'' \
+order by column_name;\
+"'\
+docker compose exec db bash -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -x -c "\
+select\
+  id, region, country, brand, model, year,\
+  price_rub_cached,\
+  total_price_rub_cached,\
+  price_eur, price_net_eur, price_brutto_eur,\
+  vat_percent, vat_included,\
+  updated_at\
+from cars\
+where id = 285235;\
+"'\
+rg -n "CBR|\uc0\u1062 \u1041 |cbr|eur_rub|EURRUB|rate" backend/app -S\
+docker compose exec redis redis-cli --scan --pattern '*eur*'\
+docker compose exec redis redis-cli --scan --pattern '*rate*'\
+docker compose exec redis redis-cli --scan --pattern '*cbr*'\
+rg -n "total_price_rub_cached|price_rub_cached|calc|calculate|customs|\uc0\u1090 \u1072 \u1084 \u1086 \u1078 |\u1091 \u1090 \u1080 \u1083 |broker|delivery|\u1083 \u1086 \u1075 \u1080 \u1089 \u1090 " backend/app -S\
+docker compose exec web bash -lc 'python - << "PY"\
+import json\
+import os\
+# 1) \uc0\u1087 \u1086 \u1087 \u1088 \u1086 \u1073 \u1091 \u1077 \u1084  \u1076 \u1077 \u1088 \u1085 \u1091 \u1090 \u1100  \u1074 \u1072 \u1096  \u1074 \u1085 \u1091 \u1090 \u1088 \u1077 \u1085 \u1085 \u1080 \u1081  API, \u1095 \u1090 \u1086 \u1073 \u1099  \u1087 \u1086 \u1083 \u1091 \u1095 \u1080 \u1090 \u1100  \u1088 \u1086 \u1074 \u1085 \u1086  \u1090 \u1077  \u1087 \u1086 \u1083 \u1103 , \u1095 \u1090 \u1086  \u1080 \u1076 \u1091 \u1090  \u1085 \u1072  \u1092 \u1088 \u1086 \u1085 \u1090 \
+import requests\
+\
+base="http://localhost:8000"\
+car_id=285235\
+\
+# \uc0\u1087 \u1088 \u1086 \u1074 \u1077 \u1088 \u1100 , \u1082 \u1072 \u1082 \u1086 \u1081  \u1101 \u1085 \u1076 \u1087 \u1086 \u1080 \u1085 \u1090  \u1091  \u1076 \u1077 \u1090 \u1072 \u1083 \u1100 \u1085 \u1086 \u1081 : \u1095 \u1072 \u1089 \u1090 \u1086  /api/car/\{id\} \u1080 \u1083 \u1080  /api/cars/\{id\}\
+PYint("net*rub", net*rate)*rate)\uc0\u1074 \u1072 \u1096 \u1077 \u1075 \u1086  \u1089 \u1072 \u1081 \u1090 \u1072 \u1086 \u1095 \u1082 \u1080 cii=False)[:2000])", f"\{base\}/api/cars?id=\{car_id\}"]:\
+ERROR:  column "region" does not exist\
+LINE 6: where region = 'EU';\
+              ^\
+     tablename      \
+--------------------\
+ parser_run_sources\
+ parser_runs\
+ sources\
+(3 rows)\
+\
+      column_name       |     data_type     \
+------------------------+-------------------\
+ currency               | character varying\
+ price                  | numeric\
+ price_rub_cached       | numeric\
+ total_price_rub_cached | numeric\
+(4 rows)\
+\
+ERROR:  column "region" does not exist\
+LINE 3:   id, region, country, brand, model, year,\
+              ^\
+backend/app/utils/pricing.py\
+9:    rates: Optional[Mapping[str, float]],\
+16:    if not rates:\
+18:    rate = rates.get(cur)\
+19:    if rate is None:\
+21:    return float(price) * float(rate)\
+\
+backend/app/scripts/calc_debug.py\
+23:            eur_rate=args.eur,\
+24:            usd_rate=args.usd,\
+\
+backend/app/routers/pages.py\
+461:    fx_rates = service.get_fx_rates(allow_fetch=False) or \{\}\
+462:    _stage("fx_rates_ms", t0)\
+613:        "fx_rates": fx_rates,\
+638:        "redis_ms": float(timing.get("fx_rates_ms", 0)),\
+831:    fx_rates = service.get_fx_rates(allow_fetch=False) or \{\}\
+832:    timing["fx_rates_ms"] = (time.perf_counter() - t0) * 1000\
+847:        "redis_ms": float(timing.get("fx_rates_ms", 0)),\
+888:            "fx_rates": fx_rates,\
+\
+backend/app/tools/parsing_diagnostics.py\
+121:                        help="Comma-separated profile IDs (optional)")\
+\
+backend/app/tools/mobilede_csv_audit.py\
+109:        help="Comma-separated brand list to verify presence in CSV",\
+\
+backend/app/tools/mobilede_db_audit.py\
+30:        help="Comma-separated brand list to verify presence in DB",\
+\
+backend/app/routers/catalog.py\
+614:        "reg_months": [\{"value": i + 1, "label": m\} for i, m in enumerate(["\uc0\u1071 \u1085 \u1074 ", "\u1060 \u1077 \u1074 ", "\u1052 \u1072 \u1088 ", "\u1040 \u1087 \u1088 ", "\u1052 \u1072 \u1081 ", "\u1048 \u1102 \u1085 ", "\u1048 \u1102 \u1083 ", "\u1040 \u1074 \u1075 ", "\u1057 \u1077 \u1085 ", "\u1054 \u1082 \u1090 ", "\u1053 \u1086 \u1103 ", "\u1044 \u1077 \u1082 "])],\
+\
+backend/app/utils/rate_limiter.py\
+9:    def __init__(self, *, rate_per_sec: float, capacity: Optional[float] = None):\
+10:        self.rate = max(rate_per_sec, 0.01)\
+11:        # Ensure capacity is at least 1 token to avoid deadlock at low rates\
+12:        default_cap = max(self.rate * 2, 1.0)\
+26:                    self.capacity, self.tokens + elapsed * self.rate)\
+31:                needed = (1 - self.tokens) / self.rate\
+\
+backend/app/tools/emavto_benchmark.py\
+73:        f"fetched cars: \{total\}, time: \{elapsed:.1f\}s, rate: \{cars_per_min:.1f\} cars/min")\
+\
+backend/app/routers/calculator.py\
+5:from ..services.calculator import calculate_import_cost, get_eur_rate\
+25:    eur_rate: Optional[float] = None\
+26:    usd_rate: Optional[float] = None\
+51:                fx = CarsService(db).get_fx_rates() or \{\}\
+52:                eur_rate = data.get("eur_rate") or fx.get("EUR") or get_eur_rate(data.get("eur_rate"))\
+53:                usd_rate = data.get("usd_rate") or fx.get("USD")\
+58:                    if not usd_rate or not eur_rate:\
+59:                        raise HTTPException(status_code=400, detail="USD price provided but no USD/EUR rate")\
+60:                    data["price_net_eur"] = float(car.price) * (usd_rate / eur_rate)\
+62:                    if not eur_rate:\
+63:                        raise HTTPException(status_code=400, detail="RUB price provided but no EUR rate")\
+64:                    data["price_net_eur"] = float(car.price) / eur_rate\
+84:        # auto eur_rate from CB if not provided\
+85:        fx = CarsService(db).get_fx_rates() or \{\}\
+86:        if data.get("eur_rate") is None:\
+87:            data["eur_rate"] = fx.get("EUR") or cfg.payload.get("meta", \{\}).get("eur_rate_default") or 95.0\
+88:        if data.get("usd_rate") is None:\
+89:            data["usd_rate"] = fx.get("USD") or cfg.payload.get("meta", \{\}).get("usd_rate_default") or 85.0\
+94:            eur_rate=data.get("eur_rate"),\
+105:        eur_rate_used = result.get("euro_rate_used") or data.get("eur_rate")\
+113:            if cur == "EUR" and eur_rate_used:\
+114:                rub = amt * eur_rate_used\
+123:        result["eur_rate_used"] = eur_rate_used\
+124:        result["usd_rate_used"] = data.get("usd_rate")\
+135:    eur_rate: Optional[float] = Query(default=None),\
+136:    usd_rate: Optional[float] = Query(default=None),\
+141:        return build_calc_debug(db, car_id=car_id, eur_rate=eur_rate, usd_rate=usd_rate, scenario=scenario)\
+\
+backend/app/tools/mobilede_daily.py\
+84:    \uc0\u1055 \u1086 \u1089 \u1083 \u1077  \u1079 \u1072 \u1075 \u1088 \u1091 \u1079 \u1082 \u1080  \u1092 \u1072 \u1081 \u1083 \u1072  \u1086 \u1073 \u1085 \u1086 \u1074 \u1083 \u1103 \u1077 \u1084  price_rub_cached \u1087 \u1086  \u1082 \u1091 \u1088 \u1089 \u1091  \u1062 \u1041 /ENV.\
+92:        rates = svc.get_fx_rates() or \{"EUR": 95.0, "USD": 85.0, "RUB": 1.0\}\
+93:        eur = rates.get("EUR", 95.0)\
+94:        usd = rates.get("USD", 85.0)\
+\
+backend/app/tools/backfill_price_rub.py\
+17:        rates = CarsService(db).get_fx_rates() or \{\}\
+24:            rub = to_rub(car.price, car.currency, rates)\
+\
+backend/app/parsing/mobile_de.py\
+105:        for idx, r in enumerate(raw_items):\
+\
+backend/app/tools/generate_sold_thumbs.py\
+66:    print(f"processed=\{total\}, generated=\{done\}, skipped_existing=\{skipped\}")\
+\
+backend/app/parsing/emavto_klg.py\
+14:from ..utils.rate_limiter import TokenBucket\
+20:    - list producer obeying list rate-limit\
+21:    - detail workers obeying detail rate-limit\
+82:        list_bucket = TokenBucket(rate_per_sec=self.list_rps)\
+83:        detail_bucket = TokenBucket(rate_per_sec=self.detail_rps)\
+211:        detail_bucket = TokenBucket(rate_per_sec=self.detail_rps)\
+294:        for idx, r in enumerate(raw_items):\
+\
+backend/app/parsing/runner.py\
+57:                        help="Run specific source key(s), comma-separated")\
+59:                        help="Run only specific profile IDs, comma-separated")\
+\
+backend/app/tools/telegram_bot.py\
+547:            f"EUR \uc0\u1087 \u1086  \u1091 \u1084 \u1086 \u1083 \u1095 \u1072 \u1085 \u1080 \u1102 : \{meta.get('eur_rate_default','?')\}\\n"\
+\
+backend/app/tools/db_inspect.py\
+29:        for i, c in enumerate(cars, 1):\
+\
+backend/app/imports/mobilede_csv.py\
+164:            name_to_idx = \{name.strip(): i for i, name in enumerate(header)\}\
+\
+backend/app/static/js/app.js\
+20:  // --- FX rates (RUB) ---\
+21:  let fxCache = \{ loaded: false, rates: \{\} \}\
+26:      const res = await fetch('https://www.cbr-xml-daily.ru/daily_json.js', \{ cache: 'no-cache' \})\
+30:        rates: \{\
+36:      console.warn('fx rates', e)\
+37:      fxCache = \{ loaded: true, rates: \{\} \}\
+46:    const rate = fx?.rates?.[cur]\
+47:    if (!rate) return null\
+48:    return Number(price) * Number(rate)\
+\
+backend/app/services/calculator_extractor.py\
+121:                    rate = self._cleanup_number(row[c + 2])\
+122:                    if a is None or b is None or rate is None:\
+126:                    if predicate(a, b, rate):\
+127:                        rows.append((a, b, rate))\
+133:                lambda a, b, rate: 0 <= a <= 10000 and 0 <= b <= 10000 and 0 < rate < 10,\
+145:                return [\{"from": a, "to": b, "eur_per_cc": rate\} for a, b, rate in defaults]\
+146:            return [\{"from": a, "to": b, "eur_per_cc": rate\} for a, b, rate in rows]\
+151:                lambda a, b, rate: 0 <= a <= 5000 and 0 <= b <= 5000 and 0 < rate < 10000,\
+153:            rows = [(a, b, rate) for a, b, rate in rows if b <= 5000]\
+156:            return [\{"from_hp": a, "to_hp": b, "rub_per_hp": rate\} for a, b, rate in rows]\
+206:        electric_excise_rates = excise_table\
+211:                "eur_rate_default": 94.9564,\
+212:                "usd_rate_default": 85.0,\
+239:                    "excise_by_hp": electric_excise_rates,\
+\
+backend/app/services/cars_service.py\
+503:    def get_fx_rates(self, *, allow_fetch: bool = True) -> dict | None:\
+516:                "https://www.cbr-xml-daily.ru/daily_json.js",\
+1186:        fx = self.get_fx_rates() or \{\}\
+1187:        eur_rate = fx.get("EUR") or cfg.payload.get("meta", \{\}).get("eur_rate_default") or 95.0\
+1188:        usd_rate = fx.get("USD") or cfg.payload.get("meta", \{\}).get("usd_rate_default") or 85.0\
+1194:            if eur_rate:\
+1195:                price_net_eur = float(used_price) / float(eur_rate)\
+1197:            if eur_rate and usd_rate:\
+1198:                price_net_eur = float(used_price) * (float(usd_rate) / float(eur_rate))\
+1217:            eur_rate=eur_rate,\
+1239:            if cur == "EUR" and eur_rate:\
+1240:                rub = amt * eur_rate\
+\
+backend/app/templates/home.html\
+278:          \{% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) | float %\}\
+280:          \{% set rub = (price_val * rate) | round(0, 'ceil') | int %\}\
+\
+backend/app/services/calculator_runtime.py\
+11:    eur_rate: Optional[float]\
+62:    eur_rate = req.eur_rate or payload["meta"].get("eur_rate_default") or 95.0\
+82:        eur_part_rub = sum_eur * eur_rate\
+88:        duty_rate = _find_range(cfg["duty_by_cc"], req.engine_cc, "from", "to", "eur_per_cc", None)\
+89:        if duty_rate is None:\
+90:            raise ValueError("duty rate not found for cc")\
+91:        duty_rub = req.engine_cc * duty_rate * eur_rate\
+103:            "euro_rate_used": eur_rate,\
+120:    customs_value_rub = req.price_net_eur * eur_rate\
+122:    excise_rate = _find_range(cfg.get("excise_by_hp", []), hp, "from_hp", "to_hp", "rub_per_hp", 0)\
+123:    excise_rub = hp * excise_rate if excise_rate else 0\
+133:    eur_part_rub = (req.price_net_eur + sum(eur_expenses.values())) * eur_rate\
+149:        "euro_rate_used": eur_rate,\
+\
+backend/app/services/calculator.py\
+81:def get_eur_rate(explicit: Optional[float]) -> float:\
+95:def calc_duty_rub(engine_cc: int, eur_rate: float) -> float:\
+96:    rate = pick_range(CC_DUTY_TABLE, engine_cc, 0)\
+97:    return engine_cc * rate * eur_rate\
+101:    rate = pick_range(EXCISE_RATE_ELECTRIC_HP, power_hp, 0)\
+103:    return float(rate) * float(rate)\
+106:def calc_under_3y(price_net_eur: float, eur_rate: float, engine_cc: int) -> Dict:\
+119:    eur_part_rub = sum_eur * eur_rate\
+120:    duty_rub = calc_duty_rub(engine_cc, eur_rate)\
+138:            "euro_rate_used": eur_rate,\
+148:def calc_3_to_5y(price_net_eur: float, eur_rate: float, engine_cc: int) -> Dict:\
+157:    eur_part_rub = sum_eur * eur_rate\
+158:    duty_rub = calc_duty_rub(engine_cc, eur_rate)\
+182:            "euro_rate_used": eur_rate,\
+192:def calc_electric(price_net_eur: float, eur_rate: float, power_hp: int, power_kw: Optional[int] = None) -> Dict:\
+200:    customs_value_rub = price_net_eur * eur_rate\
+208:    eur_part_rub = (price_net_eur + sum(v for _, _, v in fees_eur)) * eur_rate\
+232:            "euro_rate_used": eur_rate,\
+247:    eur_rate = get_eur_rate(payload.get("eur_rate"))\
+257:        return calc_under_3y(price_net_eur, eur_rate, engine_cc)\
+261:        return calc_3_to_5y(price_net_eur, eur_rate, engine_cc)\
+265:        return calc_electric(price_net_eur, eur_rate, power_hp, power_kw)\
+\
+backend/app/services/parsing_data_service.py\
+57:        rates = CarsService(self.db).get_fx_rates() or \{\}\
+84:            rub = to_rub(payload.get("price"), payload.get("currency"), rates)\
+101:            # Extract images out of payload; they are persisted separately\
+160:                    for pos, url in enumerate(candidate_images):\
+\
+backend/app/services/calc_debug.py\
+16:    eur_rate: Optional[float] = None,\
+17:    usd_rate: Optional[float] = None,\
+32:    fx = service.get_fx_rates() or \{\}\
+33:    eur_rate_used = eur_rate or fx.get("EUR") or cfg.payload.get("meta", \{\}).get("eur_rate_default") or 95.0\
+34:    usd_rate_used = usd_rate or fx.get("USD") or cfg.payload.get("meta", \{\}).get("usd_rate_default") or 85.0\
+50:            price_net_eur = float(car.price) * (usd_rate_used / eur_rate_used)\
+53:            price_net_eur = float(car.price) / eur_rate_used\
+63:        eur_rate=eur_rate_used,\
+75:        \{"name": "eur_rate", "value": eur_rate_used\},\
+81:                "formula": "price_net_eur * eur_rate",\
+82:                "value": price_net_eur * eur_rate_used,\
+98:            "eur_rate": eur_rate_used,\
+99:            "usd_rate": usd_rate_used,\
+120:            "euro_rate_used": result.get("euro_rate_used"),\
+\
+backend/app/importing/mobilede_csv.py\
+158:            name_to_idx = \{name.strip(): i for i, name in enumerate(header)\}\
+\
+backend/app/static/css/home.css\
+81:  filter: brightness(0.68) saturate(1.08) contrast(1.08);\
+backend/app/schemas/car.py\
+52:    calc_total_rub: Optional[float] = None\
+53:    calc_breakdown: Optional[list] = None\
+54:    calc_used_price: Optional[dict] = None\
+\
+backend/app/utils/home_content.py\
+35:            "\uc0\u1051 \u1086 \u1075 \u1080 \u1089 \u1090 \u1080 \u1082 \u1072 , \u1090 \u1072 \u1084 \u1086 \u1078 \u1085 \u1103  \u1080  \u1087 \u1086 \u1089 \u1090 \u1072 \u1085 \u1086 \u1074 \u1082 \u1072  \u1085 \u1072  \u1091 \u1095 \u1105 \u1090  \u1087 \u1086 \u1076  \u1082 \u1083 \u1102 \u1095 ",\
+60:                    "\uc0\u1054 \u1087 \u1083 \u1072 \u1090 \u1072  \u1095 \u1077 \u1088 \u1077 \u1079  \u1057 \u1041 \u1045 \u1056  (\u1103 \u1095 \u1077 \u1081 \u1082 \u1072 ) \u1080 \u1083 \u1080  \u1087 \u1086 \u1101 \u1090 \u1072 \u1087 \u1085 \u1086 : \u1080 \u1085 \u1074 \u1086 \u1081 \u1089 , \u1083 \u1086 \u1075 \u1080 \u1089 \u1090 \u1080 \u1082 \u1072 , \u1090 \u1072 \u1084 \u1086 \u1078 \u1085 \u1103 ",\
+84:                "paragraph": "\uc0\u1055 \u1086 \u1084 \u1086 \u1078 \u1077 \u1084  \u1073 \u1077 \u1079  \u1087 \u1086 \u1089 \u1088 \u1077 \u1076 \u1085 \u1080 \u1082 \u1086 \u1074  \u1086 \u1088 \u1075 \u1072 \u1085 \u1080 \u1079 \u1086 \u1074 \u1072 \u1090 \u1100  \u1087 \u1086 \u1082 \u1091 \u1087 \u1082 \u1091  \u1072 \u1074 \u1090 \u1086  \u1089  \u1087 \u1088 \u1086 \u1073 \u1077 \u1075 \u1086 \u1084  \u1080 \u1083 \u1080  \u1085 \u1086 \u1074 \u1086 \u1075 \u1086 : \u1076 \u1080 \u1072 \u1075 \u1085 \u1086 \u1089 \u1090 \u1080 \u1082 \u1072 , \u1086 \u1087 \u1083 \u1072 \u1090 \u1072 , \u1090 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1072 \u1103  \u1086 \u1095 \u1080 \u1089 \u1090 \u1082 \u1072 , \u1076 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072 , \u1057 \u1041 \u1050 \u1058 \u1057  \u1080  \u1069 \u1083 \u1055 \u1058 \u1057 , \u1083 \u1100 \u1075 \u1086 \u1090 \u1085 \u1099 \u1081  \u1091 \u1090 \u1080 \u1083 \u1100  \u1087 \u1088 \u1080  \u1074 \u1086 \u1079 \u1084 \u1086 \u1078 \u1085 \u1086 \u1089 \u1090 \u1080 .",\
+106:                "text": "\uc0\u1057 \u1086 \u1073 \u1089 \u1090 \u1074 \u1077 \u1085 \u1085 \u1099 \u1081  \u1087 \u1086 \u1076 \u1073 \u1086 \u1088 , \u1087 \u1088 \u1086 \u1074 \u1077 \u1088 \u1082 \u1072 , \u1076 \u1080 \u1072 \u1075 \u1085 \u1086 \u1089 \u1090 \u1080 \u1082 \u1072 , \u1083 \u1086 \u1075 \u1080 \u1089 \u1090 \u1080 \u1082 \u1072  \u1080  \u1074 \u1099 \u1076 \u1072 \u1095 \u1072 .",\
+114:                "text": "\uc0\u1055 \u1088 \u1086 \u1074 \u1077 \u1088 \u1082 \u1072  \u1080 \u1089 \u1090 \u1086 \u1088 \u1080 \u1080 , \u1076 \u1080 \u1072 \u1075 \u1085 \u1086 \u1089 \u1090 \u1080 \u1082 \u1072 , \u1083 \u1086 \u1075 \u1080 \u1089 \u1090 \u1080 \u1082 \u1072 , \u1090 \u1072 \u1084 \u1086 \u1078 \u1085 \u1103  \u1080  \u1087 \u1086 \u1089 \u1090 \u1072 \u1085 \u1086 \u1074 \u1082 \u1072  \u1085 \u1072  \u1091 \u1095 \u1105 \u1090 .",\
+136:                "title": "\uc0\u1051 \u1086 \u1075 \u1080 \u1089 \u1090 \u1080 \u1082 \u1072 ",\
+137:                "text": "\uc0\u1054 \u1088 \u1075 \u1072 \u1085 \u1080 \u1079 \u1091 \u1077 \u1084  \u1074 \u1099 \u1082 \u1091 \u1087 , \u1076 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1091 , \u1090 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1086 \u1077  \u1086 \u1092 \u1086 \u1088 \u1084 \u1083 \u1077 \u1085 \u1080 \u1077  \u1080  \u1087 \u1086 \u1089 \u1090 \u1072 \u1085 \u1086 \u1074 \u1082 \u1091  \u1085 \u1072  \u1091 \u1095 \u1105 \u1090 .",\
+150:            "\uc0\u1052 \u1099  \u1073 \u1077 \u1088 \u1077 \u1084  \u1085 \u1072  \u1089 \u1077 \u1073 \u1103  \u1083 \u1086 \u1075 \u1080 \u1089 \u1090 \u1080 \u1082 \u1091 , \u1090 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1086 \u1077  \u1086 \u1092 \u1086 \u1088 \u1084 \u1083 \u1077 \u1085 \u1080 \u1077 , \u1088 \u1077 \u1075 \u1080 \u1089 \u1090 \u1088 \u1072 \u1094 \u1080 \u1102  \u1080  \u1074 \u1099 \u1076 \u1072 \u1095 \u1091  \u1074  \u1074 \u1072 \u1096 \u1077 \u1084  \u1075 \u1086 \u1088 \u1086 \u1076 \u1077 . \u1052 \u1080 \u1085 \u1080 \u1084 \u1072 \u1083 \u1100 \u1085 \u1072 \u1103  \u1087 \u1088 \u1077 \u1076 \u1086 \u1087 \u1083 \u1072 \u1090 \u1072  \'97 \u1086 \u1089 \u1085 \u1086 \u1074 \u1085 \u1072 \u1103  \u1095 \u1072 \u1089 \u1090 \u1100  \u1086 \u1087 \u1083 \u1072 \u1095 \u1080 \u1074 \u1072 \u1077 \u1090 \u1089 \u1103  \u1087 \u1086  \u1092 \u1072 \u1082 \u1090 \u1091  \u1087 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1080 . \u1054 \u1089 \u1090 \u1072 \u1074 \u1100 \u1090 \u1077  \u1079 \u1072 \u1103 \u1074 \u1082 \u1091 , \u1080  \u1084 \u1099  \u1087 \u1088 \u1077 \u1076 \u1083 \u1086 \u1078 \u1080 \u1084  \u1074 \u1072 \u1088 \u1080 \u1072 \u1085 \u1090 \u1099  \u1074  \u1090 \u1077 \u1095 \u1077 \u1085 \u1080 \u1077  1\'962 \u1076 \u1085 \u1077 \u1081 .",\
+\
+backend/app/scripts/calc_debug.py\
+7:from backend.app.services.calc_debug import build_calc_debug\
+20:        payload = build_calc_debug(\
+\
+backend/app/utils/breakdown_labels.py\
+11:    "delivery_eu_msk": "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072  \u1045 \u1074 \u1088 \u1086 \u1087 \u1072  \'97 \u1052 \u1057 \u1050 ",\
+12:    "delivery": "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072 ",\
+15:    "broker_elpts": "\uc0\u1041 \u1088 \u1086 \u1082 \u1077 \u1088  \u1080  \u1069 \u1083 \u1055 \u1058 \u1057 ",\
+16:    "customs_fee": "\uc0\u1058 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ",\
+17:    "customs_duty": "\uc0\u1058 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1072 \u1103  \u1087 \u1086 \u1096 \u1083 \u1080 \u1085 \u1072 ",\
+18:    "\uc0\u1055 \u1086 \u1096 \u1083 \u1080 \u1085 \u1072 ": "\u1058 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1072 \u1103  \u1087 \u1086 \u1096 \u1083 \u1080 \u1085 \u1072 ",\
+19:    "recycling_fee": "\uc0\u1059 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ",\
+20:    "\uc0\u1059 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ": "\u1059 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ",\
+24:    "customs_fee": "\uc0\u1058 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ",\
+25:    "broker_elpts": "\uc0\u1041 \u1088 \u1086 \u1082 \u1077 \u1088  \u1080  \u1069 \u1083 \u1055 \u1058 \u1057 ",\
+26:    "delivery": "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072 ",\
+\
+backend/app/routers/pages.py\
+197:    price_max = db.execute(select(func.max(Car.price_rub_cached))).scalar_one_or_none()\
+1027:    calc = None\
+1177:        calc = service.ensure_calc_cache(car)\
+1186:            "calc": calc,\
+1198:@router.get("/calculator")\
+1199:def calculator_page():\
+\
+backend/app/tools/mobilede_daily.py\
+84:    \uc0\u1055 \u1086 \u1089 \u1083 \u1077  \u1079 \u1072 \u1075 \u1088 \u1091 \u1079 \u1082 \u1080  \u1092 \u1072 \u1081 \u1083 \u1072  \u1086 \u1073 \u1085 \u1086 \u1074 \u1083 \u1103 \u1077 \u1084  price_rub_cached \u1087 \u1086  \u1082 \u1091 \u1088 \u1089 \u1091  \u1062 \u1041 /ENV.\
+113:                db.query(Car).filter(Car.id == cid).update(\{"price_rub_cached": rub\}, synchronize_session=False)\
+132:                    help="Skip price_rub_cached update")\
+\
+backend/app/main.py\
+16:from .routers.calculator import router as calc_router\
+95:    app.include_router(calc_router)\
+\
+backend/app/routers/admin.py\
+11:from ..services.calculator_config_service import CalculatorConfigService\
+12:from ..services.calculator_extractor import CalculatorExtractor\
+46:    calc_cfg = CalculatorConfigService(db).latest()\
+56:            "calc_cfg": calc_cfg,\
+208:@router.post("/admin/calculator/upload")\
+209:async def upload_calculator_config(\
+221:        payload = CalculatorExtractor(tmp_path).extract()\
+222:        svc = CalculatorConfigService(db)\
+225:        return RedirectResponse(url="/admin?error=calc_upload", status_code=302)\
+\
+backend/app/tools/backfill_price_rub.py\
+20:            stmt = stmt.where(Car.price_rub_cached.is_(None))\
+28:                car.price_rub_cached = round(rub, 2)\
+44:        description="Backfill price_rub_cached for existing cars.")\
+48:        help="Update all rows, not only those with missing price_rub_cached.",\
+\
+backend/app/routers/catalog.py\
+268:                "total_price_rub_cached": c.get("total_price_rub_cached"),\
+269:                "price_rub_cached": c.get("price_rub_cached"),\
+\
+backend/app/tools/telegram_bot.py\
+25:from ..services.calculator_config_service import CalculatorConfigService\
+26:from ..services.calculator_extractor import CalculatorExtractor\
+68:AWAITING_CALC = "awaiting_calc_upload"\
+69:CALC_PENDING = "calc_pending"\
+228:def build_calc_diff(old: Dict[str, any] | None, new: Dict[str, any]) -> tuple[list[str], int]:\
+300:def format_calc_diff_message(old_payload: Dict[str, any] | None, new_payload: Dict[str, any], limit: int = 80) -> tuple[str, int]:\
+301:    blocks, total = build_calc_diff(old_payload, new_payload)\
+534:async def cb_calc_show(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:\
+539:        svc = CalculatorConfigService(db)\
+558:    if not context.user_data.get(AWAITING_CALC):\
+572:        extractor = CalculatorExtractor(Path(path))\
+576:            svc = CalculatorConfigService(db)\
+578:            diff_text, total_changes = format_calc_diff_message(old.payload if old else None, payload)\
+579:            context.user_data[CALC_PENDING] = \{\
+586:                    [InlineKeyboardButton("\uc0\u9989  \u1055 \u1088 \u1080 \u1084 \u1077 \u1085 \u1080 \u1090 \u1100 ", callback_data="calc_apply")],\
+587:                    [InlineKeyboardButton("\uc0\u10060  \u1054 \u1090 \u1084 \u1077 \u1085 \u1080 \u1090 \u1100 ", callback_data="calc_cancel")],\
+599:        context.user_data[AWAITING_CALC] = False\
+705:    application.add_handler(CommandHandler("calc_config", lambda u, c: c.application.create_task(cb_calc_show(u, c))))\
+759:        elif data == "calc_menu":\
+761:                [InlineKeyboardButton("\uc0\u1055 \u1086 \u1082 \u1072 \u1079 \u1072 \u1090 \u1100  \u1090 \u1077 \u1082 \u1091 \u1097 \u1080 \u1077 ", callback_data="calc_show")],\
+762:                [InlineKeyboardButton("\uc0\u1047 \u1072 \u1075 \u1088 \u1091 \u1079 \u1080 \u1090 \u1100  Excel", callback_data="calc_upload")],\
+766:        elif data == "calc_show":\
+767:            await cb_calc_show(update, context)\
+768:        elif data == "calc_upload":\
+769:            context.user_data[AWAITING_CALC] = True\
+771:        elif data == "calc_apply":\
+772:            pending = context.user_data.get(CALC_PENDING)\
+778:                svc = CalculatorConfigService(db)\
+785:            context.user_data[CALC_PENDING] = None\
+786:            context.user_data[AWAITING_CALC] = False\
+787:        elif data == "calc_cancel":\
+788:            context.user_data[CALC_PENDING] = None\
+789:            context.user_data[AWAITING_CALC] = False\
+\
+backend/app/routers/calculator.py\
+5:from ..services.calculator import calculate_import_cost, get_eur_rate\
+6:from ..services.calculator_config_service import CalculatorConfigService\
+7:from ..services.calculator_extractor import CalculatorExtractor\
+9:from ..services.calc_debug import build_calc_debug\
+20:class CalcRequest(BaseModel):\
+36:router = APIRouter(prefix="/api", tags=["calculator"])\
+39:@router.post("/calc")\
+40:def calc_endpoint(payload: CalcRequest, db: Session = Depends(get_db)):\
+78:        cfg_svc = CalculatorConfigService(db)\
+81:            raise HTTPException(status_code=400, detail="calculator config not found")\
+82:        from ..services.calculator_runtime import EstimateRequest, calculate\
+102:        result = calculate(cfg.payload, req_obj)\
+132:@router.get("/calc_debug")\
+133:def calc_debug_endpoint(\
+141:        return build_calc_debug(db, car_id=car_id, eur_rate=eur_rate, usd_rate=usd_rate, scenario=scenario)\
+146:@router.get("/calculator/config/current")\
+147:def calc_config_current(db: Session = Depends(get_db)):\
+148:    svc = CalculatorConfigService(db)\
+155:@router.post("/calculator/config/upload_xlsx")\
+156:def calc_config_upload(file: UploadFile = File(...), db: Session = Depends(get_db)):\
+165:        extractor = CalculatorExtractor(Path(tmp_path))\
+167:        svc = CalculatorConfigService(db)\
+\
+backend/app/tools/car_counts_refresh.py\
+59:    price_val = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached, Car.price)\
+\
+backend/app/templates/catalog.html\
+329:                  \{% set price_val = car.total_price_rub_cached or car.price_rub_cached %\}\
+\
+backend/app/models/__init__.py\
+10:from .calculator_config import CalculatorConfig\
+\
+backend/app/static/js/app.js\
+932:        const displayRub = car.total_price_rub_cached ?? car.price_rub_cached\
+933:        const calcLine = `<div class="price-main">$\{displayRub != null ? formatRub(displayRub) : '\'97'\}</div>`\
+997:              $\{calcLine\}\
+2111:          const displayRub = car.total_price_rub_cached ?? car.price_rub_cached\
+2286:    const calcBtn = qs('#toggleCalc')\
+2287:    const calcBlock = qs('#calcBreakdown')\
+2288:    if (calcBtn && calcBlock) \{\
+2289:      calcBtn.addEventListener('click', (e) => \{\
+2291:        const hidden = getComputedStyle(calcBlock).display === 'none'\
+2292:        calcBlock.style.display = hidden ? '' : 'none'\
+2293:        calcBtn.setAttribute('aria-expanded', hidden ? 'true' : 'false')\
+\
+backend/app/templates/admin/dashboard.html\
+357:      \{% if calc_cfg %\}\
+358:      <p class="small muted">\uc0\u1058 \u1077 \u1082 \u1091 \u1097 \u1072 \u1103  \u1074 \u1077 \u1088 \u1089 \u1080 \u1103 : \{\{ calc_cfg.version \}\} \'b7 \{\{ calc_cfg.source \}\} \'b7 \{\{ calc_cfg.comment or '\u1073 \u1077 \u1079  \u1082 \u1086 \u1084 \u1084 \u1077 \u1085 \u1090 \u1072 \u1088 \u1080 \u1103 ' \}\}</p>\
+362:      <form method="post" action="/admin/calculator/upload" enctype="multipart/form-data" class="form-vertical">\
+\
+backend/app/models/car.py\
+27:    price_rub_cached: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True, index=True)\
+28:    total_price_rub_cached: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)\
+58:    calc_breakdown_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)\
+63:    calc_updated_at: Mapped[datetime | None] = mapped_column(nullable=True)\
+\
+backend/app/services/calculator_extractor.py\
+8:class CalculatorExtractor:\
+10:    Extracts calculator config from Excel "\uc0\u1050 \u1072 \u1083 \u1100 \u1082 \u1091 \u1083 \u1103 \u1090 \u1086 \u1088  \u1040 \u1074 \u1090 \u1086  \u1087 \u1086 \u1076  \u1079 \u1072 \u1082 \u1072 \u1079 .xlsx".\
+11:    Produces a structured payload for CalculatorConfig.\
+76:                "delivery_eu_minsk": "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072  \u1045 \u1074 \u1088 \u1086 \u1087 \u1099 - \u1052 \u1080 \u1085 \u1089 \u1082 \u1072 ",\
+77:                "customs_by": "\uc0\u1058 \u1072 \u1084 \u1086 \u1078 \u1085 \u1103  \u1056 \u1041 ",\
+78:                "transfer_fee": "\uc0\u1050 \u1086 \u1084 \u1080 \u1089 \u1089 \u1080 \u1103  \u1079 \u1072  \u1087 \u1077 \u1088 \u1077 \u1074 \u1086 \u1076  \u1076 \u1077 \u1085 \u1077 \u1075  \u1079 \u1072  \u1090 \u1072 \u1084 \u1086 \u1078 \u1085 \u1102 ",\
+79:                "delivery_msk": "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072  \u1052 \u1080 \u1085 \u1089 \u1082 - \u1052 \u1086 \u1089 \u1082 \u1074 \u1072 ",\
+91:                "delivery_eu_msk": "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072  \u1045 \u1074 \u1088 \u1086 \u1087 \u1072 - \u1052 \u1057 \u1050 ",\
+93:                "broker_elpts": "\uc0\u1041 \u1088 \u1086 \u1082 \u1077 \u1088  \u1080  \u1069 \u1083 \u1055 \u1058 \u1057 ",\
+94:                "customs_fee": "\uc0\u1058 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ",\
+103:                "delivery_eu_msk": "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072  \u1045 \u1074 \u1088 \u1086 \u1087 \u1072 - \u1052 \u1057 \u1050 ",\
+106:                "customs_fee": "\uc0\u1058 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ",\
+107:                "broker_elpts": "\uc0\u1041 \u1088 \u1086 \u1082 \u1077 \u1088  \u1080  \u1069 \u1083 \u1055 \u1058 \u1057 ",\
+181:            \uc0\u1041 \u1077 \u1088 \u1105 \u1084  \u1084 \u1072 \u1082 \u1089 \u1080 \u1084 \u1072 \u1083 \u1100 \u1085 \u1086 \u1077  \u1095 \u1080 \u1089 \u1083 \u1086 \u1074 \u1086 \u1077  \u1079 \u1085 \u1072 \u1095 \u1077 \u1085 \u1080 \u1077  \u1080 \u1079  \u1089 \u1090 \u1088 \u1086 \u1082 \u1080  \u1089  "\u1059 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ".\
+186:                "\uc0\u1091 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081 ", case=False, na=False).any(), axis=1)\
+189:                raise ValueError("\uc0\u1053 \u1077  \u1085 \u1072 \u1081 \u1076 \u1077 \u1085 \u1072  \u1089 \u1090 \u1088 \u1086 \u1082 \u1072  \u1091 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1086 \u1075 \u1086  \u1089 \u1073 \u1086 \u1088 \u1072 ")\
+193:                raise ValueError("\uc0\u1053 \u1077  \u1085 \u1072 \u1081 \u1076 \u1077 \u1085 \u1086  \u1095 \u1080 \u1089 \u1083 \u1086 \u1074 \u1099 \u1093  \u1079 \u1085 \u1072 \u1095 \u1077 \u1085 \u1080 \u1081  \u1091 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1086 \u1075 \u1086  \u1089 \u1073 \u1086 \u1088 \u1072 ")\
+220:                    "customs_fee_rub": 0,\
+221:                    "broker_elpts_rub": 0,\
+228:                    "customs_fee_rub": expenses_3_5.get("customs_fee", 30000),\
+229:                    "broker_elpts_rub": expenses_3_5.get("broker_elpts", 115000),\
+236:                    "customs_fee_rub": expenses_e.get("customs_fee", 30000),\
+237:                    "broker_elpts_rub": expenses_e.get("broker_elpts", 115000),\
+\
+backend/app/models/calculator_config.py\
+9:class CalculatorConfig(Base):\
+10:    __tablename__ = "calculator_configs"\
+\
+backend/app/templates/home.html\
+613:      const form = document.getElementById("mini-calc-form");\
+619:      const resultWrap = document.getElementById("mini-calc-result");\
+620:      const resultTotal = document.getElementById("mini-calc-total");\
+621:      const resultList = document.getElementById("mini-calc-breakdown");\
+712:        const resp = await fetch("/api/calc", \{\
+727:          row.className = "calc-row";\
+\
+backend/app/templates/privacy.html\
+99:          \uc0\u1079 \u1072 \u1082 \u1086 \u1085 \u1086 \u1084  \u1080 \u1083 \u1080  \u1085 \u1077 \u1086 \u1073 \u1093 \u1086 \u1076 \u1080 \u1084 \u1099 \u1093  \u1076 \u1083 \u1103  \u1080 \u1089 \u1087 \u1086 \u1083 \u1085 \u1077 \u1085 \u1080 \u1103  \u1091 \u1089 \u1083 \u1091 \u1075 \u1080  (\u1083 \u1086 \u1075 \u1080 \u1089 \u1090 \u1080 \u1082 \u1072 , \u1073 \u1088 \u1086 \u1082 \u1077 \u1088 \u1089 \u1082 \u1080 \u1077 \
+\
+backend/app/templates/car_detail.html\
+64:          \{% set has_total = calc and calc.total_rub %\}\
+70:                \{% set kr_price = car.total_price_rub_cached or car.price_rub_cached %\}\
+80:                \{\{ '\{:,.0f\}'.format(calc.total_rub).replace(',', ' ') \}\} \uc0\u8381 \
+157:            <div class="calc-chip">\{\{ opt \}\}</div>\
+173:            \{% if calc and calc.total_rub %\}\
+174:              \{% set price_line = '\{:,.0f\}'.format(calc.total_rub).replace(",", " ") ~ ' \uc0\u8381  (\u1080 \u1090 \u1086 \u1075  \u1074  \u1056 \u1060 )' %\}\
+\
+backend/app/services/cars_service.py\
+33:from .calculator_config_service import CalculatorConfigService\
+34:from .calculator_runtime import EstimateRequest, calculate\
+798:            conditions.append(Car.total_price_rub_cached.is_not(None))\
+800:                conditions.append(Car.total_price_rub_cached >= price_min)\
+802:                conditions.append(Car.total_price_rub_cached <= price_max)\
+1024:                Car.total_price_rub_cached.asc().nullslast(),\
+1025:                Car.price_rub_cached.asc().nullslast(),\
+1030:                Car.total_price_rub_cached.desc().nullslast(),\
+1031:                Car.price_rub_cached.desc().nullslast(),\
+1052:            order_clause = [Car.price_rub_cached.asc().nullslast(), Car.id.desc()]\
+1067:                    Car.total_price_rub_cached,\
+1068:                    Car.price_rub_cached,\
+1130:    def ensure_calc_cache(self, car: Car) -> dict | None:\
+1150:            self.logger.info("calc_skip_no_price car=%s src=%s", car.id, getattr(car.source, "key", None))\
+1155:            self.logger.info("calc_skip_no_reg_year car=%s src=%s", car.id, getattr(car.source, "key", None))\
+1159:            car.total_price_rub_cached is not None\
+1160:            and car.calc_breakdown_json is not None\
+1161:            and car.calc_updated_at is not None\
+1163:            and car.calc_updated_at >= car.updated_at\
+1166:                "total_rub": float(car.total_price_rub_cached),\
+1167:                "breakdown": car.calc_breakdown_json or [],\
+1172:        cfg_svc = CalculatorConfigService(self.db)\
+1204:            self.logger.info("calc_skip_no_power car=%s src=%s", car.id, getattr(car.source, "key", None))\
+1207:            self.logger.info("calc_skip_no_cc car=%s src=%s", car.id, getattr(car.source, "key", None))\
+1226:            result = calculate(cfg.payload, req)\
+1228:            self.logger.exception("calc_failed car=%s src=%s", car.id, getattr(car.source, "key", None))\
+1246:        car.total_price_rub_cached = total_rub\
+1247:        car.calc_breakdown_json = display\
+1248:        car.calc_updated_at = datetime.utcnow()\
+1554:            conditions.append(Car.price_rub_cached >= price_min)\
+1556:            conditions.append(Car.price_rub_cached <= price_max)\
+1564:                Car.price_rub_cached.asc().nullslast(),\
+\
+backend/app/services/calc_debug.py\
+9:from ..services.calculator_config_service import CalculatorConfigService\
+10:from ..services.calculator_runtime import EstimateRequest, calculate\
+13:def build_calc_debug(\
+26:    cfg = CalculatorConfigService(db).ensure_default_from_path(\
+30:        raise ValueError("calculator config not found")\
+71:    result = calculate(cfg.payload, req)\
+\
+backend/app/services/calculator_config_service.py\
+6:from ..models import CalculatorConfig\
+9:class CalculatorConfigService:\
+13:    def latest(self) -> Optional[CalculatorConfig]:\
+15:            select(CalculatorConfig)\
+16:            .order_by(CalculatorConfig.version.desc())\
+21:    def create(self, payload: dict, source: str = "upload", comment: str | None = None) -> CalculatorConfig:\
+24:        cfg = CalculatorConfig(\
+35:    def ensure_default_from_path(self, path) -> CalculatorConfig | None:\
+39:        from .calculator_extractor import CalculatorExtractor\
+44:        payload = CalculatorExtractor(p).extract()\
+47:    def all_versions(self, limit: int = 20) -> list[CalculatorConfig]:\
+49:            select(CalculatorConfig)\
+50:            .order_by(CalculatorConfig.version.desc())\
+\
+backend/app/services/calculator.py\
+13:class CalcItem:\
+30:# \uc0\u1059 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088  \u1076 \u1083 \u1103  \u1044 \u1042 \u1057  (RUB) \u1087 \u1086  \u1086 \u1073 \u1098 \u1105 \u1084 \u1091 \
+44:# \uc0\u1059 \u1090 \u1080 \u1083 \u1100  \u1076 \u1083 \u1103  \u1101 \u1083 \u1077 \u1082 \u1090 \u1088 \u1086  (RUB) \u1087 \u1086  kW\
+95:def calc_duty_rub(engine_cc: int, eur_rate: float) -> float:\
+100:def calc_excise_electric(power_hp: int) -> float:\
+106:def calc_under_3y(price_net_eur: float, eur_rate: float, engine_cc: int) -> Dict:\
+111:        ("delivery_eu_minsk", "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072  \u1045 \u1074 \u1088 \u1086 \u1087 \u1072 \'96\u1052 \u1080 \u1085 \u1089 \u1082 ", 6500),\
+112:        ("customs_by", "\uc0\u1058 \u1072 \u1084 \u1086 \u1078 \u1085 \u1103  \u1056 \u1041 ", 29524),\
+113:        ("money_transfer_fee", "\uc0\u1050 \u1086 \u1084 \u1080 \u1089 \u1089 \u1080 \u1103  \u1079 \u1072  \u1087 \u1077 \u1088 \u1077 \u1074 \u1086 \u1076  \u1090 \u1072 \u1084 \u1086 \u1078 \u1085 \u1080 ", 182.62),\
+114:        ("delivery_minsk_moscow", "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072  \u1052 \u1080 \u1085 \u1089 \u1082 \'96\u1052 \u1086 \u1089 \u1082 \u1074 \u1072 ", 500),\
+120:    duty_rub = calc_duty_rub(engine_cc, eur_rate)\
+125:    breakdown: List[CalcItem] = []\
+126:    breakdown.append(CalcItem("price_net", "\uc0\u1062 \u1077 \u1085 \u1072  \u1085 \u1077 \u1090 \u1090 \u1086 ", price_net_eur, "EUR"))\
+128:        breakdown.append(CalcItem(key, title, val, "EUR"))\
+129:    breakdown.append(CalcItem("duty", "\uc0\u1055 \u1086 \u1096 \u1083 \u1080 \u1085 \u1072 ", duty_rub, "RUB"))\
+130:    breakdown.append(CalcItem("util", "\uc0\u1059 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ", util_rub, "RUB"))\
+131:    breakdown.append(CalcItem("total_rub", "\uc0\u1048 \u1090 \u1086 \u1075 \u1086  (RUB)", total_rub, "RUB"))\
+148:def calc_3_to_5y(price_net_eur: float, eur_rate: float, engine_cc: int) -> Dict:\
+153:        ("delivery_eu_moscow", "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072  \u1045 \u1074 \u1088 \u1086 \u1087 \u1072 \'96\u1052 \u1057 \u1050 ", 6000),\
+158:    duty_rub = calc_duty_rub(engine_cc, eur_rate)\
+161:        ("customs_fee", "\uc0\u1058 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ", 30000),\
+162:        ("broker_elpts", "\uc0\u1041 \u1088 \u1086 \u1082 \u1077 \u1088  \u1080  \u1069 \u1051 \u1055 \u1058 \u1057 ", 115000),\
+167:    breakdown: List[CalcItem] = []\
+168:    breakdown.append(CalcItem("price_net", "\uc0\u1062 \u1077 \u1085 \u1072  \u1085 \u1077 \u1090 \u1090 \u1086 ", price_net_eur, "EUR"))\
+170:        breakdown.append(CalcItem(key, title, val, "EUR"))\
+172:        breakdown.append(CalcItem(key, title, val, "RUB"))\
+173:    breakdown.append(CalcItem("duty", "\uc0\u1055 \u1086 \u1096 \u1083 \u1080 \u1085 \u1072 ", duty_rub, "RUB"))\
+174:    breakdown.append(CalcItem("util", "\uc0\u1059 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ", util_rub, "RUB"))\
+175:    breakdown.append(CalcItem("total_rub", "\uc0\u1048 \u1090 \u1086 \u1075 \u1086  (RUB)", total_rub, "RUB"))\
+192:def calc_electric(price_net_eur: float, eur_rate: float, power_hp: int, power_kw: Optional[int] = None) -> Dict:\
+197:        ("delivery_eu_moscow", "\uc0\u1044 \u1086 \u1089 \u1090 \u1072 \u1074 \u1082 \u1072  \u1045 \u1074 \u1088 \u1086 \u1087 \u1072 \'96\u1052 \u1057 \u1050 ", 6000),\
+200:    customs_value_rub = price_net_eur * eur_rate\
+201:    duty_rub = customs_value_rub * 0.15\
+202:    excise_rub = calc_excise_electric(power_hp)\
+203:    vat_base = customs_value_rub + duty_rub + excise_rub\
+205:    customs_fee_rub = 30000\
+206:    broker_rub = 115000\
+210:        vat_rub + customs_fee_rub + broker_rub + util_rub\
+212:    breakdown: List[CalcItem] = []\
+213:    breakdown.append(CalcItem("price_net", "\uc0\u1062 \u1077 \u1085 \u1072  \u1085 \u1077 \u1090 \u1090 \u1086 ", price_net_eur, "EUR"))\
+215:        breakdown.append(CalcItem(key, title, val, "EUR"))\
+216:    breakdown.append(CalcItem("duty", "\uc0\u1042 \u1074 \u1086 \u1079 \u1085 \u1072 \u1103  \u1087 \u1086 \u1096 \u1083 \u1080 \u1085 \u1072  15%", duty_rub, "RUB"))\
+218:        CalcItem("excise", "\uc0\u1040 \u1082 \u1094 \u1080 \u1079  (Excel \u1092 \u1086 \u1088 \u1084 \u1091 \u1083 \u1072 )", excise_rub, "RUB"))\
+219:    breakdown.append(CalcItem("vat", "\uc0\u1053 \u1044 \u1057  20%", vat_rub, "RUB"))\
+221:        CalcItem("customs_fee", "\uc0\u1058 \u1072 \u1084 \u1086 \u1078 \u1077 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ", customs_fee_rub, "RUB"))\
+223:        CalcItem("broker_elpts", "\uc0\u1041 \u1088 \u1086 \u1082 \u1077 \u1088  \u1080  \u1069 \u1051 \u1055 \u1058 \u1057 ", broker_rub, "RUB"))\
+224:    breakdown.append(CalcItem("util", "\uc0\u1059 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ", util_rub, "RUB"))\
+225:    breakdown.append(CalcItem("total_rub", "\uc0\u1048 \u1090 \u1086 \u1075 \u1086  (RUB)", total_rub, "RUB"))\
+243:def calculate_import_cost(payload: Dict) -> Dict:\
+257:        return calc_under_3y(price_net_eur, eur_rate, engine_cc)\
+261:        return calc_3_to_5y(price_net_eur, eur_rate, engine_cc)\
+265:        return calc_electric(price_net_eur, eur_rate, power_hp, power_kw)\
+\
+backend/app/services/parsing_data_service.py\
+86:                payload["price_rub_cached"] = round(rub, 2)\
+125:                    if existing.price_rub_cached is None and payload.get("price_rub_cached") is not None:\
+126:                        existing.price_rub_cached = payload["price_rub_cached"]\
+\
+backend/app/services/calculator_runtime.py\
+27:def _calc_age_months(reg_year: Optional[int], reg_month: Optional[int]) -> Optional[int]:\
+43:    age = _calc_age_months(req.reg_year, req.reg_month)\
+56:def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:\
+70:        eur_fields = \{k: v for k, v in expenses.items() if k not in ("customs_fee", "broker_elpts", "customs_by")\}\
+73:        if "broker_elpts" in expenses:\
+74:            rub_fields["broker_elpts"] = expenses["broker_elpts"]\
+75:        if "customs_fee" in expenses:\
+76:            rub_fields["customs_fee"] = expenses["customs_fee"]\
+77:        if "customs_by" in expenses and scenario_key == "under_3":\
+78:            # \uc0\u1058 \u1072 \u1084 \u1086 \u1078 \u1085 \u1103  \u1056 \u1041  \u1074  EUR\
+79:            eur_fields["customs_by"] = expenses["customs_by"]\
+95:        breakdown.append(\{"title": "\uc0\u1059 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ", "amount": util_rub, "currency": "RUB"\})\
+110:    age = _calc_age_months(req.reg_year, req.reg_month) or 0\
+113:    eur_expenses = \{k: v for k, v in expenses.items() if k not in ("customs_fee", "broker_elpts")\}\
+115:    if "customs_fee" in expenses:\
+116:        rub_expenses["customs_fee"] = expenses["customs_fee"]\
+117:    if "broker_elpts" in expenses:\
+118:        rub_expenses["broker_elpts"] = expenses["broker_elpts"]\
+120:    customs_value_rub = req.price_net_eur * eur_rate\
+121:    duty_rub = customs_value_rub * cfg.get("duty_percent", 0.15)\
+130:    vat_base = customs_value_rub + duty_rub + excise_rub + (power_fee or 0)\
+140:    breakdown.append(\{"title": "\uc0\u1059 \u1090 \u1080 \u1083 \u1080 \u1079 \u1072 \u1094 \u1080 \u1086 \u1085 \u1085 \u1099 \u1081  \u1089 \u1073 \u1086 \u1088 ", "amount": util_rub, "currency": "RUB"\})\
+\
+backend/app/static/css/home.css\
+690:  margin-left: calc(50% - 50vw);\
+691:  margin-right: calc(50% - 50vw);\
+\
+backend/app/static/css/styles.css\
+459:  top: calc(100% + 8px);\
+1237:  max-height: calc(100vh - 120px);\
+2324:/* Calculator page */\
+2325:.calc-result \{\
+2330:.calc-total \{\
+2338:.calc-total__value \{\
+2342:.calc-breakdown \{\
+2346:.calc-row \{\
+2649:.detail-calc \{\
+2653:.detail-calc__line \{\
+2662:.detail-calc button,\
+2666:.calc-chip \{\
+2746:  .detail-calc__line \{\
+2751:  .detail-calc__line \{\
+http://localhost:8000/api/car/285235 404\
+http://localhost:8000/api/cars/285235 200\
+\{"id": 285235, "source_id": 1, "external_id": "437709075", "country": "DE", "brand": "BMW", "model": "X5", "generation": null, "year": 2025, "mileage": 6124, "price": 72989.0, "currency": "EUR", "registration_year": 2025, "registration_month": 3, "body_type": "suv", "engine_type": "Diesel", "engine_cc": 3000, "power_hp": 298.0, "power_kw": 219.18, "transmission": "Automatic", "drive_type": "AWD", "color": "skyscraper grau", "vin": null, "source_url": "https://suchen.mobile.de/auto-inserat/bmw-x5-xdrive30d-m-sportpaket-h-k-ahk-komfort-gestik-salz/437709075.html", "thumbnail_url": "https://img.classistatic.de/api/v1/mo-prod/images/d9/d982010b-8408-4836-9fdc-e15074269210?rule=mo-1024.jpg", "thumbnail_local_path": null, "hash": "dcae2afad8454362351a13e7b1298c9a1d49d74874da570e7845b7d13e5303ca", "first_seen_at": "2026-01-09T14:56:43.804624", "last_seen_at": "2026-01-29T06:49:55.755294", "listing_date": "2025-10-01T02:44:03", "is_available": true, "created_at": "2026-01-09T14:56:44.843218", "updated_at": "2026-01-29T13:24:10.920843", "source_name": "mobile.de", "source_country": "DE", "display_country_code": "DE", "display_country_label": "\uc0\u1043 \u1077 \u1088 \u1084 \u1072 \u1085 \u1080 \u1103 ", "display_engine_type": "\u1044 \u1080 \u1079 \u1077 \u1083 \u1100 ", "display_transmission": "\u1040 \u1074 \u1090 \u1086 \u1084 \u1072 \u1090 "\}\
+brutto*rub 6662435.92\
+net*rub 5598750.08\
 root@cv5704357:/opt/levelavto# }

@@ -40,7 +40,7 @@ from ..utils.taxonomy import (
     color_hex,
 )
 normalize_color = _normalize_color
-from ..utils.country_map import country_label_ru, resolve_display_country
+from ..utils.country_map import country_label_ru, resolve_display_country, normalize_country_code
 from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
 from ..utils.home_content import build_home_content
 
@@ -178,7 +178,17 @@ def _build_filter_context(
     }
 
     t0 = time.perf_counter()
-    eu_countries = [c["value"] for c in service.facet_counts(field="country", filters=facet_filters)]
+    eu_countries = []
+    seen_countries = set()
+    for row in service.facet_counts(field="country", filters=facet_filters):
+        raw_val = row.get("value")
+        if not raw_val:
+            continue
+        code = normalize_country_code(raw_val)
+        if not code or code in seen_countries:
+            continue
+        eu_countries.append(code)
+        seen_countries.add(code)
     if timing_enabled:
         print(f"FILTER_CTX_STAGE name=countries ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     eu_source_ids = service.source_ids_for_region("EU")
@@ -740,7 +750,17 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     region_param = ctx_params.get("region")
     regions = [r["value"] for r in service.facet_counts(field="region", filters={})]
     country_filters = {"region": region_param} if region_param else {}
-    countries = [c["value"] for c in service.facet_counts(field="country", filters=country_filters)]
+    countries = []
+    seen_countries = set()
+    for row in service.facet_counts(field="country", filters=country_filters):
+        raw_val = row.get("value")
+        if not raw_val:
+            continue
+        code = normalize_country_code(raw_val)
+        if not code or code in seen_countries:
+            continue
+        countries.append(code)
+        seen_countries.add(code)
     country_labels = {**{c: country_label_ru(c) for c in countries}, "EU": "Европа", "KR": "Корея"}
     kr_types = []
     if "KR" in regions:
