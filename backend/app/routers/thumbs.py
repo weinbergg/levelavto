@@ -41,9 +41,11 @@ def thumb(
 
     fmt = "jpg" if fmt == "jpeg" else fmt
     path = _cache_path(src, w, fmt)
+    media_type = "image/webp" if fmt == "webp" else "image/jpeg"
     if os.path.exists(path):
         return FileResponse(
             path,
+            media_type=media_type,
             headers={
                 "Cache-Control": "public, max-age=604800",
                 "ETag": os.path.basename(path),
@@ -53,7 +55,7 @@ def thumb(
     try:
         res = requests.get(src, timeout=(0.5, 2.5))
     except Exception:
-        raise HTTPException(status_code=502, detail="upstream fetch failed")
+        raise HTTPException(status_code=404, detail="upstream fetch failed")
     if res.status_code != 200:
         raise HTTPException(status_code=404, detail="upstream not found")
 
@@ -71,6 +73,7 @@ def thumb(
 
     return FileResponse(
         path,
+        media_type=media_type,
         headers={
             "Cache-Control": "public, max-age=604800",
             "ETag": os.path.basename(path),

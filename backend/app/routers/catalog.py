@@ -189,6 +189,7 @@ def list_cars(
         page=page,
         page_size=page_size,
         light=True,
+        use_fast_count=False,
     )
     t1 = time.perf_counter()
     if items and not isinstance(items[0], dict):

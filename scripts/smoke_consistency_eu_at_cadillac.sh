@@ -8,8 +8,27 @@ BRAND="Cadillac"
 
 echo "[smoke] consistency ${REGION}/${COUNTRY}/${BRAND}"
 
-count="$(curl -fsS "${BASE_URL}/api/cars_count?region=${REGION}&country=${COUNTRY}&brand=${BRAND}" | jq -r '.count')"
-cars="$(curl -fsS "${BASE_URL}/api/cars?region=${REGION}&country=${COUNTRY}&brand=${BRAND}&page_size=200" | jq '.items')"
+count_resp="$(curl -fsS "${BASE_URL}/api/cars_count?region=${REGION}&country=${COUNTRY}&brand=${BRAND}" || true)"
+if [ -z "${count_resp}" ]; then
+  echo "[smoke] FAIL: empty response from /api/cars_count"
+  exit 1
+fi
+count="$(echo "${count_resp}" | jq -r '.count' 2>/dev/null || echo "")"
+if [ -z "${count}" ]; then
+  echo "[smoke] FAIL: /api/cars_count response: ${count_resp}"
+  exit 1
+fi
+
+cars_resp="$(curl -fsS "${BASE_URL}/api/cars?region=${REGION}&country=${COUNTRY}&brand=${BRAND}&page_size=100" || true)"
+if [ -z "${cars_resp}" ]; then
+  echo "[smoke] FAIL: empty response from /api/cars"
+  exit 1
+fi
+cars="$(echo "${cars_resp}" | jq '.items' 2>/dev/null || echo "")"
+if [ -z "${cars}" ]; then
+  echo "[smoke] FAIL: /api/cars response: ${cars_resp}"
+  exit 1
+fi
 
 echo "[smoke] count=${count}"
 
@@ -31,4 +50,10 @@ if [ -n "${models_cars}" ]; then
   fi
 fi
 
-echo "[smoke] OK"
+items_len="$(echo "${cars}" | jq 'length')"
+if [ "${count}" -lt "${items_len}" ]; then
+  echo "[smoke] FAIL: count ${count} < items.length ${items_len}"
+  exit 1
+fi
+
+echo "[smoke] OK (count=${count}, items=${items_len})"

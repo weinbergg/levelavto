@@ -572,6 +572,7 @@ class CarsService:
         page: int = 1,
         page_size: int = 20,
         light: bool = False,
+        use_fast_count: bool = True,
     ) -> Tuple[List[Car] | List[dict], int]:
         conditions = [self._available_expr()]
         if region and not country:
@@ -907,7 +908,7 @@ class CarsService:
         total = self._count_cache.get(count_key)
         total_t0 = time.perf_counter()
         if total is not None:
-            if total == 0 and self._can_fast_count(
+            if use_fast_count and total == 0 and self._can_fast_count(
                 region=region,
                 country=country,
                 brand=brand,
@@ -959,7 +960,7 @@ class CarsService:
                     self._count_cache[count_key] = total
         if total is None:
             total = None
-            if self._can_fast_count(
+            if use_fast_count and self._can_fast_count(
                 region=region,
                 country=country,
                 brand=brand,
@@ -1095,6 +1096,15 @@ class CarsService:
             items = list(self.db.execute(stmt).mappings().all())
         else:
             items = list(self.db.execute(stmt).scalars().all())
+        # Guard against stale/undercounted fast_count: ensure total >= offset+items
+        try:
+            offset = (page - 1) * page_size
+            if total is not None and total < (offset + len(items)):
+                total_stmt = select(func.count()).select_from(Car).where(where_expr)
+                total = self.db.execute(total_stmt).scalar_one()
+                self._count_cache[count_key] = total
+        except Exception:
+            self.logger.exception("count_recheck_failed")
         elapsed_items = time.perf_counter() - items_t0
         if elapsed_items > 2:
             self.logger.warning(
@@ -1692,6 +1702,7 @@ class CarsService:
             page=1,
             page_size=1,
             light=True,
+            use_fast_count=False,
         )
         return int(total)
 
