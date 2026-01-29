@@ -1668,15 +1668,22 @@
       updateCount()
     })
     regionSlotSelect?.addEventListener('change', updateCount)
-    form.addEventListener('submit', (e) => {
+    if (form.dataset.submitBound !== '1') {
+      form.dataset.submitBound = '1'
+      form.addEventListener('submit', (e) => {
       e.preventDefault()
+      e.stopPropagation()
       const params = buildHomeParams(false)
       if (DEBUG_FILTERS) {
         sessionStorage.setItem('homeSubmitParams', params.toString())
         console.info('filters:home submit', params.toString())
       }
-      window.location.href = buildCatalogUrl(params)
+      const url = buildCatalogUrl(params)
+      if (DEBUG_FILTERS) console.info('home: redirect url', url)
+      window.location.assign(url)
+      return false
     })
+    }
     window.addEventListener('pageshow', () => {
       initialAnimation = true
       updateCount()
@@ -2049,7 +2056,10 @@
       }
     }
 
-    form.addEventListener('submit', async (e) => {
+    if (form.id !== 'advanced-search-form') return
+    if (form.dataset.submitBound !== '1') {
+      form.dataset.submitBound = '1'
+      form.addEventListener('submit', async (e) => {
       e.preventDefault()
       if (messageEl) messageEl.textContent = ''
       if (suggestionsEl) suggestionsEl.innerHTML = ''
@@ -2072,6 +2082,7 @@
         console.warn('advanced search', e)
       }
     })
+    }
 
     form.addEventListener('reset', () => {
       setTimeout(() => {
