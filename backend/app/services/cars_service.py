@@ -4,7 +4,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, and_, or_, case, cast, String, text
+from sqlalchemy import select, func, and_, or_, case, cast, String, text, literal
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.dialects.postgresql import JSONB
 import logging
 from cachetools import TTLCache
@@ -276,6 +277,10 @@ class CarsService:
                     "brand_variants": brand_variants_list or [brand_norm] if brand_norm else None,
                 },
             ).first()
+        except ProgrammingError:
+            self.db.rollback()
+            self.logger.exception("fast_count_failed region=%s", region_norm)
+            return None
         except Exception:
             self.logger.exception("fast_count_failed region=%s", region_norm)
             return None
@@ -289,6 +294,114 @@ class CarsService:
                 continue
             clauses.append(f"{col} = :{key}")
         return clauses
+
+    def _facet_counts_from_cars(self, *, field: str, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+        col_map = {
+            "brand": Car.brand,
+            "model": Car.model,
+            "color": Car.color,
+            "engine_type": Car.engine_type,
+            "transmission": Car.transmission,
+            "body_type": Car.body_type,
+            "drive_type": Car.drive_type,
+            "country": func.upper(Car.country),
+            "reg_year": Car.reg_year,
+        }
+        if field == "region":
+            eu_sources = self._source_ids_for_europe()
+            kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+            region_expr = case(
+                (func.upper(Car.country).like("KR%"), literal("KR")),
+                (Car.source_id.in_(kr_sources), literal("KR")),
+                (Car.source_id.in_(eu_sources), literal("EU")) if eu_sources else (func.upper(Car.country).in_(self.EU_COUNTRIES), literal("EU")),
+                else_=func.upper(Car.country),
+            )
+            col = region_expr
+        else:
+            col = col_map.get(field)
+        if col is None:
+            return []
+        conditions = [self._available_expr()]
+        region = filters.get("region")
+        country = filters.get("country")
+        kr_type = filters.get("kr_type")
+        brand = filters.get("brand")
+        model = filters.get("model")
+        if country:
+            c = normalize_country_code(country)
+            if c == "KR":
+                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                conds = [func.upper(Car.country).like("KR%")]
+                if kr_sources:
+                    conds.append(Car.source_id.in_(kr_sources))
+                conditions.append(or_(*conds))
+            elif c == "EU":
+                region = "EU"
+            elif c:
+                conditions.append(func.upper(Car.country) == c)
+        if region:
+            r = region.upper()
+            if r == "KR":
+                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                conds = [func.upper(Car.country).like("KR%")]
+                if kr_sources:
+                    conds.append(Car.source_id.in_(kr_sources))
+                conditions.append(or_(*conds))
+            elif r == "EU":
+                eu_sources = self._source_ids_for_europe()
+                if eu_sources:
+                    conditions.append(Car.source_id.in_(eu_sources))
+                else:
+                    conditions.append(func.upper(Car.country).in_(self.EU_COUNTRIES))
+        if kr_type:
+            kt_raw = str(kr_type).upper()
+            kt = None
+            if kt_raw in ("KR_INTERNAL", "DOMESTIC"):
+                kt = "domestic"
+            elif kt_raw in ("KR_IMPORT", "IMPORT"):
+                kt = "import"
+            if kt:
+                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                conds = [func.lower(Car.kr_market_type) == kt, func.upper(Car.country).like("KR%")]
+                if kr_sources:
+                    conds.append(Car.source_id.in_(kr_sources))
+                conditions.append(and_(or_(*conds)))
+        if brand:
+            b = normalize_brand(brand).strip()
+            if b:
+                variants = brand_variants(b)
+                conditions.append(Car.brand.in_(variants))
+        if model:
+            mv = str(model).strip()
+            if mv:
+                conditions.append(Car.model == mv)
+        if field not in ("region", "country", "brand", "model"):
+            val = filters.get(field)
+            if val:
+                conditions.append(getattr(Car, field) == val)
+        stmt = (
+            select(col.label("value"), func.count().label("count"))
+            .select_from(Car)
+            .where(and_(*conditions))
+            .group_by(col)
+            .order_by(func.count().desc())
+        )
+        rows = self.db.execute(stmt).all()
+        out = []
+        for value, count in rows:
+            if value is None or value == "":
+                continue
+            out.append({"value": value, "count": int(count)})
+        if field == "brand":
+            merged: Dict[str, int] = {}
+            for row in out:
+                norm = normalize_brand(row["value"])
+                if not norm:
+                    continue
+                merged[norm] = merged.get(norm, 0) + int(row["count"])
+            out = [{"value": k, "count": v} for k, v in merged.items()]
+            out = sorted(out, key=lambda x: (-x["count"], x["value"].lower()))
+        return out
 
     def facet_counts(self, *, field: str, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         table_map = {
@@ -362,7 +475,14 @@ class CarsService:
             ORDER BY {order_sql}
             """
         )
-        rows = self.db.execute(query, params).all()
+        try:
+            rows = self.db.execute(query, params).all()
+        except ProgrammingError as exc:
+            self.db.rollback()
+            self.logger.warning(
+                "facet_counts_fallback field=%s missing_table=%s", field, table
+            )
+            return self._facet_counts_from_cars(field=field, filters=filters_norm)
         out = []
         for value, count in rows:
             if value is None or value == "":
@@ -1328,8 +1448,20 @@ class CarsService:
             LIMIT 200
             """
         )
-        rows = self.db.execute(stmt, {"brand_variants": brand_variants(norm_brand)}).all()
-        models = [{"model": r[0], "count": int(r[1])} for r in rows if r[0]]
+        try:
+            rows = self.db.execute(stmt, {"brand_variants": brand_variants(norm_brand)}).all()
+            models = [{"model": r[0], "count": int(r[1])} for r in rows if r[0]]
+        except ProgrammingError:
+            self.db.rollback()
+            fb_stmt = (
+                select(Car.model, func.count())
+                .where(self._available_expr(), Car.brand.in_(brand_variants(norm_brand)))
+                .group_by(Car.model)
+                .order_by(func.count().desc(), Car.model.asc())
+                .limit(200)
+            )
+            rows = self.db.execute(fb_stmt).all()
+            models = [{"model": r[0], "count": int(r[1])} for r in rows if r[0]]
 
         def sort_key(item: Dict[str, Any]):
             val = str(item.get("model") or "").strip()

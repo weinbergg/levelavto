@@ -90,6 +90,13 @@
     return qs ? `/catalog?${qs}` : '/catalog'
   }
 
+  function thumbProxyUrl(url, width = 360) {
+    if (!url) return '/static/img/no-photo.svg'
+    if (url.startsWith('/thumb?')) return url
+    if (!url.includes('img.classistatic.de')) return url
+    return `/thumb?u=${encodeURIComponent(url)}&w=${width}&fmt=webp`
+  }
+
   function normalizeThumbUrl(src, opts = {}) {
     const val = String(src || '').trim()
     if (!val) return '/static/img/no-photo.svg'
@@ -108,6 +115,9 @@
       }
     }
     // Keep original classistatic rule to avoid 404 on some sizes.
+    if (opts.thumb) {
+      return thumbProxyUrl(url)
+    }
     return url
   }
 

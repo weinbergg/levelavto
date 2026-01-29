@@ -14,6 +14,7 @@ from .routers.admin import router as admin_router
 from .routers.account import router as account_router
 from .routers.favorites import router as favorites_router
 from .routers.calculator import router as calc_router
+from .routers.thumbs import router as thumbs_router
 from pathlib import Path
 
 
@@ -92,6 +93,7 @@ def create_app() -> FastAPI:
     app.include_router(favorites_router)
     app.include_router(catalog_router, prefix="/api", tags=["catalog"])
     app.include_router(calc_router)
+    app.include_router(thumbs_router)
 
     @app.get("/health", include_in_schema=False)
     def healthcheck():

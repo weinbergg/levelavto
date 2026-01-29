@@ -272,15 +272,20 @@
           {% for car in initial_items %}
             <a class="car-card" href="/car/{{ car.id }}" data-id="{{ car.id }}">
               <div class="thumb-wrap">
+                {% if car.thumbnail_url %}
+                  {% set thumb_src = "/thumb?u=" ~ (car.thumbnail_url | urlencode) ~ "&w=360&fmt=webp" %}
+                {% else %}
+                  {% set thumb_src = "/static/img/no-photo.svg" %}
+                {% endif %}
                 <img
                   class="thumb"
-                  src="{{ car.thumbnail_url or '/static/img/no-photo.svg' }}"
+                  src="{{ thumb_src }}"
                   loading="lazy"
                   decoding="async"
                   referrerpolicy="no-referrer"
                   {% if loop.index0 < 2 %}fetchpriority="high"{% endif %}
                   alt=""
-                  data-thumb="{{ car.thumbnail_url or '/static/img/no-photo.svg' }}"
+                  data-thumb="{{ thumb_src }}"
                   data-id="{{ car.id }}"
                   onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
                   width="320"
@@ -316,7 +321,7 @@
                       <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt=""> {{ car.color }}</span></li>
                     {% endif %}
                     {% if car.country %}
-                      <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt=""> {{ country_labels.get(car.country, car.country) }}</span></li>
+                      <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt=""> {{ country_labels.get(car.country|upper, car.country) }}</span></li>
                     {% endif %}
                   </ul>
                 </div>

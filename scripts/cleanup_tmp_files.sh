@@ -6,6 +6,8 @@ DRY_RUN="${DRY_RUN:-0}"
 CSV_DAYS="${CSV_DAYS:-1}"
 LOG_DAYS="${LOG_DAYS:-7}"
 DUMP_DAYS="${DUMP_DAYS:-7}"
+THUMB_DAYS="${THUMB_DAYS:-7}"
+THUMB_DIR="${THUMB_CACHE_DIR:-/opt/levelavto/thumb_cache}"
 
 echo "[cleanup] root=$ROOT_DIR dry_run=$DRY_RUN"
 
@@ -35,6 +37,12 @@ for dir in "${targets[@]}"; do
     run_find "$dir" "-type f -size +1G -mtime +1"
   fi
 done
+
+# Thumbnails cache cleanup
+if [ -d "$THUMB_DIR" ]; then
+  echo "[cleanup] scan $THUMB_DIR"
+  run_find "$THUMB_DIR" "-type f -mtime +${THUMB_DAYS}"
+fi
 
 # Optional dumps cleanup in project root
 run_find "$ROOT_DIR" "-maxdepth 1 -type f -name \"*.sql.gz\" -mtime +${DUMP_DAYS}"

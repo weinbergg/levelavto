@@ -151,6 +151,7 @@ def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str
     keys = [
         "region",
         "country",
+        "kr_type",
         "brand",
         "model",
         "color",
@@ -169,7 +170,7 @@ def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str
             val = val.strip()
             if not val:
                 continue
-            if key in {"region", "country"}:
+            if key in {"region", "country", "kr_type"}:
                 val = val.upper()
         cleaned[key] = val
     # Ensure alias is not propagated.

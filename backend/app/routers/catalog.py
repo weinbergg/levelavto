@@ -54,6 +54,31 @@ def _region_label(code: str | None) -> str:
     return key
 
 
+def _canonicalize_params(
+    *,
+    region: Optional[str] = None,
+    country: Optional[str] = None,
+    eu_country: Optional[str] = None,
+    kr_type: Optional[str] = None,
+    brand: Optional[str] = None,
+    model: Optional[str] = None,
+) -> dict:
+    raw = {
+        "region": region,
+        "country": country,
+        "eu_country": eu_country,
+        "kr_type": kr_type,
+        "brand": brand,
+        "model": model,
+    }
+    normalized = normalize_count_params(raw)
+    if normalized.get("brand"):
+        normalized["brand"] = normalize_brand(normalized["brand"]).strip()
+    if normalized.get("model"):
+        normalized["model"] = str(normalized["model"]).strip()
+    return normalized
+
+
 @router.get("/cars")
 def list_cars(
     request: Request,
@@ -112,16 +137,22 @@ def list_cars(
     service = CarsService(db)
     timing_enabled = os.environ.get("CAR_API_TIMING", "0") == "1"
     t0 = time.perf_counter()
-    if not country and eu_country:
-        country = eu_country
-    items, total = service.list_cars(
+    canon = _canonicalize_params(
         region=region,
         country=country,
+        eu_country=eu_country,
+        kr_type=kr_type,
         brand=brand,
+        model=model,
+    )
+    items, total = service.list_cars(
+        region=canon.get("region"),
+        country=canon.get("country"),
+        brand=canon.get("brand"),
         lines=line,
         source_key=source,
         q=q,
-        model=model,
+        model=canon.get("model"),
         generation=generation,
         color=color,
         price_min=price_min,
@@ -134,7 +165,7 @@ def list_cars(
         year_max=year_max,
         mileage_min=mileage_min,
         mileage_max=mileage_max,
-        kr_type=kr_type,
+        kr_type=canon.get("kr_type"),
         reg_year_min=reg_year_min,
         reg_month_min=reg_month_min,
         reg_year_max=reg_year_max,
@@ -245,10 +276,10 @@ def list_cars(
         print(
             "API_CARS_TIMING db_ms={list_ms:.2f} photos_ms={photos_ms:.2f} map_ms={map_ms:.2f} total_ms={total_ms:.2f} sort={sort} filters=({region},{country},{brand},{model})".format(
                 sort=sort,
-                region=region,
-                country=country,
-                brand=brand,
-                model=model,
+                region=canon.get("region"),
+                country=canon.get("country"),
+                brand=canon.get("brand"),
+                model=canon.get("model"),
                 **parts,
             ),
             flush=True,
@@ -291,19 +322,25 @@ def cars_count(
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
-    if not country and eu_country:
-        country = eu_country
+    canon = _canonicalize_params(
+        region=region,
+        country=country,
+        eu_country=eu_country,
+        kr_type=kr_type,
+        brand=brand,
+        model=model,
+    )
     params = {
-        "region": region,
-        "country": country,
-        "brand": brand,
-        "model": model,
+        "region": canon.get("region"),
+        "country": canon.get("country"),
+        "brand": canon.get("brand"),
+        "model": canon.get("model"),
         "color": color,
         "engine_type": engine_type,
         "transmission": transmission,
         "body_type": body_type,
         "drive_type": drive_type,
-        "kr_type": kr_type,
+        "kr_type": canon.get("kr_type"),
         "price_min": price_min,
         "price_max": price_max,
         "power_hp_min": power_hp_min,
@@ -326,16 +363,16 @@ def cars_count(
         return {"count": int(cached)}
     print("CARS_COUNT_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
     total = service.count_cars(
-        region=region,
-        country=country,
-        brand=brand,
-        model=model,
+        region=canon.get("region"),
+        country=canon.get("country"),
+        brand=canon.get("brand"),
+        model=canon.get("model"),
         color=color,
         engine_type=engine_type,
         transmission=transmission,
         body_type=body_type,
         drive_type=drive_type,
-        kr_type=kr_type,
+        kr_type=canon.get("kr_type"),
         price_min=price_min,
         price_max=price_max,
         power_hp_min=power_hp_min,
@@ -595,7 +632,10 @@ def filter_ctx_brand(
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
-    params = normalize_filter_params({"region": region, "country": country, "brand": brand})
+    canon = _canonicalize_params(region=region, country=country, brand=brand)
+    params = normalize_filter_params(
+        {"region": canon.get("region"), "country": canon.get("country"), "brand": canon.get("brand")}
+    )
     cache_key = build_filter_ctx_brand_key(params)
     t0 = time.perf_counter()
     cached = redis_get_json(cache_key)
@@ -606,8 +646,8 @@ def filter_ctx_brand(
             print(f"FILTER_CTX_BRAND ms={total_ms:.2f} models={len(cached.get('models', []))}", flush=True)
         return cached
     print("FILTER_CTX_BRAND_CACHE hit=0 source=fallback", flush=True)
-    brand_norm = normalize_brand(params.get("brand")).strip() if params.get("brand") else None
-    filters = {"region": params.get("region"), "country": params.get("country"), "brand": brand_norm}
+    brand_norm = normalize_brand(canon.get("brand")).strip() if canon.get("brand") else None
+    filters = {"region": canon.get("region"), "country": canon.get("country"), "brand": brand_norm}
     models = _sort_by_label(
         [
             {"value": m["value"], "label": m["value"], "count": m.get("count", 0)}
@@ -633,7 +673,15 @@ def filter_ctx_model(
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
-    params = normalize_filter_params({"region": region, "country": country, "brand": brand, "model": model})
+    canon = _canonicalize_params(region=region, country=country, brand=brand, model=model)
+    params = normalize_filter_params(
+        {
+            "region": canon.get("region"),
+            "country": canon.get("country"),
+            "brand": canon.get("brand"),
+            "model": canon.get("model"),
+        }
+    )
     cache_key = build_filter_ctx_model_key(params)
     t0 = time.perf_counter()
     cached = redis_get_json(cache_key)
@@ -650,15 +698,15 @@ def filter_ctx_model(
         .where(Car.generation.is_not(None))
         .where(Car.is_available.is_(True))
     )
-    if params.get("brand"):
-        stmt = stmt.where(Car.brand == normalize_brand(params.get("brand")).strip())
-    if params.get("model"):
-        stmt = stmt.where(Car.model == params.get("model"))
-    if params.get("country"):
-        stmt = stmt.where(func.upper(Car.country) == params.get("country"))
-    elif params.get("region") == "EU":
+    if canon.get("brand"):
+        stmt = stmt.where(Car.brand == normalize_brand(canon.get("brand")).strip())
+    if canon.get("model"):
+        stmt = stmt.where(Car.model == canon.get("model"))
+    if canon.get("country"):
+        stmt = stmt.where(func.upper(Car.country) == canon.get("country"))
+    elif canon.get("region") == "EU":
         stmt = stmt.where(func.upper(Car.country).in_(service.EU_COUNTRIES))
-    elif params.get("region") == "KR":
+    elif canon.get("region") == "KR":
         stmt = stmt.where(func.upper(Car.country) == "KR")
     gens = [g for g in service.db.execute(stmt).scalars().all() if g]
     generations = _sort_by_label([{"value": g, "label": g} for g in gens])
