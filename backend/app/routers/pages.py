@@ -231,7 +231,7 @@ def _build_filter_context(
     basic_by_value = {c["value"]: c for c in colors if c.get("value") in basic_set}
     colors_basic = [basic_by_value[c] for c in BASIC_COLORS if c in basic_by_value]
     colors_other = [c for c in colors if c.get("value") not in basic_set]
-    countries_sorted = sorted(eu_countries)
+    countries_sorted = sorted(eu_countries, key=lambda c: (country_label_ru(c) or c).casefold())
     t0 = time.perf_counter()
     body_types = []
     for row in service.facet_counts(field="body_type", filters=facet_filters):
