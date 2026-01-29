@@ -174,6 +174,16 @@
     }
   }
 
+  function ensureOption(select, value, label = null) {
+    if (!select || !value) return
+    const exists = Array.from(select.options || []).some((o) => o.value === value)
+    if (exists) return
+    const opt = document.createElement('option')
+    opt.value = value
+    opt.textContent = label || value
+    select.appendChild(opt)
+  }
+
   function renderColorChips(container, colors) {
     if (!container) return
     container.innerHTML = ''
@@ -426,6 +436,9 @@
     const countrySelect = qs('[data-country]', scope)
     const krSelect = qs('[data-kr-type]', scope)
     if (!region) return
+    if (!region.value && countrySelect && countrySelect.value) {
+      region.value = String(countrySelect.value).toUpperCase() === 'KR' ? 'KR' : 'EU'
+    }
     const togglePanel = (panel, hidden) => {
       if (!panel) return
       const keep = panel.dataset.regionKeep === '1'
@@ -680,13 +693,14 @@
     const countrySel = form.elements['country']
     const krSel = form.elements['kr_type']
     if (regionSel && regionSel.value) {
-      params.set('region', regionSel.value)
-      if (regionSel.value === 'EU' && countrySel && countrySel.value) {
-        params.set('country', countrySel.value)
+      const regionVal = String(regionSel.value).toUpperCase()
+      params.set('region', regionVal)
+      if (regionVal === 'EU' && countrySel && countrySel.value) {
+        params.set('country', String(countrySel.value).toUpperCase())
       }
-      if (regionSel.value === 'KR') {
+      if (regionVal === 'KR') {
         params.set('country', 'KR')
-        if (krSel && krSel.value) params.set('kr_type', krSel.value)
+        if (krSel && krSel.value) params.set('kr_type', String(krSel.value).toUpperCase())
       }
     }
     params.set('page', String(page || 1))
@@ -1046,6 +1060,9 @@
     }
     const filtersForm = qs('#filters')
     const selectedFilters = parseSelectedFilters()
+    if (DEBUG_FILTERS) {
+      console.info('catalog:init selected', selectedFilters.toString())
+    }
     if (filtersForm) syncFormFromSelected(filtersForm, selectedFilters)
     qsa('#cards img.thumb').forEach((img) => {
       applyThumbFallback(img)
@@ -1059,6 +1076,21 @@
     const generationSelect = qs('#generation')
     const advancedLink = qs('#catalog-advanced-link')
     normalizeBrandOptions(brandSelect)
+    const reapplySelected = () => {
+      if (!filtersForm) return
+      selectedFilters.forEach((value, key) => {
+        if (!value || key === 'line') return
+        const field = filtersForm.elements[key]
+        if (!field) return
+        const nextValue = key === 'brand' ? normalizeBrand(value) : value
+        if (field.tagName === 'SELECT') {
+          ensureOption(field, nextValue)
+          setSelectValueInsensitive(field, nextValue)
+        } else {
+          field.value = nextValue
+        }
+      })
+    }
 
     const loadCatalogFilterBase = async () => {
       if (!filtersForm) return
@@ -1095,6 +1127,7 @@
         bindColorChips(filtersForm, () => loadCars(1))
         bindOtherColorsToggle(filtersForm)
         syncColorChips(filtersForm)
+        reapplySelected()
       } catch (e) {
         console.warn('filters base', e)
       }
@@ -1150,7 +1183,6 @@
       bindOtherColorsToggle(filtersForm)
       bindRegMonthState(filtersForm)
       bindRegionSelect(filtersForm)
-      loadCatalogFilterBase()
       const ctrls = qsa('input, select', filtersForm)
       let debounce
       const updateAdvancedLink = () => {
@@ -1262,8 +1294,11 @@
       }
     })
     const loadInitial = async () => {
+      await loadCatalogFilterBase()
+      reapplySelected()
       if (brandSelect && brandSelect.value) {
         await updateCatalogModels()
+        if (initialModelParam) setSelectValueInsensitive(modelSelect, initialModelParam)
       }
       loadCars(initialPage)
     }
@@ -1844,7 +1879,7 @@
         regionSubKr.classList.toggle('is-hidden-keep', !showKr)
       }
       if (regionEuSelect) {
-        regionEuSelect.disabled = region !== 'EU'
+        regionEuSelect.disabled = region === 'KR'
       }
       if (regionKrSelect) {
         regionKrSelect.disabled = !showKr
@@ -1857,6 +1892,33 @@
         brand: normalizeBrand(parts[0] || ''),
         model: (parts[1] || '').trim(),
         variant: (parts[2] || '').trim(),
+      }
+    }
+
+    const prepareSubmit = () => {
+      // rebuild "line" params from rows so backend receives canonical format
+      qsa('input[name="line"]', form).forEach((el) => el.remove())
+      const lines = buildLines()
+      lines.forEach((line) => {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = 'line'
+        input.value = line
+        form.appendChild(input)
+      })
+      // ensure KR submits country=KR even if EU country select is disabled
+      const regionVal = String(regionSelect?.value || '').toUpperCase()
+      let hiddenCountry = qs('input[type="hidden"][name="country"]', form)
+      if (regionVal === 'KR') {
+        if (!hiddenCountry) {
+          hiddenCountry = document.createElement('input')
+          hiddenCountry.type = 'hidden'
+          hiddenCountry.name = 'country'
+          form.appendChild(hiddenCountry)
+        }
+        hiddenCountry.value = 'KR'
+      } else if (hiddenCountry) {
+        hiddenCountry.remove()
       }
     }
 
@@ -2042,32 +2104,14 @@
     }
 
     if (form.id !== 'advanced-search-form') return
-    if (form.dataset.submitBound !== '1') {
-      form.dataset.submitBound = '1'
-      form.addEventListener('submit', async (e) => {
-      e.preventDefault()
-      if (messageEl) messageEl.textContent = ''
-      if (suggestionsEl) suggestionsEl.innerHTML = ''
-      try {
-        const params = buildParams(true)
-        const res = await fetch(`/api/cars?${params.toString()}`)
-        if (!res.ok) return
-        const data = await res.json()
-        if (data.total && data.total > 0) {
-          const redirectParams = buildParams(false)
-          if (DEBUG_FILTERS) console.info('filters:advanced submit', redirectParams.toString())
-          window.location.href = buildCatalogUrl(redirectParams)
-          return
-        }
-        if (messageEl) {
-          messageEl.textContent = 'Таких машин не найдено. Попробуйте изменить фильтры.'
-        }
-        renderSuggestions()
-      } catch (e) {
-        console.warn('advanced search', e)
+
+    form.addEventListener('submit', () => {
+      prepareSubmit()
+      if (DEBUG_FILTERS) {
+        const qs = new URLSearchParams(new FormData(form)).toString()
+        console.info('filters:advanced submit', qs)
       }
     })
-    }
 
     form.addEventListener('reset', () => {
       setTimeout(() => {
@@ -2093,7 +2137,9 @@
     } else {
       addRow({})
     }
-    bindRegionSelect(form)
+    if (form.id !== 'advanced-search-form') {
+      bindRegionSelect(form)
+    }
     updateRegionSub()
     updateRegionFilters()
     loadPayloadOptions()
