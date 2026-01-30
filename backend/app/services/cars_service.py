@@ -1066,6 +1066,7 @@ class CarsService:
                     Car.mileage,
                     Car.total_price_rub_cached,
                     Car.price_rub_cached,
+                    Car.calc_updated_at,
                     Car.thumbnail_url,
                     Car.country,
                     Car.source_id,

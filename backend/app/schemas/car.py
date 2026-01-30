@@ -15,6 +15,9 @@ class CarBase(BaseModel):
     mileage: Optional[int] = None
     price: Optional[float] = None
     currency: Optional[str] = None
+    price_rub_cached: Optional[float] = None
+    total_price_rub_cached: Optional[float] = None
+    calc_updated_at: Optional[datetime] = None
     registration_year: Optional[int] = None
     registration_month: Optional[int] = None
     body_type: Optional[str] = None

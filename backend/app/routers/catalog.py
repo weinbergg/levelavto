@@ -267,6 +267,7 @@ def list_cars(
                 "mileage": c.get("mileage"),
                 "total_price_rub_cached": c.get("total_price_rub_cached"),
                 "price_rub_cached": c.get("price_rub_cached"),
+                "calc_updated_at": c.get("calc_updated_at"),
                 "thumbnail_url": thumb_url,
                 "country": country_norm or country_raw,
                 "region": region_val,
