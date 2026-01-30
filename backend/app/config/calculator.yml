@@ -1,4 +1,4 @@
-version: 2026_01
+version: "202601"
 fx:
   source: cbr
   cache_ttl_sec: 3600
