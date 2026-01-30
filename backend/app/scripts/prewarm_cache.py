@@ -101,6 +101,55 @@ def main() -> None:
             redis_set_json(cache_key, int(count), ttl_sec=600)
             print(f"[prewarm] cars_count key={cache_key} value={count}")
 
+        def _prewarm_list(params: Dict[str, Any]) -> None:
+            list_cars(
+                None,
+                db=db,
+                region=params.get("region"),
+                country=params.get("country"),
+                eu_country=None,
+                brand=params.get("brand"),
+                line=None,
+                source=None,
+                q=None,
+                model=None,
+                generation=None,
+                color=None,
+                body_type=None,
+                engine_type=None,
+                transmission=None,
+                drive_type=None,
+                num_seats=None,
+                doors_count=None,
+                emission_class=None,
+                efficiency_class=None,
+                climatisation=None,
+                airbags=None,
+                interior_design=None,
+                air_suspension=None,
+                price_rating_label=None,
+                owners_count=None,
+                price_min=None,
+                price_max=None,
+                power_hp_min=None,
+                power_hp_max=None,
+                engine_cc_min=None,
+                engine_cc_max=None,
+                year_min=None,
+                year_max=None,
+                mileage_min=None,
+                mileage_max=None,
+                kr_type=None,
+                reg_year_min=None,
+                reg_month_min=None,
+                reg_year_max=None,
+                reg_month_max=None,
+                condition=None,
+                sort=None,
+                page=1,
+                page_size=12,
+            )
+
         list_tasks = [
             {"region": "EU"},
             {"region": "KR"},
@@ -108,30 +157,10 @@ def main() -> None:
             {"region": "EU", "country": "AT"},
         ]
         for params in list_tasks:
-            list_cars(
-                None,
-                db=db,
-                page=1,
-                page_size=12,
-                sort=None,
-                line=None,
-                source=None,
-                q=None,
-                **params,
-            )
+            _prewarm_list(params)
             print(f"[prewarm] cars_list region={params.get('region')} country={params.get('country')}")
         for params in brand_tasks:
-            list_cars(
-                None,
-                db=db,
-                page=1,
-                page_size=12,
-                sort=None,
-                line=None,
-                source=None,
-                q=None,
-                **params,
-            )
+            _prewarm_list(params)
             print(f"[prewarm] cars_list brand={params.get('brand')} region={params.get('region')} country={params.get('country')}")
     print(f"[prewarm] done in {(time.perf_counter()-started)*1000:.2f} ms")
 
