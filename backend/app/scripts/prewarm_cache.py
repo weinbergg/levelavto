@@ -114,6 +114,9 @@ def main() -> None:
                 page=1,
                 page_size=12,
                 sort=None,
+                line=None,
+                source=None,
+                q=None,
                 **params,
             )
             print(f"[prewarm] cars_list region={params.get('region')} country={params.get('country')}")
@@ -124,6 +127,9 @@ def main() -> None:
                 page=1,
                 page_size=12,
                 sort=None,
+                line=None,
+                source=None,
+                q=None,
                 **params,
             )
             print(f"[prewarm] cars_list brand={params.get('brand')} region={params.get('region')} country={params.get('country')}")
