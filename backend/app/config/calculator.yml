@@ -1,0 +1,88 @@
+version: 2026_01
+fx:
+  source: cbr
+  cache_ttl_sec: 3600
+  overrides:
+    EURRUB: null
+    USDRUB: null
+
+rules:
+  age_bucket_over_5y_as_3_5: true
+  price_mode: netto_preferred
+
+# shared duty table anchor
+_duty_table: &duty_table
+  - { cc_from: 0,    cc_to: 1000, eur_per_cc: 1.5 }
+  - { cc_from: 1001, cc_to: 1500, eur_per_cc: 1.7 }
+  - { cc_from: 1501, cc_to: 1800, eur_per_cc: 2.5 }
+  - { cc_from: 1801, cc_to: 2300, eur_per_cc: 2.7 }
+  - { cc_from: 2301, cc_to: 3000, eur_per_cc: 3.0 }
+  - { cc_from: 3001, cc_to: 8000, eur_per_cc: 3.6 }
+
+scenarios:
+  under_3_ice:
+    label: "ДВС до 3 лет"
+    expenses:
+      eur:
+        bank_transfer_eu: 1122
+        purchase_netto: 2190
+        inspection: 400
+        delivery_eu_minsk: 5500
+        customs_by: 17518
+        customs_transfer_fee: 117
+        delivery_minsk_moscow: 400
+        elpts: 600
+        insurance_broker_commission: 5839
+        investor_fee: 0
+      rub:
+        broker_elpts: 0
+        customs_fee: 0
+
+    duty_eur_per_cc_table: *duty_table
+    util_rub_by_engine_cc:
+      - { cc_from: 100,  cc_to: 2000,  util_rub: 1291200 }
+      - { cc_from: 2001, cc_to: 3000,  util_rub: 2620800 }
+      - { cc_from: 3001, cc_to: 3500,  util_rub: 2880000 }
+      - { cc_from: 3501, cc_to: 10000, util_rub: 3600000 }
+
+  age_3_5_ice:
+    label: "ДВС 3–5 лет (и 5+ по правилу)"
+    expenses:
+      eur:
+        bank_transfer_eu: 1122
+        purchase_netto: 2190
+        inspection: 400
+        delivery_eu_moscow: 5900
+        insurance_broker_commission: 5839
+        investor_fee: 0
+      rub:
+        broker_elpts: 0
+        customs_fee: 0
+
+    duty_eur_per_cc_table: *duty_table
+    util_rub_by_engine_cc:
+      - { cc_from: 100,  cc_to: 2000,  util_rub: 2702400 }
+      - { cc_from: 2001, cc_to: 3000,  util_rub: 3770400 }
+      - { cc_from: 3001, cc_to: 3500,  util_rub: 4290000 }
+      - { cc_from: 3501, cc_to: 10000, util_rub: 5550000 }
+
+  electric:
+    label: "Электро"
+    expenses:
+      eur:
+        bank_transfer_eu: 1122
+        purchase_netto: 2190
+        inspection: 400
+        delivery_eu_moscow: 5900
+        insurance_broker_commission: 5839
+        investor_fee: 0
+      rub:
+        broker_elpts: 0
+        customs_fee: 0
+
+    duty_percent: 0.15
+    vat_percent: 0.22
+
+    excise_rub_per_hp_table: []
+    power_fee_rub_table: []
+    util_rub_flat: null

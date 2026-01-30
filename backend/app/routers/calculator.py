@@ -76,7 +76,9 @@ def calc_endpoint(payload: CalcRequest, db: Session = Depends(get_db)):
         data["is_electric"] = is_electric
 
         cfg_svc = CalculatorConfigService(db)
-        cfg = cfg_svc.ensure_default_from_path(Path("/app/Калькулятор Авто под заказ.xlsx"))
+        cfg = cfg_svc.ensure_default_from_yaml(Path("/app/backend/app/config/calculator.yml"))
+        if not cfg:
+            cfg = cfg_svc.ensure_default_from_path(Path("/app/Калькулятор Авто под заказ.xlsx"))
         if not cfg:
             raise HTTPException(status_code=400, detail="calculator config not found")
         from ..services.calculator_runtime import EstimateRequest, calculate

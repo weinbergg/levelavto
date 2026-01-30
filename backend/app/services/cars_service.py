@@ -1170,17 +1170,27 @@ class CarsService:
                 "used_currency": used_currency,
             }
         cfg_svc = CalculatorConfigService(self.db)
-        # try multiple known paths
-        base_paths = [
-            Path("/app/Калькулятор Авто под заказ.xlsx"),
-            Path("/mnt/data/Калькулятор Авто под заказ.xlsx"),
-            Path(__file__).resolve().parent.parent / "resources" / "Калькулятор Авто под заказ.xlsx",
-        ]
         cfg = None
-        for p in base_paths:
-            cfg = cfg_svc.ensure_default_from_path(p)
+        yaml_paths = [
+            Path("/app/backend/app/config/calculator.yml"),
+            Path("/app/config/calculator.yml"),
+            Path(__file__).resolve().parent.parent / "config" / "calculator.yml",
+        ]
+        for p in yaml_paths:
+            cfg = cfg_svc.ensure_default_from_yaml(p)
             if cfg:
                 break
+        if not cfg:
+            # fallback to legacy Excel bootstrap only if YAML is missing
+            base_paths = [
+                Path("/app/Калькулятор Авто под заказ.xlsx"),
+                Path("/mnt/data/Калькулятор Авто под заказ.xlsx"),
+                Path(__file__).resolve().parent.parent / "resources" / "Калькулятор Авто под заказ.xlsx",
+            ]
+            for p in base_paths:
+                cfg = cfg_svc.ensure_default_from_path(p)
+                if cfg:
+                    break
         if not cfg:
             return None
         fx = self.get_fx_rates() or {}
@@ -1241,6 +1251,13 @@ class CarsService:
             display.append({
                 "title": label_map.get(title, label_for(title)),
                 "amount_rub": rub,
+            })
+        cfg_version = cfg.payload.get("meta", {}).get("version")
+        if cfg_version:
+            display.append({
+                "title": "__config_version",
+                "amount_rub": 0,
+                "version": cfg_version,
             })
         total_rub = float(result.get("total_rub") or 0)
         car.total_price_rub_cached = total_rub

@@ -23,9 +23,10 @@ def build_calc_debug(
 
     service = CarsService(db)
     pricing = service.price_info(car)
-    cfg = CalculatorConfigService(db).ensure_default_from_path(
-        "/app/Калькулятор Авто под заказ.xlsx"
-    )
+    cfg_svc = CalculatorConfigService(db)
+    cfg = cfg_svc.ensure_default_from_yaml("/app/backend/app/config/calculator.yml")
+    if not cfg:
+        cfg = cfg_svc.ensure_default_from_path("/app/Калькулятор Авто под заказ.xlsx")
     if not cfg:
         raise ValueError("calculator config not found")
 
@@ -118,5 +119,10 @@ def build_calc_debug(
             "scenario": result.get("scenario"),
             "total_rub": result.get("total_rub"),
             "euro_rate_used": result.get("euro_rate_used"),
+            "config_version": cfg.payload.get("meta", {}).get("version"),
+        },
+        "config": {
+            "version": cfg.payload.get("meta", {}).get("version"),
+            "source": cfg.source,
         },
     }

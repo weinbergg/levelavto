@@ -1,0 +1,150 @@
+version: 2026_01
+
+duty_eur_per_cc:
+  - { from_cc: 0,    to_cc: 1000, eur_per_cc: 1.5 }
+  - { from_cc: 1001, to_cc: 1500, eur_per_cc: 1.7 }
+  - { from_cc: 1501, to_cc: 1800, eur_per_cc: 2.5 }
+  - { from_cc: 1801, to_cc: 2300, eur_per_cc: 2.7 }
+  - { from_cc: 2301, to_cc: 3000, eur_per_cc: 3.0 }
+  - { from_cc: 3001, to_cc: 8000, eur_per_cc: 3.6 }
+
+util_cc_buckets:
+  - { from_cc: 0,    to_cc: 2000,  table: "100-2000" }
+  - { from_cc: 2001, to_cc: 3000,  table: "2000-3000" }
+  - { from_cc: 3001, to_cc: 3500,  table: "3000-3500" }
+  - { from_cc: 3501, to_cc: 10000, table: "3500-10000" }
+
+selection_rule: "if kw > 0 => use kw table else use hp table"
+
+util_tables:
+  "100-2000":
+    kw:
+      - { from: 0.00,   to: 117.68, price_rub: 3400 }
+      - { from: 117.69, to: 139.75, price_rub: 900000 }
+      - { from: 139.76, to: 161.81, price_rub: 952800 }
+      - { from: 161.82, to: 183.00, price_rub: 1010400 }
+      - { from: 183.01, to: 205.94, price_rub: 1142400 }
+      - { from: 205.95, to: 228.00, price_rub: 1291200 }
+      - { from: 228.01, to: 250.00, price_rub: 1459200 }
+      - { from: 250.01, to: 272.13, price_rub: 1663200 }
+      - { from: 272.14, to: 294.20, price_rub: 1896000 }
+      - { from: 294.21, to: 316.26, price_rub: 2160000 }
+      - { from: 316.27, to: 338.33, price_rub: 2464800 }
+      - { from: 338.34, to: 367.75, price_rub: 2808000 }
+      - { from: 367.76, to: 10000.00, price_rub: 3201600 }
+    hp:
+      - { from: 0,   to: 160,   price_rub: 3400 }
+      - { from: 161, to: 190,   price_rub: 900000 }
+      - { from: 191, to: 220,   price_rub: 952800 }
+      - { from: 221, to: 250,   price_rub: 1010400 }
+      - { from: 251, to: 280,   price_rub: 1142400 }
+      - { from: 281, to: 310,   price_rub: 1291200 }
+      - { from: 311, to: 340,   price_rub: 1459200 }
+      - { from: 341, to: 370,   price_rub: 1663200 }
+      - { from: 371, to: 400,   price_rub: 1896000 }
+      - { from: 401, to: 430,   price_rub: 2160000 }
+      - { from: 431, to: 460,   price_rub: 2464800 }
+      - { from: 461, to: 500,   price_rub: 2808000 }
+      - { from: 501, to: 10000, price_rub: 3201600 }
+
+  "2000-3000":
+    kw:
+      - { from: 0.00,   to: 117.68, price_rub: 3400 }
+      - { from: 117.69, to: 139.75, price_rub: 2306800 }
+      - { from: 139.76, to: 161.81, price_rub: 2364800 }
+      - { from: 161.82, to: 183.88, price_rub: 2402400 }
+      - { from: 183.89, to: 205.94, price_rub: 2520800 }
+      - { from: 205.95, to: 228.00, price_rub: 2620800 }
+      - { from: 228.01, to: 250.00, price_rub: 2726400 }
+      - { from: 250.01, to: 272.13, price_rub: 2834400 }
+      - { from: 272.14, to: 294.20, price_rub: 2949600 }
+      - { from: 294.21, to: 316.26, price_rub: 3067200 }
+      - { from: 316.27, to: 338.33, price_rub: 3189600 }
+      - { from: 338.34, to: 367.75, price_rub: 3316800 }
+      - { from: 367.76, to: 10000.00, price_rub: 3448800 }
+    hp:
+      - { from: 0,   to: 160,   price_rub: 3400 }
+      - { from: 161, to: 190,   price_rub: 2306800 }
+      - { from: 191, to: 220,   price_rub: 2364800 }
+      - { from: 221, to: 250,   price_rub: 2402400 }
+      - { from: 251, to: 280,   price_rub: 2520800 }
+      - { from: 281, to: 310,   price_rub: 2620800 }
+      - { from: 311, to: 340,   price_rub: 2726400 }
+      - { from: 341, to: 370,   price_rub: 2834400 }
+      - { from: 371, to: 400,   price_rub: 2949600 }
+      - { from: 401, to: 430,   price_rub: 3067200 }
+      - { from: 431, to: 460,   price_rub: 3189600 }
+      - { from: 461, to: 500,   price_rub: 3316800 }
+      - { from: 501, to: 10000, price_rub: 3448800 }
+
+  "3000-3500":
+    kw:
+      - { from: 0.00,   to: 51.48,  price_rub: 2584000 }
+      - { from: 51.49,  to: 73.55,  price_rub: 2584000 }
+      - { from: 73.56,  to: 95.61,  price_rub: 2584000 }
+      - { from: 95.62,  to: 117.68, price_rub: 2584000 }
+      - { from: 117.69, to: 139.75, price_rub: 2635200 }
+      - { from: 139.76, to: 161.81, price_rub: 2688000 }
+      - { from: 161.82, to: 183.88, price_rub: 2743200 }
+      - { from: 183.89, to: 205.94, price_rub: 2810400 }
+      - { from: 205.95, to: 228.00, price_rub: 2880000 }
+      - { from: 228.01, to: 250.00, price_rub: 3038400 }
+      - { from: 250.01, to: 272.13, price_rub: 3206400 }
+      - { from: 272.14, to: 294.20, price_rub: 3384000 }
+      - { from: 294.21, to: 316.26, price_rub: 3568800 }
+      - { from: 316.27, to: 338.33, price_rub: 3765600 }
+      - { from: 338.34, to: 367.75, price_rub: 3972000 }
+      - { from: 367.76, to: 10000.00, price_rub: 4190400 }
+    hp:
+      - { from: 0,   to: 70,    price_rub: 2584000 }
+      - { from: 71,  to: 100,   price_rub: 2584000 }
+      - { from: 101, to: 130,   price_rub: 2584000 }
+      - { from: 131, to: 160,   price_rub: 2584000 }
+      - { from: 161, to: 190,   price_rub: 2635200 }
+      - { from: 191, to: 220,   price_rub: 2688000 }
+      - { from: 221, to: 250,   price_rub: 2743200 }
+      - { from: 251, to: 280,   price_rub: 2810400 }
+      - { from: 281, to: 310,   price_rub: 2880000 }
+      - { from: 311, to: 340,   price_rub: 3038400 }
+      - { from: 341, to: 370,   price_rub: 3206400 }
+      - { from: 371, to: 400,   price_rub: 3384000 }
+      - { from: 401, to: 430,   price_rub: 3568800 }
+      - { from: 431, to: 460,   price_rub: 3765600 }
+      - { from: 461, to: 500,   price_rub: 3972000 }
+      - { from: 501, to: 10000, price_rub: 4190400 }
+
+  "3500-10000":
+    kw:
+      - { from: 0.00,   to: 51.48,  price_rub: 3290600 }
+      - { from: 51.49,  to: 73.55,  price_rub: 3290600 }
+      - { from: 73.56,  to: 95.61,  price_rub: 3290600 }
+      - { from: 95.62,  to: 117.68, price_rub: 3290600 }
+      - { from: 117.69, to: 139.75, price_rub: 3345600 }
+      - { from: 139.76, to: 161.81, price_rub: 3403200 }
+      - { from: 161.82, to: 183.88, price_rub: 3460800 }
+      - { from: 183.89, to: 205.94, price_rub: 3530400 }
+      - { from: 205.95, to: 228.00, price_rub: 3600000 }
+      - { from: 228.01, to: 250.00, price_rub: 3727200 }
+      - { from: 250.01, to: 272.13, price_rub: 3857600 }
+      - { from: 272.14, to: 294.20, price_rub: 3993600 }
+      - { from: 294.21, to: 316.26, price_rub: 4132800 }
+      - { from: 316.27, to: 338.33, price_rub: 4276800 }
+      - { from: 338.34, to: 367.75, price_rub: 4425600 }
+      - { from: 367.76, to: 10000.00, price_rub: 4581600 }
+    hp:
+      - { from: 0,   to: 70,    price_rub: 3290600 }
+      - { from: 71,  to: 100,   price_rub: 3290600 }
+      - { from: 101, to: 130,   price_rub: 3290600 }
+      - { from: 131, to: 160,   price_rub: 3290600 }
+      - { from: 161, to: 190,   price_rub: 3345600 }
+      - { from: 191, to: 220,   price_rub: 3403200 }
+      - { from: 221, to: 250,   price_rub: 3460800 }
+      - { from: 251, to: 280,   price_rub: 3530400 }
+      - { from: 281, to: 310,   price_rub: 3600000 }
+      - { from: 311, to: 340,   price_rub: 3727200 }
+      - { from: 341, to: 370,   price_rub: 3857600 }
+      - { from: 371, to: 400,   price_rub: 3993600 }
+      - { from: 401, to: 430,   price_rub: 4132800 }
+      - { from: 431, to: 460,   price_rub: 4276800 }
+      - { from: 461, to: 500,   price_rub: 4425600 }
+      - { from: 501, to: 10000, price_rub: 4581600 }

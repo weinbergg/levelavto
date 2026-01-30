@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from typing import Optional
+from pathlib import Path
+
+from .calculator_config_loader import load_runtime_payload
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from ..models import CalculatorConfig
@@ -37,12 +40,23 @@ class CalculatorConfigService:
         if self.latest():
             return self.latest()
         from .calculator_extractor import CalculatorExtractor
-        from pathlib import Path
         p = Path(path)
         if not p.exists():
             return None
         payload = CalculatorExtractor(p).extract()
         return self.create(payload=payload, source="bootstrap", comment=str(p))
+
+    def ensure_default_from_yaml(self, path) -> CalculatorConfig | None:
+        """Load calculator config from YAML and store as config source of truth."""
+        p = Path(path)
+        if not p.exists():
+            return None
+        payload = load_runtime_payload(p)
+        latest = self.latest()
+        payload_version = payload.get("meta", {}).get("version")
+        if latest and latest.source == "yaml" and latest.payload.get("meta", {}).get("version") == payload_version:
+            return latest
+        return self.create(payload=payload, source="yaml", comment=str(p))
 
     def all_versions(self, limit: int = 20) -> list[CalculatorConfig]:
         stmt = (

@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
+from .customs_config import get_customs_config, calc_duty_eur, calc_util_fee_rub
+
 
 @dataclass
 class EstimateRequest:
@@ -85,11 +87,15 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
         for k, v in rub_fields.items():
             breakdown.append({"title": k, "amount": v, "currency": "RUB"})
 
-        duty_rate = _find_range(cfg["duty_by_cc"], req.engine_cc, "from", "to", "eur_per_cc", None)
-        if duty_rate is None:
-            raise ValueError("duty rate not found for cc")
-        duty_rub = req.engine_cc * duty_rate * eur_rate
-        util_rub = _find_range(cfg["util_by_cc"], req.engine_cc, "from", "to", "rub", 0)
+        customs_cfg = get_customs_config()
+        duty_eur = calc_duty_eur(req.engine_cc, customs_cfg)
+        duty_rub = duty_eur * eur_rate
+        util_rub = calc_util_fee_rub(
+            engine_cc=req.engine_cc,
+            kw=req.power_kw,
+            hp=int(req.power_hp) if req.power_hp is not None else None,
+            cfg=customs_cfg,
+        )
 
         breakdown.append({"title": "Пошлина", "amount": duty_rub, "currency": "RUB"})
         breakdown.append({"title": "Утилизационный сбор", "amount": util_rub, "currency": "RUB"})
