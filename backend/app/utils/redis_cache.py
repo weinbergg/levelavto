@@ -3,6 +3,8 @@ import logging
 import os
 import time
 from typing import Any, Optional, Dict, Tuple
+from decimal import Decimal
+from datetime import date, datetime
 
 import redis
 
@@ -277,7 +279,13 @@ def redis_set_json(key: str, value: Any, ttl_sec: int) -> bool:
     if client is None:
         return False
     try:
-        client.setex(key, ttl_sec, json.dumps(value, ensure_ascii=False))
+        def _default(obj: Any):
+            if isinstance(obj, Decimal):
+                return float(obj)
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            return str(obj)
+        client.setex(key, ttl_sec, json.dumps(value, ensure_ascii=False, default=_default))
         return True
     except Exception as exc:
         msg = str(exc)
