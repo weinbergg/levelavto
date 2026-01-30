@@ -28,10 +28,15 @@ def _cache_path(url: str, width: int, fmt: str) -> str:
 
 @router.get("/thumb")
 def thumb(
-    u: str = Query(..., description="Source image URL"),
+    u: str | None = Query(None, description="Source image URL"),
+    url: str | None = Query(None, description="Source image URL (alias)"),
     w: int = Query(360, ge=120, le=1024),
     fmt: str = Query("webp", regex="^(webp|jpg|jpeg)$"),
 ):
+    if not u and url:
+        u = url
+    if not u:
+        raise HTTPException(status_code=400, detail="missing url")
     src = unquote(u)
     parsed = urlparse(src)
     if parsed.scheme not in {"http", "https"}:

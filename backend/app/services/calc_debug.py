@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..models.car import Car
 from ..services.cars_service import CarsService
 from ..services.calculator_config_service import CalculatorConfigService
-from ..services.calculator_runtime import EstimateRequest, calculate
+from ..services.calculator_runtime import EstimateRequest, calculate, is_bev
 
 
 def build_calc_debug(
@@ -54,9 +54,15 @@ def build_calc_debug(
             price_net_eur = float(car.price) / eur_rate_used
             price_source = "car.price_rub"
 
-    is_electric = False
-    if car.engine_type and "electric" in car.engine_type.lower():
-        is_electric = True
+    notes = []
+    is_electric = is_bev(
+        car.engine_cc,
+        float(car.power_kw) if car.power_kw is not None else None,
+        float(car.power_hp) if car.power_hp is not None else None,
+        car.engine_type,
+    )
+    if car.engine_type and "electric" in car.engine_type.lower() and car.engine_cc and car.engine_cc > 0:
+        notes.append("fuel_conflict: engine_type electric but engine_cc>0, treating as ICE/PHEV")
 
     req = EstimateRequest(
         scenario=scenario,
@@ -121,6 +127,7 @@ def build_calc_debug(
             "euro_rate_used": result.get("euro_rate_used"),
             "config_version": cfg.payload.get("meta", {}).get("version"),
         },
+        "notes": notes,
         "config": {
             "version": cfg.payload.get("meta", {}).get("version"),
             "source": cfg.source,

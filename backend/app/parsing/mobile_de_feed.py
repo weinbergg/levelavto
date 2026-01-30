@@ -52,10 +52,10 @@ class MobileDeFeedParser:
             return None
         if "diesel" in val:
             return "Diesel"
+        if "hybrid" in val or "plug-in" in val or "plug in" in val:
+            return "Hybrid"
         if "electric" in val or "ev" in val:
             return "Electric"
-        if "hybrid" in val:
-            return "Hybrid"
         if "petrol" in val or "benzin" in val or "gasoline" in val:
             return "Petrol"
         if "lpg" in val or "gas" in val:

@@ -41,9 +41,11 @@ def _age_months(row: CarRow) -> Optional[int]:
 
 
 def _is_electric(row: CarRow) -> bool:
-    if row.engine_type and "electric" in row.engine_type.lower():
-        return True
-    if row.engine_type and "ev" in row.engine_type.lower():
+    if row.engine_cc and row.engine_cc > 0:
+        return False
+    if not ((row.power_kw and row.power_kw > 0) or (row.power_hp and row.power_hp > 0)):
+        return False
+    if row.engine_type and ("electric" in row.engine_type.lower() or "ev" in row.engine_type.lower()):
         return True
     return False
 

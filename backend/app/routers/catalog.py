@@ -971,7 +971,7 @@ def filter_ctx_model(
     gens = [g for g in service.db.execute(stmt).scalars().all() if g]
     generations = _sort_by_label([{"value": g, "label": g} for g in gens])
     payload = {"generations": generations}
-    redis_set_json(cache_key, payload, ttl_sec=3600)
+    redis_set_json(cache_key, payload, ttl_sec=86400)
     if os.getenv("FILTER_CTX_DEBUG") == "1":
         total_ms = (time.perf_counter() - t0) * 1000
         print(f"FILTER_CTX_MODEL ms={total_ms:.2f} generations={len(generations)}", flush=True)

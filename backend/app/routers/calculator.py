@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from ..services.calculator import calculate_import_cost, get_eur_rate
 from ..services.calculator_config_service import CalculatorConfigService
+from ..services.calculator_runtime import is_bev
 from ..services.calculator_extractor import CalculatorExtractor
 from ..services.cars_service import CarsService
 from ..services.calc_debug import build_calc_debug
@@ -71,8 +72,12 @@ def calc_endpoint(payload: CalcRequest, db: Session = Depends(get_db)):
                 data["first_registration_year"] = getattr(car, "registration_year", None)
             if data.get("first_registration_month") is None and hasattr(car, "registration_month"):
                 data["first_registration_month"] = getattr(car, "registration_month", None)
-            if car.engine_type and "electric" in car.engine_type.lower():
-                is_electric = True
+            is_electric = is_bev(
+                car.engine_cc,
+                float(car.power_kw) if car.power_kw is not None else None,
+                float(car.power_hp) if car.power_hp is not None else None,
+                car.engine_type,
+            )
         data["is_electric"] = is_electric
 
         cfg_svc = CalculatorConfigService(db)

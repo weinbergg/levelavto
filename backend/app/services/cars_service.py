@@ -31,7 +31,7 @@ from ..utils.taxonomy import (
 )
 from ..utils.breakdown_labels import label_for
 from .calculator_config_service import CalculatorConfigService
-from .calculator_runtime import EstimateRequest, calculate
+from .calculator_runtime import EstimateRequest, calculate, is_bev
 
 BRAND_ALIASES = {
     "alfa": "Alfa Romeo",
@@ -1210,7 +1210,12 @@ class CarsService:
         if price_net_eur is None:
             return None
         engine_type = (car.engine_type or "").lower()
-        is_electric = "electric" in engine_type or "ev" in engine_type
+        is_electric = is_bev(
+            car.engine_cc,
+            float(car.power_kw) if car.power_kw is not None else None,
+            float(car.power_hp) if car.power_hp is not None else None,
+            car.engine_type,
+        )
         if is_electric and not (car.power_hp or car.power_kw):
             self.logger.info("calc_skip_no_power car=%s src=%s", car.id, getattr(car.source, "key", None))
             return None
