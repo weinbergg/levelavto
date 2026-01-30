@@ -14,7 +14,7 @@ def test_decimal_price_net_eur_does_not_crash():
         price_net_eur=Decimal("123.45"),
         eur_rate=91.28,
         engine_cc=1995,
-        power_hp=None,
+        power_hp=200,
         power_kw=None,
         is_electric=False,
         reg_year=2024,
