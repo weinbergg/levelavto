@@ -4,11 +4,11 @@ from typing import Dict, Any, List, Tuple
 
 from backend.app.db import SessionLocal
 from backend.app.services.cars_service import CarsService
-from backend.app.routers.catalog import filter_ctx_base, filter_ctx_brand, filter_ctx_model, list_cars, cars_count
+from backend.app.routers.catalog import filter_ctx_base, filter_ctx_brand, filter_ctx_model, list_cars
 from backend.app.utils.redis_cache import (
     redis_set_json,
     build_total_cars_key,
-    build_cars_count_key,
+    build_cars_count_simple_key,
     normalize_filter_params,
     normalize_count_params,
 )
@@ -92,8 +92,14 @@ def main() -> None:
         ]
         for params in count_keys:
             normalized = normalize_count_params(params)
-            count = cars_count(None, db=db, **normalized)
-            print(f"[prewarm] cars_count key={build_cars_count_key(normalized)} value={count.get('count')}")
+            count = service.count_cars(**normalized)
+            cache_key = build_cars_count_simple_key(
+                normalized.get("region"),
+                normalized.get("country"),
+                normalized.get("brand"),
+            )
+            redis_set_json(cache_key, int(count), ttl_sec=600)
+            print(f"[prewarm] cars_count key={cache_key} value={count}")
 
         list_tasks = [
             {"region": "EU"},
