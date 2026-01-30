@@ -97,6 +97,32 @@ def build_cars_count_key(params: Optional[Dict[str, Any]] = None) -> str:
     return f"cars_count:{items}"
 
 
+def build_cars_count_simple_key(region: Optional[str], country: Optional[str], brand: Optional[str]) -> str:
+    return "cars_count:{r}:{c}:{b}".format(
+        r=region or "all",
+        c=country or "all",
+        b=brand or "all",
+    )
+
+
+def build_cars_list_key(
+    region: Optional[str],
+    country: Optional[str],
+    brand: Optional[str],
+    sort: Optional[str],
+    page: int,
+    page_size: int,
+) -> str:
+    return "cars_list:{r}:{c}:{b}:{sort}:{page}:{size}".format(
+        r=region or "all",
+        c=country or "all",
+        b=brand or "all",
+        sort=sort or "none",
+        page=page,
+        size=page_size,
+    )
+
+
 def build_filter_payload_key(params: Optional[Dict[str, Any]] = None) -> str:
     if not params:
         return "filter_payload:all"
@@ -259,3 +285,19 @@ def redis_set_json(key: str, value: Any, ttl_sec: int) -> bool:
             _mark_redis_write_disabled(msg, seconds=300)
         logger.warning("redis set failed: %s", exc)
         return False
+
+
+def redis_delete_by_pattern(pattern: str) -> int:
+    client = get_redis()
+    if client is None:
+        return 0
+    deleted = 0
+    try:
+        for key in client.scan_iter(match=pattern, count=200):
+            try:
+                deleted += int(client.delete(key))
+            except Exception:
+                continue
+    except Exception as exc:
+        logger.warning("redis scan/delete failed: %s", exc)
+    return deleted

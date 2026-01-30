@@ -18,6 +18,8 @@ from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
 from ..utils.redis_cache import (
     redis_get_json,
     redis_set_json,
+    build_cars_list_key,
+    build_cars_count_simple_key,
     build_filter_payload_key,
     build_filter_ctx_base_key,
     build_filter_ctx_brand_key,
@@ -35,6 +37,111 @@ import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+TOP_BRANDS = [
+    "BMW",
+    "Mercedes-Benz",
+    "Audi",
+    "Volkswagen",
+    "Toyota",
+    "Ford",
+    "Renault",
+    "Hyundai",
+    "Kia",
+    "Skoda",
+    "Peugeot",
+    "Opel",
+]
+
+TOP_BRANDS_SET = {normalize_brand(b) for b in TOP_BRANDS}
+
+
+def _cacheable_catalog_filters(
+    *,
+    region: Optional[str],
+    country: Optional[str],
+    brand: Optional[str],
+    model: Optional[str],
+    generation: Optional[str],
+    color: Optional[str],
+    body_type: Optional[str],
+    engine_type: Optional[str],
+    transmission: Optional[str],
+    drive_type: Optional[str],
+    price_min: Optional[float],
+    price_max: Optional[float],
+    power_hp_min: Optional[float],
+    power_hp_max: Optional[float],
+    engine_cc_min: Optional[int],
+    engine_cc_max: Optional[int],
+    year_min: Optional[int],
+    year_max: Optional[int],
+    mileage_min: Optional[int],
+    mileage_max: Optional[int],
+    kr_type: Optional[str],
+    reg_year_min: Optional[int],
+    reg_month_min: Optional[int],
+    reg_year_max: Optional[int],
+    reg_month_max: Optional[int],
+    condition: Optional[str],
+    q: Optional[str],
+    line: Optional[List[str]],
+    source: Optional[str | List[str]],
+    num_seats: Optional[str],
+    doors_count: Optional[str],
+    emission_class: Optional[str],
+    efficiency_class: Optional[str],
+    climatisation: Optional[str],
+    airbags: Optional[str],
+    interior_design: Optional[str],
+    air_suspension: Optional[bool],
+    price_rating_label: Optional[str],
+    owners_count: Optional[str],
+) -> bool:
+    if any(
+        [
+            model,
+            generation,
+            color,
+            body_type,
+            engine_type,
+            transmission,
+            drive_type,
+            price_min is not None,
+            price_max is not None,
+            power_hp_min is not None,
+            power_hp_max is not None,
+            engine_cc_min is not None,
+            engine_cc_max is not None,
+            year_min is not None,
+            year_max is not None,
+            mileage_min is not None,
+            mileage_max is not None,
+            kr_type,
+            reg_year_min is not None,
+            reg_month_min is not None,
+            reg_year_max is not None,
+            reg_month_max is not None,
+            condition,
+            q,
+            line,
+            source,
+            num_seats,
+            doors_count,
+            emission_class,
+            efficiency_class,
+            climatisation,
+            airbags,
+            interior_design,
+            air_suspension is True,
+            price_rating_label,
+            owners_count,
+        ]
+    ):
+        return False
+    if brand and normalize_brand(brand) not in TOP_BRANDS_SET:
+        return False
+    return True
 
 
 def _sort_by_label(items: list[dict]) -> list[dict]:
@@ -145,6 +252,62 @@ def list_cars(
         brand=brand,
         model=model,
     )
+    cache_ok = _cacheable_catalog_filters(
+        region=canon.get("region"),
+        country=canon.get("country"),
+        brand=canon.get("brand"),
+        model=model,
+        generation=generation,
+        color=color,
+        body_type=body_type,
+        engine_type=engine_type,
+        transmission=transmission,
+        drive_type=drive_type,
+        price_min=price_min,
+        price_max=price_max,
+        power_hp_min=power_hp_min,
+        power_hp_max=power_hp_max,
+        engine_cc_min=engine_cc_min,
+        engine_cc_max=engine_cc_max,
+        year_min=year_min,
+        year_max=year_max,
+        mileage_min=mileage_min,
+        mileage_max=mileage_max,
+        kr_type=canon.get("kr_type"),
+        reg_year_min=reg_year_min,
+        reg_month_min=reg_month_min,
+        reg_year_max=reg_year_max,
+        reg_month_max=reg_month_max,
+        condition=condition,
+        q=q,
+        line=line,
+        source=source,
+        num_seats=num_seats,
+        doors_count=doors_count,
+        emission_class=emission_class,
+        efficiency_class=efficiency_class,
+        climatisation=climatisation,
+        airbags=airbags,
+        interior_design=interior_design,
+        air_suspension=air_suspension,
+        price_rating_label=price_rating_label,
+        owners_count=owners_count,
+    )
+    cache_key = None
+    if cache_ok:
+        cache_key = build_cars_list_key(
+            canon.get("region"),
+            canon.get("country"),
+            canon.get("brand"),
+            sort,
+            page,
+            page_size,
+        )
+        cached = redis_get_json(cache_key)
+        if cached is not None:
+            print("CARS_LIST_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
+            return cached
+        print("CARS_LIST_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
     if os.getenv("FILTERS_CANON") == "1":
         print(
             "FILTERS_CANON cars_count "
@@ -300,12 +463,15 @@ def list_cars(
             ),
             flush=True,
         )
-    return {
+    resp = {
         "items": payload_items,
         "total": total,
         "page": page,
         "page_size": page_size,
     }
+    if cache_ok and cache_key:
+        redis_set_json(cache_key, resp, ttl_sec=300)
+    return resp
 
 
 @router.get("/cars_count")
@@ -372,12 +538,59 @@ def cars_count(
         "condition": condition,
     }
     normalized = normalize_count_params(params)
-    cache_key = build_cars_count_key(normalized)
-    cached = redis_get_json(cache_key)
-    if cached is not None:
-        print("CARS_COUNT_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
-        return {"count": int(cached)}
-    print("CARS_COUNT_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
+    cache_ok = _cacheable_catalog_filters(
+        region=canon.get("region"),
+        country=canon.get("country"),
+        brand=canon.get("brand"),
+        model=model,
+        generation=None,
+        color=color,
+        body_type=body_type,
+        engine_type=engine_type,
+        transmission=transmission,
+        drive_type=drive_type,
+        price_min=price_min,
+        price_max=price_max,
+        power_hp_min=power_hp_min,
+        power_hp_max=power_hp_max,
+        engine_cc_min=engine_cc_min,
+        engine_cc_max=engine_cc_max,
+        year_min=year_min,
+        year_max=year_max,
+        mileage_min=mileage_min,
+        mileage_max=mileage_max,
+        kr_type=canon.get("kr_type"),
+        reg_year_min=reg_year_min,
+        reg_month_min=None,
+        reg_year_max=reg_year_max,
+        reg_month_max=None,
+        condition=condition,
+        q=None,
+        line=None,
+        source=None,
+        num_seats=None,
+        doors_count=None,
+        emission_class=None,
+        efficiency_class=None,
+        climatisation=None,
+        airbags=None,
+        interior_design=None,
+        air_suspension=None,
+        price_rating_label=None,
+        owners_count=None,
+    )
+    cache_key = None
+    if cache_ok:
+        cache_key = build_cars_count_simple_key(
+            canon.get("region"),
+            canon.get("country"),
+            canon.get("brand"),
+        )
+        cached = redis_get_json(cache_key)
+        if cached is not None:
+            print("CARS_COUNT_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
+            return {"count": int(cached)}
+        print("CARS_COUNT_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
     total = service.count_cars(
         region=canon.get("region"),
         country=canon.get("country"),
@@ -403,7 +616,8 @@ def cars_count(
         reg_year_max=reg_year_max,
         condition=condition,
     )
-    redis_set_json(cache_key, int(total), ttl_sec=600)
+    if cache_ok and cache_key:
+        redis_set_json(cache_key, int(total), ttl_sec=600)
     return {"count": int(total)}
 
 

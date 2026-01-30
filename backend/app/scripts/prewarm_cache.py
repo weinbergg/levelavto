@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Tuple
 
 from backend.app.db import SessionLocal
 from backend.app.services.cars_service import CarsService
-from backend.app.routers.catalog import filter_ctx_base, filter_ctx_brand, filter_ctx_model
+from backend.app.routers.catalog import filter_ctx_base, filter_ctx_brand, filter_ctx_model, list_cars, cars_count
 from backend.app.utils.redis_cache import (
     redis_set_json,
     build_total_cars_key,
@@ -69,6 +69,7 @@ def main() -> None:
             print(f"[prewarm] filter_ctx_base key={key} ms={ms:.2f}")
         brand_tasks = [
             {"region": "EU", "country": "DE", "brand": "BMW"},
+            {"region": "EU", "country": "DE", "brand": "Mercedes-Benz"},
             {"region": "EU", "country": "AT", "brand": "Cadillac"},
         ]
         for params in brand_tasks:
@@ -84,17 +85,42 @@ def main() -> None:
         redis_set_json(build_total_cars_key(), total, ttl_sec=600)
         print(f"[prewarm] total_cars={total}")
         count_keys = [
-            {},
             {"region": "EU"},
-            {"region": "EU", "country": "DE"},
             {"region": "KR"},
+            {"region": "EU", "country": "DE"},
+            {"region": "EU", "country": "AT"},
         ]
         for params in count_keys:
             normalized = normalize_count_params(params)
-            count = service.count_cars(**normalized)
-            count_key = build_cars_count_key(normalized)
-            redis_set_json(count_key, int(count), ttl_sec=600)
-            print(f"[prewarm] cars_count key={count_key} value={count}")
+            count = cars_count(None, db=db, **normalized)
+            print(f"[prewarm] cars_count key={build_cars_count_key(normalized)} value={count.get('count')}")
+
+        list_tasks = [
+            {"region": "EU"},
+            {"region": "KR"},
+            {"region": "EU", "country": "DE"},
+            {"region": "EU", "country": "AT"},
+        ]
+        for params in list_tasks:
+            list_cars(
+                None,
+                db=db,
+                page=1,
+                page_size=12,
+                sort=None,
+                **params,
+            )
+            print(f"[prewarm] cars_list region={params.get('region')} country={params.get('country')}")
+        for params in brand_tasks:
+            list_cars(
+                None,
+                db=db,
+                page=1,
+                page_size=12,
+                sort=None,
+                **params,
+            )
+            print(f"[prewarm] cars_list brand={params.get('brand')} region={params.get('region')} country={params.get('country')}")
     print(f"[prewarm] done in {(time.perf_counter()-started)*1000:.2f} ms")
 
 

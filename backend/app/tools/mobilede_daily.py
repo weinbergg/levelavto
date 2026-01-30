@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import requests
+from backend.app.utils.redis_cache import redis_delete_by_pattern
 
 
 HOST = os.getenv("MOBILEDE_HOST", "https://parsers1-valdez.auto-parser.ru")
@@ -151,6 +152,11 @@ def main() -> None:
         run_import(target, trigger="auto-daily", limit=args.limit, allow_deactivate=args.allow_deactivate)
         if not args.skip_cache:
             update_price_cache()
+        deleted = 0
+        deleted += redis_delete_by_pattern("cars_count:*")
+        deleted += redis_delete_by_pattern("cars_list:*")
+        deleted += redis_delete_by_pattern("filter_ctx_*")
+        print(f"[mobilede_daily] redis invalidated keys={deleted}")
         if not KEEP_CSV:
             try:
                 target.unlink()
