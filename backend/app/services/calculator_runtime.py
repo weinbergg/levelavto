@@ -202,7 +202,8 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
 
         customs_cfg = get_customs_config()
         duty_rub = Decimal("0")
-        if cfg.get("duty_enabled", True):
+        # железобетонно: under_3 НИКОГДА не включает пошлину РФ
+        if scenario_key != "under_3" and cfg.get("duty_enabled", True):
             duty_eur = calc_duty_eur(req.engine_cc, customs_cfg)
             duty_rub = Decimal(str(duty_eur)) * eur_rate
 
