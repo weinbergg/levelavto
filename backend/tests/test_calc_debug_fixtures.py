@@ -16,7 +16,8 @@ payload = load_runtime_payload(CFG_PATH)
 
 
 def _ceil_rub(x: Decimal) -> Decimal:
-    return x.quantize(Decimal("1"), rounding=ROUND_CEILING)
+    step = Decimal("100000")
+    return (x / step).to_integral_value(rounding=ROUND_CEILING) * step
 
 
 def _step_map(steps):

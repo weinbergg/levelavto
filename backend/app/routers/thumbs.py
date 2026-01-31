@@ -4,6 +4,7 @@ import hashlib
 import io
 import os
 import subprocess
+import time
 import uuid
 from urllib.parse import urlparse, unquote
 
@@ -16,6 +17,8 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _ALLOWED_HOSTS = {"img.classistatic.de"}
+_LOCK_TTL_SEC = 30
+_CACHE_TTL_SEC = 7 * 24 * 3600
 
 
 def _cache_dir() -> str:
@@ -27,6 +30,17 @@ def _cache_dir() -> str:
 def _cache_path(url: str, width: int, fmt: str) -> str:
     key = hashlib.sha1(f"{url}|{width}|{fmt}".encode("utf-8")).hexdigest()
     return os.path.join(_cache_dir(), f"{key}.{fmt}")
+
+
+def _meta_path(path: str) -> str:
+    return f"{path}.meta"
+
+
+def _is_fresh(path: str, ttl: int) -> bool:
+    try:
+        return (time.time() - os.path.getmtime(path)) <= ttl
+    except FileNotFoundError:
+        return False
 
 
 def _normalize_source_url(u: str | None, url: str | None) -> str:
@@ -92,6 +106,39 @@ def _fetch_with_curl(src: str, dest: str, max_bytes: int) -> int:
     return code
 
 
+def _placeholder_response() -> FileResponse:
+    path = "/app/backend/app/static/img/no-photo.svg"
+    return FileResponse(
+        path,
+        media_type="image/svg+xml",
+        headers={
+            "Cache-Control": "public, max-age=604800",
+        },
+    )
+
+
+def _acquire_lock(path: str) -> bool:
+    lock_path = f"{path}.lock"
+    now = time.time()
+    try:
+        if os.path.exists(lock_path) and now - os.path.getmtime(lock_path) < _LOCK_TTL_SEC:
+            return False
+        with open(lock_path, "w") as f:
+            f.write(str(now))
+        return True
+    except Exception:
+        return False
+
+
+def _release_lock(path: str) -> None:
+    lock_path = f"{path}.lock"
+    try:
+        if os.path.exists(lock_path):
+            os.remove(lock_path)
+    except Exception:
+        pass
+
+
 @router.get("/thumb")
 def thumb(
     u: str | None = Query(None, description="Source image URL"),
@@ -105,23 +152,32 @@ def thumb(
     path = _cache_path(src, w, fmt)
     media_type = "image/webp" if fmt == "webp" else "image/jpeg"
     if os.path.exists(path):
+        # stale-while-revalidate: serve cached even if stale, refresh in background on next request
         return FileResponse(
             path,
             media_type=media_type,
             headers={
-                "Cache-Control": "public, max-age=604800",
+                "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
                 "ETag": os.path.basename(path),
             },
         )
 
+    if not _acquire_lock(path):
+        # another worker is fetching; return placeholder to avoid stampede
+        logger.info("thumb_lock_busy url=%s", src)
+        return _placeholder_response()
+
     tmp_fetch = os.path.join(_cache_dir(), f".fetch-{uuid.uuid4().hex}")
     code = _fetch_with_curl(src, tmp_fetch, max_bytes=2_000_000)
     if code in (404, 410):
-        raise HTTPException(status_code=404, detail="upstream not found")
+        _release_lock(path)
+        return _placeholder_response()
     if code == 413:
+        _release_lock(path)
         raise HTTPException(status_code=413, detail="upstream too large")
     if code != 200:
-        raise HTTPException(status_code=502, detail="upstream fetch failed")
+        _release_lock(path)
+        return _placeholder_response()
 
     try:
         with open(tmp_fetch, "rb") as handle:
@@ -134,20 +190,28 @@ def thumb(
         save_fmt = "JPEG" if fmt == "jpg" else fmt.upper()
         img.save(tmp_path, format=save_fmt, quality=80, method=6)
         os.replace(tmp_path, path)
+        # touch meta for freshness
+        try:
+            with open(_meta_path(path), "w") as mh:
+                mh.write(str(time.time()))
+        except Exception:
+            pass
     except Exception:
-        raise HTTPException(status_code=500, detail="thumb processing failed")
+        _release_lock(path)
+        return _placeholder_response()
     finally:
         try:
             if os.path.exists(tmp_fetch):
                 os.remove(tmp_fetch)
         except Exception:
             pass
+        _release_lock(path)
 
     return FileResponse(
         path,
         media_type=media_type,
         headers={
-            "Cache-Control": "public, max-age=604800",
+            "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
             "ETag": os.path.basename(path),
         },
     )

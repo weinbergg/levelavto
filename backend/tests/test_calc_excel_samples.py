@@ -13,7 +13,8 @@ payload = load_runtime_payload(CFG_PATH)
 
 
 def _ceil_rub(x: float) -> float:
-    return float(math.ceil(x)) if not float(x).is_integer() else float(x)
+    step = 100000.0
+    return float(math.ceil(float(x) / step) * step)
 
 
 def _calc_under3_expected(net_eur: float, eur_rate: float, engine_cc: int, hp: float) -> float:

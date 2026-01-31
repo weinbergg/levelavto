@@ -3,14 +3,17 @@ from __future__ import annotations
 import argparse
 import base64
 import datetime as dt
+import json
 import os
 import subprocess
 import shutil
 import sys
+import time
 from pathlib import Path
 
 import requests
-from backend.app.utils.redis_cache import redis_delete_by_pattern
+from backend.app.utils.redis_cache import redis_delete_by_pattern, bump_dataset_version
+from backend.app.utils.telegram import format_daily_report, send_telegram_message
 
 
 HOST = os.getenv("MOBILEDE_HOST", "https://parsers1-valdez.auto-parser.ru")
@@ -63,6 +66,7 @@ def run_import(
     trigger: str = "auto-daily",
     limit: int | None = None,
     allow_deactivate: bool = False,
+    stats_file: Path | None = None,
 ) -> None:
     cmd = [
         sys.executable,
@@ -73,6 +77,8 @@ def run_import(
         "--trigger",
         trigger,
     ]
+    if stats_file:
+        cmd += ["--stats-file", str(stats_file)]
     if not allow_deactivate:
         cmd.append("--skip-deactivate")
     if limit:
@@ -142,6 +148,7 @@ def main() -> None:
         run_date = dt.datetime.strptime(args.date, "%Y-%m-%d").date()
     else:
         run_date = dt.datetime.utcnow().date()
+    started_ts = time.time()
 
     target = DOWNLOAD_DIR / f"mobilede_active_offers_{run_date:%Y-%m-%d}.csv"
     download_file(run_date, target)
@@ -149,19 +156,77 @@ def main() -> None:
         rotate_backups(DOWNLOAD_DIR, keep=args.keep)
 
     if not args.skip_import:
-        run_import(target, trigger="auto-daily", limit=args.limit, allow_deactivate=args.allow_deactivate)
+        stats_file = DOWNLOAD_DIR / "mobilede_import_stats.json"
+        run_import(
+            target,
+            trigger="auto-daily",
+            limit=args.limit,
+            allow_deactivate=args.allow_deactivate,
+            stats_file=stats_file,
+        )
         if not args.skip_cache:
             update_price_cache()
         deleted = 0
         deleted += redis_delete_by_pattern("cars_count:*")
         deleted += redis_delete_by_pattern("cars_list:*")
         deleted += redis_delete_by_pattern("filter_ctx_*")
-        print(f"[mobilede_daily] redis invalidated keys={deleted}")
+        new_ver = bump_dataset_version()
+        print(f"[mobilede_daily] redis invalidated keys={deleted} dataset_version={new_ver}")
         if not KEEP_CSV:
             try:
                 target.unlink()
             except OSError:
                 pass
+        # Telegram report (optional)
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        if token and chat_id:
+            stats = {}
+            try:
+                if stats_file.exists():
+                    stats = json.loads(stats_file.read_text(encoding="utf-8"))
+            except Exception:
+                stats = {}
+            try:
+                from backend.app.db import SessionLocal
+                from backend.app.models import Car, Source
+                from sqlalchemy import func
+
+                with SessionLocal() as db:
+                    total_active = db.query(func.count(Car.id)).filter(Car.is_available.is_(True)).scalar() or 0
+                    rows = (
+                        db.query(Source.key, func.count(Car.id))
+                        .join(Car, Car.source_id == Source.id)
+                        .filter(Car.is_available.is_(True))
+                        .group_by(Source.key)
+                        .all()
+                    )
+                    by_source = {k or "unknown": int(v) for k, v in rows}
+            except Exception:
+                total_active = 0
+                by_source = {}
+            try:
+                from backend.app.services.cars_service import CarsService
+
+                with SessionLocal() as db:
+                    rates = CarsService(db).get_fx_rates() or {}
+            except Exception:
+                rates = {}
+            report_payload = {
+                "dataset_version": new_ver,
+                "eur_rate": rates.get("EUR"),
+                "usd_rate": rates.get("USD"),
+                "import_stats": stats if isinstance(stats, dict) else {},
+                "totals": {"active_total": total_active},
+                "by_source": by_source,
+                "elapsed_sec": int(time.time() - started_ts),
+            }
+            msg = format_daily_report(report_payload)
+            ok = send_telegram_message(token, chat_id, msg)
+            if not ok:
+                print("[mobilede_daily] telegram send failed")
+        else:
+            print("[mobilede_daily] telegram disabled (missing TELEGRAM_BOT_TOKEN/CHAT_ID)")
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ _redis_client: Optional[redis.Redis] = None
 _redis_disabled_until: float = 0.0
 _redis_write_disabled_until: float = 0.0
 _redis_write_disabled_reason: Optional[str] = None
+_dataset_version_cache: Optional[Tuple[str, float]] = None
 
 
 def _now() -> float:
@@ -59,6 +60,38 @@ def get_redis() -> Optional[redis.Redis]:
     return _redis_client
 
 
+def _dataset_version() -> str:
+    global _dataset_version_cache
+    env_ver = os.getenv("DATASET_VERSION")
+    if env_ver:
+        return str(env_ver)
+    now = _now()
+    if _dataset_version_cache and now - _dataset_version_cache[1] < 10:
+        return _dataset_version_cache[0]
+    ver = "0"
+    r = get_redis()
+    if r is not None:
+        try:
+            val = r.get("dataset_version")
+            if val:
+                ver = str(val)
+        except Exception:
+            ver = "0"
+    _dataset_version_cache = (ver, now)
+    return ver
+
+
+def bump_dataset_version() -> str:
+    ver = str(int(_now()))
+    r = get_redis()
+    if r is not None:
+        try:
+            r.set("dataset_version", ver)
+        except Exception:
+            pass
+    return ver
+
+
 def build_filter_ctx_key(params: Optional[Dict[str, Any]], include_payload: bool) -> str:
     if not params:
         key = ("home", include_payload)
@@ -76,7 +109,7 @@ def build_filter_ctx_key(params: Optional[Dict[str, Any]], include_payload: bool
             str(params.get("reg_year") or ""),
             include_payload,
         )
-    return f"filter_ctx:{key}"
+    return f"filter_ctx:{key}:v{_dataset_version()}"
 
 
 def build_total_cars_key(params: Optional[Dict[str, Any]] = None) -> str:
@@ -93,17 +126,18 @@ def build_total_cars_key(params: Optional[Dict[str, Any]] = None) -> str:
 
 def build_cars_count_key(params: Optional[Dict[str, Any]] = None) -> str:
     if not params:
-        return "cars_count:all"
+        return f"cars_count:all:v{_dataset_version()}"
     cleaned = normalize_count_params(params)
     items = tuple(sorted((str(k), str(v)) for k, v in cleaned.items()))
-    return f"cars_count:{items}"
+    return f"cars_count:{items}:v{_dataset_version()}"
 
 
 def build_cars_count_simple_key(region: Optional[str], country: Optional[str], brand: Optional[str]) -> str:
-    return "cars_count:{r}:{c}:{b}".format(
+    return "cars_count:{r}:{c}:{b}:v{v}".format(
         r=region or "all",
         c=country or "all",
         b=brand or "all",
+        v=_dataset_version(),
     )
 
 
@@ -115,13 +149,14 @@ def build_cars_list_key(
     page: int,
     page_size: int,
 ) -> str:
-    return "cars_list:{r}:{c}:{b}:{sort}:{page}:{size}".format(
+    return "cars_list:{r}:{c}:{b}:{sort}:{page}:{size}:v{v}".format(
         r=region or "all",
         c=country or "all",
         b=brand or "all",
         sort=sort or "none",
         page=page,
         size=page_size,
+        v=_dataset_version(),
     )
 
 
@@ -139,29 +174,29 @@ def build_filter_payload_key(params: Optional[Dict[str, Any]] = None) -> str:
 
 def build_filter_ctx_base_key(params: Optional[Dict[str, Any]] = None) -> str:
     if not params:
-        return "filter_ctx_base:all"
+        return f"filter_ctx_base:all:v{_dataset_version()}"
     key = (
         str(params.get("region") or ""),
         str(params.get("country") or ""),
     )
-    return f"filter_ctx_base:{key}"
+    return f"filter_ctx_base:{key}:v{_dataset_version()}"
 
 
 def build_filter_ctx_brand_key(params: Optional[Dict[str, Any]] = None) -> str:
     if not params:
-        return "filter_ctx_brand:all"
+        return f"filter_ctx_brand:all:v{_dataset_version()}"
     key = (
         str(params.get("region") or ""),
         str(params.get("country") or ""),
         str(params.get("kr_type") or ""),
         str(params.get("brand") or ""),
     )
-    return f"filter_ctx_brand:{key}"
+    return f"filter_ctx_brand:{key}:v{_dataset_version()}"
 
 
 def build_filter_ctx_model_key(params: Optional[Dict[str, Any]] = None) -> str:
     if not params:
-        return "filter_ctx_model:all"
+        return f"filter_ctx_model:all:v{_dataset_version()}"
     key = (
         str(params.get("region") or ""),
         str(params.get("country") or ""),
@@ -169,7 +204,7 @@ def build_filter_ctx_model_key(params: Optional[Dict[str, Any]] = None) -> str:
         str(params.get("brand") or ""),
         str(params.get("model") or ""),
     )
-    return f"filter_ctx_model:{key}"
+    return f"filter_ctx_model:{key}:v{_dataset_version()}"
 
 
 def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

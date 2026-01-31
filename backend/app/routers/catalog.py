@@ -10,10 +10,8 @@ from ..utils.taxonomy import (
     ru_fuel,
     ru_transmission,
     color_hex,
-    normalize_color,
-    ru_color,
-    is_color_base,
 )
+from ..utils.color_groups import normalize_color_group, color_group_label
 from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
 from ..utils.redis_cache import (
     redis_get_json,
@@ -470,7 +468,7 @@ def list_cars(
         "page_size": page_size,
     }
     if cache_ok and cache_key:
-        redis_set_json(cache_key, resp, ttl_sec=300)
+        redis_set_json(cache_key, resp, ttl_sec=900)
     return resp
 
 
@@ -617,7 +615,7 @@ def cars_count(
         condition=condition,
     )
     if cache_ok and cache_key:
-        redis_set_json(cache_key, int(total), ttl_sec=600)
+        redis_set_json(cache_key, int(total), ttl_sec=1200)
     return {"count": int(total)}
 
 
@@ -710,23 +708,25 @@ def filter_options(
 
 
 def _split_colors(raw_colors: List[dict]) -> tuple[list[dict], list[dict]]:
-    normalized = []
+    buckets: dict[str, int] = {}
     for c in raw_colors:
         value = (c.get("value") or "").strip()
         if not value:
             continue
-        norm = normalize_color(value) or value
-        label = ru_color(norm) or value
-        hex_value = color_hex(norm)
-        normalized.append({"value": norm, "label": label, "hex": hex_value, "count": c.get("count", 0)})
+        group = normalize_color_group(value)
+        buckets[group] = buckets.get(group, 0) + int(c.get("count", 0) or 0)
     basic: list[dict] = []
-    other: list[dict] = []
-    for c in normalized:
-        if is_color_base(c["value"]):
-            basic.append(c)
-        else:
-            other.append(c)
-    return basic, other
+    for key, cnt in buckets.items():
+        basic.append(
+            {
+                "value": key,
+                "label": color_group_label(key),
+                "hex": color_hex(key),
+                "count": cnt,
+            }
+        )
+    basic.sort(key=lambda x: (-x["count"], x["label"]))
+    return basic, []
 
 
 @router.get("/filter_ctx_base")
@@ -834,7 +834,7 @@ def filter_ctx_base(
         "reg_years": reg_years,
         "reg_months": [{"value": i + 1, "label": m} for i, m in enumerate(["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"])],
     }
-    redis_set_json(cache_key, payload, ttl_sec=21600)
+    redis_set_json(cache_key, payload, ttl_sec=86400)
     if os.getenv("FILTER_CTX_DEBUG") == "1":
         total_ms = (time.perf_counter() - t0) * 1000
         print(
@@ -909,7 +909,7 @@ def filter_ctx_brand(
         brand=brand_norm,
     )
     payload = {"models": models}
-    redis_set_json(cache_key, payload, ttl_sec=21600)
+    redis_set_json(cache_key, payload, ttl_sec=86400)
     if os.getenv("FILTER_CTX_DEBUG") == "1":
         total_ms = (time.perf_counter() - t0) * 1000
         print(f"FILTER_CTX_BRAND ms={total_ms:.2f} models={len(models)}", flush=True)

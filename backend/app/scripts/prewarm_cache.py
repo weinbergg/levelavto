@@ -57,6 +57,7 @@ def _prewarm_model(db, params: Dict[str, Any]) -> Tuple[str, float]:
 
 def main() -> None:
     started = time.perf_counter()
+    max_sec = float(os.getenv("PREWARM_MAX_SEC", "0") or 0)
     if not redis_set_json("prewarm_ping", {"ok": True}, ttl_sec=60):
         print("[prewarm] redis unavailable or write-disabled")
         raise SystemExit(2)
@@ -71,6 +72,9 @@ def main() -> None:
         if os.getenv("INCLUDE_RU_PREWARM") == "1":
             base_tasks.append({"region": "RU"})
         for params in base_tasks:
+            if max_sec and (time.perf_counter() - started) > max_sec:
+                print("[prewarm] max runtime reached, stop base tasks")
+                break
             key, ms = _prewarm_base(db, params)
             print(f"[prewarm] filter_ctx_base key={key} ms={ms:.2f}")
         eu_countries = ["DE", "AT", "NL", "BE", "FR", "IT", "ES"]
@@ -79,12 +83,18 @@ def main() -> None:
             brand_tasks.append({"region": "EU", "country": "DE", "brand": b})
         brand_tasks.append({"region": "EU", "country": "AT", "brand": "Cadillac"})
         for params in brand_tasks:
+            if max_sec and (time.perf_counter() - started) > max_sec:
+                print("[prewarm] max runtime reached, stop brand tasks")
+                break
             key, ms = _prewarm_brand(db, params)
             print(f"[prewarm] filter_ctx_brand key={key} ms={ms:.2f}")
         model_tasks = [
             {"region": "EU", "country": "DE", "brand": "BMW", "model": "X5"},
         ]
         for params in model_tasks:
+            if max_sec and (time.perf_counter() - started) > max_sec:
+                print("[prewarm] max runtime reached, stop model tasks")
+                break
             key, ms = _prewarm_model(db, params)
             print(f"[prewarm] filter_ctx_model key={key} ms={ms:.2f}")
         total = service.total_cars()
@@ -98,6 +108,9 @@ def main() -> None:
             count_keys.append({"region": "EU", "country": c})
         count_keys.append({"region": "EU", "country": "AT"})
         for params in count_keys:
+            if max_sec and (time.perf_counter() - started) > max_sec:
+                print("[prewarm] max runtime reached, stop count prewarm")
+                break
             normalized = normalize_count_params(params)
             count = service.count_cars(**normalized)
             cache_key = build_cars_count_simple_key(
@@ -164,9 +177,15 @@ def main() -> None:
             {"region": "EU", "country": "AT"},
         ]
         for params in list_tasks:
+            if max_sec and (time.perf_counter() - started) > max_sec:
+                print("[prewarm] max runtime reached, stop list prewarm")
+                break
             _prewarm_list(params)
             print(f"[prewarm] cars_list region={params.get('region')} country={params.get('country')}")
         for params in brand_tasks:
+            if max_sec and (time.perf_counter() - started) > max_sec:
+                print("[prewarm] max runtime reached, stop brand list prewarm")
+                break
             _prewarm_list(params)
             print(f"[prewarm] cars_list brand={params.get('brand')} region={params.get('region')} country={params.get('country')}")
     print(f"[prewarm] done in {(time.perf_counter()-started)*1000:.2f} ms")

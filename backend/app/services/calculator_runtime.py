@@ -74,8 +74,10 @@ def choose_scenario(req: EstimateRequest, payload: Dict[str, Any]) -> str:
 def _ceil_rub(value: float) -> float:
     if value is None:
         return value
-    # округляем только финальный итог: ceil до рубля
-    return float(Decimal(str(value)).quantize(Decimal("1"), rounding=ROUND_CEILING))
+    # округляем только финальный итог: вверх до 100 000 рублей
+    v = Decimal(str(value))
+    step = Decimal("100000")
+    return float((v / step).to_integral_value(rounding=ROUND_CEILING) * step)
 
 
 def _percent_fixed(amount: Decimal, cfg: Dict[str, Any]) -> Decimal:

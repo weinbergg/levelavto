@@ -23,3 +23,13 @@ def test_normalize_source_url_rejects_scheme():
 def test_normalize_source_url_rejects_host():
     with pytest.raises(HTTPException):
         thumbs._normalize_source_url("https://example.com/x.jpg", None)
+
+
+def test_lock_acquire_and_busy(tmp_path, monkeypatch):
+    monkeypatch.setenv("THUMB_CACHE_DIR", str(tmp_path))
+    src = "https://img.classistatic.de/api/v1/mo-prod/images/aa/aa.jpg?rule=mo-1024.jpg"
+    path = thumbs._cache_path(src, 360, "webp")
+    assert thumbs._acquire_lock(path) is True
+    # second acquire should be blocked while lock is fresh
+    assert thumbs._acquire_lock(path) is False
+    thumbs._release_lock(path)

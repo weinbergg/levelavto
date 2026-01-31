@@ -68,7 +68,7 @@ def _get_cars_count(service: CarsService, params: Dict[str, Any], timing_enabled
         print(f"CARS_COUNT_CACHE hit=0 source=fallback key={cache_key}", flush=True)
     total = service.count_cars(**normalized)
     _TOTAL_CARS_CACHE[cache_key] = int(total)
-    redis_set_json(cache_key, int(total), ttl_sec=600)
+    redis_set_json(cache_key, int(total), ttl_sec=1200)
     return int(total)
 RECOMMENDED_PLACEMENT = "recommended"
 MONTHS_RU = [
