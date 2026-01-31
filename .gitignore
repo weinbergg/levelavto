@@ -13,6 +13,7 @@ pars/
 # local data / logs / tmp
 logs/
 tmp/
+artifacts/
 backend/app/runtime/**/*.json
 backend/app/runtime/**/*.log
 backend/app/imports/**/*.csv
@@ -37,6 +38,11 @@ node_modules/
 .pytest_cache/
 .mypy_cache/
 .coverage
+.calc_debug.tar/
+calc_debug.tar/
+calc_debug.tar.gz
+calc_debug/
+calc_*.json
 htmlcov/
 
 # docker artifacts

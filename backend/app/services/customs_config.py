@@ -57,6 +57,13 @@ class CustomsConfig(BaseModel):
     util_tables_3_5: Optional[Dict[str, UtilTable]] = None
     util_tables_electric: Optional[Dict[str, UtilTable]] = None
 
+    @field_validator("version", mode="before")
+    @classmethod
+    def _coerce_version(cls, v):
+        if v is None:
+            return ""
+        return str(v)
+
     @model_validator(mode="after")
     def _validate_ranges(self):
         _validate_no_overlap(self.duty_eur_per_cc, "duty_eur_per_cc")

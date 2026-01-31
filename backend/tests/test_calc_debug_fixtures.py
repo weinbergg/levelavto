@@ -157,6 +157,9 @@ def test_calc_debug_fixture_matches_formula(car_id):
 
     if scenario == "under_3":
         expected = _expected_under_3(net_eur, eur_rate, engine_cc, hp, kw)
+        assert "Пошлина РФ" not in calc_step
+        assert "НДС" not in calc_step
+        assert "Таможенный сбор" not in calc_step
     elif scenario == "3_5":
         expected = _expected_3_5(net_eur, eur_rate, engine_cc, hp, kw)
     elif scenario == "electric":
