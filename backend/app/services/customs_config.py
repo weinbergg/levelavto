@@ -53,6 +53,9 @@ class CustomsConfig(BaseModel):
     util_cc_buckets: List[UtilBucket]
     selection_rule: str
     util_tables: Dict[str, UtilTable]
+    util_tables_under3: Optional[Dict[str, UtilTable]] = None
+    util_tables_3_5: Optional[Dict[str, UtilTable]] = None
+    util_tables_electric: Optional[Dict[str, UtilTable]] = None
 
     @model_validator(mode="after")
     def _validate_ranges(self):
@@ -108,7 +111,23 @@ def calc_duty_eur(engine_cc: int, cfg: CustomsConfig) -> float:
     raise ValueError("duty_eur_per_cc not found for engine_cc")
 
 
-def calc_util_fee_rub(engine_cc: int, kw: Optional[float], hp: Optional[int], cfg: CustomsConfig) -> int:
+def _pick_util_tables(cfg: CustomsConfig, age_bucket: Optional[str]) -> Dict[str, UtilTable]:
+    if age_bucket == "under_3" and cfg.util_tables_under3:
+        return cfg.util_tables_under3
+    if age_bucket == "3_5" and cfg.util_tables_3_5:
+        return cfg.util_tables_3_5
+    if age_bucket == "electric" and cfg.util_tables_electric:
+        return cfg.util_tables_electric
+    return cfg.util_tables
+
+
+def calc_util_fee_rub(
+    engine_cc: int,
+    kw: Optional[float],
+    hp: Optional[int],
+    cfg: CustomsConfig,
+    age_bucket: Optional[str] = None,
+) -> int:
     bucket = None
     for b in cfg.util_cc_buckets:
         if b.from_cc <= engine_cc <= b.to_cc:
@@ -116,7 +135,8 @@ def calc_util_fee_rub(engine_cc: int, kw: Optional[float], hp: Optional[int], cf
             break
     if bucket is None:
         raise ValueError("util_cc_bucket not found for engine_cc")
-    table = cfg.util_tables.get(bucket.table)
+    tables = _pick_util_tables(cfg, age_bucket)
+    table = tables.get(bucket.table)
     if not table:
         raise ValueError(f"util table {bucket.table} not found")
 

@@ -16,7 +16,7 @@ util_cc_buckets:
 
 selection_rule: "if kw > 0 => use kw table else use hp table"
 
-util_tables:
+util_tables: &util_tables
   "100-2000":
     kw:
       - { from: 0.00,   to: 117.68, price_rub: 3400 }
@@ -148,3 +148,9 @@ util_tables:
       - { from: 431, to: 460,   price_rub: 4276800 }
       - { from: 461, to: 500,   price_rub: 4425600 }
       - { from: 501, to: 10000, price_rub: 4581600 }
+
+# Возрастные таблицы утиля. Пока используем одинаковые данные,
+# но оставляем возможность менять отдельно под возрастные корзины.
+util_tables_under3: *util_tables
+util_tables_3_5: *util_tables
+util_tables_electric: *util_tables

@@ -27,7 +27,7 @@ scenarios:
     investor_fee: 0
     broker_elpts_rub: 0
     customs_fee_rub: 0
-    duty_enabled: true
+    duty_enabled: false
 
   age_3_5:
     label: "ДВС 3–5 лет (и 5+ по правилу)"

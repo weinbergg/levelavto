@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 import math
+from decimal import Decimal, ROUND_CEILING
 
 from .customs_config import get_customs_config, calc_duty_eur, calc_util_fee_rub
+from ..utils.range_lookup import lookup_range
 
 
 @dataclass
@@ -73,42 +75,70 @@ def _ceil_rub(value: float) -> float:
     if value is None:
         return value
     # округляем только финальный итог: ceil до рубля
-    if float(value).is_integer():
-        return float(value)
-    return float(math.ceil(value))
+    return float(Decimal(str(value)).quantize(Decimal("1"), rounding=ROUND_CEILING))
 
 
-def _percent_fixed(amount: float, cfg: Dict[str, Any]) -> float:
-    percent = float(cfg.get("percent", 0.0) or 0.0)
-    fixed = float(cfg.get("fixed", 0.0) or 0.0)
+def _percent_fixed(amount: Decimal, cfg: Dict[str, Any]) -> Decimal:
+    percent = Decimal(str(cfg.get("percent", 0.0) or 0.0))
+    fixed = Decimal(str(cfg.get("fixed", 0.0) or 0.0))
     return amount * percent + fixed
 
 
-def _calc_excise_rub(power_kw: Optional[float], power_hp: Optional[float], cfg: Dict[str, Any]) -> float:
+def _calc_excise_rub(power_kw: Optional[float], power_hp: Optional[float], cfg: Dict[str, Any]) -> Decimal:
     if power_kw is not None and float(power_kw) > 0:
-        rate = _find_range(cfg.get("excise_by_kw", []), float(power_kw), "from_kw", "to_kw", "rub_per_kw", 0)
-        return float(rate) * float(power_kw) if rate else 0.0
+        rate = lookup_range(float(power_kw), cfg.get("excise_by_kw", []), "from_kw", "to_kw", "rub_per_kw")
+        if not rate:
+            return Decimal("0")
+        return Decimal(str(rate)) * Decimal(str(power_kw))
     if power_hp is None:
-        return 0.0
-    rate = _find_range(cfg.get("excise_by_hp", []), float(power_hp), "from_hp", "to_hp", "rub_per_hp", 0)
-    return float(rate) * float(power_hp) if rate else 0.0
+        return Decimal("0")
+    rate = lookup_range(float(power_hp), cfg.get("excise_by_hp", []), "from_hp", "to_hp", "rub_per_hp")
+    if not rate:
+        return Decimal("0")
+    return Decimal(str(rate)) * Decimal(str(power_hp))
+
+
+LABELS = {
+    "bank_transfer_eu": "Банк, за перевод денег",
+    "purchase_netto": "Покупка по НЕТТО",
+    "inspection": "Осмотр подборщиком",
+    "delivery_eu_minsk": "Доставка Европы- Минска",
+    "customs_by": "Таможня РБ",
+    "customs_transfer_fee": "Комиссия за перевод таможни",
+    "delivery_minsk_moscow": "Доставка Минск- Москва",
+    "elpts": "ЭЛПТС",
+    "insurance_broker_commission": "Страхование, брокер",
+    "investor_fee": "Инвестор",
+    "delivery_eu_moscow": "Доставка Европа- МСК",
+    "broker_elpts": "Брокер и ЭлПТС",
+    "customs_fee": "Таможенный сбор",
+    "duty": "Пошлина РФ",
+    "import_duty": "Ввозная пошлина",
+    "excise": "Акциз",
+    "vat": "НДС",
+    "util_fee": "Утилизационный сбор",
+    "total_rub": "Итого (RUB)",
+}
 
 
 def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
-    def f(x) -> float:
+    def d(x) -> Decimal:
         if x is None:
-            return 0.0
+            return Decimal("0")
         try:
-            return float(x)
+            return Decimal(str(x))
         except Exception:
-            return 0.0
+            return Decimal("0")
+
+    def out(x: Decimal) -> float:
+        return float(x) if x is not None else 0.0
 
     scenarios = payload["scenarios"]
     scenario_key = choose_scenario(req, payload)
     if scenario_key not in scenarios:
         raise ValueError(f"scenario {scenario_key} not found")
     cfg = scenarios[scenario_key]
-    eur_rate = f(req.eur_rate or payload["meta"].get("eur_rate_default") or 95.0)
+    eur_rate = d(req.eur_rate or payload["meta"].get("eur_rate_default") or 95.0)
 
     breakdown = []
 
@@ -116,23 +146,23 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
         if not req.engine_cc:
             raise ValueError("engine_cc is required for ICE scenarios")
 
-        net_eur = f(req.price_net_eur)
+        net_eur = d(req.price_net_eur)
         # EUR расходы по формулам
         bank_transfer_eu = _percent_fixed(net_eur, cfg["bank_transfer_eu"])
         purchase_netto = _percent_fixed(net_eur, cfg["purchase_netto"])
-        inspection = f(cfg.get("inspection"))
+        inspection = d(cfg.get("inspection"))
 
         if scenario_key == "under_3":
-            delivery_eu_minsk = f(cfg.get("delivery_eu_minsk"))
-            customs_by = net_eur * f(cfg.get("customs_by_percent"))
-            delivery_minsk_moscow = f(cfg.get("delivery_minsk_moscow"))
+            delivery_eu_minsk = d(cfg.get("delivery_eu_minsk"))
+            customs_by = net_eur * d(cfg.get("customs_by_percent"))
+            delivery_minsk_moscow = d(cfg.get("delivery_minsk_moscow"))
             customs_transfer_fee = (
                 (delivery_eu_minsk + delivery_minsk_moscow + customs_by)
-                * f(cfg.get("customs_transfer_fee_percent"))
+                * d(cfg.get("customs_transfer_fee_percent"))
             )
-            elpts = f(cfg.get("elpts"))
-            insurance_broker_commission = net_eur * f(cfg.get("insurance_broker_commission_percent"))
-            investor_fee = f(cfg.get("investor_fee"))
+            elpts = d(cfg.get("elpts"))
+            insurance_broker_commission = net_eur * d(cfg.get("insurance_broker_commission_percent"))
+            investor_fee = d(cfg.get("investor_fee"))
             eur_fields = {
                 "bank_transfer_eu": bank_transfer_eu,
                 "purchase_netto": purchase_netto,
@@ -146,8 +176,8 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
                 "investor_fee": investor_fee,
             }
         else:
-            delivery_eu_moscow = f(cfg.get("delivery_eu_moscow"))
-            insurance_broker_commission = net_eur * f(cfg.get("insurance_broker_commission_percent"))
+            delivery_eu_moscow = d(cfg.get("delivery_eu_moscow"))
+            insurance_broker_commission = net_eur * d(cfg.get("insurance_broker_commission_percent"))
             eur_fields = {
                 "bank_transfer_eu": bank_transfer_eu,
                 "purchase_netto": purchase_netto,
@@ -157,56 +187,59 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
             }
 
         rub_fields = {
-            "broker_elpts": f(cfg.get("broker_elpts_rub")),
-            "customs_fee": f(cfg.get("customs_fee_rub")),
+            "broker_elpts": d(cfg.get("broker_elpts_rub")),
+            "customs_fee": d(cfg.get("customs_fee_rub")),
         }
 
-        sum_eur = net_eur + sum(eur_fields.values())
+        sum_eur = net_eur + sum(eur_fields.values(), Decimal("0"))
         subtotal_rub = sum_eur * eur_rate
 
         for k, v in eur_fields.items():
-            breakdown.append({"title": k, "amount": v, "currency": "EUR"})
+            breakdown.append({"title": LABELS.get(k, k), "amount": out(v), "currency": "EUR"})
         for k, v in rub_fields.items():
-            breakdown.append({"title": k, "amount": v, "currency": "RUB"})
+            if v != 0:
+                breakdown.append({"title": LABELS.get(k, k), "amount": out(v), "currency": "RUB"})
 
         customs_cfg = get_customs_config()
-        duty_rub = 0.0
+        duty_rub = Decimal("0")
         if cfg.get("duty_enabled", True):
             duty_eur = calc_duty_eur(req.engine_cc, customs_cfg)
-            duty_rub = duty_eur * eur_rate
+            duty_rub = Decimal(str(duty_eur)) * eur_rate
 
         util_rub = calc_util_fee_rub(
             engine_cc=req.engine_cc,
             kw=req.power_kw,
             hp=int(req.power_hp) if req.power_hp is not None else None,
             cfg=customs_cfg,
+            age_bucket=scenario_key,
         )
 
-        breakdown.append({"title": "Пошлина", "amount": duty_rub, "currency": "RUB"})
-        breakdown.append({"title": "Утилизационный сбор", "amount": util_rub, "currency": "RUB"})
+        if duty_rub != 0:
+            breakdown.append({"title": LABELS["duty"], "amount": out(duty_rub), "currency": "RUB"})
+        breakdown.append({"title": LABELS["util_fee"], "amount": int(util_rub), "currency": "RUB"})
 
-        total_rub = subtotal_rub + duty_rub + util_rub + sum(rub_fields.values())
+        total_rub = subtotal_rub + duty_rub + Decimal(str(util_rub)) + sum(rub_fields.values(), Decimal("0"))
         total_rub = _ceil_rub(total_rub)
-        breakdown.append({"title": "Итого (RUB)", "amount": total_rub, "currency": "RUB"})
+        breakdown.append({"title": LABELS["total_rub"], "amount": total_rub, "currency": "RUB"})
         return {
             "scenario": scenario_key,
             "total_rub": total_rub,
             "breakdown": breakdown,
-            "euro_rate_used": eur_rate,
+            "euro_rate_used": float(eur_rate),
         }
 
     # electric (BEV only)
-    power_kw = f(req.power_kw) if req.power_kw is not None else None
-    power_hp = f(req.power_hp) if req.power_hp is not None else None
+    power_kw = d(req.power_kw) if req.power_kw is not None else None
+    power_hp = d(req.power_hp) if req.power_hp is not None else None
     if not ((power_kw and power_kw > 0) or (power_hp and power_hp > 0)):
         raise ValueError("power_kw or power_hp required for electric")
 
-    net_eur = f(req.price_net_eur)
+    net_eur = d(req.price_net_eur)
     bank_transfer_eu = _percent_fixed(net_eur, cfg["bank_transfer_eu"])
     purchase_netto = _percent_fixed(net_eur, cfg["purchase_netto"])
-    inspection = f(cfg.get("inspection"))
-    delivery_eu_moscow = f(cfg.get("delivery_eu_moscow"))
-    insurance_broker_commission = net_eur * f(cfg.get("insurance_broker_commission_percent"))
+    inspection = d(cfg.get("inspection"))
+    delivery_eu_moscow = d(cfg.get("delivery_eu_moscow"))
+    insurance_broker_commission = net_eur * d(cfg.get("insurance_broker_commission_percent"))
 
     eur_fields = {
         "bank_transfer_eu": bank_transfer_eu,
@@ -216,38 +249,45 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
         "insurance_broker_commission": insurance_broker_commission,
     }
     rub_fields = {
-        "broker_elpts": f(cfg.get("broker_elpts_rub")),
-        "customs_fee": f(cfg.get("customs_fee_rub")),
+        "broker_elpts": d(cfg.get("broker_elpts_rub")),
+        "customs_fee": d(cfg.get("customs_fee_rub")),
     }
 
-    subtotal_eur = net_eur + sum(eur_fields.values())
+    subtotal_eur = net_eur + sum(eur_fields.values(), Decimal("0"))
     subtotal_rub = subtotal_eur * eur_rate
-    import_duty_rub = net_eur * f(cfg.get("import_duty_percent")) * eur_rate
-    excise_rub = _calc_excise_rub(power_kw, power_hp, cfg)
+    import_duty_rub = net_eur * d(cfg.get("import_duty_percent")) * eur_rate
+    excise_rub = _calc_excise_rub(float(power_kw) if power_kw is not None else None, float(power_hp) if power_hp is not None else None, cfg)
     vat_base = (net_eur * eur_rate) + excise_rub
-    vat_rub = vat_base * f(cfg.get("vat_percent"))
+    vat_rub = vat_base * d(cfg.get("vat_percent"))
 
     customs_cfg = get_customs_config()
     util_rub = calc_util_fee_rub(
         engine_cc=req.engine_cc or 0,
-        kw=power_kw,
+        kw=float(power_kw) if power_kw is not None else None,
         hp=int(power_hp) if power_hp is not None else None,
         cfg=customs_cfg,
+        age_bucket="electric",
     )
 
-    breakdown.extend([{"title": k, "amount": v, "currency": "EUR"} for k, v in eur_fields.items()])
-    breakdown.extend([{"title": k, "amount": v, "currency": "RUB"} for k, v in rub_fields.items()])
-    breakdown.append({"title": "import_duty", "amount": import_duty_rub, "currency": "RUB"})
-    breakdown.append({"title": "excise", "amount": excise_rub, "currency": "RUB"})
-    breakdown.append({"title": "vat", "amount": vat_rub, "currency": "RUB"})
-    breakdown.append({"title": "Утилизационный сбор", "amount": util_rub, "currency": "RUB"})
+    breakdown.extend([{"title": LABELS.get(k, k), "amount": out(v), "currency": "EUR"} for k, v in eur_fields.items()])
+    breakdown.extend(
+        [
+            {"title": LABELS.get(k, k), "amount": out(v), "currency": "RUB"}
+            for k, v in rub_fields.items()
+            if v != 0
+        ]
+    )
+    breakdown.append({"title": LABELS["import_duty"], "amount": out(import_duty_rub), "currency": "RUB"})
+    breakdown.append({"title": LABELS["excise"], "amount": out(excise_rub), "currency": "RUB"})
+    breakdown.append({"title": LABELS["vat"], "amount": out(vat_rub), "currency": "RUB"})
+    breakdown.append({"title": LABELS["util_fee"], "amount": int(util_rub), "currency": "RUB"})
 
-    total_rub = subtotal_rub + import_duty_rub + excise_rub + vat_rub + util_rub + sum(rub_fields.values())
+    total_rub = subtotal_rub + import_duty_rub + excise_rub + vat_rub + Decimal(str(util_rub)) + sum(rub_fields.values(), Decimal("0"))
     total_rub = _ceil_rub(total_rub)
-    breakdown.append({"title": "Итого (RUB)", "amount": total_rub, "currency": "RUB"})
+    breakdown.append({"title": LABELS["total_rub"], "amount": total_rub, "currency": "RUB"})
     return {
         "scenario": "electric",
         "total_rub": total_rub,
         "breakdown": breakdown,
-        "euro_rate_used": eur_rate,
+        "euro_rate_used": float(eur_rate),
     }

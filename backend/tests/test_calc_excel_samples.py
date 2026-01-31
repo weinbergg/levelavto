@@ -29,9 +29,8 @@ def _calc_under3_expected(net_eur: float, eur_rate: float, engine_cc: int, hp: f
     investor = 0
     subtotal_eur = net_eur + bank + purchase + inspection + delivery_eu_minsk + customs_by + customs_transfer_fee + delivery_minsk_moscow + elpts + insurance + investor
     subtotal_rub = subtotal_eur * eur_rate
-    duty_rub = calc_duty_eur(engine_cc, get_customs_config()) * eur_rate
-    util_rub = calc_util_fee_rub(engine_cc=engine_cc, kw=None, hp=int(hp), cfg=get_customs_config())
-    total = subtotal_rub + duty_rub + util_rub
+    util_rub = calc_util_fee_rub(engine_cc=engine_cc, kw=None, hp=int(hp), cfg=get_customs_config(), age_bucket="under_3")
+    total = subtotal_rub + util_rub
     return _ceil_rub(total)
 
 
@@ -44,7 +43,7 @@ def _calc_3_5_expected(net_eur: float, eur_rate: float, engine_cc: int, hp: floa
     subtotal_eur = net_eur + bank + purchase + inspection + delivery_eu_moscow + insurance
     subtotal_rub = subtotal_eur * eur_rate
     duty_rub = calc_duty_eur(engine_cc, get_customs_config()) * eur_rate
-    util_rub = calc_util_fee_rub(engine_cc=engine_cc, kw=None, hp=int(hp), cfg=get_customs_config())
+    util_rub = calc_util_fee_rub(engine_cc=engine_cc, kw=None, hp=int(hp), cfg=get_customs_config(), age_bucket="3_5")
     total = subtotal_rub + 65000 + 30000 + duty_rub + util_rub
     return _ceil_rub(total)
 
@@ -72,7 +71,7 @@ def _calc_electric_expected(net_eur: float, eur_rate: float, power_kw: float, po
                 excise = power_hp * row["rub_per_hp"]
                 break
     vat = (net_eur * eur_rate + excise) * 0.22
-    util_rub = calc_util_fee_rub(engine_cc=0, kw=power_kw, hp=int(power_hp), cfg=get_customs_config())
+    util_rub = calc_util_fee_rub(engine_cc=0, kw=power_kw, hp=int(power_hp), cfg=get_customs_config(), age_bucket="electric")
     total = subtotal_rub + 115000 + 30000 + import_duty + excise + vat + util_rub
     return _ceil_rub(total)
 
