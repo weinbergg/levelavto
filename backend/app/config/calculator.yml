@@ -1,4 +1,4 @@
-version: "202601"
+version: "2026_01"
 fx:
   source: cbr
   cache_ttl_sec: 3600
@@ -7,82 +7,74 @@ fx:
     USDRUB: null
 
 rules:
+  # 5+ лет считаем как 3–5
   age_bucket_over_5y_as_3_5: true
+  # prefer net price if available
   price_mode: netto_preferred
 
-# shared duty table anchor
-_duty_table: &duty_table
-  - { cc_from: 0,    cc_to: 1000, eur_per_cc: 1.5 }
-  - { cc_from: 1001, cc_to: 1500, eur_per_cc: 1.7 }
-  - { cc_from: 1501, cc_to: 1800, eur_per_cc: 2.5 }
-  - { cc_from: 1801, cc_to: 2300, eur_per_cc: 2.7 }
-  - { cc_from: 2301, cc_to: 3000, eur_per_cc: 3.0 }
-  - { cc_from: 3001, cc_to: 8000, eur_per_cc: 3.6 }
-
 scenarios:
-  under_3_ice:
+  under_3:
     label: "ДВС до 3 лет"
-    expenses:
-      eur:
-        bank_transfer_eu: 1122
-        purchase_netto: 2190
-        inspection: 400
-        delivery_eu_minsk: 5500
-        customs_by: 17518
-        customs_transfer_fee: 117
-        delivery_minsk_moscow: 400
-        elpts: 600
-        insurance_broker_commission: 5839
-        investor_fee: 0
-      rub:
-        broker_elpts: 0
-        customs_fee: 0
+    bank_transfer_eu: { percent: 0.014, fixed: 100 }
+    purchase_netto: { percent: 0.03, fixed: 0 }
+    inspection: 400
+    delivery_eu_minsk: 5500
+    customs_by_percent: 0.24
+    customs_transfer_fee_percent: 0.005
+    delivery_minsk_moscow: 400
+    elpts: 600
+    insurance_broker_commission_percent: 0.08
+    investor_fee: 0
+    broker_elpts_rub: 0
+    customs_fee_rub: 0
+    duty_enabled: true
 
-    duty_eur_per_cc_table: *duty_table
-    util_rub_by_engine_cc:
-      - { cc_from: 100,  cc_to: 2000,  util_rub: 1291200 }
-      - { cc_from: 2001, cc_to: 3000,  util_rub: 2620800 }
-      - { cc_from: 3001, cc_to: 3500,  util_rub: 2880000 }
-      - { cc_from: 3501, cc_to: 10000, util_rub: 3600000 }
-
-  age_3_5_ice:
+  age_3_5:
     label: "ДВС 3–5 лет (и 5+ по правилу)"
-    expenses:
-      eur:
-        bank_transfer_eu: 1122
-        purchase_netto: 2190
-        inspection: 400
-        delivery_eu_moscow: 5900
-        insurance_broker_commission: 5839
-        investor_fee: 0
-      rub:
-        broker_elpts: 0
-        customs_fee: 0
-
-    duty_eur_per_cc_table: *duty_table
-    util_rub_by_engine_cc:
-      - { cc_from: 100,  cc_to: 2000,  util_rub: 2702400 }
-      - { cc_from: 2001, cc_to: 3000,  util_rub: 3770400 }
-      - { cc_from: 3001, cc_to: 3500,  util_rub: 4290000 }
-      - { cc_from: 3501, cc_to: 10000, util_rub: 5550000 }
+    bank_transfer_eu: { percent: 0.014, fixed: 100 }
+    purchase_netto: { percent: 0.02, fixed: 0 }
+    inspection: 400
+    delivery_eu_moscow: 5000
+    insurance_broker_commission_percent: 0.08
+    broker_elpts_rub: 65000
+    customs_fee_rub: 30000
+    duty_enabled: true
 
   electric:
     label: "Электро"
-    expenses:
-      eur:
-        bank_transfer_eu: 1122
-        purchase_netto: 2190
-        inspection: 400
-        delivery_eu_moscow: 5900
-        insurance_broker_commission: 5839
-        investor_fee: 0
-      rub:
-        broker_elpts: 0
-        customs_fee: 0
-
-    duty_percent: 0.15
+    bank_transfer_eu: { percent: 0.014, fixed: 100 }
+    purchase_netto: { percent: 0.02, fixed: 500 }
+    inspection: 400
+    delivery_eu_moscow: 6000
+    insurance_broker_commission_percent: 0.08
+    broker_elpts_rub: 115000
+    customs_fee_rub: 30000
+    import_duty_percent: 0.15
     vat_percent: 0.22
-
-    excise_rub_per_hp_table: []
-    power_fee_rub_table: []
-    util_rub_flat: null
+    # excise: rate per unit; if power below min bucket -> 0
+    excise_by_hp:
+      - { from_hp: 0,   to_hp: 80,   rub_per_hp: 90 }
+      - { from_hp: 81,  to_hp: 100,  rub_per_hp: 151 }
+      - { from_hp: 101, to_hp: 130,  rub_per_hp: 201 }
+      - { from_hp: 131, to_hp: 160,  rub_per_hp: 301 }
+      - { from_hp: 161, to_hp: 190,  rub_per_hp: 401 }
+      - { from_hp: 191, to_hp: 220,  rub_per_hp: 501 }
+      - { from_hp: 221, to_hp: 250,  rub_per_hp: 601 }
+      - { from_hp: 251, to_hp: 280,  rub_per_hp: 701 }
+      - { from_hp: 281, to_hp: 408,  rub_per_hp: 901 }
+      - { from_hp: 409, to_hp: 544,  rub_per_hp: 1401 }
+      - { from_hp: 545, to_hp: 680,  rub_per_hp: 1601 }
+      - { from_hp: 681, to_hp: 3000, rub_per_hp: 1829 }
+    excise_by_kw:
+      - { from_kw: 0.0,    to_kw: 58.84,  rub_per_kw: 90 }
+      - { from_kw: 59.58,  to_kw: 73.55,  rub_per_kw: 151 }
+      - { from_kw: 74.29,  to_kw: 95.62,  rub_per_kw: 201 }
+      - { from_kw: 96.35,  to_kw: 117.68, rub_per_kw: 301 }
+      - { from_kw: 118.42, to_kw: 139.75, rub_per_kw: 401 }
+      - { from_kw: 140.48, to_kw: 161.81, rub_per_kw: 501 }
+      - { from_kw: 162.55, to_kw: 183.88, rub_per_kw: 601 }
+      - { from_kw: 184.61, to_kw: 205.94, rub_per_kw: 701 }
+      - { from_kw: 206.68, to_kw: 300.08, rub_per_kw: 901 }
+      - { from_kw: 300.82, to_kw: 400.11, rub_per_kw: 1401 }
+      - { from_kw: 400.85, to_kw: 500.14, rub_per_kw: 1601 }
+      - { from_kw: 500.88, to_kw: 2206.5, rub_per_kw: 1829 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel
 import yaml
 
 
@@ -23,76 +23,70 @@ class RuleConfig(BaseModel):
     price_mode: str = "netto_preferred"  # netto_preferred | brutto | netto_only
 
 
-class RangeEurPerCc(BaseModel):
-    cc_from: int
-    cc_to: int
-    eur_per_cc: float
-
-    @field_validator("cc_from", "cc_to")
-    @classmethod
-    def _non_negative(cls, v: int) -> int:
-        if v < 0:
-            raise ValueError("cc_from/cc_to must be >= 0")
-        return v
-
-
-class RangeUtilRub(BaseModel):
-    cc_from: int
-    cc_to: int
-    util_rub: float
-
-    @field_validator("cc_from", "cc_to")
-    @classmethod
-    def _non_negative(cls, v: int) -> int:
-        if v < 0:
-            raise ValueError("cc_from/cc_to must be >= 0")
-        return v
+class PercentFixed(BaseModel):
+    percent: float = 0.0
+    fixed: float = 0.0
 
 
 class RangeExciseHp(BaseModel):
-    cc_from: int = Field(..., alias="from_hp")
-    cc_to: int = Field(..., alias="to_hp")
+    from_hp: float
+    to_hp: float
     rub_per_hp: float
 
 
-class RangePowerFee(BaseModel):
-    age_bucket: str
-    cc_from: int = Field(..., alias="from_hp")
-    cc_to: int = Field(..., alias="to_hp")
-    rub: float
+class RangeExciseKw(BaseModel):
+    from_kw: float
+    to_kw: float
+    rub_per_kw: float
 
 
-class ExpensesSplit(BaseModel):
-    eur: Dict[str, float] = {}
-    rub: Dict[str, float] = {}
-
-
-class ScenarioIce(BaseModel):
+class ScenarioUnder3(BaseModel):
     label: str
-    expenses: ExpensesSplit
-    duty_eur_per_cc_table: List[RangeEurPerCc]
-    util_rub_by_engine_cc: List[RangeUtilRub]
+    bank_transfer_eu: PercentFixed
+    purchase_netto: PercentFixed
+    inspection: float
+    delivery_eu_minsk: float
+    customs_by_percent: float
+    customs_transfer_fee_percent: float
+    delivery_minsk_moscow: float
+    elpts: float
+    insurance_broker_commission_percent: float
+    investor_fee: float = 0.0
+    broker_elpts_rub: float = 0.0
+    customs_fee_rub: float = 0.0
+    duty_enabled: bool = True
 
-    @model_validator(mode="after")
-    def _validate_ranges(self):
-        _validate_no_overlap(self.duty_eur_per_cc_table, "duty_eur_per_cc_table")
-        _validate_no_overlap(self.util_rub_by_engine_cc, "util_rub_by_engine_cc")
-        return self
+
+class Scenario3to5(BaseModel):
+    label: str
+    bank_transfer_eu: PercentFixed
+    purchase_netto: PercentFixed
+    inspection: float
+    delivery_eu_moscow: float
+    insurance_broker_commission_percent: float
+    broker_elpts_rub: float = 65000.0
+    customs_fee_rub: float = 30000.0
+    duty_enabled: bool = True
 
 
 class ScenarioElectric(BaseModel):
     label: str
-    expenses: ExpensesSplit
-    duty_percent: float
-    vat_percent: float
-    excise_rub_per_hp_table: List[RangeExciseHp] = []
-    power_fee_rub_table: List[RangePowerFee] = []
-    util_rub_flat: Optional[float] = None
+    bank_transfer_eu: PercentFixed
+    purchase_netto: PercentFixed
+    inspection: float
+    delivery_eu_moscow: float
+    insurance_broker_commission_percent: float
+    broker_elpts_rub: float = 115000.0
+    customs_fee_rub: float = 30000.0
+    import_duty_percent: float = 0.15
+    vat_percent: float = 0.22
+    excise_by_hp: List[RangeExciseHp] = []
+    excise_by_kw: List[RangeExciseKw] = []
 
 
 class Scenarios(BaseModel):
-    under_3_ice: ScenarioIce
-    age_3_5_ice: ScenarioIce
+    under_3: ScenarioUnder3
+    age_3_5: Scenario3to5
     electric: ScenarioElectric
 
 
@@ -117,6 +111,13 @@ _LABEL_MAP: Dict[str, str] = {
     "delivery_eu_moscow": "Доставка Европа- МСК",
     "broker_elpts": "Брокер и ЭлПТС",
     "customs_fee": "Таможенный сбор",
+    "import_duty": "Ввозная пошлина 15%",
+    "excise": "Акциз",
+    "vat": "НДС",
+    "util_fee": "Утилизационный сбор",
+    "duty": "Пошлина",
+    "subtotal_eur": "Итого EUR (до перевода)",
+    "subtotal_rub": "Итого RUB (до пошлин)",
 }
 
 
@@ -141,24 +142,6 @@ def load_yaml(path: Path) -> CalculatorConfigYaml:
 
 
 def to_runtime_payload(cfg: CalculatorConfigYaml) -> Dict[str, Any]:
-    def _expenses(exp: ExpensesSplit) -> Dict[str, float]:
-        out: Dict[str, float] = {}
-        out.update(exp.eur or {})
-        out.update(exp.rub or {})
-        return out
-
-    def _duty(rows: List[RangeEurPerCc]) -> List[Dict[str, Any]]:
-        return [{"from": r.cc_from, "to": r.cc_to, "eur_per_cc": r.eur_per_cc} for r in rows]
-
-    def _util(rows: List[RangeUtilRub]) -> List[Dict[str, Any]]:
-        return [{"from": r.cc_from, "to": r.cc_to, "rub": r.util_rub} for r in rows]
-
-    def _excise(rows: List[RangeExciseHp]) -> List[Dict[str, Any]]:
-        return [{"from_hp": r.cc_from, "to_hp": r.cc_to, "rub_per_hp": r.rub_per_hp} for r in rows]
-
-    def _power_fee(rows: List[RangePowerFee]) -> List[Dict[str, Any]]:
-        return [{"age_bucket": r.age_bucket, "from_hp": r.cc_from, "to_hp": r.cc_to, "rub": r.rub} for r in rows]
-
     eur_default = cfg.fx.overrides.EURRUB if cfg.fx and cfg.fx.overrides else None
     usd_default = cfg.fx.overrides.USDRUB if cfg.fx and cfg.fx.overrides else None
 
@@ -175,25 +158,45 @@ def to_runtime_payload(cfg: CalculatorConfigYaml) -> Dict[str, Any]:
         "label_map": _LABEL_MAP,
         "scenarios": {
             "under_3": {
-                "label": cfg.scenarios.under_3_ice.label,
-                "expenses": _expenses(cfg.scenarios.under_3_ice.expenses),
-                "duty_by_cc": _duty(cfg.scenarios.under_3_ice.duty_eur_per_cc_table),
-                "util_by_cc": _util(cfg.scenarios.under_3_ice.util_rub_by_engine_cc),
+                "label": cfg.scenarios.under_3.label,
+                "bank_transfer_eu": cfg.scenarios.under_3.bank_transfer_eu.model_dump(),
+                "purchase_netto": cfg.scenarios.under_3.purchase_netto.model_dump(),
+                "inspection": cfg.scenarios.under_3.inspection,
+                "delivery_eu_minsk": cfg.scenarios.under_3.delivery_eu_minsk,
+                "customs_by_percent": cfg.scenarios.under_3.customs_by_percent,
+                "customs_transfer_fee_percent": cfg.scenarios.under_3.customs_transfer_fee_percent,
+                "delivery_minsk_moscow": cfg.scenarios.under_3.delivery_minsk_moscow,
+                "elpts": cfg.scenarios.under_3.elpts,
+                "insurance_broker_commission_percent": cfg.scenarios.under_3.insurance_broker_commission_percent,
+                "investor_fee": cfg.scenarios.under_3.investor_fee,
+                "broker_elpts_rub": cfg.scenarios.under_3.broker_elpts_rub,
+                "customs_fee_rub": cfg.scenarios.under_3.customs_fee_rub,
+                "duty_enabled": cfg.scenarios.under_3.duty_enabled,
             },
             "3_5": {
-                "label": cfg.scenarios.age_3_5_ice.label,
-                "expenses": _expenses(cfg.scenarios.age_3_5_ice.expenses),
-                "duty_by_cc": _duty(cfg.scenarios.age_3_5_ice.duty_eur_per_cc_table),
-                "util_by_cc": _util(cfg.scenarios.age_3_5_ice.util_rub_by_engine_cc),
+                "label": cfg.scenarios.age_3_5.label,
+                "bank_transfer_eu": cfg.scenarios.age_3_5.bank_transfer_eu.model_dump(),
+                "purchase_netto": cfg.scenarios.age_3_5.purchase_netto.model_dump(),
+                "inspection": cfg.scenarios.age_3_5.inspection,
+                "delivery_eu_moscow": cfg.scenarios.age_3_5.delivery_eu_moscow,
+                "insurance_broker_commission_percent": cfg.scenarios.age_3_5.insurance_broker_commission_percent,
+                "broker_elpts_rub": cfg.scenarios.age_3_5.broker_elpts_rub,
+                "customs_fee_rub": cfg.scenarios.age_3_5.customs_fee_rub,
+                "duty_enabled": cfg.scenarios.age_3_5.duty_enabled,
             },
             "electric": {
                 "label": cfg.scenarios.electric.label,
-                "expenses": _expenses(cfg.scenarios.electric.expenses),
-                "duty_percent": cfg.scenarios.electric.duty_percent,
+                "bank_transfer_eu": cfg.scenarios.electric.bank_transfer_eu.model_dump(),
+                "purchase_netto": cfg.scenarios.electric.purchase_netto.model_dump(),
+                "inspection": cfg.scenarios.electric.inspection,
+                "delivery_eu_moscow": cfg.scenarios.electric.delivery_eu_moscow,
+                "insurance_broker_commission_percent": cfg.scenarios.electric.insurance_broker_commission_percent,
+                "broker_elpts_rub": cfg.scenarios.electric.broker_elpts_rub,
+                "customs_fee_rub": cfg.scenarios.electric.customs_fee_rub,
+                "import_duty_percent": cfg.scenarios.electric.import_duty_percent,
                 "vat_percent": cfg.scenarios.electric.vat_percent,
-                "excise_by_hp": _excise(cfg.scenarios.electric.excise_rub_per_hp_table),
-                "power_fee": _power_fee(cfg.scenarios.electric.power_fee_rub_table),
-                "util_rub": cfg.scenarios.electric.util_rub_flat or 0,
+                "excise_by_hp": [r.model_dump() for r in cfg.scenarios.electric.excise_by_hp],
+                "excise_by_kw": [r.model_dump() for r in cfg.scenarios.electric.excise_by_kw],
             },
         },
     }

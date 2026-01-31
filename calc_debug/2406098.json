@@ -1,0 +1,115 @@
+{
+  "input": {
+    "car_id": 2406098,
+    "scenario": null,
+    "eur_rate": 91.08,
+    "usd_rate": 75.7327,
+    "price_net_eur": 12512.0
+  },
+  "car": {
+    "id": 2406098,
+    "brand": "Citroën",
+    "model": "C4",
+    "variant": "ELEC FEELPACK 136",
+    "price": 14890.0,
+    "currency": "EUR",
+    "engine_cc": 2000,
+    "power_hp": 136.0,
+    "power_kw": 100.03,
+    "registration_year": 2021,
+    "registration_month": 12,
+    "engine_type": "Electric",
+    "country": "DE",
+    "source_url": "https://suchen.mobile.de/auto-inserat/citroen-c4-elec-feelpack-136-borken/446954800.html"
+  },
+  "pricing": {
+    "gross_eur": 14890.0,
+    "net_eur": 12512.0,
+    "vat_percent": 19.0,
+    "vat_reclaimable": true
+  },
+  "steps": [
+    {
+      "name": "price_net_eur",
+      "value": 12512.0,
+      "note": "payload.net_eur"
+    },
+    {
+      "name": "eur_rate",
+      "value": 91.08
+    },
+    {
+      "name": "eur_to_rub",
+      "formula": "price_net_eur * eur_rate",
+      "value": 1139592.96
+    },
+    {
+      "name": "bank_transfer_eu",
+      "value": 1122.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "purchase_netto",
+      "value": 2190.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "inspection",
+      "value": 400.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "delivery_eu_moscow",
+      "value": 5900.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "insurance_broker_commission",
+      "value": 5839.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "investor_fee",
+      "value": 0.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "broker_elpts",
+      "value": 0.0,
+      "currency": "RUB"
+    },
+    {
+      "name": "customs_fee",
+      "value": 0.0,
+      "currency": "RUB"
+    },
+    {
+      "name": "Пошлина",
+      "value": 491832.0,
+      "currency": "RUB"
+    },
+    {
+      "name": "Утилизационный сбор",
+      "value": 3400,
+      "currency": "RUB"
+    },
+    {
+      "name": "Итого (RUB)",
+      "value": 3042102.04,
+      "currency": "RUB"
+    }
+  ],
+  "result": {
+    "scenario": "3_5",
+    "total_rub": 3042102.04,
+    "euro_rate_used": 91.08,
+    "config_version": "202601"
+  },
+  "notes": [
+    "fuel_conflict: engine_type electric but engine_cc>0, treating as ICE/PHEV"
+  ],
+  "config": {
+    "version": "202601",
+    "source": "yaml"
+  }
+}

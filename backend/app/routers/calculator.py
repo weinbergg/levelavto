@@ -7,7 +7,7 @@ from ..services.calculator_config_service import CalculatorConfigService
 from ..services.calculator_runtime import is_bev
 from ..services.calculator_extractor import CalculatorExtractor
 from ..services.cars_service import CarsService
-from ..services.calc_debug import build_calc_debug
+from ..services.calc_debug import build_calc_debug, build_calc_compare
 from fastapi import UploadFile, File
 import tempfile
 import json
@@ -146,6 +146,20 @@ def calc_debug_endpoint(
 ):
     try:
         return build_calc_debug(db, car_id=car_id, eur_rate=eur_rate, usd_rate=usd_rate, scenario=scenario)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/calc_compare")
+def calc_compare_endpoint(
+    car_id: int = Query(..., ge=1),
+    eur_rate: Optional[float] = Query(default=None),
+    usd_rate: Optional[float] = Query(default=None),
+    scenario: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return build_calc_compare(db, car_id=car_id, eur_rate=eur_rate, usd_rate=usd_rate, scenario=scenario)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

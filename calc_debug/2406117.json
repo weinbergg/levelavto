@@ -1,0 +1,133 @@
+{
+  "input": {
+    "car_id": 2406117,
+    "scenario": null,
+    "eur_rate": 91.08,
+    "usd_rate": 75.7327,
+    "price_net_eur": 30966.0
+  },
+  "car": {
+    "id": 2406117,
+    "brand": "Nissan",
+    "model": "Primastar",
+    "variant": "Kombi L1H1 Tekna #BT #ANDROID #NAVI",
+    "price": 36850.0,
+    "currency": "EUR",
+    "engine_cc": 2000,
+    "power_hp": 150.0,
+    "power_kw": 110.32,
+    "registration_year": 2025,
+    "registration_month": 6,
+    "engine_type": "Diesel",
+    "country": "DE",
+    "source_url": "https://suchen.mobile.de/auto-inserat/nissan-primastar-kombi-l1h1-tekna-bt-android-navi-bayreuth/446954809.html"
+  },
+  "pricing": {
+    "gross_eur": 36850.0,
+    "net_eur": 30966.0,
+    "vat_percent": 19.0,
+    "vat_reclaimable": true
+  },
+  "steps": [
+    {
+      "name": "price_net_eur",
+      "value": 30966.0,
+      "note": "payload.net_eur"
+    },
+    {
+      "name": "eur_rate",
+      "value": 91.08
+    },
+    {
+      "name": "eur_to_rub",
+      "formula": "price_net_eur * eur_rate",
+      "value": 2820383.28
+    },
+    {
+      "name": "bank_transfer_eu",
+      "value": 1122.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "purchase_netto",
+      "value": 2190.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "inspection",
+      "value": 400.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "delivery_eu_minsk",
+      "value": 5500.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "customs_transfer_fee",
+      "value": 117.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "delivery_minsk_moscow",
+      "value": 400.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "elpts",
+      "value": 600.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "insurance_broker_commission",
+      "value": 5839.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "investor_fee",
+      "value": 0.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "customs_by",
+      "value": 17518.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "broker_elpts",
+      "value": 0.0,
+      "currency": "RUB"
+    },
+    {
+      "name": "customs_fee",
+      "value": 0.0,
+      "currency": "RUB"
+    },
+    {
+      "name": "Пошлина",
+      "value": 491832.0,
+      "currency": "RUB"
+    },
+    {
+      "name": "Утилизационный сбор",
+      "value": 3400,
+      "currency": "RUB"
+    },
+    {
+      "name": "Итого (RUB)",
+      "value": 6383736.16,
+      "currency": "RUB"
+    }
+  ],
+  "result": {
+    "scenario": "under_3",
+    "total_rub": 6383736.16,
+    "euro_rate_used": 91.08,
+    "config_version": "202601"
+  },
+  "notes": [],
+  "config": {
+    "version": "202601",
+    "source": "yaml"
+  }
+}

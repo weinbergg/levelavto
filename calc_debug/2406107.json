@@ -1,0 +1,115 @@
+{
+  "input": {
+    "car_id": 2406107,
+    "scenario": null,
+    "eur_rate": 91.08,
+    "usd_rate": 75.7327,
+    "price_net_eur": 27630.0
+  },
+  "car": {
+    "id": 2406107,
+    "brand": "Mercedes-Benz",
+    "model": "GLC 300",
+    "variant": "GLC300 e 4Matic*AHK*360°*Business",
+    "price": 32880.0,
+    "currency": "EUR",
+    "engine_cc": 2000,
+    "power_hp": 211.0,
+    "power_kw": 155.19,
+    "registration_year": 2022,
+    "registration_month": 2,
+    "engine_type": "Electric",
+    "country": "DE",
+    "source_url": "https://suchen.mobile.de/auto-inserat/mercedes-benz-glc300-e-4matic-ahk-360-business-oberursel-taunus/445779431.html"
+  },
+  "pricing": {
+    "gross_eur": 32880.0,
+    "net_eur": 27630.0,
+    "vat_percent": 19.0,
+    "vat_reclaimable": true
+  },
+  "steps": [
+    {
+      "name": "price_net_eur",
+      "value": 27630.0,
+      "note": "payload.net_eur"
+    },
+    {
+      "name": "eur_rate",
+      "value": 91.08
+    },
+    {
+      "name": "eur_to_rub",
+      "formula": "price_net_eur * eur_rate",
+      "value": 2516540.4
+    },
+    {
+      "name": "bank_transfer_eu",
+      "value": 1122.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "purchase_netto",
+      "value": 2190.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "inspection",
+      "value": 400.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "delivery_eu_moscow",
+      "value": 5900.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "insurance_broker_commission",
+      "value": 5839.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "investor_fee",
+      "value": 0.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "broker_elpts",
+      "value": 0.0,
+      "currency": "RUB"
+    },
+    {
+      "name": "customs_fee",
+      "value": 0.0,
+      "currency": "RUB"
+    },
+    {
+      "name": "Пошлина",
+      "value": 491832.0,
+      "currency": "RUB"
+    },
+    {
+      "name": "Утилизационный сбор",
+      "value": 952800,
+      "currency": "RUB"
+    },
+    {
+      "name": "Итого (RUB)",
+      "value": 5368449.48,
+      "currency": "RUB"
+    }
+  ],
+  "result": {
+    "scenario": "3_5",
+    "total_rub": 5368449.48,
+    "euro_rate_used": 91.08,
+    "config_version": "202601"
+  },
+  "notes": [
+    "fuel_conflict: engine_type electric but engine_cc>0, treating as ICE/PHEV"
+  ],
+  "config": {
+    "version": "202601",
+    "source": "yaml"
+  }
+}
