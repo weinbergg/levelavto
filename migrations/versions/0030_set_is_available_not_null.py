@@ -9,7 +9,7 @@ from alembic import op
 
 
 revision = "0030_set_is_available_not_null"
-down_revision = "0029_add_idx_country_price_avail"
+down_revision = "0029_idx_country_price"
 branch_labels = None
 depends_on = None
 

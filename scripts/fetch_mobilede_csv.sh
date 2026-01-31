@@ -65,9 +65,14 @@ echo "[fetch-mobilede] importing..."
 docker compose exec "$WEB" python -m backend.app.tools.mobilede_csv_import --file "/app/tmp/mobilede_active_offers_${fetch_date}.csv" --skip-deactivate --stats-file backend/app/runtime/jobs/mobilede_last.json
 python -m backend.app.tools.notify_tg --job mobilede --result backend/app/runtime/jobs/mobilede_last.json || true
 echo "[fetch-mobilede] invalidating redis cache keys..."
-docker compose exec -T redis redis-cli KEYS "cars_count:*" | xargs -r docker compose exec -T redis redis-cli DEL
-docker compose exec -T redis redis-cli KEYS "cars_list:*" | xargs -r docker compose exec -T redis redis-cli DEL
-docker compose exec -T redis redis-cli KEYS "filter_ctx_*" | xargs -r docker compose exec -T redis redis-cli DEL
+del_pattern() {
+  local pattern="$1"
+  docker compose exec -T redis redis-cli --scan --pattern "$pattern" | \
+    xargs -r docker compose exec -T redis redis-cli DEL
+}
+del_pattern "cars_count:*"
+del_pattern "cars_list:*"
+del_pattern "filter_ctx_*"
 if [[ "$KEEP_CSV" != "1" ]]; then
   rm -f "${TMP_DIR}/mobilede_active_offers_${fetch_date}.csv" || true
   rm -f "${TMP_DIR}/mobilede_active_offers_${yesterday_utc}.csv" || true

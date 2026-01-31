@@ -4,7 +4,13 @@ from typing import Dict, Any, List, Tuple
 
 from backend.app.db import SessionLocal
 from backend.app.services.cars_service import CarsService
-from backend.app.routers.catalog import filter_ctx_base, filter_ctx_brand, filter_ctx_model, list_cars
+from backend.app.routers.catalog import (
+    filter_ctx_base,
+    filter_ctx_brand,
+    filter_ctx_model,
+    list_cars,
+    TOP_BRANDS,
+)
 from backend.app.utils.redis_cache import (
     redis_set_json,
     build_total_cars_key,
@@ -67,11 +73,11 @@ def main() -> None:
         for params in base_tasks:
             key, ms = _prewarm_base(db, params)
             print(f"[prewarm] filter_ctx_base key={key} ms={ms:.2f}")
-        brand_tasks = [
-            {"region": "EU", "country": "DE", "brand": "BMW"},
-            {"region": "EU", "country": "DE", "brand": "Mercedes-Benz"},
-            {"region": "EU", "country": "AT", "brand": "Cadillac"},
-        ]
+        eu_countries = ["DE", "AT", "NL", "BE", "FR", "IT", "ES"]
+        brand_tasks = []
+        for b in TOP_BRANDS:
+            brand_tasks.append({"region": "EU", "country": "DE", "brand": b})
+        brand_tasks.append({"region": "EU", "country": "AT", "brand": "Cadillac"})
         for params in brand_tasks:
             key, ms = _prewarm_brand(db, params)
             print(f"[prewarm] filter_ctx_brand key={key} ms={ms:.2f}")
@@ -87,9 +93,10 @@ def main() -> None:
         count_keys = [
             {"region": "EU"},
             {"region": "KR"},
-            {"region": "EU", "country": "DE"},
-            {"region": "EU", "country": "AT"},
         ]
+        for c in eu_countries:
+            count_keys.append({"region": "EU", "country": c})
+        count_keys.append({"region": "EU", "country": "AT"})
         for params in count_keys:
             normalized = normalize_count_params(params)
             count = service.count_cars(**normalized)

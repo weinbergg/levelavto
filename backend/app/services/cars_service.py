@@ -332,19 +332,19 @@ class CarsService:
             c = normalize_country_code(country)
             if c == "KR":
                 kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-                conds = [func.upper(Car.country).like("KR%")]
+                conds = [Car.country.like("KR%")]
                 if kr_sources:
                     conds.append(Car.source_id.in_(kr_sources))
                 conditions.append(or_(*conds))
             elif c == "EU":
                 region = "EU"
             elif c:
-                conditions.append(func.upper(Car.country) == c)
+                conditions.append(Car.country == c)
         if region:
             r = region.upper()
             if r == "KR":
                 kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-                conds = [func.upper(Car.country).like("KR%")]
+                conds = [Car.country.like("KR%")]
                 if kr_sources:
                     conds.append(Car.source_id.in_(kr_sources))
                 conditions.append(or_(*conds))
@@ -353,7 +353,7 @@ class CarsService:
                 if eu_sources:
                     conditions.append(Car.source_id.in_(eu_sources))
                 else:
-                    conditions.append(func.upper(Car.country).in_(self.EU_COUNTRIES))
+                    conditions.append(Car.country.in_(self.EU_COUNTRIES))
         if kr_type:
             kt_raw = str(kr_type).upper()
             kt = None
@@ -363,7 +363,7 @@ class CarsService:
                 kt = "import"
             if kt:
                 kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-                conds = [func.lower(Car.kr_market_type) == kt, func.upper(Car.country).like("KR%")]
+                conds = [func.lower(Car.kr_market_type) == kt, Car.country.like("KR%")]
                 if kr_sources:
                     conds.append(Car.source_id.in_(kr_sources))
                 conditions.append(and_(or_(*conds)))
@@ -615,7 +615,7 @@ class CarsService:
                     region = "EU"
             elif c == "KR":
                 kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-                kr_conds = [func.upper(Car.country).like("KR%")]
+                kr_conds = [Car.country.like("KR%")]
                 if kr_sources:
                     kr_conds.append(Car.source_id.in_(kr_sources))
                 conditions.append(or_(*kr_conds))
@@ -634,7 +634,7 @@ class CarsService:
                 if eu_sources:
                     conditions.append(Car.source_id.in_(eu_sources))
                 else:
-                    conditions.append(func.upper(Car.country).in_(self.EU_COUNTRIES))
+                    conditions.append(Car.country.in_(self.EU_COUNTRIES))
         if kr_type:
             kt_raw = str(kr_type).upper()
             kt = None
@@ -646,7 +646,7 @@ class CarsService:
                 # allow KR by country or by source hints
                 kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
                 conds = [func.lower(Car.kr_market_type) == kt]
-                conds.append(func.upper(Car.country).like("KR%"))
+                conds.append(Car.country.like("KR%"))
                 if kr_sources:
                     conds.append(Car.source_id.in_(kr_sources))
                 conditions.append(and_(or_(*conds)))
