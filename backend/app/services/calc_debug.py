@@ -108,6 +108,9 @@ def build_calc_debug(
         },
         "car": {
             "id": car.id,
+            "brand": car.brand,
+            "model": car.model,
+            "variant": car.variant,
             "price": float(car.price) if car.price is not None else None,
             "currency": car.currency,
             "engine_cc": car.engine_cc,
