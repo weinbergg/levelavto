@@ -77,10 +77,25 @@ def main() -> None:
         categories = [
             ("bev", lambda c: _is_bev(c)),
             ("phev_hybrid", lambda c: _is_phev_or_hybrid(c)),
-            ("ice_under_3", lambda c: (c.engine_cc and c.engine_cc > 0) and (_age_months(c.registration_year, c.registration_month) is not None) and _age_months(c.registration_year, c.registration_month) < 36),
-            ("ice_3_5", lambda c: (c.engine_cc and c.engine_cc > 0) and (_age_months(c.registration_year, c.registration_month) is not None) and 36 <= _age_months(c.registration_year, c.registration_month) <= 60),
-            ("ice_over_5", lambda c: (c.engine_cc and c.engine_cc > 0) and (_age_months(c.registration_year, c.registration_month) is not None) and _age_months(c.registration_year, c.registration_month) > 60),
-            ("diesel", lambda c: c.engine_type and "diesel" in c.engine_type.lower()),
+            (
+                "ice_under_3",
+                lambda c: (c.engine_cc and c.engine_cc > 0)
+                and (_age_months(c.registration_year, c.registration_month) is not None)
+                and _age_months(c.registration_year, c.registration_month) < 36,
+            ),
+            (
+                "ice_3_5",
+                lambda c: (c.engine_cc and c.engine_cc > 0)
+                and (_age_months(c.registration_year, c.registration_month) is not None)
+                and 36 <= _age_months(c.registration_year, c.registration_month) <= 60,
+            ),
+            (
+                "ice_over_5",
+                lambda c: (c.engine_cc and c.engine_cc > 0)
+                and (_age_months(c.registration_year, c.registration_month) is not None)
+                and _age_months(c.registration_year, c.registration_month) > 60,
+            ),
+            ("diesel", lambda c: c.engine_cc and c.engine_cc > 0 and c.engine_type and "diesel" in c.engine_type.lower()),
             ("big_cc", lambda c: c.engine_cc and c.engine_cc >= 3000),
             ("small_cc", lambda c: c.engine_cc and c.engine_cc <= 1600),
         ]
@@ -99,32 +114,45 @@ def main() -> None:
         manifest = []
         for item in selected:
             car_id = int(item["id"])
-            payload = build_calc_debug(db, car_id, eur_rate=args.eur_rate, usd_rate=args.usd_rate)
             path = os.path.join(out_dir, f"{car_id}.json")
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=False, indent=2)
-            car = payload.get("car", {})
-            manifest.append(
-                {
-                    "category": item["category"],
-                    "car_id": car_id,
-                    "brand": car.get("brand"),
-                    "model": car.get("model"),
-                    "engine_cc": car.get("engine_cc"),
-                    "engine_type": car.get("engine_type"),
-                    "registration_year": car.get("registration_year"),
-                    "registration_month": car.get("registration_month"),
-                    "source_url": car.get("source_url"),
-                    "json_path": path,
-                }
-            )
+            try:
+                payload = build_calc_debug(db, car_id, eur_rate=args.eur_rate, usd_rate=args.usd_rate)
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, ensure_ascii=False, indent=2)
+                car = payload.get("car", {})
+                manifest.append(
+                    {
+                        "category": item["category"],
+                        "car_id": car_id,
+                        "brand": car.get("brand"),
+                        "model": car.get("model"),
+                        "engine_cc": car.get("engine_cc"),
+                        "engine_type": car.get("engine_type"),
+                        "registration_year": car.get("registration_year"),
+                        "registration_month": car.get("registration_month"),
+                        "source_url": car.get("source_url"),
+                        "json_path": path,
+                    }
+                )
+            except Exception as exc:
+                manifest.append(
+                    {
+                        "category": item["category"],
+                        "car_id": car_id,
+                        "error": str(exc),
+                        "json_path": None,
+                    }
+                )
 
         manifest_path = os.path.join(out_dir, "manifest.json")
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
         print(f"[calc_debug_sample] wrote {len(manifest)} items to {out_dir}")
         for row in manifest:
-            print(f"[calc_debug_sample] {row['category']}: {row['car_id']} {row.get('source_url')}")
+            if row.get("error"):
+                print(f"[calc_debug_sample] {row['category']}: {row['car_id']} error={row['error']}")
+            else:
+                print(f"[calc_debug_sample] {row['category']}: {row['car_id']} {row.get('source_url')}")
 
 
 if __name__ == "__main__":
