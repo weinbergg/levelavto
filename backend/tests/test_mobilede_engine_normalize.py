@@ -1,9 +1,17 @@
 from backend.app.parsing.mobile_de_feed import MobileDeFeedParser
-from backend.app.parsing.config import SiteConfig
+from backend.app.parsing.config import SiteConfig, PaginationConfig
 
 
 def _parser():
-    return MobileDeFeedParser(SiteConfig(key="mobilede", country="DE"))
+    cfg = SiteConfig(
+        key="mobilede",
+        name="mobile.de",
+        country="DE",
+        type="json",
+        base_search_url="https://example.com",
+        pagination=PaginationConfig(),
+    )
+    return MobileDeFeedParser(cfg)
 
 
 def test_normalize_engine_prefers_hybrid():
