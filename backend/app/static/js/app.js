@@ -49,7 +49,8 @@
   }
 
   function formatRub(val) {
-    const rounded = Math.ceil(Number(val))
+    const n = Number(val)
+    const rounded = Math.ceil(n / 100000) * 100000
     return `${rounded.toLocaleString('ru-RU')} ₽`
   }
 
@@ -941,8 +942,8 @@
         let regLabel = ''
         if (car.registration_year) {
           const m = Number(car.registration_month || 1)
-          const mm = m > 9 ? String(m) : `0${m}`
-          regLabel = `${mm}.${car.registration_year}`
+          const label = window.MONTH_LABELS && window.MONTH_LABELS[m]
+          regLabel = label ? `${label} ${car.registration_year}` : `${String(m).padStart(2, '0')}.${car.registration_year}`
         } else if (car.year) {
           regLabel = String(car.year)
         }

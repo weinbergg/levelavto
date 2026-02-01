@@ -65,7 +65,8 @@
           <div class="detail-price">
             <div class="detail-price__total">
               {% if display_price %}
-                {{ '{:,.0f}'.format(display_price).replace(',', ' ') }} ₽
+                {% set display_price_round = ((display_price + 99999) // 100000) * 100000 %}
+                {{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽
               {% elif car.price and car.currency %}
                 {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency }}
               {% else %}

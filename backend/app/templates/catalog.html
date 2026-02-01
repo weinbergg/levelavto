@@ -297,8 +297,13 @@
                   <div class="car-card__title">{{ car.brand or '' }} {{ car.model or '' }}</div>
                   {% set meta = [] %}
                   {% if car.registration_year %}
-                    {% set reg_month = '%02d'|format(car.registration_month or 1) %}
-                    {% set _ = meta.append(reg_month ~ '.' ~ car.registration_year) %}
+                    {% set reg_month = car.registration_month or 1 %}
+                    {% set reg_month_label = (reg_months | selectattr('value', 'equalto', reg_month) | map(attribute='label') | first) %}
+                    {% if reg_month_label %}
+                      {% set _ = meta.append(reg_month_label ~ ' ' ~ car.registration_year) %}
+                    {% else %}
+                      {% set _ = meta.append('%02d'|format(reg_month) ~ '.' ~ car.registration_year) %}
+                    {% endif %}
                   {% elif car.year %}
                     {% set _ = meta.append(car.year) %}
                   {% endif %}
@@ -332,7 +337,8 @@
                 </div>
                 <div class="car-card__price">
                   {% if car.display_price_rub %}
-                    <div class="price-main">{{ '{:,.0f}'.format(car.display_price_rub).replace(',', ' ') }} ₽</div>
+                    {% set display_price_round = ((car.display_price_rub + 99999) // 100000) * 100000 %}
+                    <div class="price-main">{{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽</div>
                   {% elif car.price and car.currency %}
                     <div class="price-main">{{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency }}</div>
                   {% else %}
@@ -356,5 +362,10 @@
 <script>
   window.CATALOG_API = "/api/cars";
   window.COUNTRY_LABELS = {{ country_labels | tojson }};
+  {% set month_labels = {} %}
+  {% for m in reg_months %}
+    {% set _ = month_labels.update({m.value: m.label}) %}
+  {% endfor %}
+  window.MONTH_LABELS = {{ month_labels | tojson }};
 </script>
 {% endblock %}
