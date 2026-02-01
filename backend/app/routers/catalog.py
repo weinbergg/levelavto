@@ -638,6 +638,8 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     if not car:
         raise HTTPException(status_code=404, detail="Car not found")
     detail = CarDetailOut.model_validate(car)
+    if car.images:
+        detail.images = [im.url for im in car.images if im.url]
     detail.display_price_rub = display_price_rub(
         car.total_price_rub_cached,
         car.price_rub_cached,

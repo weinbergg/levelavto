@@ -149,8 +149,37 @@ util_tables: &util_tables
       - { from: 461, to: 500,   price_rub: 4425600 }
       - { from: 501, to: 10000, price_rub: 4581600 }
 
-# Возрастные таблицы утиля. Пока используем одинаковые данные,
-# но оставляем возможность менять отдельно под возрастные корзины.
+# Возрастные таблицы утиля. Для 3–5 лет используем уточненные значения.
 util_tables_under3: *util_tables
-util_tables_3_5: *util_tables
+util_tables_3_5:
+  <<: *util_tables
+  "2000-3000":
+    kw:
+      - { from: 0.00,   to: 117.68, price_rub: 3400 }
+      - { from: 117.69, to: 139.75, price_rub: 2306800 }
+      - { from: 139.76, to: 161.81, price_rub: 2364800 }
+      - { from: 161.82, to: 183.88, price_rub: 2402400 }
+      - { from: 183.89, to: 205.94, price_rub: 2520800 }
+      - { from: 205.95, to: 228.00, price_rub: 3770400 }
+      - { from: 228.01, to: 250.00, price_rub: 2726400 }
+      - { from: 250.01, to: 272.13, price_rub: 2834400 }
+      - { from: 272.14, to: 294.20, price_rub: 2949600 }
+      - { from: 294.21, to: 316.26, price_rub: 3067200 }
+      - { from: 316.27, to: 338.33, price_rub: 3189600 }
+      - { from: 338.34, to: 367.75, price_rub: 3316800 }
+      - { from: 367.76, to: 10000.00, price_rub: 3448800 }
+    hp:
+      - { from: 0,   to: 160,   price_rub: 3400 }
+      - { from: 161, to: 190,   price_rub: 2306800 }
+      - { from: 191, to: 220,   price_rub: 2364800 }
+      - { from: 221, to: 250,   price_rub: 2402400 }
+      - { from: 251, to: 280,   price_rub: 2520800 }
+      - { from: 281, to: 310,   price_rub: 3770400 }
+      - { from: 311, to: 340,   price_rub: 2726400 }
+      - { from: 341, to: 370,   price_rub: 2834400 }
+      - { from: 371, to: 400,   price_rub: 2949600 }
+      - { from: 401, to: 430,   price_rub: 3067200 }
+      - { from: 431, to: 460,   price_rub: 3189600 }
+      - { from: 461, to: 500,   price_rub: 3316800 }
+      - { from: 501, to: 10000, price_rub: 3448800 }
 util_tables_electric: *util_tables

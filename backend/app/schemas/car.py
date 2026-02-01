@@ -66,3 +66,4 @@ class CarDetailOut(CarBase):
     display_country_label: Optional[str] = None
     display_engine_type: Optional[str] = None
     display_transmission: Optional[str] = None
+    images: Optional[List[Any]] = None

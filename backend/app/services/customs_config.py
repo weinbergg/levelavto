@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 import yaml
+import logging
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -86,6 +87,7 @@ def _validate_no_overlap(rows: List[Any], name: str) -> None:
 
 
 _CFG_CACHE: Optional[CustomsConfig] = None
+logger = logging.getLogger(__name__)
 
 
 def load_customs_config(path: Path) -> CustomsConfig:
@@ -148,12 +150,22 @@ def calc_util_fee_rub(
         raise ValueError(f"util table {bucket.table} not found")
 
     use_kw = kw is not None and float(kw) > 0
+    rng = None
     if use_kw:
         rng = _find_range_util(table.kw, float(kw))
+        if rng is None and hp is not None:
+            # fallback to hp table if kw does not match any range
+            rng = _find_range_util(table.hp, float(hp))
     else:
         if hp is None:
-            raise ValueError("hp is required when kw is not provided")
-        rng = _find_range_util(table.hp, float(hp))
+            # fallback to lowest available range (safe minimal value)
+            if table.hp:
+                logger.warning("util_fee_missing_power_cc=%s age_bucket=%s", engine_cc, age_bucket)
+                rng = table.hp[0]
+            else:
+                raise ValueError("hp is required when kw is not provided")
+        else:
+            rng = _find_range_util(table.hp, float(hp))
     if rng is None:
         raise ValueError("util range not found for provided power")
     return int(rng.price_rub)
