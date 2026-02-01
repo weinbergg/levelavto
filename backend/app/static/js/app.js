@@ -929,11 +929,24 @@
           : ''
         const photosCount = car.photos_count ?? car.images_count
         const more = (photosCount && photosCount > 1 && car.thumbnail_url) ? `<span class="more-badge">+${photosCount - 1} фото</span>` : ''
-        const displayRub = car.total_price_rub_cached ?? car.price_rub_cached
-        const calcLine = `<div class="price-main">${displayRub != null ? formatRub(displayRub) : '—'}</div>`
+        const displayRub = car.display_price_rub
+        let priceText = displayRub != null ? formatRub(displayRub) : ''
+        if (!priceText && car.price != null && car.currency) {
+          priceText = `${Number(car.price).toLocaleString('ru-RU')} ${car.currency}`
+        }
+        if (!priceText) priceText = 'Цена по запросу'
+        const calcLine = `<div class="price-main">${priceText}</div>`
         const priceLines = []
         const footnote = ''
-        const metaLine = [car.year, car.display_engine_type || car.engine_type].filter(Boolean).join(' · ')
+        let regLabel = ''
+        if (car.registration_year) {
+          const m = Number(car.registration_month || 1)
+          const mm = m > 9 ? String(m) : `0${m}`
+          regLabel = `${mm}.${car.registration_year}`
+        } else if (car.year) {
+          regLabel = String(car.year)
+        }
+        const metaLine = [regLabel, car.display_engine_type || car.engine_type].filter(Boolean).join(' · ')
         const colorDot = (hex, raw) => {
           if (!hex) return ''
           const title = raw ? ` title="${escapeHtml(raw)}"` : ''
@@ -2112,8 +2125,12 @@
           card.className = 'car-card'
           const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
           let thumb = normalizeThumbUrl(thumbRaw, { thumb: true })
-          const displayRub = car.total_price_rub_cached ?? car.price_rub_cached
-          const price = displayRub != null ? formatRub(displayRub) : '—'
+          const displayRub = car.display_price_rub
+          let price = displayRub != null ? formatRub(displayRub) : ''
+          if (!price && car.price != null && car.currency) {
+            price = `${Number(car.price).toLocaleString('ru-RU')} ${car.currency}`
+          }
+          if (!price) price = 'Цена по запросу'
           card.innerHTML = `
             <div class="thumb-wrap">
               <img class="thumb" src="${thumb}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-thumb="${thumb}" data-id="${car.id}" onerror="this.onerror=null;this.src='/static/img/no-photo.svg';" />

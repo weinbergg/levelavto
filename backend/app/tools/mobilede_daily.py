@@ -150,6 +150,7 @@ def main() -> None:
         run_date = dt.datetime.utcnow().date()
     started_ts = time.time()
 
+    print(f"[mobilede_daily] daily start date={run_date:%Y-%m-%d}", flush=True)
     target = DOWNLOAD_DIR / f"mobilede_active_offers_{run_date:%Y-%m-%d}.csv"
     download_file(run_date, target)
     if KEEP_CSV:
@@ -187,6 +188,7 @@ def main() -> None:
                     stats = json.loads(stats_file.read_text(encoding="utf-8"))
             except Exception:
                 stats = {}
+            print("[mobilede_daily] daily stats collected", flush=True)
             try:
                 from backend.app.db import SessionLocal
                 from backend.app.models import Car, Source
@@ -222,11 +224,14 @@ def main() -> None:
                 "elapsed_sec": int(time.time() - started_ts),
             }
             msg = format_daily_report(report_payload)
+            print("[mobilede_daily] telegram send attempt", flush=True)
             ok = send_telegram_message(token, chat_id, msg)
-            if not ok:
-                print("[mobilede_daily] telegram send failed")
+            if ok:
+                print("[mobilede_daily] telegram send ok", flush=True)
+            else:
+                print("[mobilede_daily] telegram send error", flush=True)
         else:
-            print("[mobilede_daily] telegram disabled (missing TELEGRAM_BOT_TOKEN/CHAT_ID)")
+            print("[mobilede_daily] telegram disabled: missing TELEGRAM_BOT_TOKEN/CHAT_ID", flush=True)
 
 
 if __name__ == "__main__":

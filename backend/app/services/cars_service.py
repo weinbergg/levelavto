@@ -1020,17 +1020,25 @@ class CarsService:
 
         order_clause = []
         if sort == "price_asc":
+            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+            missing_price = and_(
+                Car.total_price_rub_cached.is_(None),
+                Car.price_rub_cached.is_(None),
+            )
             order_clause = [
-                (Car.total_price_rub_cached.is_(None)).asc(),
-                Car.total_price_rub_cached.asc(),
-                Car.price_rub_cached.asc().nullslast(),
+                missing_price.asc(),
+                price_expr.asc().nullslast(),
                 Car.id.asc(),
             ]
         elif sort == "price_desc":
+            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+            missing_price = and_(
+                Car.total_price_rub_cached.is_(None),
+                Car.price_rub_cached.is_(None),
+            )
             order_clause = [
-                (Car.total_price_rub_cached.is_(None)).asc(),
-                Car.total_price_rub_cached.desc(),
-                Car.price_rub_cached.desc().nullslast(),
+                missing_price.asc(),
+                price_expr.desc().nullslast(),
                 Car.id.asc(),
             ]
         elif sort == "year_desc":
@@ -1065,10 +1073,14 @@ class CarsService:
                     Car.brand,
                     Car.model,
                     Car.year,
+                    Car.registration_year,
+                    Car.registration_month,
                     Car.mileage,
                     Car.total_price_rub_cached,
                     Car.price_rub_cached,
                     Car.calc_updated_at,
+                    Car.price,
+                    Car.currency,
                     Car.thumbnail_url,
                     Car.country,
                     Car.source_id,

@@ -11,6 +11,7 @@ from ..utils.taxonomy import (
     ru_transmission,
     color_hex,
 )
+from ..utils.price_utils import display_price_rub
 from ..utils.color_groups import normalize_color_group, color_group_label
 from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
 from ..utils.redis_cache import (
@@ -423,15 +424,20 @@ def list_cars(
         thumb_url = pick_classistatic_thumb(thumb_url)
         if isinstance(thumb_url, str) and "rule=mo-" in thumb_url:
             thumb_replaced += 1
+        total_cached = c.get("total_price_rub_cached")
+        price_cached = c.get("price_rub_cached")
         payload_items.append(
             {
                 "id": c.get("id"),
                 "brand": c.get("brand"),
                 "model": c.get("model"),
                 "year": c.get("year"),
+                "registration_year": c.get("registration_year"),
+                "registration_month": c.get("registration_month"),
                 "mileage": c.get("mileage"),
-                "total_price_rub_cached": c.get("total_price_rub_cached"),
-                "price_rub_cached": c.get("price_rub_cached"),
+                "total_price_rub_cached": total_cached,
+                "price_rub_cached": price_cached,
+                "display_price_rub": display_price_rub(total_cached, price_cached),
                 "calc_updated_at": c.get("calc_updated_at"),
                 "thumbnail_url": thumb_url,
                 "country": country_norm or country_raw,
@@ -442,6 +448,8 @@ def list_cars(
                 "power_hp": c.get("power_hp"),
                 "images_count": img_count,
                 "photos_count": img_count,
+                "price": c.get("price"),
+                "currency": c.get("currency"),
             }
         )
     t3 = time.perf_counter()
@@ -630,6 +638,10 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     if not car:
         raise HTTPException(status_code=404, detail="Car not found")
     detail = CarDetailOut.model_validate(car)
+    detail.display_price_rub = display_price_rub(
+        car.total_price_rub_cached,
+        car.price_rub_cached,
+    )
     if car.source:
         detail.source_name = car.source.name
         detail.source_country = car.source.country

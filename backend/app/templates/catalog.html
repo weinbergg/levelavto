@@ -296,7 +296,12 @@
                 <div>
                   <div class="car-card__title">{{ car.brand or '' }} {{ car.model or '' }}</div>
                   {% set meta = [] %}
-                  {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %}
+                  {% if car.registration_year %}
+                    {% set reg_month = '%02d'|format(car.registration_month or 1) %}
+                    {% set _ = meta.append(reg_month ~ '.' ~ car.registration_year) %}
+                  {% elif car.year %}
+                    {% set _ = meta.append(car.year) %}
+                  {% endif %}
                   {% if car.engine_type %}{% set _ = meta.append(car.engine_type) %}{% endif %}
                   {% if meta %}
                     <div class="car-card__meta">{{ meta|join(' · ') }}</div>
@@ -326,11 +331,12 @@
                   </ul>
                 </div>
                 <div class="car-card__price">
-                  {% set price_val = car.total_price_rub_cached or car.price_rub_cached %}
-                  {% if price_val %}
-                    <div class="price-main">{{ '{:,.0f}'.format(price_val).replace(',', ' ') }} ₽</div>
+                  {% if car.display_price_rub %}
+                    <div class="price-main">{{ '{:,.0f}'.format(car.display_price_rub).replace(',', ' ') }} ₽</div>
+                  {% elif car.price and car.currency %}
+                    <div class="price-main">{{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency }}</div>
                   {% else %}
-                    <div class="price-main">—</div>
+                    <div class="price-main">Цена по запросу</div>
                   {% endif %}
                 </div>
               </div>

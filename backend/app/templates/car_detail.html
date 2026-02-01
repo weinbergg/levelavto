@@ -61,31 +61,17 @@
           {% set net = pricing.net_eur if pricing else None %}
           {% set vat_pct = pricing.vat_percent if pricing else None %}
           {% set vat_reclaim = pricing.vat_reclaimable if pricing else False %}
-          {% set has_total = calc and calc.total_rub %}
-          {% set base_line = gross or car.price %}
-          {% set is_kr = (car.display_country_code or car.country or '')|upper == 'KR' %}
+          {% set display_price = car.display_price_rub %}
           <div class="detail-price">
             <div class="detail-price__total">
-              {% if is_kr %}
-                {% set kr_price = car.total_price_rub_cached or car.price_rub_cached %}
-                {% if kr_price %}
-                  {{ '{:,.0f}'.format(kr_price).replace(',', ' ') }} ₽
-                {% elif car.price %}
-                  {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}
-                {% else %}
-                  Цена по запросу
-                {% endif %}
+              {% if display_price %}
+                {{ '{:,.0f}'.format(display_price).replace(',', ' ') }} ₽
+              {% elif car.price and car.currency %}
+                {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency }}
               {% else %}
-                {% if has_total %}
-                {{ '{:,.0f}'.format(calc.total_rub).replace(',', ' ') }} ₽
-                {% elif base_line %}
-                {{ '{:,.0f}'.format(base_line).replace(',', ' ') }} {{ car.currency or '€' }}{% if not has_total %} *{% endif %}
-                {% else %}
                 Цена по запросу
-                {% endif %}
               {% endif %}
             </div>
-            {% if not is_kr %}
             <div class="detail-price__meta">
               {% if gross %}
               BRUTTO: {{ '{:,.0f}'.format(gross).replace(',', ' ') }} €
@@ -98,11 +84,7 @@
               {% if vat_pct is not none %}
               <br>НДС: {% if vat_reclaim %}возмещается ({{ vat_pct }}%){% else %}не возмещается{% endif %}
               {% endif %}
-              {% if not has_total %}
-              <br><span class="muted">* Итог в РФ уточняйте — свяжитесь с нами</span>
-              {% endif %}
             </div>
-            {% endif %}
           </div>
           {% if meta %}
           <p class="muted detail-meta">{{ meta|join(' · ') }}</p>

@@ -39,6 +39,7 @@ from ..utils.taxonomy import (
     normalize_color as _normalize_color,
     color_hex,
 )
+from ..utils.price_utils import display_price_rub
 normalize_color = _normalize_color
 from ..utils.country_map import country_label_ru, resolve_display_country, normalize_country_code
 from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
@@ -828,6 +829,13 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
 
         if isinstance(items, list):
             initial_items = items
+            for c in initial_items:
+                if not isinstance(c, dict):
+                    continue
+                c["display_price_rub"] = display_price_rub(
+                    c.get("total_price_rub_cached"),
+                    c.get("price_rub_cached"),
+                )
             ids = [c.get("id") for c in initial_items if isinstance(c, dict) and c.get("id")]
             if ids:
                 rows = db.execute(
@@ -1028,6 +1036,10 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         code, label = resolve_display_country(car)
         car.display_country_code = code
         car.display_country_label = label
+        car.display_price_rub = display_price_rub(
+            car.total_price_rub_cached,
+            car.price_rub_cached,
+        )
         if getattr(car, "images", None):
             for im in car.images:
                 try:
