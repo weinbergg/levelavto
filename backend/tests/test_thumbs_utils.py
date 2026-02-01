@@ -33,3 +33,14 @@ def test_lock_acquire_and_busy(tmp_path, monkeypatch):
     # second acquire should be blocked while lock is fresh
     assert thumbs._acquire_lock(path) is False
     thumbs._release_lock(path)
+
+
+def test_thumb_placeholder_on_error(tmp_path, monkeypatch):
+    monkeypatch.setenv("THUMB_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(thumbs, "_fetch_with_curl", lambda *args, **kwargs: 500)
+    resp = thumbs.thumb(
+        url="https://img.classistatic.de/api/v1/mo-prod/images/aa/aa.jpg?rule=mo-1024.jpg",
+        w=360,
+        fmt="webp",
+    )
+    assert resp.media_type.startswith("image/")

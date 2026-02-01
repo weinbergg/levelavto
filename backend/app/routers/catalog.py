@@ -179,8 +179,12 @@ def _canonicalize_params(
     normalized = normalize_count_params(raw)
     if normalized.get("brand"):
         normalized["brand"] = normalize_brand(normalized["brand"]).strip()
+        if normalized["brand"] == "":
+            normalized["brand"] = None
     if normalized.get("model"):
         normalized["model"] = str(normalized["model"]).strip()
+        if normalized["model"] == "":
+            normalized["model"] = None
     return normalized
 
 

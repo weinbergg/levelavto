@@ -153,6 +153,7 @@ def thumb(
     media_type = "image/webp" if fmt == "webp" else "image/jpeg"
     if os.path.exists(path):
         # stale-while-revalidate: serve cached even if stale, refresh in background on next request
+        logger.info("thumb_cache_hit path=%s", path)
         return FileResponse(
             path,
             media_type=media_type,
@@ -170,12 +171,27 @@ def thumb(
     tmp_fetch = os.path.join(_cache_dir(), f".fetch-{uuid.uuid4().hex}")
     code = _fetch_with_curl(src, tmp_fetch, max_bytes=2_000_000)
     if code in (404, 410):
+        try:
+            if os.path.exists(tmp_fetch):
+                os.remove(tmp_fetch)
+        except Exception:
+            pass
         _release_lock(path)
         return _placeholder_response()
     if code == 413:
+        try:
+            if os.path.exists(tmp_fetch):
+                os.remove(tmp_fetch)
+        except Exception:
+            pass
         _release_lock(path)
         raise HTTPException(status_code=413, detail="upstream too large")
     if code != 200:
+        try:
+            if os.path.exists(tmp_fetch):
+                os.remove(tmp_fetch)
+        except Exception:
+            pass
         _release_lock(path)
         return _placeholder_response()
 
@@ -190,6 +206,7 @@ def thumb(
         save_fmt = "JPEG" if fmt == "jpg" else fmt.upper()
         img.save(tmp_path, format=save_fmt, quality=80, method=6)
         os.replace(tmp_path, path)
+        logger.info("thumb_cache_write_ok path=%s bytes=%s fmt=%s w=%s", path, os.path.getsize(path), fmt, w)
         # touch meta for freshness
         try:
             with open(_meta_path(path), "w") as mh:

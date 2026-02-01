@@ -235,8 +235,8 @@ def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str
             val = val.strip()
             if not val:
                 continue
-            if key in {"region", "country", "kr_type"}:
-                val = val.upper()
+        if key in {"region", "country", "kr_type"}:
+            val = val.upper()
         cleaned[key] = val
     # Ensure alias is not propagated.
     cleaned.pop("eu_country", None)
@@ -282,8 +282,8 @@ def normalize_count_params(params: Optional[Dict[str, Any]] = None) -> Dict[str,
             val = val.strip()
             if not val:
                 continue
-            if key in {"region", "country", "kr_type"}:
-                val = val.upper()
+        if key in {"region", "country", "kr_type"}:
+            val = val.upper()
         cleaned[key] = val
     cleaned.pop("eu_country", None)
     return cleaned

@@ -1021,15 +1021,17 @@ class CarsService:
         order_clause = []
         if sort == "price_asc":
             order_clause = [
-                Car.total_price_rub_cached.asc().nullslast(),
+                (Car.total_price_rub_cached.is_(None)).asc(),
+                Car.total_price_rub_cached.asc(),
                 Car.price_rub_cached.asc().nullslast(),
-                Car.id.desc(),
+                Car.id.asc(),
             ]
         elif sort == "price_desc":
             order_clause = [
-                Car.total_price_rub_cached.desc().nullslast(),
+                (Car.total_price_rub_cached.is_(None)).asc(),
+                Car.total_price_rub_cached.desc(),
                 Car.price_rub_cached.desc().nullslast(),
-                Car.id.desc(),
+                Car.id.asc(),
             ]
         elif sort == "year_desc":
             order_clause = [Car.year.desc().nullslast(), Car.id.desc()]

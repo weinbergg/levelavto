@@ -182,6 +182,62 @@ def main() -> None:
                 break
             _prewarm_list(params)
             print(f"[prewarm] cars_list region={params.get('region')} country={params.get('country')}")
+        kr_sort_tasks = [
+            {"region": "KR", "sort": "price_asc"},
+            {"region": "KR", "sort": "price_desc"},
+        ]
+        for params in kr_sort_tasks:
+            if max_sec and (time.perf_counter() - started) > max_sec:
+                print("[prewarm] max runtime reached, stop KR sort prewarm")
+                break
+            list_cars(
+                None,
+                db=db,
+                region="KR",
+                country=None,
+                eu_country=None,
+                brand=None,
+                line=None,
+                source=None,
+                q=None,
+                model=None,
+                generation=None,
+                color=None,
+                body_type=None,
+                engine_type=None,
+                transmission=None,
+                drive_type=None,
+                num_seats=None,
+                doors_count=None,
+                emission_class=None,
+                efficiency_class=None,
+                climatisation=None,
+                airbags=None,
+                interior_design=None,
+                air_suspension=None,
+                price_rating_label=None,
+                owners_count=None,
+                price_min=None,
+                price_max=None,
+                power_hp_min=None,
+                power_hp_max=None,
+                engine_cc_min=None,
+                engine_cc_max=None,
+                year_min=None,
+                year_max=None,
+                mileage_min=None,
+                mileage_max=None,
+                kr_type=None,
+                reg_year_min=None,
+                reg_month_min=None,
+                reg_year_max=None,
+                reg_month_max=None,
+                condition=None,
+                sort=params.get("sort"),
+                page=1,
+                page_size=24,
+            )
+            print(f"[prewarm] cars_list region=KR sort={params.get('sort')}")
         for params in brand_tasks:
             if max_sec and (time.perf_counter() - started) > max_sec:
                 print("[prewarm] max runtime reached, stop brand list prewarm")
