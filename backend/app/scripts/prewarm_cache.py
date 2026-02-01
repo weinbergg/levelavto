@@ -55,12 +55,22 @@ def _prewarm_model(db, params: Dict[str, Any]) -> Tuple[str, float]:
     return f"filter_ctx_model:{normalized}", (time.perf_counter() - started) * 1000
 
 
+def _should_stop(started: float, max_sec: float, now: float | None = None) -> bool:
+    if not max_sec:
+        return False
+    current = now if now is not None else time.monotonic()
+    return (current - started) > max_sec
+
+
 def main() -> None:
-    started = time.perf_counter()
+    started = time.monotonic()
     max_sec = float(os.getenv("PREWARM_MAX_SEC", "0") or 0)
     if not redis_set_json("prewarm_ping", {"ok": True}, ttl_sec=60):
         print("[prewarm] redis unavailable or write-disabled")
         raise SystemExit(2)
+    if _should_stop(started, max_sec):
+        print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
+        return
     with SessionLocal() as db:
         service = CarsService(db)
         base_tasks: List[Dict[str, Any]] = [
@@ -72,9 +82,9 @@ def main() -> None:
         if os.getenv("INCLUDE_RU_PREWARM") == "1":
             base_tasks.append({"region": "RU"})
         for params in base_tasks:
-            if max_sec and (time.perf_counter() - started) > max_sec:
-                print("[prewarm] max runtime reached, stop base tasks")
-                break
+            if _should_stop(started, max_sec):
+                print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
+                return
             key, ms = _prewarm_base(db, params)
             print(f"[prewarm] filter_ctx_base key={key} ms={ms:.2f}")
         eu_countries = ["DE", "AT", "NL", "BE", "FR", "IT", "ES"]
@@ -83,20 +93,23 @@ def main() -> None:
             brand_tasks.append({"region": "EU", "country": "DE", "brand": b})
         brand_tasks.append({"region": "EU", "country": "AT", "brand": "Cadillac"})
         for params in brand_tasks:
-            if max_sec and (time.perf_counter() - started) > max_sec:
-                print("[prewarm] max runtime reached, stop brand tasks")
-                break
+            if _should_stop(started, max_sec):
+                print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
+                return
             key, ms = _prewarm_brand(db, params)
             print(f"[prewarm] filter_ctx_brand key={key} ms={ms:.2f}")
         model_tasks = [
             {"region": "EU", "country": "DE", "brand": "BMW", "model": "X5"},
         ]
         for params in model_tasks:
-            if max_sec and (time.perf_counter() - started) > max_sec:
-                print("[prewarm] max runtime reached, stop model tasks")
-                break
+            if _should_stop(started, max_sec):
+                print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
+                return
             key, ms = _prewarm_model(db, params)
             print(f"[prewarm] filter_ctx_model key={key} ms={ms:.2f}")
+        if _should_stop(started, max_sec):
+            print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
+            return
         total = service.total_cars()
         redis_set_json(build_total_cars_key(), total, ttl_sec=600)
         print(f"[prewarm] total_cars={total}")
@@ -108,9 +121,9 @@ def main() -> None:
             count_keys.append({"region": "EU", "country": c})
         count_keys.append({"region": "EU", "country": "AT"})
         for params in count_keys:
-            if max_sec and (time.perf_counter() - started) > max_sec:
-                print("[prewarm] max runtime reached, stop count prewarm")
-                break
+            if _should_stop(started, max_sec):
+                print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
+                return
             normalized = normalize_count_params(params)
             count = service.count_cars(**normalized)
             cache_key = build_cars_count_simple_key(
@@ -177,9 +190,9 @@ def main() -> None:
             {"region": "EU", "country": "AT"},
         ]
         for params in list_tasks:
-            if max_sec and (time.perf_counter() - started) > max_sec:
-                print("[prewarm] max runtime reached, stop list prewarm")
-                break
+            if _should_stop(started, max_sec):
+                print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
+                return
             _prewarm_list(params)
             print(f"[prewarm] cars_list region={params.get('region')} country={params.get('country')}")
         kr_sort_tasks = [
@@ -187,9 +200,9 @@ def main() -> None:
             {"region": "KR", "sort": "price_desc"},
         ]
         for params in kr_sort_tasks:
-            if max_sec and (time.perf_counter() - started) > max_sec:
-                print("[prewarm] max runtime reached, stop KR sort prewarm")
-                break
+            if _should_stop(started, max_sec):
+                print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
+                return
             list_cars(
                 None,
                 db=db,

@@ -29,13 +29,18 @@ def _find_range(table: List[Dict[str, Any]], val: float, key_from: str, key_to: 
     return default
 
 
+def _today_date():
+    import datetime as dt
+    return dt.date.today()
+
+
 def _calc_age_months(reg_year: Optional[int], reg_month: Optional[int]) -> Optional[int]:
     if not reg_year or not reg_month:
         return None
     import datetime as dt
     try:
         d = dt.date(reg_year, reg_month, 1)
-        today = dt.date.today().replace(day=1)
+        today = _today_date().replace(day=1)
         months = (today.year - d.year) * 12 + (today.month - d.month)
         return max(months, 0)
     except Exception:
