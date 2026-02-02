@@ -22,7 +22,7 @@ _CACHE_TTL_SEC = 7 * 24 * 3600
 
 
 def _cache_dir() -> str:
-    base = os.getenv("THUMB_CACHE_DIR") or "/opt/levelavto/thumb_cache"
+    base = os.getenv("THUMB_CACHE_DIR") or "/app/thumb_cache"
     os.makedirs(base, exist_ok=True)
     return base
 

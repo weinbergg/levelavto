@@ -14,6 +14,7 @@ pars/
 logs/
 tmp/
 artifacts/
+thumb_cache/
 backend/app/runtime/**/*.json
 backend/app/runtime/**/*.log
 backend/app/imports/**/*.csv

@@ -966,7 +966,7 @@
           : ''
         const photosCount = car.photos_count ?? car.images_count
         const more = (photosCount && photosCount > 1 && car.thumbnail_url) ? `<span class="more-badge">+${photosCount - 1} фото</span>` : ''
-        const displayRub = car.display_price_rub != null ? car.display_price_rub : (car.total_price_rub_cached ?? car.price_rub_cached)
+        const displayRub = car.display_price_rub
         let priceText = displayRub != null ? formatRub(displayRub) : ''
         if (!priceText) priceText = 'Цена уточняется'
         const calcLine = `<div class="price-main">${priceText}</div>`
@@ -2161,7 +2161,7 @@
           const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
           let thumb = normalizeThumbUrl(thumbRaw, { thumb: true })
           const origThumb = normalizeThumbUrl(thumbRaw)
-          const displayRub = car.display_price_rub != null ? car.display_price_rub : (car.total_price_rub_cached ?? car.price_rub_cached)
+          const displayRub = car.display_price_rub
           let price = displayRub != null ? formatRub(displayRub) : ''
           if (!price) price = 'Цена уточняется'
           card.innerHTML = `

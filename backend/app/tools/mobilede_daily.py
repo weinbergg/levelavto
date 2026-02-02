@@ -124,6 +124,46 @@ def update_price_cache() -> None:
         db.close()
 
 
+def recalc_eu_calc_cache(since_minutes: int | None = None, only_missing: bool = True) -> None:
+    from backend.app.db import SessionLocal
+    from backend.app.models import Car
+    from backend.app.services.cars_service import CarsService
+    from datetime import datetime, timedelta
+
+    updated = skipped = errors = 0
+    with SessionLocal() as db:
+        svc = CarsService(db)
+        q = db.query(Car.id).filter(Car.is_available.is_(True), ~Car.country.like("KR%"))
+        if only_missing:
+            q = q.filter(Car.total_price_rub_cached.is_(None))
+        if since_minutes:
+            since_ts = datetime.utcnow() - timedelta(minutes=since_minutes)
+            q = q.filter(Car.updated_at >= since_ts)
+        total = q.count()
+        batch = 2000
+        offset = 0
+        while True:
+            ids = [r[0] for r in q.order_by(Car.id.asc()).offset(offset).limit(batch).all()]
+            if not ids:
+                break
+            cars = db.query(Car).filter(Car.id.in_(ids)).all()
+            for car in cars:
+                try:
+                    res = svc.ensure_calc_cache(car)
+                    if res is None:
+                        skipped += 1
+                        continue
+                    updated += 1
+                except Exception:
+                    errors += 1
+            db.commit()
+            offset += batch
+    print(
+        f"[mobilede_daily] recalc_eu_calc_cache total={total} updated={updated} skipped={skipped} errors={errors}",
+        flush=True,
+    )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="Fetch daily mobile.de CSV and import")
@@ -167,6 +207,9 @@ def main() -> None:
         )
         if not args.skip_cache:
             update_price_cache()
+        if os.getenv("RUN_EU_CALC_AFTER_DAILY", "1") == "1":
+            since_min = int(os.getenv("EU_CALC_SINCE_MIN", "180")) if os.getenv("EU_CALC_SINCE_MIN") else 180
+            recalc_eu_calc_cache(since_minutes=since_min, only_missing=True)
         deleted = 0
         deleted += redis_delete_by_pattern("cars_count:*")
         deleted += redis_delete_by_pattern("cars_list:*")
