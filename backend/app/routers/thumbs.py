@@ -48,7 +48,9 @@ def _normalize_source_url(u: str | None, url: str | None) -> str:
         u = url
     if not u:
         raise HTTPException(status_code=400, detail="missing url")
-    src = unquote(u)
+    src = unquote(u).strip()
+    while src.startswith("."):
+        src = src[1:]
     parsed = urlparse(src)
     if parsed.scheme not in {"http", "https"}:
         raise HTTPException(status_code=400, detail="invalid url scheme")
