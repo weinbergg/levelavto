@@ -744,7 +744,7 @@ def _split_colors(raw_colors: List[dict]) -> tuple[list[dict], list[dict]]:
             }
         )
     basic.sort(key=lambda x: (-x["count"], x["label"]))
-    return basic, []
+    return basic[:12], []
 
 
 @router.get("/filter_ctx_base")
@@ -836,7 +836,7 @@ def filter_ctx_base(
             if v.get("value")
         ]
     )
-    colors_basic, colors_other = _split_colors(service.facet_counts(field="color", filters=base_filters))
+    colors_basic, colors_other = _split_colors(service.facet_counts(field="color_group", filters=base_filters))
     payload = {
         "regions": regions,
         "countries": countries,

@@ -17,6 +17,7 @@ import requests
 import time
 from ..models import Car, Source, FeaturedCar
 from ..utils.localization import display_color
+from ..utils.color_groups import normalize_color_group_key
 from ..utils.country_map import normalize_country_code
 from ..utils.taxonomy import (
     normalize_color,
@@ -300,6 +301,7 @@ class CarsService:
             "brand": Car.brand,
             "model": Car.model,
             "color": Car.color,
+            "color_group": Car.color_group,
             "engine_type": Car.engine_type,
             "transmission": Car.transmission,
             "body_type": Car.body_type,
@@ -776,13 +778,17 @@ class CarsService:
             conditions.append(func.lower(Car.generation).like(
                 func.lower(f"%{generation.strip()}%")))
         if color:
-            aliases = color_aliases(color)
-            if aliases:
-                conditions.append(or_(
-                    *[func.lower(Car.color).like(f"%{a}%") for a in aliases]
-                ))
+            group_key = normalize_color_group_key(color)
+            if group_key:
+                conditions.append(Car.color_group == group_key)
             else:
-                conditions.append(func.lower(Car.color) == color.lower())
+                aliases = color_aliases(color)
+                if aliases:
+                    conditions.append(or_(
+                        *[func.lower(Car.color).like(f"%{a}%") for a in aliases]
+                    ))
+                else:
+                    conditions.append(func.lower(Car.color) == color.lower())
         if source_key:
             keys: List[str] = []
             if isinstance(source_key, str):

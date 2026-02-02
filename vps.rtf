@@ -6,240 +6,63 @@
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
 \f0\fs24 \cf0 root@cv5704357:/opt/levelavto# git pull\
-root@cv5704357:/opt/levelavto# git pull\
-docker compose build weborce-recreate web\
+docker compose build web\
 docker compose up -d --force-recreate web\
 docker compose run --rm prewarm\
-# \uc0\u1087 \u1088 \u1086 \u1075 \u1088 \u1077 \u1074  \u1089  \u1083 \u1080 \u1084 \u1080 \u1090 \u1086 \u1084 \
-# \uc0\u1087 \u1088 \u1086 \u1075 \u1088 \u1077 \u1074  \u1089  \u1083 \u1080 \u1084 \u1080 \u1090 \u1086 \u1084 ocker compose run --rm prewarm\
-PREWARM_MAX_SEC=1 docker compose run --rm prewarm\
-# \uc0\u1094 \u1077 \u1085 \u1072  \u1074  list \u1080  detail \u1089 \u1086 \u1074 \u1087 \u1072 \u1076 \u1072 \u1077 \u1090 \
-# \uc0\u1094 \u1077 \u1085 \u1072  \u1074  list \u1080  detail \u1089 \u1086 \u1074 \u1087 \u1072 \u1076 \u1072 \u1077 \u1090 \
-ID=518771http://localhost:8000/api/cars?region=EU&country=DE&page=1&page_size=5&sort=price_asc" \\\
-curl -s "http://localhost:8000/api/cars?region=EU&country=DE&page=1&page_size=5&sort=price_asc" \\rice_rub\}'\
- | jq '.items[] | \{id, total:.total_price_rub_cached, price:.price_rub_cached, display:.display_price_rub\}'\
-curl -s "http://localhost:8000/api/cars/$ID" \\ce:.price_rub_cached, display:.display_price_rub, images:(.images|length)\}'\
- | jq '\{id, total:.total_price_rub_cached, price:.price_rub_cached, display:.display_price_rub, images:(.images|length)\}'\
-# \uc0\u1091 \u1090 \u1080 \u1083 \u1100 /\u1080 \u1090 \u1086 \u1075  \u1076 \u1083 \u1103  518771\
-# \uc0\u1091 \u1090 \u1080 \u1083 \u1100 /\u1080 \u1090 \u1086 \u1075  \u1076 \u1083 \u1103  518771web python - <<'PY'\
+\
 docker compose exec -T web python - <<'PY'\
-from backend.app.db import SessionLocal\
-from backend.app.models import Caror_runtime import EstimateRequest, choose_scenario, _calc_age_months\
-from backend.app.services.calculator_runtime import EstimateRequest, choose_scenario, _calc_age_months\
-from backend.app.services.customs_config import get_customs_config, calc_util_fee_rub\
-from backend.app.services.calculator_runtime import calculatelculatorConfigService\
-from backend.app.services.calculator_config_service import CalculatorConfigService\
-from pathlib import Path\
-car_id = 518771\
-car_id = 518771al() as db:\
-with SessionLocal() as db:lter(Car.id == car_id).first()\
-    car = db.query(Car).filter(Car.id == car_id).first()m_yaml(Path("/app/backend/app/config/calculator.yml"))\
-    cfg = CalculatorConfigService(db).ensure_default_from_yaml(Path("/app/backend/app/config/calculator.yml"))\
-    payload = cfg.payload if cfg else \{\}gistration_year, car.registration_month)\
-    age_months = _calc_age_months(car.registration_year, car.registration_month)\
-    req = EstimateRequest(\
-        scenario=None,20000,\
-        price_net_eur=20000,\
-        eur_rate=91.54,ngine_cc,\
-        engine_cc=car.engine_cc,_hp) if car.power_hp else None,\
-        power_hp=float(car.power_hp) if car.power_hp else None,\
-        power_kw=float(car.power_kw) if car.power_kw else None,\
-        is_electric=False,tration_year,\
-        reg_year=car.registration_year,h,\
-        reg_month=car.registration_month,\
-    )cenario = choose_scenario(req, payload)\
-    scenario = choose_scenario(req, payload)ngine_cc, kw=req.power_kw, hp=int(req.power_hp or 0), cfg=get_customs_config(), age_bucket=scenario\
-    util = calc_util_fee_rub(engine_cc=car.engine_cc, kw=req.power_kw, hp=int(req.power_hp or 0), cfg=get_customs_config(), age_bucket=scenario)   print("age_months:", age_months, "scenario:", scenario, "util_rub:", util)\
-    print("age_months:", age_months, "scenario:", scenario, "util_rub:", util)\
-    print("total_rub:", calculate(payload, req)["total_rub"])\
+from backend.app.utils.redis_cache import bump_dataset_version\
+print("dataset_version", bump_dataset_version())\
 PY\
-remote: Enumerating objects: 21, done.\
-remote: Counting objects: 100% (21/21), done.\
-remote: Compressing objects: 100% (2/2), done.\
-remote: Total 11 (delta 8), reused 11 (delta 8), pack-reused 0 (from 0)\
-Unpacking objects: 100% (11/11), 3.52 KiB | 400.00 KiB/s, done.\
+curl -s "http://localhost:8000/catalog?region=EU&country=DE&brand=Mercedes-Benz&model=GLS%20500" \\\
+  | head -n 200\
+curl -s "http://localhost:8000/api/cars/518771" | jq '.images | length'\
+python -m pytest -q backend/tests/test_price_utils_display.py\
+remote: Enumerating objects: 30, done.\
+remote: Counting objects: 100% (30/30), done.\
+remote: Compressing objects: 100% (3/3), done.\
+remote: Total 16 (delta 12), reused 16 (delta 12), pack-reused 0 (from 0)\
+Unpacking objects: 100% (16/16), 4.75 KiB | 347.00 KiB/s, done.\
 From github.com:weinbergg/levelavto\
-   b1eb6fb..63abc44  main       -> origin/main\
-Updating b1eb6fb..63abc44\
+   63abc44..5738e40  main       -> origin/main\
+Updating 63abc44..5738e40\
 Fast-forward\
- backend/app/static/js/app.js          |   7 +--\
- backend/app/templates/car_detail.html |   3 +-\
- backend/app/templates/catalog.html    |  17 ++++--\
- vps.rtf                               | 282 +++++++++++++++++++++++++++++++++++++++++++++----------------------------------------------------\
- 4 files changed, 150 insertions(+), 159 deletions(-)\
-[+] Building 3.7s (13/13) FINISHED                                                                                                             \
+ backend/app/services/cars_service.py      |  18 ++--\
+ backend/app/static/js/app.js              |  16 +++-\
+ backend/app/templates/base.html           |   2 +-\
+ backend/app/utils/price_utils.py          |  12 ++-\
+ backend/tests/test_price_utils_display.py |  11 +++\
+ vps.rtf                                   | 436 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------\
+ 6 files changed, 356 insertions(+), 139 deletions(-)\
+ create mode 100644 backend/tests/test_price_utils_display.py\
+[+] Building 3.8s (13/13) FINISHED                                                                                                             \
  => [internal] load local bake definitions                                                                                                0.0s\
  => => reading from stdin 480B                                                                                                            0.0s\
  => [internal] load build definition from Dockerfile                                                                                      0.0s\
  => => transferring dockerfile: 553B                                                                                                      0.0s\
- => [internal] load metadata for docker.io/library/python:3.11-slim                                                                       0.0s\
+ => [internal] load metadata for docker.io/library/python:3.11-slim                                                                       0.1s\
  => [internal] load .dockerignore                                                                                                         0.0s\
  => => transferring context: 285B                                                                                                         0.0s\
- => [1/6] FROM docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.0s\
- => => resolve docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.0s\
+ => [1/6] FROM docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.1s\
+ => => resolve docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.1s\
  => [internal] load build context                                                                                                         0.3s\
- => => transferring context: 434.48kB                                                                                                     0.2s\
+ => => transferring context: 520.56kB                                                                                                     0.2s\
  => CACHED [2/6] WORKDIR /app                                                                                                             0.0s\
  => CACHED [3/6] RUN apt-get update && apt-get install -y --no-install-recommends     build-essential curl libpq-dev &&     rm -rf /var/  0.0s\
  => CACHED [4/6] COPY backend/requirements.txt /app/backend/requirements.txt                                                              0.0s\
  => CACHED [5/6] RUN pip install --upgrade pip && pip install -r /app/backend/requirements.txt                                            0.0s\
- => [6/6] COPY . /app                                                                                                                     0.9s\
- => exporting to image                                                                                                                    2.1s\
- => => exporting layers                                                                                                                   1.6s\
- => => exporting manifest sha256:566357062fac81b675a968ea1920ce9e74a9c7f5bb649fb921f7be714a0ad36d                                         0.0s\
- => => exporting config sha256:fcfff214a449eebf725a33aaf01a19d4d9bb3ce17830ca8183532242b82eaa79                                           0.0s\
- => => exporting attestation manifest sha256:3a1662436e4ebf52249423fd9f7ebd28895f9247329cc00cafa46cc01081a161                             0.0s\
- => => exporting manifest list sha256:39c0933732223b8d57d9ced1705e6f787d7625ceb14bfb94f09ba9705cd7d909                                    0.0s\
+ => [6/6] COPY . /app                                                                                                                     1.0s\
+ => exporting to image                                                                                                                    2.0s\
+ => => exporting layers                                                                                                                   1.5s\
+ => => exporting manifest sha256:5c2835cbbcf2e1e7645774f45924fe709da4c3206ad976e589dedc7ffbd8d703                                         0.0s\
+ => => exporting config sha256:8328b4712cf0ee5557854eb2861b72266805c56c61d40d20e504d88d4308216e                                           0.0s\
+ => => exporting attestation manifest sha256:2bd76a7a2a859c5296f93f6c4506d5298b73221abb079419e7481d8a363e2cda                             0.0s\
+ => => exporting manifest list sha256:68d7798dd1eb976c0afdc8b6976ec83af2e2949d3f0a61b8fe1fadce2d5cc28b                                    0.0s\
  => => naming to docker.io/library/levelavto-web:latest                                                                                   0.0s\
  => => unpacking to docker.io/library/levelavto-web:latest                                                                                0.4s\
  => resolving provenance for metadata file                                                                                                0.0s\
 [+] build 1/1\
  \uc0\u10004  Image levelavto-web Built                                                                                                              3.8s \
-[+] up 3/3\
- \uc0\u10004  Container autodealer_db    Healthy                                                                                                    11.3s \
- \uc0\u10004  Container autodealer_redis Healthy                                                                                                    11.3s \
- \uc0\u10004  Container autodealer_web   Recreated                                                                                                  10.7s \
-[+] start 3/3\
- \uc0\u10004  Container autodealer_db    Running                                                                                                     0.0s \
-[+]  1/3iner autodealer_redis Running                                                                                                     0.0s \
- \uc0\u10251  Container autodealer_db    Waiting                                                                                                     0.1s \
-[+]  3/3iner autodealer_redis Waiting                                                                                                     0.1s \
- \uc0\u10004  Container autodealer_db    Healthy                                                                                                     0.5s \
- \uc0\u10004  Container autodealer_redis Healthy                                                                                                     0.5s \
- \uc0\u10004  Container autodealer_web   Running                                                                                                     0.0s \
-Container autodealer_web Waiting \
-Container autodealer_redis Waiting \
-Container autodealer_redis Healthy \
-Container autodealer_web Healthy \
-Container levelavto-prewarm-run-1dc5cac67051 Creating \
-Container levelavto-prewarm-run-1dc5cac67051 Created \
-FILTER_CTX_BASE_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_base key=filter_ctx_base:\{\} ms=1.90\
-FILTER_CTX_BASE_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'EU'\} ms=1.17\
-FILTER_CTX_BASE_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'EU', 'country': 'DE'\} ms=1.20\
-FILTER_CTX_BASE_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'KR'\} ms=0.87\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'BMW'\} ms=1.13\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Mercedes-Benz'\} ms=1.56\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Audi'\} ms=0.47\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Volkswagen'\} ms=0.94\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Toyota'\} ms=0.42\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Ford'\} ms=0.44\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Renault'\} ms=0.37\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Hyundai'\} ms=0.41\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Kia'\} ms=0.17\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Skoda'\} ms=0.39\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Peugeot'\} ms=0.25\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Opel'\} ms=0.41\
-FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'AT', 'brand': 'Cadillac'\} ms=0.15\
-FILTER_CTX_MODEL_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_model key=filter_ctx_model:\{'region': 'EU', 'country': 'DE', 'brand': 'BMW', 'model': 'X5'\} ms=0.27\
-[prewarm] total_cars=2397398\
-count_slow total=6.834s filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=7.372s sort=None page=1 size=1 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:all:all:v0 value=2288389\
-count_slow total=6.966s filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=7.137s sort=None page=1 size=1 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:KR:all:all:v0 value=109009\
-count_slow total=6.751s filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=7.054s sort=None page=1 size=1 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:DE:all:v0 value=1894244\
-count_slow total=2.506s filters=('EU', 'AT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:AT:all:v0 value=4064\
-count_slow total=7.201s filters=('EU', 'NL', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:NL:all:v0 value=13724\
-count_slow total=2.741s filters=('EU', 'BE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:BE:all:v0 value=4875\
-[prewarm] cars_count key=cars_count:EU:FR:all:v0 value=1322\
-count_slow total=22.842s filters=('EU', 'IT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=7.154s sort=None page=1 size=1 filters=('EU', 'IT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:IT:all:v0 value=344364\
-[prewarm] cars_count key=cars_count:EU:ES:all:v0 value=620\
-list_slow total=3.292s sort=None page=1 size=1 filters=('EU', 'AT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:AT:all:v0 value=4064\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:all:all:none:1:12:v0\
-list_slow total=10.869s sort=None page=1 size=12 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list region=EU country=None\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:none:1:12:v0\
-list_slow total=11.439s sort=None page=1 size=12 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list region=KR country=None\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:all:none:1:12:v0\
-list_slow total=8.934s sort=None page=1 size=12 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:AT:all:none:1:12:v0\
-list_slow total=2.352s sort=None page=1 size=12 filters=('EU', 'AT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list region=EU country=AT\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:price_asc:1:24:v0\
-list_slow total=7.528s sort=price_asc page=1 size=24 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list region=KR sort=price_asc\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:price_desc:1:24:v0\
-list_slow total=6.736s sort=price_desc page=1 size=24 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list region=KR sort=price_desc\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:BMW:none:1:12:v0\
-count_slow total=49.315s filters=('EU', 'DE', 'BMW', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=25.092s sort=None page=1 size=12 filters=('EU', 'DE', 'BMW', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=BMW region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Mercedes-Benz:none:1:12:v0\
-count_slow total=124.487s filters=('EU', 'DE', 'Mercedes-Benz', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=43.875s sort=None page=1 size=12 filters=('EU', 'DE', 'Mercedes-Benz', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Mercedes-Benz region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Audi:none:1:12:v0\
-count_slow total=83.542s filters=('EU', 'DE', 'Audi', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=81.553s sort=None page=1 size=12 filters=('EU', 'DE', 'Audi', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Audi region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Volkswagen:none:1:12:v0\
-count_slow total=177.159s filters=('EU', 'DE', 'Volkswagen', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=61.501s sort=None page=1 size=12 filters=('EU', 'DE', 'Volkswagen', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Volkswagen region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Toyota:none:1:12:v0\
-count_slow total=22.222s filters=('EU', 'DE', 'Toyota', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=5.935s sort=None page=1 size=12 filters=('EU', 'DE', 'Toyota', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Toyota region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Ford:none:1:12:v0\
-count_slow total=77.209s filters=('EU', 'DE', 'Ford', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=69.412s sort=None page=1 size=12 filters=('EU', 'DE', 'Ford', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Ford region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Renault:none:1:12:v0\
-count_slow total=37.712s filters=('EU', 'DE', 'Renault', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=22.533s sort=None page=1 size=12 filters=('EU', 'DE', 'Renault', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Renault region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Hyundai:none:1:12:v0\
-count_slow total=36.457s filters=('EU', 'DE', 'Hyundai', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=64.280s sort=None page=1 size=12 filters=('EU', 'DE', 'Hyundai', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Hyundai region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Kia:none:1:12:v0\
-count_slow total=29.966s filters=('EU', 'DE', 'Kia', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=24.601s sort=None page=1 size=12 filters=('EU', 'DE', 'Kia', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Kia region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Skoda:none:1:12:v0\
-count_slow total=40.477s filters=('EU', 'DE', 'Skoda', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=38.333s sort=None page=1 size=12 filters=('EU', 'DE', 'Skoda', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Skoda region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Peugeot:none:1:12:v0\
-count_slow total=33.577s filters=('EU', 'DE', 'Peugeot', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=31.500s sort=None page=1 size=12 filters=('EU', 'DE', 'Peugeot', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Peugeot region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Opel:none:1:12:v0\
-count_slow total=65.140s filters=('EU', 'DE', 'Opel', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=61.824s sort=None page=1 size=12 filters=('EU', 'DE', 'Opel', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_list brand=Opel region=EU country=DE\
-[prewarm] cars_list brand=Cadillac region=EU country=AT\
-[prewarm] done in 1452904.81 ms\
 [+] start 3/3\
  \uc0\u10004  Container autodealer_redis Running                                                                                                     0.0s \
 [+]  1/3iner autodealer_db    Running                                                                                                     0.0s \
@@ -250,174 +73,338 @@ list_slow total=61.824s sort=None page=1 size=12 filters=('EU', 'DE', 'Opel', No
  \uc0\u10004  Container autodealer_web   Running                                                                                                     0.0s \
 Container autodealer_redis Waiting \
 Container autodealer_web Waiting \
-Container autodealer_web Healthy \
 Container autodealer_redis Healthy \
-Container levelavto-prewarm-run-6cdcd2a3df83 Creating \
-Container levelavto-prewarm-run-6cdcd2a3df83 Created \
+Container autodealer_web Healthy \
+Container levelavto-prewarm-run-2b2bfdf0b035 Creating \
+Container levelavto-prewarm-run-2b2bfdf0b035 Created \
 FILTER_CTX_BASE_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_base key=filter_ctx_base:\{\} ms=1.29\
+[prewarm] filter_ctx_base key=filter_ctx_base:\{\} ms=2.27\
 FILTER_CTX_BASE_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'EU'\} ms=0.65\
+[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'EU'\} ms=0.69\
 FILTER_CTX_BASE_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'EU', 'country': 'DE'\} ms=0.68\
+[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'EU', 'country': 'DE'\} ms=0.62\
 FILTER_CTX_BASE_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'KR'\} ms=0.62\
+[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'KR'\} ms=0.73\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'BMW'\} ms=0.79\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'BMW'\} ms=0.49\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Mercedes-Benz'\} ms=0.98\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Mercedes-Benz'\} ms=0.88\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Audi'\} ms=0.47\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Audi'\} ms=0.45\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Volkswagen'\} ms=0.30\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Volkswagen'\} ms=0.23\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Toyota'\} ms=0.46\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Toyota'\} ms=0.22\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Ford'\} ms=0.44\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Ford'\} ms=0.55\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Renault'\} ms=0.21\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Renault'\} ms=0.24\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Hyundai'\} ms=0.39\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Hyundai'\} ms=0.25\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Kia'\} ms=0.16\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Kia'\} ms=0.20\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Skoda'\} ms=0.39\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Skoda'\} ms=0.52\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Peugeot'\} ms=0.19\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Peugeot'\} ms=0.25\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Opel'\} ms=0.40\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Opel'\} ms=0.26\
 FILTER_CTX_BRAND_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'AT', 'brand': 'Cadillac'\} ms=0.22\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'AT', 'brand': 'Cadillac'\} ms=0.24\
 FILTER_CTX_MODEL_CACHE hit=1 source=redis\
-[prewarm] filter_ctx_model key=filter_ctx_model:\{'region': 'EU', 'country': 'DE', 'brand': 'BMW', 'model': 'X5'\} ms=0.21\
+[prewarm] filter_ctx_model key=filter_ctx_model:\{'region': 'EU', 'country': 'DE', 'brand': 'BMW', 'model': 'X5'\} ms=0.16\
 [prewarm] total_cars=2397398\
-count_slow total=6.422s filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=6.759s sort=None page=1 size=1 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:all:all:v0 value=2288389\
-count_slow total=6.481s filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=6.768s sort=None page=1 size=1 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:KR:all:all:v0 value=109009\
-count_slow total=6.302s filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=6.818s sort=None page=1 size=1 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:DE:all:v0 value=1894244\
-count_slow total=2.347s filters=('EU', 'AT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:AT:all:v0 value=4064\
-count_slow total=6.788s filters=('EU', 'NL', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:NL:all:v0 value=13724\
-count_slow total=2.555s filters=('EU', 'BE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:BE:all:v0 value=4875\
-[prewarm] cars_count key=cars_count:EU:FR:all:v0 value=1322\
-count_slow total=28.911s filters=('EU', 'IT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=29.331s sort=None page=1 size=1 filters=('EU', 'IT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:IT:all:v0 value=344364\
-[prewarm] cars_count key=cars_count:EU:ES:all:v0 value=620\
-list_slow total=2.105s sort=None page=1 size=1 filters=('EU', 'AT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-[prewarm] cars_count key=cars_count:EU:AT:all:v0 value=4064\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:all:all:none:1:12:v0\
-list_slow total=6.885s sort=None page=1 size=12 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+count_slow total=7.239s filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=8.195s sort=None page=1 size=1 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:all:all:v1769974524 value=2288389\
+count_slow total=7.441s filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=7.453s sort=None page=1 size=1 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:KR:all:all:v1769974524 value=109009\
+count_slow total=7.037s filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=7.490s sort=None page=1 size=1 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:DE:all:v1769974524 value=1894244\
+count_slow total=2.883s filters=('EU', 'AT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:AT:all:v1769974524 value=4064\
+count_slow total=8.030s filters=('EU', 'NL', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:NL:all:v1769974524 value=13724\
+count_slow total=2.681s filters=('EU', 'BE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:BE:all:v1769974524 value=4875\
+[prewarm] cars_count key=cars_count:EU:FR:all:v1769974524 value=1322\
+count_slow total=29.214s filters=('EU', 'IT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=28.880s sort=None page=1 size=1 filters=('EU', 'IT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:IT:all:v1769974524 value=344364\
+[prewarm] cars_count key=cars_count:EU:ES:all:v1769974524 value=620\
+list_slow total=2.557s sort=None page=1 size=1 filters=('EU', 'AT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:AT:all:v1769974524 value=4064\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:all:all:none:1:12:v1769974524\
+list_slow total=6.440s sort=None page=1 size=12 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list region=EU country=None\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:none:1:12:v0\
-list_slow total=6.823s sort=None page=1 size=12 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:none:1:12:v1769974524\
+list_slow total=6.922s sort=None page=1 size=12 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list region=KR country=None\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:all:none:1:12:v0\
-list_slow total=6.994s sort=None page=1 size=12 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:all:none:1:12:v1769974524\
+list_slow total=7.092s sort=None page=1 size=12 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:AT:all:none:1:12:v0\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:AT:all:none:1:12:v1769974524\
 [prewarm] cars_list region=EU country=AT\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:price_asc:1:24:v0\
-list_slow total=6.725s sort=price_asc page=1 size=24 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:price_asc:1:24:v1769974524\
+list_slow total=6.856s sort=price_asc page=1 size=24 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list region=KR sort=price_asc\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:price_desc:1:24:v0\
-count_slow total=6.494s filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=6.672s sort=price_desc page=1 size=24 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:price_desc:1:24:v1769974524\
+count_slow total=6.782s filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=7.102s sort=price_desc page=1 size=24 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list region=KR sort=price_desc\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:BMW:none:1:12:v0\
-count_slow total=54.395s filters=('EU', 'DE', 'BMW', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=50.774s sort=None page=1 size=12 filters=('EU', 'DE', 'BMW', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:BMW:none:1:12:v1769974524\
+count_slow total=59.347s filters=('EU', 'DE', 'BMW', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=55.251s sort=None page=1 size=12 filters=('EU', 'DE', 'BMW', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=BMW region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Mercedes-Benz:none:1:12:v0\
-count_slow total=135.294s filters=('EU', 'DE', 'Mercedes-Benz', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=44.532s sort=None page=1 size=12 filters=('EU', 'DE', 'Mercedes-Benz', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Mercedes-Benz:none:1:12:v1769974524\
+count_slow total=128.476s filters=('EU', 'DE', 'Mercedes-Benz', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=43.699s sort=None page=1 size=12 filters=('EU', 'DE', 'Mercedes-Benz', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Mercedes-Benz region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Audi:none:1:12:v0\
-count_slow total=84.591s filters=('EU', 'DE', 'Audi', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=104.673s sort=None page=1 size=12 filters=('EU', 'DE', 'Audi', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Audi:none:1:12:v1769974524\
+count_slow total=83.998s filters=('EU', 'DE', 'Audi', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=86.510s sort=None page=1 size=12 filters=('EU', 'DE', 'Audi', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Audi region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Volkswagen:none:1:12:v0\
-count_slow total=197.894s filters=('EU', 'DE', 'Volkswagen', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=66.547s sort=None page=1 size=12 filters=('EU', 'DE', 'Volkswagen', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Volkswagen:none:1:12:v1769974524\
+count_slow total=195.002s filters=('EU', 'DE', 'Volkswagen', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=78.133s sort=None page=1 size=12 filters=('EU', 'DE', 'Volkswagen', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Volkswagen region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Toyota:none:1:12:v0\
-count_slow total=23.950s filters=('EU', 'DE', 'Toyota', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=22.174s sort=None page=1 size=12 filters=('EU', 'DE', 'Toyota', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Toyota:none:1:12:v1769974524\
+count_slow total=28.523s filters=('EU', 'DE', 'Toyota', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=22.304s sort=None page=1 size=12 filters=('EU', 'DE', 'Toyota', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Toyota region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Ford:none:1:12:v0\
-count_slow total=74.905s filters=('EU', 'DE', 'Ford', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=68.691s sort=None page=1 size=12 filters=('EU', 'DE', 'Ford', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Ford:none:1:12:v1769974524\
+count_slow total=72.679s filters=('EU', 'DE', 'Ford', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=70.208s sort=None page=1 size=12 filters=('EU', 'DE', 'Ford', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Ford region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Renault:none:1:12:v0\
-count_slow total=36.065s filters=('EU', 'DE', 'Renault', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=38.333s sort=None page=1 size=12 filters=('EU', 'DE', 'Renault', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Renault:none:1:12:v1769974524\
+count_slow total=36.787s filters=('EU', 'DE', 'Renault', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=38.015s sort=None page=1 size=12 filters=('EU', 'DE', 'Renault', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Renault region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Hyundai:none:1:12:v0\
-count_slow total=35.914s filters=('EU', 'DE', 'Hyundai', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=35.053s sort=None page=1 size=12 filters=('EU', 'DE', 'Hyundai', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Hyundai:none:1:12:v1769974524\
+count_slow total=36.094s filters=('EU', 'DE', 'Hyundai', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=35.751s sort=None page=1 size=12 filters=('EU', 'DE', 'Hyundai', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Hyundai region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Kia:none:1:12:v0\
-count_slow total=23.372s filters=('EU', 'DE', 'Kia', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=24.072s sort=None page=1 size=12 filters=('EU', 'DE', 'Kia', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Kia:none:1:12:v1769974524\
+count_slow total=25.079s filters=('EU', 'DE', 'Kia', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=24.551s sort=None page=1 size=12 filters=('EU', 'DE', 'Kia', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Kia region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Skoda:none:1:12:v0\
-count_slow total=39.123s filters=('EU', 'DE', 'Skoda', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=37.672s sort=None page=1 size=12 filters=('EU', 'DE', 'Skoda', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Skoda:none:1:12:v1769974524\
+count_slow total=39.341s filters=('EU', 'DE', 'Skoda', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=38.765s sort=None page=1 size=12 filters=('EU', 'DE', 'Skoda', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Skoda region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Peugeot:none:1:12:v0\
-count_slow total=32.852s filters=('EU', 'DE', 'Peugeot', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=32.438s sort=None page=1 size=12 filters=('EU', 'DE', 'Peugeot', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Peugeot:none:1:12:v1769974524\
+count_slow total=33.153s filters=('EU', 'DE', 'Peugeot', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=33.715s sort=None page=1 size=12 filters=('EU', 'DE', 'Peugeot', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Peugeot region=EU country=DE\
-CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Opel:none:1:12:v0\
-count_slow total=66.463s filters=('EU', 'DE', 'Opel', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
-list_slow total=69.348s sort=None page=1 size=12 filters=('EU', 'DE', 'Opel', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Opel:none:1:12:v1769974524\
+count_slow total=70.046s filters=('EU', 'DE', 'Opel', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=66.386s sort=None page=1 size=12 filters=('EU', 'DE', 'Opel', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
 [prewarm] cars_list brand=Opel region=EU country=DE\
 [prewarm] cars_list brand=Cadillac region=EU country=AT\
-[prewarm] done in 1559770.97 ms\
-\{\
-  "id": 727654,\
-  "total": null,\
-  "price": 90.98,\
-  "display": 90.98\
-\}\
-\{\
-  "id": 735306,\
-  "total": null,\
-  "price": 90.98,\
-  "display": 90.98\
-\}\
-\{\
-  "id": 1331613,\
-  "total": null,\
-  "price": 90.98,\
-  "display": 90.98\
-\}\
-\{\
-  "id": 1818463,\
-  "total": null,\
-  "price": 90.98,\
-  "display": 90.98\
-\}\
-\{\
-  "id": 1853244,\
-  "total": null,\
-  "price": 90.98,\
-  "display": 90.98\
-\}\
-\{\
-  "id": 518771,\
-  "total": 10500000.0,\
-  "price": 5640365.22,\
-  "display": 10500000.0,\
-  "images": 21\
-\}\
-age_months: 43 scenario: 3_5 util_rub: 3770400\
-total_rub: 7300000.0\
+[prewarm] done in 1571118.72 ms\
+dataset_version 1770011254\
+<!DOCTYPE html>\
+<html lang="ru">\
+  <head>\
+    <meta charset="UTF-8" />\
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\
+    <title>\uc0\u1050 \u1072 \u1090 \u1072 \u1083 \u1086 \u1075  \'97 \u1040 \u1074 \u1090 \u1086 \u1082 \u1072 \u1090 \u1072 \u1083 \u1086 \u1075 </title>\
+    <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml" />\
+    <link rel="stylesheet" href="/static/css/styles.css?v=20" />\
+    \
+  </head>\
+  <body data-auth="0">\
+    <header class="header">\
+      <div class="header__bar header__bar--single">\
+        <div class="la-container">\
+          <div class="header__shell">\
+            <div class="header__brand">\
+              <a class="header__logo" href="/" aria-label="Level Avto">\
+                <img\
+                  src="/static/img/logo.svg"\
+                  alt="Level Avto"\
+                  class="header__logo-img"\
+                />\
+              </a>\
+            </div>\
+            <nav class="header__nav" aria-label="\uc0\u1043 \u1083 \u1072 \u1074 \u1085 \u1072 \u1103  \u1085 \u1072 \u1074 \u1080 \u1075 \u1072 \u1094 \u1080 \u1103 ">\
+              <ul class="header__menu">\
+                <li><a class="header__link" href="/">\uc0\u1043 \u1083 \u1072 \u1074 \u1085 \u1072 \u1103 </a></li>\
+                <li><a class="header__link" href="/#about">\uc0\u1054  \u1085 \u1072 \u1089 </a></li>\
+                <li>\
+                  <a class="header__link" href="/#how-it-works"\
+                    >\uc0\u1050 \u1072 \u1082  \u1084 \u1099  \u1088 \u1072 \u1073 \u1086 \u1090 \u1072 \u1077 \u1084 </a\
+                  >\
+                </li>\
+                <li><a class="header__link" href="/#contacts">\uc0\u1050 \u1086 \u1085 \u1090 \u1072 \u1082 \u1090 \u1099 </a></li>\
+              </ul>\
+            </nav>\
+            <div class="header__actions">\
+              \
+              <div class="header__profile">\
+                <button\
+                  class="header__icon-btn"\
+                  id="profileToggle"\
+                  aria-haspopup="true"\
+                  aria-expanded="false"\
+                  aria-label="\uc0\u1055 \u1088 \u1086 \u1092 \u1080 \u1083 \u1100 "\
+                  type="button"\
+                >\
+                  <svg class="icon-18" viewBox="0 0 24 24" aria-hidden="true">\
+                    <path\
+                      d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-3.31 0-6 2.69-6 6v2h12v-2c0-3.31-2.69-6-6-6z"\
+                      fill="currentColor"\
+                    />\
+                  </svg>\
+                </button>\
+                <div class="header__profile-menu" id="profileMenu" role="menu">\
+                  \
+                  <a class="header__link" role="menuitem" href="/login">\uc0\u1042 \u1093 \u1086 \u1076 </a>\
+                  <a class="header__link" role="menuitem" href="/register"\
+                    >\uc0\u1056 \u1077 \u1075 \u1080 \u1089 \u1090 \u1088 \u1072 \u1094 \u1080 \u1103 </a\
+                  >\
+                  \
+                </div>\
+              </div>\
+              <a class="btn btn-primary btn-cta header__cta" href="/#lead-form"\
+                >\uc0\u1057 \u1074 \u1103 \u1079 \u1072 \u1090 \u1100 \u1089 \u1103 </a\
+              >\
+              <button\
+                class="header__burger header__burger--main"\
+                aria-label="\uc0\u1054 \u1090 \u1082 \u1088 \u1099 \u1090 \u1100  \u1084 \u1077 \u1085 \u1102 "\
+              >\
+                <span></span><span></span><span></span>\
+              </button>\
+            </div>\
+          </div>\
+        </div>\
+      </div>\
+      <div class="header__drawer" id="headerDrawer">\
+        <div class="header__drawer-inner">\
+          <div class="header__drawer-top">\
+            <a class="header__logo" href="/">\
+              <img\
+                src="/static/img/logo.svg"\
+                alt="Level Avto"\
+                class="header__logo-img"\
+              />\
+            </a>\
+            <button class="header__drawer-close" aria-label="\uc0\u1047 \u1072 \u1082 \u1088 \u1099 \u1090 \u1100  \u1084 \u1077 \u1085 \u1102 ">\
+              \'d7\
+            </button>\
+          </div>\
+          <nav class="header__drawer-nav" aria-label="\uc0\u1052 \u1077 \u1085 \u1102 ">\
+            <a class="header__link" href="/">\uc0\u1043 \u1083 \u1072 \u1074 \u1085 \u1072 \u1103 </a>\
+            <a class="header__link" href="/#about">\uc0\u1054  \u1085 \u1072 \u1089 </a>\
+            <a class="header__link" href="/#how-it-works">\uc0\u1050 \u1072 \u1082  \u1084 \u1099  \u1088 \u1072 \u1073 \u1086 \u1090 \u1072 \u1077 \u1084 </a>\
+            <a class="header__link" href="/#contacts">\uc0\u1050 \u1086 \u1085 \u1090 \u1072 \u1082 \u1090 \u1099 </a>\
+            \
+            <a class="header__link" href="/login">\uc0\u1042 \u1093 \u1086 \u1076 </a>\
+            <a class="header__link" href="/register">\uc0\u1056 \u1077 \u1075 \u1080 \u1089 \u1090 \u1088 \u1072 \u1094 \u1080 \u1103 </a>\
+            \
+            <a class="btn btn-primary btn-cta" href="/#lead-form">\uc0\u1057 \u1074 \u1103 \u1079 \u1072 \u1090 \u1100 \u1089 \u1103 </a>\
+          </nav>\
+        </div>\
+      </div>\
+    </header>\
+    <main>\
+<section class="catalog">\
+  <div class="la-container catalog__layout">\
+    <div class="filters-overlay" id="filtersOverlay" aria-hidden="true"></div>\
+    <aside class="filters-panel" id="filtersPanel">\
+      <div class="filters-panel__header">\
+        <h3>\uc0\u1060 \u1080 \u1083 \u1100 \u1090 \u1088 \u1099 </h3>\
+        <button class="filters-panel__close" type="button" id="filtersClose" aria-label="\uc0\u1047 \u1072 \u1082 \u1088 \u1099 \u1090 \u1100  \u1092 \u1080 \u1083 \u1100 \u1090 \u1088 \u1099 ">\'d7</button>\
+      </div>\
+      <form id="filters" onsubmit="return false;">\
+        \
+        <div class="filters-primary">\
+          <div class="filters-primary-grid">\
+            \
+            \
+            \
+            <label>\uc0\u1056 \u1077 \u1075 \u1080 \u1086 \u1085 \
+              <select name="region" id="region" data-region-select>\
+                <option value="">\uc0\u1042 \u1089 \u1077  \u1088 \u1077 \u1075 \u1080 \u1086 \u1085 \u1099 </option>\
+                \
+                <option value="EU" selected>\uc0\u1045 \u1074 \u1088 \u1086 \u1087 \u1072 </option>\
+                \
+                <option value="KR" >\uc0\u1050 \u1086 \u1088 \u1077 \u1103 </option>\
+                \
+              </select>\
+            </label>\
+            \
+            <label data-region-panel="eu">\uc0\u1057 \u1090 \u1088 \u1072 \u1085 \u1072  (\u1045 \u1074 \u1088 \u1086 \u1087 \u1072 )\
+              <select name="country" id="country" data-country>\
+                <option value="">\uc0\u1042 \u1089 \u1077  \u1089 \u1090 \u1088 \u1072 \u1085 \u1099 </option>\
+                \
+                <option value="DE" selected>\uc0\u1043 \u1077 \u1088 \u1084 \u1072 \u1085 \u1080 \u1103 </option>\
+                \
+                <option value="IT" >\uc0\u1048 \u1090 \u1072 \u1083 \u1080 \u1103 </option>\
+                \
+                <option value="NL" >\uc0\u1053 \u1080 \u1076 \u1077 \u1088 \u1083 \u1072 \u1085 \u1076 \u1099 </option>\
+                \
+                <option value="DK" >\uc0\u1044 \u1072 \u1085 \u1080 \u1103 </option>\
+                \
+                <option value="BE" >\uc0\u1041 \u1077 \u1083 \u1100 \u1075 \u1080 \u1103 </option>\
+                \
+                <option value="AT" >\uc0\u1040 \u1074 \u1089 \u1090 \u1088 \u1080 \u1103 </option>\
+                \
+                <option value="CZ" >\uc0\u1063 \u1077 \u1093 \u1080 \u1103 </option>\
+                \
+                <option value="LU" >\uc0\u1051 \u1102 \u1082 \u1089 \u1077 \u1084 \u1073 \u1091 \u1088 \u1075 </option>\
+                \
+                <option value="PL" >\uc0\u1055 \u1086 \u1083 \u1100 \u1096 \u1072 </option>\
+                \
+                <option value="RO" >\uc0\u1056 \u1091 \u1084 \u1099 \u1085 \u1080 \u1103 </option>\
+                \
+                <option value="SE" >\uc0\u1064 \u1074 \u1077 \u1094 \u1080 \u1103 </option>\
+                \
+                <option value="FR" >\uc0\u1060 \u1088 \u1072 \u1085 \u1094 \u1080 \u1103 </option>\
+                \
+                <option value="HU" >\uc0\u1042 \u1077 \u1085 \u1075 \u1088 \u1080 \u1103 </option>\
+                \
+                <option value="LT" >\uc0\u1051 \u1080 \u1090 \u1074 \u1072 </option>\
+                \
+                <option value="SK" >\uc0\u1057 \u1083 \u1086 \u1074 \u1072 \u1082 \u1080 \u1103 </option>\
+                \
+                <option value="EE" >\uc0\u1069 \u1089 \u1090 \u1086 \u1085 \u1080 \u1103 </option>\
+                \
+                <option value="LV" >\uc0\u1051 \u1072 \u1090 \u1074 \u1080 \u1103 </option>\
+                \
+                <option value="ES" >\uc0\u1048 \u1089 \u1087 \u1072 \u1085 \u1080 \u1103 </option>\
+                \
+                <option value="BG" >\uc0\u1041 \u1086 \u1083 \u1075 \u1072 \u1088 \u1080 \u1103 </option>\
+                \
+                <option value="CH" >\uc0\u1064 \u1074 \u1077 \u1081 \u1094 \u1072 \u1088 \u1080 \u1103 </option>\
+                \
+                <option value="SI" >\uc0\u1057 \u1083 \u1086 \u1074 \u1077 \u1085 \u1080 \u1103 </option>\
+                \
+                <option value="MC" >\uc0\u1052 \u1086 \u1085 \u1072 \u1082 \u1086 </option>\
+                \
+                <option value="HR" >\uc0\u1061 \u1086 \u1088 \u1074 \u1072 \u1090 \u1080 \u1103 </option>\
+                \
+                <option value="FI" >\uc0\u1060 \u1080 \u1085 \u1083 \u1103 \u1085 \u1076 \u1080 \u1103 </option>\
+                \
+                <option value="GR" >\uc0\u1043 \u1088 \u1077 \u1094 \u1080 \u1103 </option>\
+                \
+                <option value="JP" >\uc0\u1071 \u1087 \u1086 \u1085 \u1080 \u1103 </option>\
+                \
+                <option value="PT" >\uc0\u1055 \u1086 \u1088 \u1090 \u1091 \u1075 \u1072 \u1083 \u1080 \u1103 </option>\
+                \
+                <option value="AE" >\uc0\u1054 \u1040 \u1069 </option>\
+                \
+                <option value="US" >\uc0\u1057 \u1064 \u1040 </option>\
+                \
+                <option value="NO" >\uc0\u1053 \u1086 \u1088 \u1074 \u1077 \u1075 \u1080 \u1103 </option>\
+                \
+                <option value="GB" >\uc0\u1042 \u1077 \u1083 \u1080 \u1082 \u1086 \u1073 \u1088 \u1080 \u1090 \u1072 \u1085 \u1080 \u1103 </option>\
+                \
+                <option value="IE" >\uc0\u1048 \u1088 \u1083 \u1072 \u1085 \u1076 \u1080 \u1103 </option>\
+                \
+                <option value="AD" >\uc0\u1040 \u1085 \u1076 \u1086 \u1088 \u1088 \u1072 </option>\
+21\
+-bash: python: command not found\
 root@cv5704357:/opt/levelavto# }

@@ -8,6 +8,7 @@ from sqlalchemy import select, update, or_
 from ..models import Car, Source, CarImage, ProgressKV
 from ..services.cars_service import CarsService
 from ..utils.pricing import to_rub
+from ..utils.color_groups import normalize_color_group
 
 
 def compute_car_hash(payload: Dict[str, Any]) -> str:
@@ -65,6 +66,8 @@ class ParsingDataService:
             payload.setdefault("country", source.country)
             payload.setdefault("thumbnail_url", None)
             payload.setdefault("is_available", True)
+            if "color" in payload:
+                payload["color_group"] = normalize_color_group(payload.get("color"))
             # normalize KR market type
             if payload.get("country") == "KR":
                 if not payload.get("kr_market_type"):
