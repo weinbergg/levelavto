@@ -11,6 +11,7 @@ from backend.app.services.cars_service import CarsService
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--region", default="EU")
+    ap.add_argument("--country", default=None)
     ap.add_argument("--batch", type=int, default=2000)
     ap.add_argument("--only-missing", action="store_true")
     ap.add_argument("--since-minutes", type=int, default=None)
@@ -22,6 +23,8 @@ def main() -> None:
         q = db.query(Car.id).filter(Car.is_available.is_(True))
         if args.region.upper() == "EU":
             q = q.filter(~Car.country.like("KR%"))
+        if args.country:
+            q = q.filter(Car.country == args.country.upper())
         if args.only_missing:
             q = q.filter(Car.total_price_rub_cached.is_(None))
         if args.since_minutes:
