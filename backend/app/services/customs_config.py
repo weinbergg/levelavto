@@ -117,7 +117,15 @@ def calc_duty_eur(engine_cc: int, cfg: CustomsConfig) -> float:
     for row in cfg.duty_eur_per_cc:
         if row.from_cc <= engine_cc <= row.to_cc:
             return float(engine_cc) * float(row.eur_per_cc)
-    raise ValueError("duty_eur_per_cc not found for engine_cc")
+    # Fallback to nearest boundary to avoid hard failures on out-of-range engine_cc
+    rows = sorted(cfg.duty_eur_per_cc, key=lambda r: r.from_cc)
+    if not rows:
+        raise ValueError("duty_eur_per_cc not found for engine_cc")
+    if engine_cc < rows[0].from_cc:
+        logger.warning("duty_cc_below_range cc=%s using_min=%s", engine_cc, rows[0].from_cc)
+        return float(engine_cc) * float(rows[0].eur_per_cc)
+    logger.warning("duty_cc_above_range cc=%s using_max=%s", engine_cc, rows[-1].to_cc)
+    return float(engine_cc) * float(rows[-1].eur_per_cc)
 
 
 def _pick_util_tables(cfg: CustomsConfig, age_bucket: Optional[str]) -> Dict[str, UtilTable]:
@@ -138,12 +146,20 @@ def calc_util_fee_rub(
     age_bucket: Optional[str] = None,
 ) -> int:
     bucket = None
-    for b in cfg.util_cc_buckets:
+    buckets_sorted = sorted(cfg.util_cc_buckets, key=lambda b: b.from_cc)
+    for b in buckets_sorted:
         if b.from_cc <= engine_cc <= b.to_cc:
             bucket = b
             break
     if bucket is None:
-        raise ValueError("util_cc_bucket not found for engine_cc")
+        if not buckets_sorted:
+            raise ValueError("util_cc_bucket not found for engine_cc")
+        if engine_cc < buckets_sorted[0].from_cc:
+            bucket = buckets_sorted[0]
+            logger.warning("util_cc_below_range cc=%s using_min=%s", engine_cc, bucket.from_cc)
+        else:
+            bucket = buckets_sorted[-1]
+            logger.warning("util_cc_above_range cc=%s using_max=%s", engine_cc, bucket.to_cc)
     tables = _pick_util_tables(cfg, age_bucket)
     table = tables.get(bucket.table)
     if not table:

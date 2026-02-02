@@ -38,3 +38,15 @@ def test_duty_calc():
     cfg = _cfg()
     duty = calc_duty_eur(engine_cc=1500, cfg=cfg)
     assert duty == pytest.approx(2550.0, abs=0.1)
+
+
+def test_duty_out_of_range_uses_max_bucket():
+    cfg = _cfg()
+    duty = calc_duty_eur(engine_cc=10000, cfg=cfg)
+    assert duty == pytest.approx(36000.0, abs=0.1)
+
+
+def test_util_out_of_range_uses_max_bucket():
+    cfg = _cfg()
+    util = calc_util_fee_rub(engine_cc=12000, kw=None, hp=200, cfg=cfg)
+    assert util == 3403200
