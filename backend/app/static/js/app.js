@@ -102,6 +102,7 @@
     const val = String(src || '').trim()
     if (!val) return '/static/img/no-photo.svg'
     let url = val
+    while (url.startsWith('.')) url = url.slice(1)
     if (url.startsWith('//')) url = `https:${url}`
     if (url.startsWith('http://')) url = url.replace('http://', 'https://')
     if (url.startsWith('api/v1/mo-prod/images/')) url = `https://img.classistatic.de/${url}`
@@ -126,11 +127,18 @@
     if (!img) return
     const rawSrc = img.getAttribute('src') || ''
     const rawData = img.dataset.thumb || ''
+    const rawOrig = img.dataset.orig || ''
     let normalized = normalizeThumbUrl(rawSrc, { thumb: true })
     if (normalized === '/static/img/no-photo.svg' && rawData) {
       const dataNormalized = normalizeThumbUrl(rawData, { thumb: true })
       if (dataNormalized !== '/static/img/no-photo.svg') {
         normalized = dataNormalized
+      }
+    }
+    if (normalized === '/static/img/no-photo.svg' && rawOrig) {
+      const origNormalized = normalizeThumbUrl(rawOrig)
+      if (origNormalized !== '/static/img/no-photo.svg') {
+        normalized = origNormalized
       }
     }
     if (normalized === '/static/img/no-photo.svg' && rawSrc) {
@@ -156,6 +164,13 @@
       img.onerror = () => {
         if (img.dataset.fallbackApplied === '1') return
         img.dataset.fallbackApplied = '1'
+        const orig = img.dataset.orig || ''
+        const origNormalized = normalizeThumbUrl(orig)
+        if (origNormalized && origNormalized !== '/static/img/no-photo.svg') {
+          img.src = origNormalized
+          img.dataset.fallbackApplied = '2'
+          return
+        }
         img.src = '/static/img/no-photo.svg'
       }
     }
@@ -913,10 +928,15 @@
           const item = itemsById.get(id)
           const img = card.querySelector('img.thumb')
           if (img) {
-            const src = normalizeThumbUrl(item.thumbnail_url || '', { thumb: true })
+            const rawThumb = item.thumbnail_url || ''
+            const src = normalizeThumbUrl(rawThumb, { thumb: true })
+            const orig = normalizeThumbUrl(rawThumb)
             if (src !== '/static/img/no-photo.svg') {
               img.dataset.thumb = src
               img.setAttribute('src', src)
+            }
+            if (orig && orig !== '/static/img/no-photo.svg') {
+              img.dataset.orig = orig
             }
             applyThumbFallback(img)
           }
@@ -934,7 +954,9 @@
         card.href = `/car/${car.id}`
         card.className = 'car-card'
         const images = Array.isArray(car.images) && car.images.length ? car.images : (car.thumbnail_url ? [car.thumbnail_url] : [])
-        const thumbSrc = normalizeThumbUrl(images[0], { thumb: true })
+        const rawThumb = images[0] || ''
+        const thumbSrc = normalizeThumbUrl(rawThumb, { thumb: true })
+        const origThumb = normalizeThumbUrl(rawThumb)
         const hasGallery = images.length > 1
         const navControls = hasGallery
           ? `
@@ -946,10 +968,7 @@
         const more = (photosCount && photosCount > 1 && car.thumbnail_url) ? `<span class="more-badge">+${photosCount - 1} фото</span>` : ''
         const displayRub = car.display_price_rub
         let priceText = displayRub != null ? formatRub(displayRub) : ''
-        if (!priceText && car.price != null && car.currency) {
-          priceText = `${Number(car.price).toLocaleString('ru-RU')} ${car.currency}`
-        }
-        if (!priceText) priceText = 'Цена по запросу'
+        if (!priceText) priceText = 'Цена уточняется'
         const calcLine = `<div class="price-main">${priceText}</div>`
         const priceLines = []
         const footnote = ''
@@ -1005,6 +1024,7 @@
               decoding="async"
               referrerpolicy="no-referrer"
               data-thumb="${thumbSrc}"
+              data-orig="${origThumb}"
               data-id="${car.id}"
               onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
               fetchpriority="low"
@@ -2140,15 +2160,13 @@
           card.className = 'car-card'
           const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
           let thumb = normalizeThumbUrl(thumbRaw, { thumb: true })
+          const origThumb = normalizeThumbUrl(thumbRaw)
           const displayRub = car.display_price_rub
           let price = displayRub != null ? formatRub(displayRub) : ''
-          if (!price && car.price != null && car.currency) {
-            price = `${Number(car.price).toLocaleString('ru-RU')} ${car.currency}`
-          }
-          if (!price) price = 'Цена по запросу'
+          if (!price) price = 'Цена уточняется'
           card.innerHTML = `
             <div class="thumb-wrap">
-              <img class="thumb" src="${thumb}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-thumb="${thumb}" data-id="${car.id}" onerror="this.onerror=null;this.src='/static/img/no-photo.svg';" />
+              <img class="thumb" src="${thumb}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-thumb="${thumb}" data-orig="${origThumb}" data-id="${car.id}" onerror="this.onerror=null;this.src='/static/img/no-photo.svg';" />
             </div>
             <div class="car-card__body">
               <div>
@@ -2157,6 +2175,8 @@
               <div class="car-card__price">${price}</div>
             </div>
           `
+          const img = card.querySelector('img.thumb')
+          if (img) applyThumbFallback(img)
           grid.appendChild(card)
         })
         suggestionsEl.appendChild(grid)

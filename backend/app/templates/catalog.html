@@ -286,6 +286,7 @@
                   {% if loop.index0 < 2 %}fetchpriority="high"{% endif %}
                   alt=""
                   data-thumb="{{ thumb_src }}"
+                  data-orig="{{ car.thumbnail_url or '' }}"
                   data-id="{{ car.id }}"
                   onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
                   width="320"
@@ -339,10 +340,8 @@
                   {% if car.display_price_rub %}
                     {% set display_price_round = ((car.display_price_rub + 99999) // 100000) * 100000 %}
                     <div class="price-main">{{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽</div>
-                  {% elif car.price and car.currency %}
-                    <div class="price-main">{{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency }}</div>
                   {% else %}
-                    <div class="price-main">Цена по запросу</div>
+                    <div class="price-main">Цена уточняется</div>
                   {% endif %}
                 </div>
               </div>

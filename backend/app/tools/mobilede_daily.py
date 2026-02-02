@@ -178,6 +178,14 @@ def main() -> None:
                 target.unlink()
             except OSError:
                 pass
+        if os.getenv("RUN_CLEANUP_AFTER_DAILY", "1") == "1":
+            cleanup_script = Path(__file__).resolve().parents[3] / "scripts" / "cleanup_tmp_files.sh"
+            if cleanup_script.exists():
+                try:
+                    subprocess.run(["/bin/bash", str(cleanup_script)], check=False)
+                    print("[mobilede_daily] cleanup_tmp_files.sh completed", flush=True)
+                except Exception as exc:
+                    print(f"[mobilede_daily] cleanup_tmp_files.sh failed: {exc}", flush=True)
         # Telegram report (optional)
         token = os.getenv("TELEGRAM_BOT_TOKEN")
         chat_id = os.getenv("TELEGRAM_CHAT_ID")

@@ -15,6 +15,7 @@ depends_on = None
 
 def upgrade() -> None:
     with op.get_context().autocommit_block():
+        op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)")
         op.execute(
             "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_cars_kr_available_total_price "
             "ON cars (country, is_available, total_price_rub_cached, id)"
