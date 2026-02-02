@@ -721,6 +721,19 @@
     return params
   }
 
+  function normalizeParamsString(qsString) {
+    if (!qsString) return ''
+    const params = new URLSearchParams(qsString)
+    params.delete('page')
+    params.delete('page_size')
+    const entries = Array.from(params.entries())
+    entries.sort((a, b) => {
+      if (a[0] === b[0]) return String(a[1]).localeCompare(String(b[1]))
+      return a[0].localeCompare(b[0])
+    })
+    return entries.map(([k, v]) => `${k}=${v}`).join('&')
+  }
+
   function renderEmpty(cards, reason = 'Нет результатов по выбранным фильтрам.') {
     cards.innerHTML = `<div class="empty-state">${reason}<br><button class="btn btn-secondary" id="emptyReset">Сбросить фильтры</button></div>`
     qs('#emptyReset')?.addEventListener('click', () => {
@@ -817,7 +830,8 @@
     const ssrEnabled = cards.dataset.ssr === '1'
     const ssrParams = cards.dataset.ssrParams || ''
     const hasSSR = ssrEnabled && cards.querySelector('.car-card')
-    const reuseSSR = page === 1 && hasSSR && ssrParams === paramsPreview.toString()
+    const reuseSSR = page === 1 && hasSSR
+      && normalizeParamsString(ssrParams) === normalizeParamsString(paramsPreview.toString())
     spinner.style.display = 'block'
     if (!reuseSSR) {
       renderSkeleton(cards)

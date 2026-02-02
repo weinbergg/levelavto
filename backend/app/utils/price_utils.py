@@ -13,8 +13,12 @@ def display_price_rub(
     total_price_rub_cached: Optional[float],
     price_rub_cached: Optional[float],
 ) -> Optional[float]:
-    if total_price_rub_cached is not None:
-        return float(total_price_rub_cached)
+    # Display should use the ad price when available and be rounded for UI.
+    raw = None
     if price_rub_cached is not None:
-        return float(price_rub_cached)
-    return None
+        raw = float(price_rub_cached)
+    elif total_price_rub_cached is not None:
+        raw = float(total_price_rub_cached)
+    if raw is None:
+        return None
+    return ceil_to_step(raw, 100000)

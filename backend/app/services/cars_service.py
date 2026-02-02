@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import select, func, and_, or_, case, cast, String, text, literal
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.dialects.postgresql import JSONB
@@ -795,11 +795,12 @@ class CarsService:
                 if src_ids:
                     conditions.append(Car.source_id.in_(src_ids))
         if price_min is not None or price_max is not None:
-            conditions.append(Car.total_price_rub_cached.is_not(None))
+            price_expr = func.coalesce(Car.price_rub_cached, Car.total_price_rub_cached)
+            conditions.append(price_expr.is_not(None))
             if price_min is not None:
-                conditions.append(Car.total_price_rub_cached >= price_min)
+                conditions.append(price_expr >= price_min)
             if price_max is not None:
-                conditions.append(Car.total_price_rub_cached <= price_max)
+                conditions.append(price_expr <= price_max)
         if year_min is not None:
             conditions.append(Car.year >= year_min)
         if year_max is not None:
@@ -1020,7 +1021,7 @@ class CarsService:
 
         order_clause = []
         if sort == "price_asc":
-            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+            price_expr = func.coalesce(Car.price_rub_cached, Car.total_price_rub_cached)
             missing_price = and_(
                 Car.total_price_rub_cached.is_(None),
                 Car.price_rub_cached.is_(None),
@@ -1031,7 +1032,7 @@ class CarsService:
                 Car.id.asc(),
             ]
         elif sort == "price_desc":
-            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+            price_expr = func.coalesce(Car.price_rub_cached, Car.total_price_rub_cached)
             missing_price = and_(
                 Car.total_price_rub_cached.is_(None),
                 Car.price_rub_cached.is_(None),
@@ -1059,7 +1060,8 @@ class CarsService:
             order_clause = [Car.listing_sort_ts.asc().nullslast(), Car.id.desc()]
         else:
             # default: цена сначала дешевые
-            order_clause = [Car.price_rub_cached.asc().nullslast(), Car.id.desc()]
+            price_expr = func.coalesce(Car.price_rub_cached, Car.total_price_rub_cached)
+            order_clause = [price_expr.asc().nullslast(), Car.id.desc()]
 
         thumb_rank = case(
             (and_(Car.thumbnail_url.is_not(None), Car.thumbnail_url != ""), 1),
@@ -1287,7 +1289,7 @@ class CarsService:
         return {"total_rub": total_rub, "breakdown": display, "vat_reclaim": vat_reclaim, "used_price": used_price, "used_currency": used_currency}
 
     def get_car(self, car_id: int) -> Optional[Car]:
-        stmt = select(Car).where(Car.id == car_id)
+        stmt = select(Car).options(selectinload(Car.images)).where(Car.id == car_id)
         return self.db.execute(stmt).scalar_one_or_none()
 
     def brands(self, country: Optional[str] = None) -> List[str]:
