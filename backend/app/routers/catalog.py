@@ -437,7 +437,11 @@ def list_cars(
                 "mileage": c.get("mileage"),
                 "total_price_rub_cached": total_cached,
                 "price_rub_cached": price_cached,
-                "display_price_rub": display_price_rub(total_cached, price_cached),
+                "display_price_rub": display_price_rub(
+                    total_cached,
+                    price_cached,
+                    allow_price_fallback=str(c.get("country") or "").upper() == "KR",
+                ),
                 "calc_updated_at": c.get("calc_updated_at"),
                 "thumbnail_url": thumb_url,
                 "country": country_norm or country_raw,
@@ -643,6 +647,7 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     detail.display_price_rub = display_price_rub(
         car.total_price_rub_cached,
         car.price_rub_cached,
+        allow_price_fallback=str(car.country or "").upper() == "KR",
     )
     if car.source:
         detail.source_name = car.source.name

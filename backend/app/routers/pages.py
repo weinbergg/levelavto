@@ -835,6 +835,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                 c["display_price_rub"] = display_price_rub(
                     c.get("total_price_rub_cached"),
                     c.get("price_rub_cached"),
+                    allow_price_fallback=str(c.get("country") or "").upper() == "KR",
                 )
             ids = [c.get("id") for c in initial_items if isinstance(c, dict) and c.get("id")]
             if ids:
@@ -1039,6 +1040,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         car.display_price_rub = display_price_rub(
             car.total_price_rub_cached,
             car.price_rub_cached,
+            allow_price_fallback=str(car.country or "").upper() == "KR",
         )
         if getattr(car, "images", None):
             for im in car.images:

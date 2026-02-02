@@ -801,7 +801,7 @@ class CarsService:
                 if src_ids:
                     conditions.append(Car.source_id.in_(src_ids))
         if price_min is not None or price_max is not None:
-            price_expr = func.coalesce(Car.price_rub_cached, Car.total_price_rub_cached)
+            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
             conditions.append(price_expr.is_not(None))
             if price_min is not None:
                 conditions.append(price_expr >= price_min)
@@ -1027,10 +1027,10 @@ class CarsService:
 
         order_clause = []
         if sort == "price_asc":
-            price_expr = func.coalesce(Car.price_rub_cached, Car.total_price_rub_cached)
+            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
             missing_price = and_(
-                Car.total_price_rub_cached.is_(None),
                 Car.price_rub_cached.is_(None),
+                Car.total_price_rub_cached.is_(None),
             )
             order_clause = [
                 missing_price.asc(),
@@ -1038,10 +1038,10 @@ class CarsService:
                 Car.id.asc(),
             ]
         elif sort == "price_desc":
-            price_expr = func.coalesce(Car.price_rub_cached, Car.total_price_rub_cached)
+            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
             missing_price = and_(
-                Car.total_price_rub_cached.is_(None),
                 Car.price_rub_cached.is_(None),
+                Car.total_price_rub_cached.is_(None),
             )
             order_clause = [
                 missing_price.asc(),
@@ -1066,7 +1066,7 @@ class CarsService:
             order_clause = [Car.listing_sort_ts.asc().nullslast(), Car.id.desc()]
         else:
             # default: цена сначала дешевые
-            price_expr = func.coalesce(Car.price_rub_cached, Car.total_price_rub_cached)
+            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
             order_clause = [price_expr.asc().nullslast(), Car.id.desc()]
 
         thumb_rank = case(

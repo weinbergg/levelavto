@@ -5,77 +5,32 @@
 \paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
-\f0\fs24 \cf0 root@cv5704357:/opt/levelavto# git pull\
-docker compose build web\
+\f0\fs24 \cf0 root@cv5704357:/opt/levelavto# docker compose exec -T db psql -U autodealer -d autodealer -c \\\
+"ALTER TABLE alembic_version ALTER COLUMN version_num TYPE varchar(64);"\
+docker compose exec -T web alembic -c migrations/alembic.ini upgrade head\
+docker compose exec -T db psql -U autodealer -d autodealer -c \\\
+"select column_name from information_schema.columns where table_name='cars' and column_name='color_group';"\
+docker compose exec -T web python -m backend.app.scripts.backfill_color_group --only-missing --batch 2000\
 docker compose up -d --force-recreate web\
 docker compose run --rm prewarm\
+curl -s "http://localhost:8000/api/cars/1759419" | head -n 3\
+ALTER TABLE\
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
+INFO  [alembic.runtime.migration] Will assume transactional DDL.\
+ column_name \
+-------------\
+ color_group\
+(1 row)\
 \
-docker compose exec -T web alembic -c migrations/alembic.ini upgrade head\
-docker compose exec -T web python -m backend.app.scripts.backfill_color_group --only-missing --batch 2000\
-curl -s "http://localhost:8000/api/filter_ctx_base?region=EU&country=DE" | python - <<'PY'\
-import json,sys\
-data=json.load(sys.stdin)\
-colors=data.get("colors_basic", [])\
-print("colors_basic_len", len(colors))\
-print(colors[:12])\
-PY\
-curl -s "http://localhost:8000/api/cars?region=EU&country=DE&page=1&page_size=12" >/dev/null\
-curl -s "http://localhost:8000/api/cars?region=EU&country=DE&page=1&page_size=12" >/dev/null\
-docker compose logs --tail=200 web | grep -E "CARS_LIST_CACHE|CARS_COUNT_CACHE"\
-docker compose exec -T web python -m pytest -q \\\
-  backend/tests/test_color_groups.py \\\
-  backend/tests/test_filter_normalize.py\
-remote: Enumerating objects: 40, done.\
-remote: Counting objects: 100% (40/40), done.\
-remote: Compressing objects: 100% (5/5), done.\
-remote: Total 22 (delta 17), reused 22 (delta 17), pack-reused 0 (from 0)\
-Unpacking objects: 100% (22/22), 8.68 KiB | 592.00 KiB/s, done.\
-From github.com:weinbergg/levelavto\
-   5738e40..ac3c473  main       -> origin/main\
-Updating 5738e40..ac3c473\
-Fast-forward\
- backend/app/models/car.py                    |   1 +\
- backend/app/routers/catalog.py               |   4 +-\
- backend/app/scripts/backfill_color_group.py  |  46 +++++++\
- backend/app/services/cars_service.py         |  18 ++-\
- backend/app/services/parsing_data_service.py |   3 +\
- backend/app/utils/color_groups.py            | 148 +++++++++++++++++---\
- backend/tests/test_color_groups.py           |  25 ++--\
- backend/tests/test_filter_normalize.py       |  27 ++++\
- migrations/versions/0032_add_color_group.py  |  31 +++++\
- vps.rtf                                      | 673 ++++++++++++++++++++++++++++++++++++++++++++----------------------------------------------\
- 10 files changed, 596 insertions(+), 380 deletions(-)\
- create mode 100644 backend/app/scripts/backfill_color_group.py\
- create mode 100644 backend/tests/test_filter_normalize.py\
- create mode 100644 migrations/versions/0032_add_color_group.py\
-[+] Building 3.5s (13/13) FINISHED                                                                                                             \
- => [internal] load local bake definitions                                                                                                0.0s\
- => => reading from stdin 480B                                                                                                            0.0s\
- => [internal] load build definition from Dockerfile                                                                                      0.0s\
- => => transferring dockerfile: 553B                                                                                                      0.0s\
- => [internal] load metadata for docker.io/library/python:3.11-slim                                                                       0.2s\
- => [internal] load .dockerignore                                                                                                         0.0s\
- => => transferring context: 285B                                                                                                         0.0s\
- => [internal] load build context                                                                                                         0.2s\
- => => transferring context: 471.25kB                                                                                                     0.2s\
- => [1/6] FROM docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.0s\
- => => resolve docker.io/library/python:3.11-slim@sha256:5be45dbade29bebd6886af6b438fd7e0b4eb7b611f39ba62b430263f82de36d2                 0.0s\
- => CACHED [2/6] WORKDIR /app                                                                                                             0.0s\
- => CACHED [3/6] RUN apt-get update && apt-get install -y --no-install-recommends     build-essential curl libpq-dev &&     rm -rf /var/  0.0s\
- => CACHED [4/6] COPY backend/requirements.txt /app/backend/requirements.txt                                                              0.0s\
- => CACHED [5/6] RUN pip install --upgrade pip && pip install -r /app/backend/requirements.txt                                            0.0s\
- => [6/6] COPY . /app                                                                                                                     0.8s\
- => exporting to image                                                                                                                    1.9s\
- => => exporting layers                                                                                                                   1.5s\
- => => exporting manifest sha256:7ccd44cda1251c4e203737326517cece12699f46734cb4f9e5daf9e35f47af2f                                         0.0s\
- => => exporting config sha256:31c189aa501f88bfc4314afcc2ba9754f374e438f305c98d3bd3e3b33ba56885                                           0.0s\
- => => exporting attestation manifest sha256:4d4c0da93c966334985b479939af38797e6f3421bdfd0ac213d9f247878d8bac                             0.0s\
- => => exporting manifest list sha256:3c93a634c9f4a24f2d6fe67e54605af37ae0c3c567026e6ea9390b85114cb75e                                    0.0s\
- => => naming to docker.io/library/levelavto-web:latest                                                                                   0.0s\
- => => unpacking to docker.io/library/levelavto-web:latest                                                                                0.4s\
- => resolving provenance for metadata file                                                                                                0.0s\
-[+] build 1/1\
- \uc0\u10004  Image levelavto-web Built                                                                                                              3.6s \
+Traceback (most recent call last):\
+  File "<frozen runpy>", line 198, in _run_module_as_main\
+  File "<frozen runpy>", line 88, in _run_code\
+  File "/app/backend/app/scripts/backfill_color_group.py", line 46, in <module>\
+    main()\
+  File "/app/backend/app/scripts/backfill_color_group.py", line 28, in main\
+    group = normalize_color_group(car.color, car.color_hex)\
+                                             ^^^^^^^^^^^^^\
+AttributeError: 'Car' object has no attribute 'color_hex'\
 [+] up 3/3\
  \uc0\u10004  Container autodealer_db    Healthy                                                                                                    11.2s \
  \uc0\u10004  Container autodealer_redis Healthy                                                                                                    11.2s \
@@ -84,200 +39,142 @@ Fast-forward\
  \uc0\u10004  Container autodealer_redis Running                                                                                                     0.0s \
  \uc0\u10004  Container autodealer_db    Running                                                                                                     0.0s \
  \uc0\u10004  Container autodealer_web   Running                                                                                                     0.0s \
-[+]  3/3r autodealer_redis Waiting \
+[+]  3/3r autodealer_db Waiting \
  \uc0\u10004  Container autodealer_redis Healthy                                                                                                     0.5s \
  \uc0\u10004  Container autodealer_db    Healthy                                                                                                     0.5s \
  \uc0\u10004  Container autodealer_web   Running                                                                                                     0.0s \
-Container autodealer_web Waiting \
 Container autodealer_redis Waiting \
+Container autodealer_web Waiting \
 Container autodealer_redis Healthy \
-Container autodealer_web Error dependency web failed to start\
-dependency failed to start: container autodealer_web is unhealthy\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\
-INFO  [alembic.runtime.migration] Will assume transactional DDL.\
-INFO  [alembic.runtime.migration] Running upgrade 0030_set_is_available_not_null -> 0031_add_idx_kr_available_total_price, add idx for KR price sorting\
-Traceback (most recent call last):\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context\
-    self.dialect.do_execute(\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 941, in do_execute\
-    cursor.execute(statement, parameters)\
-psycopg2.errors.StringDataRightTruncation: value too long for type character varying(32)\
-\
-\
-The above exception was the direct cause of the following exception:\
-\
-Traceback (most recent call last):\
-  File "/usr/local/bin/alembic", line 6, in <module>\
-    sys.exit(main())\
-             ^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/alembic/config.py", line 636, in main\
-    CommandLine(prog=prog).main(argv=argv)\
-  File "/usr/local/lib/python3.11/site-packages/alembic/config.py", line 626, in main\
-    self.run_cmd(cfg, options)\
-  File "/usr/local/lib/python3.11/site-packages/alembic/config.py", line 603, in run_cmd\
-    fn(\
-  File "/usr/local/lib/python3.11/site-packages/alembic/command.py", line 406, in upgrade\
-    script.run_env()\
-  File "/usr/local/lib/python3.11/site-packages/alembic/script/base.py", line 586, in run_env\
-    util.load_python_file(self.dir, "env.py")\
-  File "/usr/local/lib/python3.11/site-packages/alembic/util/pyfiles.py", line 95, in load_python_file\
-    module = load_module_py(module_id, path)\
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/alembic/util/pyfiles.py", line 113, in load_module_py\
-    spec.loader.exec_module(module)  # type: ignore\
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\
-  File "<frozen importlib._bootstrap_external>", line 940, in exec_module\
-  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed\
-  File "/app/migrations/env.py", line 65, in <module>\
-    run_migrations_online()\
-  File "/app/migrations/env.py", line 59, in run_migrations_online\
-    raise last_exc\
-  File "/app/migrations/env.py", line 53, in run_migrations_online\
-    context.run_migrations()\
-  File "<string>", line 8, in run_migrations\
-  File "/usr/local/lib/python3.11/site-packages/alembic/runtime/environment.py", line 946, in run_migrations\
-    self.get_context().run_migrations(**kw)\
-  File "/usr/local/lib/python3.11/site-packages/alembic/runtime/migration.py", line 635, in run_migrations\
-    head_maintainer.update_to_step(step)\
-  File "/usr/local/lib/python3.11/site-packages/alembic/runtime/migration.py", line 867, in update_to_step\
-    self._update_version(from_, to_)\
-  File "/usr/local/lib/python3.11/site-packages/alembic/runtime/migration.py", line 802, in _update_version\
-    ret = self.context.impl._exec(\
-          ^^^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/alembic/ddl/impl.py", line 210, in _exec\
-    return conn.execute(construct, params)\
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1418, in execute\
-    return meth(\
-           ^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 515, in _execute_on_connection\
-    return connection._execute_clauseelement(\
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1640, in _execute_clauseelement\
-    ret = self._execute_context(\
-          ^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context\
-    return self._exec_single_context(\
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context\
-    self._handle_dbapi_exception(\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception\
-    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context\
-    self.dialect.do_execute(\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 941, in do_execute\
-    cursor.execute(statement, parameters)\
-sqlalchemy.exc.DataError: (psycopg2.errors.StringDataRightTruncation) value too long for type character varying(32)\
-\
-[SQL: UPDATE alembic_version SET version_num='0031_add_idx_kr_available_total_price' WHERE alembic_version.version_num = '0030_set_is_available_not_null']\
-(Background on this error at: https://sqlalche.me/e/20/9h9h)\
-Traceback (most recent call last):\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context\
-    self.dialect.do_execute(\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 941, in do_execute\
-    cursor.execute(statement, parameters)\
-psycopg2.errors.UndefinedColumn: column cars.color_group does not exist\
-LINE 1: ...ype AS cars_drive_type, cars.color AS cars_color, cars.color...\
-                                                             ^\
-\
-\
-The above exception was the direct cause of the following exception:\
-\
-Traceback (most recent call last):\
-  File "<frozen runpy>", line 198, in _run_module_as_main\
-  File "<frozen runpy>", line 88, in _run_code\
-  File "/app/backend/app/scripts/backfill_color_group.py", line 46, in <module>\
-    main()\
-  File "/app/backend/app/scripts/backfill_color_group.py", line 26, in main\
-    for car in q.yield_per(args.batch):\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2813, in __iter__\
-    result = self._iter()\
-             ^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2827, in _iter\
-    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(\
-                                                  ^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2362, in execute\
-    return self._execute_internal(\
-           ^^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2247, in _execute_internal\
-    result: Result[Any] = compile_state_cls.orm_execute_statement(\
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 305, in orm_execute_statement\
-    result = conn.execute(\
-             ^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1418, in execute\
-    return meth(\
-           ^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 515, in _execute_on_connection\
-    return connection._execute_clauseelement(\
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1640, in _execute_clauseelement\
-    ret = self._execute_context(\
-          ^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context\
-    return self._exec_single_context(\
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context\
-    self._handle_dbapi_exception(\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception\
-    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context\
-    self.dialect.do_execute(\
-  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 941, in do_execute\
-    cursor.execute(statement, parameters)\
-sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column cars.color_group does not exist\
-LINE 1: ...ype AS cars_drive_type, cars.color AS cars_color, cars.color...\
-                                                             ^\
-\
-[SQL: SELECT cars.id AS cars_id, cars.source_id AS cars_source_id, cars.external_id AS cars_external_id, cars.country AS cars_country, cars.brand AS cars_brand, cars.model AS cars_model, cars.generation AS cars_generation, cars.variant AS cars_variant, cars.year AS cars_year, cars.mileage AS cars_mileage, cars.price AS cars_price, cars.currency AS cars_currency, cars.price_rub_cached AS cars_price_rub_cached, cars.total_price_rub_cached AS cars_total_price_rub_cached, cars.listing_sort_ts AS cars_listing_sort_ts, cars.reg_sort_key AS cars_reg_sort_key, cars.kr_market_type AS cars_kr_market_type, cars.registration_year AS cars_registration_year, cars.registration_month AS cars_registration_month, cars.body_type AS cars_body_type, cars.engine_type AS cars_engine_type, cars.engine_cc AS cars_engine_cc, cars.power_hp AS cars_power_hp, cars.power_kw AS cars_power_kw, cars.transmission AS cars_transmission, cars.drive_type AS cars_drive_type, cars.color AS cars_color, cars.color_group AS cars_color_group, cars.vin AS cars_vin, cars.source_url AS cars_source_url, cars.thumbnail_url AS cars_thumbnail_url, cars.thumbnail_local_path AS cars_thumbnail_local_path, cars.source_payload AS cars_source_payload, cars.calc_breakdown_json AS cars_calc_breakdown_json, cars.hash AS cars_hash, cars.first_seen_at AS cars_first_seen_at, cars.last_seen_at AS cars_last_seen_at, cars.listing_date AS cars_listing_date, cars.calc_updated_at AS cars_calc_updated_at, cars.created_at AS cars_created_at, cars.updated_at AS cars_updated_at, cars.is_available AS cars_is_available \
-FROM cars \
-WHERE cars.color_group IS NULL ORDER BY cars.id]\
-(Background on this error at: https://sqlalche.me/e/20/f405)\
--bash: python: command not found\
-autodealer_web  | CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:all:none:1:12:v1770011254\
-autodealer_web  | CARS_LIST_CACHE hit=1 source=redis key=cars_list:EU:DE:all:none:1:12:v1770011254\
-.....                                                                    [100%]\
-5 passed in 0.05s\
-root@cv5704357:/opt/levelavto# }
+Container autodealer_web Healthy \
+Container levelavto-prewarm-run-60a78a5375b1 Creating \
+Container levelavto-prewarm-run-60a78a5375b1 Created \
+FILTER_CTX_BASE_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_base key=filter_ctx_base:\{\} ms=28.10\
+FILTER_CTX_BASE_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'EU'\} ms=9.07\
+FILTER_CTX_BASE_CACHE hit=1 source=redis\
+[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'EU', 'country': 'DE'\} ms=0.92\
+FILTER_CTX_BASE_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_base key=filter_ctx_base:\{'region': 'KR'\} ms=6.47\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'BMW'\} ms=52966.89\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Mercedes-Benz'\} ms=130873.08\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Audi'\} ms=86556.46\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Volkswagen'\} ms=184014.18\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Toyota'\} ms=21588.28\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Ford'\} ms=73478.88\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Renault'\} ms=38510.23\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Hyundai'\} ms=38027.65\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Kia'\} ms=25851.93\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Skoda'\} ms=40807.29\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Peugeot'\} ms=34291.33\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'DE', 'brand': 'Opel'\} ms=66932.03\
+FILTER_CTX_BRAND_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_brand key=filter_ctx_brand:\{'region': 'EU', 'country': 'AT', 'brand': 'Cadillac'\} ms=8.47\
+FILTER_CTX_MODEL_CACHE hit=0 source=fallback\
+[prewarm] filter_ctx_model key=filter_ctx_model:\{'region': 'EU', 'country': 'DE', 'brand': 'BMW', 'model': 'X5'\} ms=2142.19\
+[prewarm] total_cars=2397398\
+count_slow total=6.949s filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=8.962s sort=None page=1 size=1 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:all:all:v1770011254 value=2288389\
+count_slow total=8.104s filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=9.519s sort=None page=1 size=1 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:KR:all:all:v1770011254 value=109009\
+count_slow total=8.006s filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=8.348s sort=None page=1 size=1 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:DE:all:v1770011254 value=1894244\
+count_slow total=2.173s filters=('EU', 'AT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:AT:all:v1770011254 value=4064\
+count_slow total=8.281s filters=('EU', 'NL', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=3.371s sort=None page=1 size=1 filters=('EU', 'NL', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:NL:all:v1770011254 value=13724\
+count_slow total=2.234s filters=('EU', 'BE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:BE:all:v1770011254 value=4875\
+[prewarm] cars_count key=cars_count:EU:FR:all:v1770011254 value=1322\
+count_slow total=24.817s filters=('EU', 'IT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=25.179s sort=None page=1 size=1 filters=('EU', 'IT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:IT:all:v1770011254 value=344364\
+[prewarm] cars_count key=cars_count:EU:ES:all:v1770011254 value=620\
+list_slow total=2.438s sort=None page=1 size=1 filters=('EU', 'AT', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_count key=cars_count:EU:AT:all:v1770011254 value=4064\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:all:all:none:1:12:v1770011254\
+list_slow total=6.663s sort=None page=1 size=12 filters=('EU', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list region=EU country=None\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:none:1:12:v1770011254\
+list_slow total=6.626s sort=None page=1 size=12 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list region=KR country=None\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:all:none:1:12:v1770011254\
+list_slow total=6.784s sort=None page=1 size=12 filters=('EU', 'DE', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:AT:all:none:1:12:v1770011254\
+[prewarm] cars_list region=EU country=AT\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:price_asc:1:24:v1770011254\
+list_slow total=6.644s sort=price_asc page=1 size=24 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list region=KR sort=price_asc\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:KR:all:all:price_desc:1:24:v1770011254\
+count_slow total=6.540s filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=7.056s sort=price_desc page=1 size=24 filters=('KR', 'KR', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list region=KR sort=price_desc\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:BMW:none:1:12:v1770011254\
+count_slow total=51.496s filters=('EU', 'DE', 'BMW', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=52.421s sort=None page=1 size=12 filters=('EU', 'DE', 'BMW', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=BMW region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Mercedes-Benz:none:1:12:v1770011254\
+count_slow total=132.869s filters=('EU', 'DE', 'Mercedes-Benz', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=115.423s sort=None page=1 size=12 filters=('EU', 'DE', 'Mercedes-Benz', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Mercedes-Benz region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Audi:none:1:12:v1770011254\
+count_slow total=83.315s filters=('EU', 'DE', 'Audi', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=79.714s sort=None page=1 size=12 filters=('EU', 'DE', 'Audi', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Audi region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Volkswagen:none:1:12:v1770011254\
+count_slow total=188.156s filters=('EU', 'DE', 'Volkswagen', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=193.685s sort=None page=1 size=12 filters=('EU', 'DE', 'Volkswagen', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Volkswagen region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Toyota:none:1:12:v1770011254\
+count_slow total=22.384s filters=('EU', 'DE', 'Toyota', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=21.827s sort=None page=1 size=12 filters=('EU', 'DE', 'Toyota', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Toyota region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Ford:none:1:12:v1770011254\
+count_slow total=73.354s filters=('EU', 'DE', 'Ford', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=72.606s sort=None page=1 size=12 filters=('EU', 'DE', 'Ford', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Ford region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Renault:none:1:12:v1770011254\
+count_slow total=36.508s filters=('EU', 'DE', 'Renault', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=37.167s sort=None page=1 size=12 filters=('EU', 'DE', 'Renault', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Renault region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Hyundai:none:1:12:v1770011254\
+count_slow total=39.791s filters=('EU', 'DE', 'Hyundai', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=39.917s sort=None page=1 size=12 filters=('EU', 'DE', 'Hyundai', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Hyundai region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Kia:none:1:12:v1770011254\
+count_slow total=28.306s filters=('EU', 'DE', 'Kia', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=27.961s sort=None page=1 size=12 filters=('EU', 'DE', 'Kia', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Kia region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Skoda:none:1:12:v1770011254\
+count_slow total=42.128s filters=('EU', 'DE', 'Skoda', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=46.350s sort=None page=1 size=12 filters=('EU', 'DE', 'Skoda', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Skoda region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Peugeot:none:1:12:v1770011254\
+count_slow total=37.227s filters=('EU', 'DE', 'Peugeot', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=35.369s sort=None page=1 size=12 filters=('EU', 'DE', 'Peugeot', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Peugeot region=EU country=DE\
+CARS_LIST_CACHE hit=0 source=fallback key=cars_list:EU:DE:Opel:none:1:12:v1770011254\
+count_slow total=68.798s filters=('EU', 'DE', 'Opel', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+list_slow total=67.174s sort=None page=1 size=12 filters=('EU', 'DE', 'Opel', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)\
+[prewarm] cars_list brand=Opel region=EU country=DE\
+[prewarm] cars_list brand=Cadillac region=EU country=AT\
+[prewarm] done in 2557146.05 ms\
+\{"id":1759419,"source_id":1,"external_id":"446116372","country":"DE","brand":"BMW","model":"X5","generation":null,"year":2026,"mileage":5,"price":102990.0,"currency":"EUR","price_rub_cached":9402863.41,"total_price_rub_cached":14700000.0,"display_price_rub":9500000.0,"calc_updated_at":"2026-02-01T07:50:03.005974","registration_year":2026,"registration_month":1,"body_type":"suv","engine_type":"Electric","engine_cc":3000,"power_hp":489.0,"power_kw":359.66,"transmission":"Automatic","drive_type":"AWD","color":"skyscraper grau","vin":null,"source_url":"https://suchen.mobile.de/auto-inserat/bmw-x5-xdrive50e-m-sport-pro-innov-comfo-trav-hud-l%C3%BCneburg/446116372.html","thumbnail_url":"https://img.classistatic.de/api/v1/mo-prod/images/fc/fca703ed-cde7-437b-b7c9-f71a92c0d082?rule=mo-1024.jpg","thumbnail_local_path":null,"hash":"61de13535ec66274f2b007f8ed26c8b7c785ca5fef4cd0c404286c4f3c662273","first_seen_at":"2026-01-22T08:34:01.055318","last_seen_at":"2026-01-30T08:27:24.470109","listing_date":"2026-01-19T18:13:41","is_available":true,"created_at":"2026-01-22T08:34:01.673745","updated_at":"2026-02-01T07:50:03.010874","source_name":"mobile.de","source_country":"DE","display_country_code":"DE","display_country_label":"\uc0\u1043 \u1077 \u1088 \u1084 \u1072 \u1085 \u1080 \u1103 ","display_engine_type":"\u1069 \u1083 \u1077 \u1082 \u1090 \u1088 \u1086 ","display_transmission":"\u1040 \u1074 \u1090 \u1086 \u1084 \u1072 \u1090 ","images":["https://img.classistatic.de/api/v1/mo-prod/images/fc/fca703ed-cde7-437b-b7c9-f71a92c0d082?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/d2/d2229897-fd96-4a6f-a8d2-02ea19673363?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/b1/b1016868-0966-4c5c-8196-89a693711ecd?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/aa/aa1309fb-f8f1-4bd2-ba10-d8815f2fe45c?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/4c/4cc6923b-c07d-4ee5-b4ae-4268d1b25550?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/1c/1cb4ed67-1f17-43a3-aa28-444162281274?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/9b/9b42c924-3927-4154-8cfd-11b0a73a6cfe?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/ca/ca02c453-2d16-42e6-ad51-e4b77d786349?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/73/73404aa9-ebe8-4fa2-87c0-27c8f3c0ecd3?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/e7/e72fd42e-b0b2-4849-94f6-3e1ede1ccfaa?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/5f/5f19bfb2-df29-49ef-ad2b-bee104a84e58?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/b8/b8a4eb22-1cef-4c89-be3c-6a21e032dbff?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/dc/dc9ff191-ebdb-492c-8407-bd2a7f41cdd4?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/0a/0aaa8850-cbf1-496e-ad85-c87043d20d97?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/35/35e37e1c-6658-4c75-a128-27c1318b0771?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/d9/d9e137a1-2fa3-498f-bbe1-28f9a95d2888?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/22/226d3f2e-a06f-4007-9136-b309951e8c3d?rule=mo-1024.jpg","https://img.classistatic.de/api/v1/mo-prod/images/eb/eb31a2a6-d19f-4852-97a2-5ba6dbdb4ebc?rule=mo-1024.jpg"]\}root@cv5704357:/opt/levelavto# }
