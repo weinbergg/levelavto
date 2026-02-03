@@ -1153,6 +1153,33 @@ class CarsService:
     def ensure_calc_cache(self, car: Car) -> dict | None:
         if not car:
             return None
+        def _fallback_total(reason: str) -> dict | None:
+            # Use existing cached RUB price if available; otherwise derive from price+currency.
+            fx_local = self.get_fx_rates() or {}
+            eur = fx_local.get("EUR") or 95.0
+            usd = fx_local.get("USD") or 85.0
+            total = None
+            if car.price_rub_cached is not None:
+                total = float(car.price_rub_cached)
+            else:
+                cur_local = str(car.currency or "EUR").strip().upper()
+                if car.price is None:
+                    total = None
+                elif cur_local == "EUR":
+                    total = float(car.price) * float(eur)
+                elif cur_local == "USD":
+                    total = float(car.price) * float(usd)
+                elif cur_local in ("RUB", "₽"):
+                    total = float(car.price)
+            if total is None:
+                return None
+            car.total_price_rub_cached = total
+            if car.calc_breakdown_json is None:
+                car.calc_breakdown_json = []
+            car.calc_updated_at = datetime.utcnow()
+            self.db.commit()
+            self.logger.info("calc_fallback_total car=%s reason=%s", car.id, reason)
+            return {"total_rub": total, "breakdown": car.calc_breakdown_json or []}
         # базовые цены из source_payload
         payload = car.source_payload or {}
         price_gross = payload.get("price_eur")
@@ -1171,12 +1198,12 @@ class CarsService:
             used_currency = car.currency or "EUR"
         if not used_price:
             self.logger.info("calc_skip_no_price car=%s src=%s", car.id, getattr(car.source, "key", None))
-            return None
+            return _fallback_total("no_price")
         reg_year = car.registration_year or car.year
         reg_month = car.registration_month or 1
         if reg_year is None:
             self.logger.info("calc_skip_no_reg_year car=%s src=%s", car.id, getattr(car.source, "key", None))
-            return None
+            return _fallback_total("no_reg_year")
         # кеш
         if (
             car.total_price_rub_cached is not None
@@ -1230,7 +1257,7 @@ class CarsService:
             if eur_rate and usd_rate:
                 price_net_eur = float(used_price) * (float(usd_rate) / float(eur_rate))
         if price_net_eur is None:
-            return None
+            return _fallback_total("no_price_net_eur")
         engine_type = (car.engine_type or "").lower()
         is_electric = is_bev(
             car.engine_cc,
@@ -1240,10 +1267,10 @@ class CarsService:
         )
         if is_electric and not (car.power_hp or car.power_kw):
             self.logger.info("calc_skip_no_power car=%s src=%s", car.id, getattr(car.source, "key", None))
-            return None
+            return _fallback_total("no_power")
         if not is_electric and not car.engine_cc:
             self.logger.info("calc_skip_no_cc car=%s src=%s", car.id, getattr(car.source, "key", None))
-            return None
+            return _fallback_total("no_engine_cc")
         scenario = None
         if is_electric:
             scenario = "electric"
@@ -1264,7 +1291,7 @@ class CarsService:
             result = calculate(cfg.payload, req)
         except Exception:
             self.logger.exception("calc_failed car=%s src=%s", car.id, getattr(car.source, "key", None))
-            return None
+            return _fallback_total("calc_failed")
         display = []
         label_map = cfg.payload.get("label_map", {})
         for item in result.get("breakdown", []):
