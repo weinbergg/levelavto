@@ -13,7 +13,7 @@ def display_price_rub(
     total_price_rub_cached: Optional[float],
     price_rub_cached: Optional[float],
     *,
-    allow_price_fallback: bool = False,
+    allow_price_fallback: bool = True,
 ) -> Optional[float]:
     # Display should use total (calculator) price when available and be rounded for UI.
     raw = None
