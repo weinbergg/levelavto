@@ -20,6 +20,7 @@ def main() -> None:
     ap.add_argument("--sleep", type=int, default=0, help="seconds to sleep between windows")
     ap.add_argument("--telegram", action="store_true", help="send progress to Telegram if env configured")
     ap.add_argument("--telegram-interval", type=int, default=900, help="seconds between telegram updates")
+    ap.add_argument("--rate-shift", type=float, default=0.0, help="add rub to EUR/USD rates when recalculating")
     args = ap.parse_args()
 
     updated = skipped = errors = 0
@@ -45,6 +46,17 @@ def main() -> None:
 
     with SessionLocal() as db:
         svc = CarsService(db)
+        if args.rate_shift:
+            # warm cache with shifted rate so subsequent calls reuse it
+            rates = svc.get_fx_rates(allow_fetch=True) or {}
+            if rates:
+                rates = {
+                    "EUR": float(rates.get("EUR", 0.0)) + args.rate_shift,
+                    "USD": float(rates.get("USD", 0.0)) + args.rate_shift,
+                    "RUB": 1.0,
+                }
+                svc._fx_cache = rates
+                svc._fx_cache_ts = time.time()
         base = db.query(Car.id).filter(Car.is_available.is_(True))
         if args.region.upper() == "EU":
             base = base.filter(~Car.country.like("KR%"))

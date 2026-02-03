@@ -509,8 +509,9 @@ class CarsService:
             return self._fx_cache
         if not allow_fetch:
             return self._fx_cache or {}
-        eur_env = float(os.environ.get("EURO_RATE", "95.0"))
-        usd_env = float(os.environ.get("USD_RATE", "85.0"))
+        fx_add_rub = float(os.environ.get("FX_ADD_RUB", "1.0"))
+        eur_env = float(os.environ.get("EURO_RATE", "95.0")) + fx_add_rub
+        usd_env = float(os.environ.get("USD_RATE", "85.0")) + fx_add_rub
         eur, usd = eur_env, usd_env
         cached = self._fx_cache
         try:
@@ -519,8 +520,8 @@ class CarsService:
                 timeout=(0.3, 0.7),
             )
             data = res.json()
-            eur = float(data["Valute"]["EUR"]["Value"])
-            usd = float(data["Valute"]["USD"]["Value"])
+            eur = float(data["Valute"]["EUR"]["Value"]) + fx_add_rub
+            usd = float(data["Valute"]["USD"]["Value"]) + fx_add_rub
             self._fx_cache = {"EUR": eur, "USD": usd, "RUB": 1.0}
             self._fx_cache_ts = now
             return self._fx_cache
@@ -1155,7 +1156,7 @@ class CarsService:
             return None
         def _fallback_total(reason: str) -> dict | None:
             # Use existing cached RUB price if available; otherwise derive from price+currency.
-            fx_local = self.get_fx_rates() or {}
+        fx_local = self.get_fx_rates() or {}
             eur = fx_local.get("EUR") or 95.0
             usd = fx_local.get("USD") or 85.0
             total = None
