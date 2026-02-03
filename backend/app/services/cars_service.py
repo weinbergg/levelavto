@@ -1156,7 +1156,7 @@ class CarsService:
             return None
         def _fallback_total(reason: str) -> dict | None:
             # Use existing cached RUB price if available; otherwise derive from price+currency.
-        fx_local = self.get_fx_rates() or {}
+            fx_local = self.get_fx_rates() or {}
             eur = fx_local.get("EUR") or 95.0
             usd = fx_local.get("USD") or 85.0
             total = None
