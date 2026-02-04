@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import Optional, List
+import os
 from ..db import get_db
 from ..services.cars_service import CarsService, normalize_brand
 from ..schemas import CarDetailOut
@@ -641,6 +642,11 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     car = service.get_car(car_id)
     if not car:
         raise HTTPException(status_code=404, detail="Car not found")
+    if os.getenv("LAZY_RECALC_ENABLED", "1") != "0":
+        try:
+            service.ensure_calc_cache(car)
+        except Exception:
+            pass
     detail = CarDetailOut.model_validate(car)
     if car.images:
         detail.images = [im.url for im in car.images if im.url]

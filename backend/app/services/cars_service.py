@@ -1149,11 +1149,120 @@ class CarsService:
                 page_size,
                 count_key,
             )
+        if not light and items:
+            try:
+                self._lazy_recalc_items(items)
+            except Exception:
+                self.logger.exception("lazy_recalc_failed")
         return items, total
 
-    def ensure_calc_cache(self, car: Car) -> dict | None:
+    def _extract_breakdown_version(self, breakdown: list[dict], title: str) -> str | None:
+        for row in breakdown or []:
+            if row.get("title") == title:
+                return row.get("version")
+        return None
+
+    def _needs_recalc_for_versions(
+        self,
+        car: Car,
+        cfg_version: str | None,
+        customs_version: str | None,
+        *,
+        lazy_enabled: bool,
+    ) -> bool:
+        if not lazy_enabled:
+            return False
+        if car.total_price_rub_cached is None or car.calc_breakdown_json is None:
+            return True
+        if car.calc_updated_at is not None and car.updated_at is not None:
+            if car.calc_updated_at < car.updated_at:
+                return True
+        breakdown = car.calc_breakdown_json or []
+        if customs_version and self._extract_breakdown_version(breakdown, "__customs_version") != customs_version:
+            return True
+        if cfg_version and self._extract_breakdown_version(breakdown, "__config_version") != cfg_version:
+            return True
+        return False
+
+    def _lazy_recalc_items(self, items: List[Car]) -> None:
+        lazy_enabled = os.getenv("LAZY_RECALC_ENABLED", "1") != "0"
+        if not lazy_enabled:
+            return
+        customs_version = None
+        try:
+            from backend.app.services.customs_config import get_customs_config
+
+            customs_version = get_customs_config().version
+        except Exception:
+            customs_version = None
+
+        cfg_version = None
+        try:
+            cfg_svc = CalculatorConfigService(self.db)
+            cfg = None
+            yaml_paths = [
+                Path("/app/backend/app/config/calculator.yml"),
+                Path("/app/config/calculator.yml"),
+                Path(__file__).resolve().parent.parent / "config" / "calculator.yml",
+            ]
+            for p in yaml_paths:
+                cfg = cfg_svc.ensure_default_from_yaml(p)
+                if cfg:
+                    break
+            if cfg:
+                cfg_version = cfg.payload.get("meta", {}).get("version")
+        except Exception:
+            cfg_version = None
+
+        for car in items:
+            if self._needs_recalc_for_versions(car, cfg_version, customs_version, lazy_enabled=lazy_enabled):
+                try:
+                    self.ensure_calc_cache(car, force=True)
+                except Exception:
+                    self.logger.exception("lazy_recalc_item_failed car=%s", getattr(car, "id", None))
+
+    def ensure_calc_cache(self, car: Car, *, force: bool = False) -> dict | None:
         if not car:
             return None
+        lazy_enabled = os.getenv("LAZY_RECALC_ENABLED", "1") != "0"
+        customs_version = None
+        try:
+            from backend.app.services.customs_config import get_customs_config
+
+            customs_version = get_customs_config().version
+        except Exception:
+            customs_version = None
+
+        def _extract_version(breakdown: list[dict], title: str) -> str | None:
+            for row in breakdown or []:
+                if row.get("title") == title:
+                    return row.get("version")
+            return None
+
+        def _upsert_version(breakdown: list[dict], title: str, version: str) -> None:
+            if not version:
+                return
+            for row in breakdown:
+                if row.get("title") == title:
+                    row["version"] = version
+                    return
+            breakdown.append({"title": title, "amount_rub": 0, "version": version})
+
+        def _needs_recalc(cfg_version: str | None) -> bool:
+            if not lazy_enabled:
+                return False
+            if car.total_price_rub_cached is None or car.calc_breakdown_json is None:
+                return True
+            if car.calc_updated_at is not None and car.updated_at is not None:
+                if car.calc_updated_at < car.updated_at:
+                    return True
+            breakdown = car.calc_breakdown_json or []
+            if customs_version and _extract_version(breakdown, "__customs_version") != customs_version:
+                return True
+            if cfg_version and _extract_version(breakdown, "__config_version") != cfg_version:
+                return True
+            return False
+
         def _fallback_total(reason: str) -> dict | None:
             # Use existing cached RUB price if available; otherwise derive from price+currency.
             fx_local = self.get_fx_rates() or {}
@@ -1177,6 +1286,7 @@ class CarsService:
             car.total_price_rub_cached = total
             if car.calc_breakdown_json is None:
                 car.calc_breakdown_json = []
+            _upsert_version(car.calc_breakdown_json, "__customs_version", customs_version or "")
             car.calc_updated_at = datetime.utcnow()
             self.db.commit()
             self.logger.info("calc_fallback_total car=%s reason=%s", car.id, reason)
@@ -1206,20 +1316,6 @@ class CarsService:
             self.logger.info("calc_skip_no_reg_year car=%s src=%s", car.id, getattr(car.source, "key", None))
             return _fallback_total("no_reg_year")
         # кеш
-        if (
-            car.total_price_rub_cached is not None
-            and car.calc_breakdown_json is not None
-            and car.calc_updated_at is not None
-            and car.updated_at is not None
-            and car.calc_updated_at >= car.updated_at
-        ):
-            return {
-                "total_rub": float(car.total_price_rub_cached),
-                "breakdown": car.calc_breakdown_json or [],
-                "vat_reclaim": vat_reclaim,
-                "used_price": used_price,
-                "used_currency": used_currency,
-            }
         cfg_svc = CalculatorConfigService(self.db)
         cfg = None
         yaml_paths = [
@@ -1244,6 +1340,23 @@ class CarsService:
                     break
         if not cfg:
             return None
+        cfg_version = cfg.payload.get("meta", {}).get("version")
+        if (
+            not force
+            and car.total_price_rub_cached is not None
+            and car.calc_breakdown_json is not None
+            and car.calc_updated_at is not None
+            and car.updated_at is not None
+            and car.calc_updated_at >= car.updated_at
+            and not _needs_recalc(cfg_version)
+        ):
+            return {
+                "total_rub": float(car.total_price_rub_cached),
+                "breakdown": car.calc_breakdown_json or [],
+                "vat_reclaim": vat_reclaim,
+                "used_price": used_price,
+                "used_currency": used_currency,
+            }
         fx = self.get_fx_rates() or {}
         eur_rate = fx.get("EUR") or cfg.payload.get("meta", {}).get("eur_rate_default") or 95.0
         usd_rate = fx.get("USD") or cfg.payload.get("meta", {}).get("usd_rate_default") or 85.0
@@ -1308,13 +1421,10 @@ class CarsService:
                 "title": label_map.get(title, label_for(title)),
                 "amount_rub": rub,
             })
-        cfg_version = cfg.payload.get("meta", {}).get("version")
         if cfg_version:
-            display.append({
-                "title": "__config_version",
-                "amount_rub": 0,
-                "version": cfg_version,
-            })
+            _upsert_version(display, "__config_version", cfg_version)
+        if customs_version:
+            _upsert_version(display, "__customs_version", customs_version)
         total_rub = float(result.get("total_rub") or 0)
         car.total_price_rub_cached = total_rub
         car.calc_breakdown_json = display
