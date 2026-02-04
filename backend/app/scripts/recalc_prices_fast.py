@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 from datetime import datetime, timedelta
 
 from backend.app.db import SessionLocal
@@ -9,6 +10,7 @@ from backend.app.models import Car
 from backend.app.services.cars_service import CarsService
 from backend.app.services.calculator_runtime import is_bev, _calc_age_months
 from backend.app.services.customs_config import get_customs_config, calc_util_fee_rub, calc_duty_eur
+from backend.app.utils.telegram import send_telegram_message
 
 
 def _parse_ids(value: str | None) -> list[int]:
@@ -82,10 +84,16 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only-ids", type=str, default=None)
     ap.add_argument("--since-minutes", type=int, default=None)
+    ap.add_argument("--chunk", type=int, default=20000)
+    ap.add_argument("--sleep", type=float, default=0.0)
+    ap.add_argument("--telegram", action="store_true")
+    ap.add_argument("--telegram-interval", type=int, default=1200)
     args = ap.parse_args()
 
     only_ids = _parse_ids(args.only_ids)
-    updated = skipped = checked = 0
+    updated = skipped = checked = errors = 0
+    started = time.time()
+    last_notify = 0.0
 
     with SessionLocal() as db:
         svc = CarsService(db)
@@ -102,6 +110,18 @@ def main() -> None:
         q = q.order_by(Car.id.asc())
 
         last_id = 0
+        telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        telegram_chat = os.getenv("TELEGRAM_CHAT_ID")
+        telegram_ok = bool(telegram_token and telegram_chat)
+        if args.telegram and not telegram_ok:
+            print("[fast_recalc] telegram disabled: missing TELEGRAM_BOT_TOKEN/CHAT_ID", flush=True)
+        if args.telegram and telegram_ok:
+            send_telegram_message(
+                telegram_token,
+                telegram_chat,
+                f"fast_recalc start batch={args.batch} chunk={args.chunk} country={args.country} dry={args.dry_run}",
+            )
+
         while True:
             batch_q = q.filter(Car.id > last_id).limit(args.batch)
             rows = batch_q.all()
@@ -126,16 +146,40 @@ def main() -> None:
                 if args.dry_run:
                     updated += 1
                 else:
-                    svc.ensure_calc_cache(car, force=True)
-                    updated += 1
+                    try:
+                        svc.ensure_calc_cache(car, force=True)
+                        updated += 1
+                    except Exception:
+                        errors += 1
 
                 if checked % 500 == 0:
-                    print(f"[fast_recalc] checked={checked} updated={updated} skipped={skipped}", flush=True)
+                    print(f"[fast_recalc] checked={checked} updated={updated} skipped={skipped} errors={errors}", flush=True)
 
             if args.limit and checked >= args.limit:
                 break
+            if args.chunk and checked % args.chunk == 0:
+                db.expunge_all()
+                if args.sleep:
+                    time.sleep(args.sleep)
 
-    print(f"[fast_recalc] done checked={checked} updated={updated} skipped={skipped}", flush=True)
+            if args.telegram and telegram_ok:
+                now = time.time()
+                if now - last_notify >= args.telegram_interval:
+                    last_notify = now
+                    msg = (
+                        f"fast_recalc progress checked={checked} updated={updated} skipped={skipped} "
+                        f"errors={errors} elapsed_min={int((now-started)/60)}"
+                    )
+                    send_telegram_message(telegram_token, telegram_chat, msg)
+
+    finished = time.time()
+    print(f"[fast_recalc] done checked={checked} updated={updated} skipped={skipped} errors={errors}", flush=True)
+    if args.telegram and telegram_ok:
+        msg = (
+            f"fast_recalc done checked={checked} updated={updated} skipped={skipped} "
+            f"errors={errors} elapsed_min={int((finished-started)/60)}"
+        )
+        send_telegram_message(telegram_token, telegram_chat, msg)
 
 
 if __name__ == "__main__":
