@@ -1483,6 +1483,19 @@ body.filters-open {
   }
 }
 @media (max-width: 720px) {
+  .detail-gallery,
+  .detail-gallery.card,
+  .detail-hero__main,
+  .detail-hero__thumbs,
+  .detail-info,
+  .detail-info.card {
+    max-width: 100%;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  .detail-hero {
+    grid-template-columns: 1fr;
+  }
   .advanced-grid {
     grid-template-columns: 1fr;
   }
