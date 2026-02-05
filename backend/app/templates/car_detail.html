@@ -65,7 +65,7 @@
           <div class="detail-price">
             <div class="detail-price__total">
               {% if display_price %}
-                {% set display_price_round = ((display_price + 99999) // 100000) * 100000 %}
+                {% set display_price_round = ((display_price + 9999) // 10000) * 10000 %}
                 {{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽
               {% else %}
                 Цена уточняется

@@ -338,7 +338,7 @@
                 </div>
                 <div class="car-card__price">
                   {% if car.display_price_rub %}
-                    {% set display_price_round = ((car.display_price_rub + 99999) // 100000) * 100000 %}
+                    {% set display_price_round = ((car.display_price_rub + 9999) // 10000) * 10000 %}
                     <div class="price-main">{{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽</div>
                   {% else %}
                     <div class="price-main">Цена уточняется</div>

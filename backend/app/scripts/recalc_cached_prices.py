@@ -51,7 +51,7 @@ def main() -> None:
                     else:
                         skipped += 1
                         continue
-                    rub = ceil_to_step(rub, 100000)
+                    rub = ceil_to_step(rub, 10000)
                     car.price_rub_cached = rub
                     car.total_price_rub_cached = rub
                     car.calc_updated_at = datetime.utcnow()

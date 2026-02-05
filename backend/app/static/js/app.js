@@ -50,7 +50,7 @@
 
   function formatRub(val) {
     const n = Number(val)
-    const rounded = Math.ceil(n / 100000) * 100000
+    const rounded = Math.ceil(n / 10000) * 10000
     return `${rounded.toLocaleString('ru-RU')} ₽`
   }
 

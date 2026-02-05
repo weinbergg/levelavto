@@ -23,4 +23,4 @@ def display_price_rub(
         raw = float(price_rub_cached)
     if raw is None:
         return None
-    return ceil_to_step(raw, 100000)
+    return ceil_to_step(raw, 10000)
