@@ -111,6 +111,20 @@ def _verify_sample(db, ids: Iterable[int], eur_rate: float) -> list[dict[str, An
     out: list[dict[str, Any]] = []
     for car in db.query(Car).filter(Car.id.in_(list(ids))).all():
         age_bucket = _calc_age_bucket(car)
+        if age_bucket in ("under_3", "3_5") and not car.engine_cc:
+            out.append(
+                {
+                    "id": car.id,
+                    "country": car.country,
+                    "engine_cc": car.engine_cc,
+                    "power_hp": car.power_hp,
+                    "power_kw": car.power_kw,
+                    "engine_type": car.engine_type,
+                    "age_bucket": age_bucket,
+                    "error": "missing engine_cc for ICE scenario",
+                }
+            )
+            continue
         util_expected = calc_util_fee_rub(
             engine_cc=car.engine_cc or 0,
             kw=float(car.power_kw) if car.power_kw is not None else None,
@@ -122,11 +136,26 @@ def _verify_sample(db, ids: Iterable[int], eur_rate: float) -> list[dict[str, An
         if age_bucket == "3_5" and (car.engine_cc or 0) > 0:
             duty_expected = calc_duty_eur(car.engine_cc or 0, cfg) * eur_rate
 
-        result = build_calc_debug(db, car.id, eur_rate=eur_rate)
-        steps = result.get("steps") or []
-        util_actual = _extract_step(steps, "Утилизационный сбор")
-        duty_actual = _extract_step(steps, "Пошлина РФ")
-        total_actual = _extract_step(steps, "Итого (RUB)")
+        try:
+            result = build_calc_debug(db, car.id, eur_rate=eur_rate)
+            steps = result.get("steps") or []
+            util_actual = _extract_step(steps, "Утилизационный сбор")
+            duty_actual = _extract_step(steps, "Пошлина РФ")
+            total_actual = _extract_step(steps, "Итого (RUB)")
+        except Exception as exc:
+            out.append(
+                {
+                    "id": car.id,
+                    "country": car.country,
+                    "engine_cc": car.engine_cc,
+                    "power_hp": car.power_hp,
+                    "power_kw": car.power_kw,
+                    "engine_type": car.engine_type,
+                    "age_bucket": age_bucket,
+                    "error": str(exc),
+                }
+            )
+            continue
 
         out.append(
             {
