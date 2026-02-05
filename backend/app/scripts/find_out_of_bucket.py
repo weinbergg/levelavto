@@ -9,6 +9,7 @@ from backend.app.db import SessionLocal
 from backend.app.models import Car
 from backend.app.services.calculator_runtime import _calc_age_months, is_bev
 from backend.app.services.customs_config import get_customs_config
+from backend.app.services.cars_service import CarsService
 
 
 def _age_bucket(car: Car) -> str:
@@ -47,12 +48,15 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=1000)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--out", default="/app/artifacts/out_of_bucket.csv")
+    ap.add_argument("--fix", action="store_true", help="recalculate flagged cars")
     args = ap.parse_args()
 
     cfg = get_customs_config()
     total = flagged = 0
 
+    updated = errors = 0
     with SessionLocal() as db:
+        svc = CarsService(db)
         q = db.query(Car).filter(Car.is_available.is_(True))
         if args.country:
             q = q.filter(Car.country == args.country.upper())
@@ -119,12 +123,21 @@ def main() -> None:
                                 ";".join(reasons),
                             ]
                         )
+                        if args.fix:
+                            try:
+                                svc.ensure_calc_cache(car, force=True)
+                                updated += 1
+                            except Exception:
+                                errors += 1
                 offset += args.batch
                 if args.limit and total >= args.limit:
                     break
+            if args.fix:
+                db.commit()
 
     print(
-        f"[out_of_bucket] total_checked={total} flagged={flagged} out={args.out} at={datetime.now(timezone.utc).isoformat()}"
+        f"[out_of_bucket] total_checked={total} flagged={flagged} updated={updated} errors={errors} "
+        f"out={args.out} at={datetime.now(timezone.utc).isoformat()}"
     )
 
 

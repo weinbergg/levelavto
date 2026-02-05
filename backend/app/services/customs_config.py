@@ -113,6 +113,16 @@ def _find_range_util(rows: List[UtilRange], val: float) -> Optional[UtilRange]:
     return None
 
 
+def _clamp_range_util(rows: List[UtilRange], val: float) -> UtilRange:
+    rows_sorted = sorted(rows, key=lambda r: r.from_)
+    if val < rows_sorted[0].from_:
+        return rows_sorted[0]
+    if val > rows_sorted[-1].to:
+        return rows_sorted[-1]
+    # should not reach here if ranges are complete, fallback to first
+    return rows_sorted[0]
+
+
 def calc_duty_eur(engine_cc: int, cfg: CustomsConfig) -> float:
     for row in cfg.duty_eur_per_cc:
         if row.from_cc <= engine_cc <= row.to_cc:
@@ -172,6 +182,9 @@ def calc_util_fee_rub(
         if rng is None and hp is not None:
             # fallback to hp table if kw does not match any range
             rng = _find_range_util(table.hp, float(hp))
+        if rng is None:
+            rng = _clamp_range_util(table.kw, float(kw))
+            logger.warning("util_power_above_range cc=%s kw=%s age_bucket=%s", engine_cc, kw, age_bucket)
     else:
         if hp is None:
             # fallback to lowest available range (safe minimal value)
@@ -182,6 +195,9 @@ def calc_util_fee_rub(
                 raise ValueError("hp is required when kw is not provided")
         else:
             rng = _find_range_util(table.hp, float(hp))
+        if rng is None and hp is not None:
+            rng = _clamp_range_util(table.hp, float(hp))
+            logger.warning("util_power_above_range cc=%s hp=%s age_bucket=%s", engine_cc, hp, age_bucket)
     if rng is None:
         raise ValueError("util range not found for provided power")
     return int(rng.price_rub)

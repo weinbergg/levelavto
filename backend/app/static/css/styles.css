@@ -2744,12 +2744,18 @@ input[type="number"]::-webkit-outer-spin-button {
 @media (max-width: 720px) {
   .detail-specs,
   .detail-calc__line {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    overflow-x: hidden;
   }
   .detail-specs,
   .detail-calc__line {
     -webkit-overflow-scrolling: touch;
+  }
+  .car-detail-page,
+  .detail-hero,
+  .detail-info {
+    max-width: 100%;
+    overflow-x: hidden;
   }
   .detail-state,
   .detail-options {
