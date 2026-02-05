@@ -1483,6 +1483,12 @@ body.filters-open {
   }
 }
 @media (max-width: 720px) {
+  .header__profile-menu {
+    right: 12px;
+    left: auto;
+    max-width: calc(100vw - 24px);
+    width: min(280px, calc(100vw - 24px));
+  }
   .detail-gallery,
   .detail-gallery.card,
   .detail-hero__main,
