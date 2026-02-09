@@ -353,6 +353,83 @@ content %}
     </div>
 
     <div class="admin-block">
+      <h3>Рекомендуемые авто (главная)</h3>
+      {% if featured_recommended %}
+        <div class="current-featured">
+          {% for item in featured_recommended %}
+            <span class="chip">{{ item.car.id }} · {{ item.car.brand or '' }} {{ item.car.model or '' }}</span>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="small muted">Список пуст — используются последние авто с фото.</p>
+      {% endif %}
+      <form method="post" action="/admin/featured" class="form-vertical">
+        <input type="hidden" name="placement" value="recommended" />
+        <label>ID автомобилей (через пробел или запятую)
+          <textarea name="car_ids" rows="2" placeholder="123 456 789"></textarea>
+        </label>
+        <button type="submit" class="btn btn-primary">Сохранить список</button>
+      </form>
+      <div class="actions-row">
+        <a class="btn btn-secondary" href="/admin/featured/template">Скачать шаблон</a>
+      </div>
+      <form method="post" action="/admin/featured/upload" enctype="multipart/form-data" class="form-vertical">
+        <label>Загрузить шаблон (.txt/.csv)
+          <input type="file" name="file" accept=".txt,.csv" />
+        </label>
+        <button type="submit" class="btn btn-primary">Применить файл</button>
+      </form>
+    </div>
+
+    <div class="admin-block">
+      <h3>Утилизационный сбор — шаблон</h3>
+      <p class="small muted">Скачайте шаблон, отредактируйте значения и загрузите обратно. YAML не нужен.</p>
+      <form method="post" action="/admin/customs/edit" class="form-vertical">
+        <label>Возраст
+          <select name="age_bucket">
+            <option value="under_3">Младше 3 лет</option>
+            <option value="3_5">3–5 лет</option>
+            <option value="electric">Электро</option>
+          </select>
+        </label>
+        <label>Бакет объема
+          <select name="cc_table">
+            {% for table_name in customs_cc_tables %}
+              <option value="{{ table_name }}">{{ table_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Тип мощности
+          <select name="power_type">
+            <option value="kw">кВт</option>
+            <option value="hp">л.с.</option>
+          </select>
+        </label>
+        <div class="actions-row">
+          <label>От
+            <input type="number" name="range_from" step="0.01" required />
+          </label>
+          <label>До
+            <input type="number" name="range_to" step="0.01" required />
+          </label>
+          <label>Цена, ₽
+            <input type="number" name="price_rub" step="1" required />
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Обновить строку</button>
+      </form>
+      <div class="actions-row">
+        <a class="btn btn-secondary" href="/admin/customs/template">Скачать шаблон</a>
+      </div>
+      <form method="post" action="/admin/customs/upload" enctype="multipart/form-data" class="form-vertical">
+        <label>Загрузить шаблон (.txt/.csv)
+          <input type="file" name="file" accept=".txt,.csv" />
+        </label>
+        <button type="submit" class="btn btn-primary">Применить изменения</button>
+      </form>
+    </div>
+
+    <div class="admin-block">
       <h3>Калькулятор</h3>
       {% if calc_cfg %}
       <p class="small muted">Текущая версия: {{ calc_cfg.version }} · {{ calc_cfg.source }} · {{ calc_cfg.comment or 'без комментария' }}</p>

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 from pathlib import Path
 import tempfile
@@ -10,8 +10,16 @@ from ..services.admin_service import AdminService
 from ..services.cars_service import CarsService
 from ..services.calculator_config_service import CalculatorConfigService
 from ..services.calculator_extractor import CalculatorExtractor
+from ..services.customs_config import reset_customs_config_cache
 from ..utils.recommended_config import load_config, save_config, DEFAULT_CONFIG
 from ..utils.home_content import build_home_content, default_home_content, serialize_home_content
+from ..utils.customs_template import (
+    load_customs_dict,
+    save_customs_dict,
+    bump_customs_version,
+    build_util_template,
+    apply_util_template,
+)
 from ..models import User
 
 
@@ -38,6 +46,7 @@ def admin_dashboard(
     templates = request.app.state.templates
     admin_svc = AdminService(db)
     cars_svc = CarsService(db)
+    featured_recommended = admin_svc.list_featured("recommended")
     content = admin_svc.list_site_content(
         list(CONTACT_KEYS.keys()) + ["home_content", *LEGACY_HOME_KEYS]
     )
@@ -45,6 +54,13 @@ def admin_dashboard(
     recommended_cfg = load_config()
     calc_cfg = CalculatorConfigService(db).latest()
     total_cars = cars_svc.total_cars()
+    customs_data = load_customs_dict()
+    cc_tables = set()
+    for key in ("util_tables_under3", "util_tables_3_5", "util_tables_electric", "util_tables"):
+        tables = customs_data.get(key) or {}
+        if isinstance(tables, dict):
+            cc_tables.update(tables.keys())
+    customs_cc_tables = sorted(cc_tables)
     return templates.TemplateResponse(
         "admin/dashboard.html",
         {
@@ -53,8 +69,10 @@ def admin_dashboard(
             "content": content,
             "home": home_content,
             "recommended_cfg": recommended_cfg,
+            "featured_recommended": featured_recommended,
             "calc_cfg": calc_cfg,
             "total_cars": total_cars,
+            "customs_cc_tables": customs_cc_tables,
         },
     )
 
@@ -106,6 +124,106 @@ def update_recommended(
         }
     )
     return RedirectResponse(url="/admin", status_code=302)
+
+
+@router.post("/admin/featured")
+def update_featured(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    placement: str = Form("recommended"),
+    car_ids: str = Form(""),
+):
+    ids = [int(x) for x in car_ids.replace(",", " ").split() if x.strip().isdigit()]
+    AdminService(db).set_featured(placement, ids)
+    return RedirectResponse(url="/admin", status_code=302)
+
+
+@router.get("/admin/featured/template")
+def download_featured_template(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    items = AdminService(db).list_featured("recommended")
+    lines = ["# featured_template v1", "# один ID на строку"]
+    lines.extend([str(fc.car_id) for fc in items])
+    content = "\n".join(lines) + "\n"
+    return Response(
+        content,
+        media_type="text/plain",
+        headers={"Content-Disposition": "attachment; filename=featured_template.txt"},
+    )
+
+
+@router.post("/admin/featured/upload")
+async def upload_featured_template(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    if not file.filename.lower().endswith((".txt", ".csv")):
+        return RedirectResponse(url="/admin?error=badfile", status_code=302)
+    raw = (await file.read()).decode("utf-8", errors="ignore")
+    ids = [int(x) for x in raw.replace(",", " ").split() if x.strip().isdigit()]
+    AdminService(db).set_featured("recommended", ids)
+    return RedirectResponse(url="/admin?featured_updated=1", status_code=302)
+
+
+@router.get("/admin/customs/template")
+def download_customs_template(
+    request: Request,
+    user: User = Depends(require_admin),
+):
+    data = load_customs_dict()
+    content = build_util_template(data)
+    return Response(
+        content,
+        media_type="text/plain",
+        headers={"Content-Disposition": "attachment; filename=util_template.txt"},
+    )
+
+
+@router.post("/admin/customs/upload")
+async def upload_customs_template(
+    request: Request,
+    user: User = Depends(require_admin),
+    file: UploadFile = File(...),
+):
+    if not file.filename.lower().endswith((".txt", ".csv")):
+        return RedirectResponse(url="/admin?error=badfile", status_code=302)
+    raw = (await file.read()).decode("utf-8", errors="ignore")
+    data = load_customs_dict()
+    stats = apply_util_template(data, raw)
+    bump_customs_version(data)
+    save_customs_dict(data)
+    reset_customs_config_cache()
+    return RedirectResponse(url=f"/admin?customs_updated=1&customs_updated_cnt={stats.updated}&customs_errors={stats.errors}", status_code=302)
+
+
+@router.post("/admin/customs/edit")
+def edit_customs_row(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    age_bucket: str = Form("under_3"),
+    cc_table: str = Form(""),
+    power_type: str = Form("kw"),
+    range_from: float = Form(...),
+    range_to: float = Form(...),
+    price_rub: float = Form(...),
+):
+    line = f"{age_bucket},{cc_table},{power_type},{range_from},{range_to},{price_rub}"
+    data = load_customs_dict()
+    stats = apply_util_template(data, line)
+    bump_customs_version(data)
+    save_customs_dict(data)
+    reset_customs_config_cache()
+    return RedirectResponse(
+        url=f"/admin?customs_updated=1&customs_updated_cnt={stats.updated}&customs_errors={stats.errors}",
+        status_code=302,
+    )
 
 
 @router.post("/admin/home_content")

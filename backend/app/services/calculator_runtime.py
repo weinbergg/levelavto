@@ -7,6 +7,7 @@ from decimal import Decimal, ROUND_CEILING
 
 from .customs_config import get_customs_config, calc_duty_eur, calc_util_fee_rub
 from ..utils.range_lookup import lookup_range
+from ..utils.price_utils import get_round_step_rub
 
 
 @dataclass
@@ -81,7 +82,7 @@ def _ceil_rub(value: float) -> float:
         return value
     # округляем только финальный итог: вверх до 10 000 рублей
     v = Decimal(str(value))
-    step = Decimal("10000")
+    step = Decimal(str(get_round_step_rub()))
     return float((v / step).to_integral_value(rounding=ROUND_CEILING) * step)
 
 

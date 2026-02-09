@@ -1,5 +1,14 @@
 import math
+import os
 from typing import Optional
+
+
+def get_round_step_rub() -> int:
+    try:
+        step = int(os.getenv("PRICE_ROUND_STEP_RUB", "10000"))
+        return max(1, step)
+    except Exception:
+        return 10000
 
 
 def ceil_to_step(value: Optional[float], step: int) -> Optional[float]:
@@ -23,4 +32,4 @@ def display_price_rub(
         raw = float(price_rub_cached)
     if raw is None:
         return None
-    return ceil_to_step(raw, 10000)
+    return ceil_to_step(raw, get_round_step_rub())

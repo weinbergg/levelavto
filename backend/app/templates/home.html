@@ -274,12 +274,10 @@
             </ul>
           </div>
           <div class="car-card__price">
-          {% if car.price %}
-          {% set rate = fx_rates.get((car.currency or 'EUR').upper(), 1) | float %}
-          {% set price_val = car.price | float %}
-          {% set rub = (price_val * rate) | round(0, 'ceil') | int %}
-            <span>{{ '{:,.0f}'.format(rub).replace(',', ' ') }} ₽</span>
-            {% endif %}
+          {% if car.display_price_rub %}
+          {% set display_price_round = ((car.display_price_rub + 9999) // 10000) * 10000 %}
+            <span>{{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽</span>
+          {% endif %}
           </div>
         </div>
       </a>

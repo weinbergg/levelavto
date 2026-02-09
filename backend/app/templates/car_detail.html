@@ -84,6 +84,9 @@
               <br>НДС: {% if vat_reclaim %}возмещается ({{ vat_pct }}%){% else %}не возмещается{% endif %}
               {% endif %}
             </div>
+            {% if car.country and car.country|upper == 'KR' %}
+            <div class="detail-price__note">*Без учета утилизационного сбора РФ</div>
+            {% endif %}
           </div>
           {% if meta %}
           <p class="muted detail-meta">{{ meta|join(' · ') }}</p>

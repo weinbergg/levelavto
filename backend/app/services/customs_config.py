@@ -106,6 +106,11 @@ def get_customs_config() -> CustomsConfig:
     return _CFG_CACHE
 
 
+def reset_customs_config_cache() -> None:
+    global _CFG_CACHE
+    _CFG_CACHE = None
+
+
 def _find_range_util(rows: List[UtilRange], val: float) -> Optional[UtilRange]:
     for r in rows:
         if r.from_ <= val <= r.to:

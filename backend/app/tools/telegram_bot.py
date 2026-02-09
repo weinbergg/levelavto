@@ -24,7 +24,17 @@ from ..services.parser_control_service import ParserControlService
 from ..services.parsing_data_service import ParsingDataService
 from ..services.calculator_config_service import CalculatorConfigService
 from ..services.calculator_extractor import CalculatorExtractor
+from ..services.admin_service import AdminService
+from ..services.cars_service import CarsService
+from ..services.customs_config import reset_customs_config_cache
 from ..utils.recommended_config import load_config, save_config
+from ..utils.customs_template import (
+    load_customs_dict,
+    save_customs_dict,
+    bump_customs_version,
+    build_util_template,
+    apply_util_template,
+)
 import asyncio
 from .telegram_bot_jobs import format_status as format_job_status
 
@@ -68,6 +78,10 @@ AWAITING_CHUNKS = "awaiting_chunks"
 AWAITING_CALC = "awaiting_calc_upload"
 CALC_PENDING = "calc_pending"
 AWAITING_RECO = "awaiting_recommended"
+AWAITING_FEATURED = "awaiting_featured_ids"
+AWAITING_FEATURED_SEARCH = "awaiting_featured_search"
+AWAITING_UTIL_TEMPLATE = "awaiting_util_template"
+UTIL_EDIT_STATE = "util_edit_state"
 MOBILE_DOWNLOAD_DIR = Path(os.environ.get("MOBILE_DOWNLOAD_DIR", "/app/tmp"))
 MOBILE_FILENAME = "mobilede_active_offers.csv"
 MOBILE_SCRIPT = ["bash", "scripts/fetch_mobilede_csv.sh"]
@@ -190,6 +204,105 @@ def format_reco_config(cfg: Dict[str, Any]) -> str:
         f"Возраст до: {_fmt_val(cfg.get('max_age_years'))} лет\n"
         f"Цена: {_fmt_int(cfg.get('price_min'))} — {_fmt_int(cfg.get('price_max'))} ₽\n"
         f"Пробег до: {_fmt_int(cfg.get('mileage_max'))} км"
+    )
+
+
+def format_featured_list(items: list) -> str:
+    if not items:
+        return "Рекомендуемые авто: список пуст (используются последние с фото)."
+    lines = ["Рекомендуемые авто (ID · марка/модель):"]
+    for fc in items:
+        car = getattr(fc, "car", None)
+        title = f"{car.brand or ''} {car.model or ''}".strip() if car else ""
+        lines.append(f"{fc.car_id} · {title}")
+    return "\n".join(lines)
+
+
+async def show_featured_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    db = SessionLocal()
+    try:
+        items = AdminService(db).list_featured("recommended")
+        text = format_featured_list(items)
+    finally:
+        db.close()
+    keyboard = [
+        [InlineKeyboardButton("Задать список ID", callback_data="featured_set")],
+        [InlineKeyboardButton("Поиск авто", callback_data="featured_search")],
+        [InlineKeyboardButton("Скачать шаблон", callback_data="featured_template")],
+        [InlineKeyboardButton("Назад", callback_data="menu")],
+    ]
+    if update.message:
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    elif update.callback_query and update.callback_query.message:
+        await update.callback_query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def show_util_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = "Утилизационный сбор: выберите действие."
+    keyboard = [
+        [InlineKeyboardButton("Скачать шаблон", callback_data="util_template")],
+        [InlineKeyboardButton("Загрузить шаблон", callback_data="util_upload")],
+        [InlineKeyboardButton("Изменить значение", callback_data="util_edit")],
+        [InlineKeyboardButton("Назад", callback_data="menu")],
+    ]
+    if update.message:
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    elif update.callback_query and update.callback_query.message:
+        await update.callback_query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+def _util_table_names(data: Dict[str, Any]) -> List[str]:
+    buckets = data.get("util_cc_buckets") or []
+    names = [b.get("table") for b in buckets if b.get("table")]
+    return list(dict.fromkeys(names)) or sorted(
+        (data.get("util_tables") or {}).keys()
+    )
+
+
+async def start_util_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data[UTIL_EDIT_STATE] = {"stage": "age"}
+    kb = [
+        [InlineKeyboardButton("До 3 лет", callback_data="util_age_under3")],
+        [InlineKeyboardButton("3–5 лет", callback_data="util_age_3_5")],
+        [InlineKeyboardButton("Электро", callback_data="util_age_electric")],
+        [InlineKeyboardButton("Назад", callback_data="util_menu")],
+    ]
+    await update.callback_query.message.reply_text(
+        "Выберите возрастной блок:", reply_markup=InlineKeyboardMarkup(kb)
+    )
+
+
+async def handle_util_age(update: Update, age_bucket: str, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = load_customs_dict()
+    tables = _util_table_names(data)
+    context.user_data[UTIL_EDIT_STATE] = {"stage": "table", "age_bucket": age_bucket}
+    kb = [[InlineKeyboardButton(name, callback_data=f\"util_table::{name}\")] for name in tables]
+    kb.append([InlineKeyboardButton("Назад", callback_data="util_menu")])
+    await update.callback_query.message.reply_text(
+        f"Выберите таблицу (объём): {age_bucket}", reply_markup=InlineKeyboardMarkup(kb)
+    )
+
+
+async def handle_util_table(update: Update, table_name: str, context: ContextTypes.DEFAULT_TYPE) -> None:
+    state = context.user_data.get(UTIL_EDIT_STATE) or {}
+    state.update({"stage": "power", "table": table_name})
+    context.user_data[UTIL_EDIT_STATE] = state
+    kb = [
+        [InlineKeyboardButton("кВт", callback_data="util_power_kw")],
+        [InlineKeyboardButton("л.с.", callback_data="util_power_hp")],
+        [InlineKeyboardButton("Назад", callback_data="util_menu")],
+    ]
+    await update.callback_query.message.reply_text(
+        f"Тип мощности для {table_name}:", reply_markup=InlineKeyboardMarkup(kb)
+    )
+
+
+async def handle_util_power(update: Update, power_type: str, context: ContextTypes.DEFAULT_TYPE) -> None:
+    state = context.user_data.get(UTIL_EDIT_STATE) or {}
+    state.update({"stage": "range", "power_type": power_type, "awaiting_range": True})
+    context.user_data[UTIL_EDIT_STATE] = state
+    await update.callback_query.message.reply_text(
+        "Введите диапазон и цену: 161-190 1677600"
     )
 
 
@@ -335,6 +448,8 @@ async def show_menu(update: Update) -> None:
         [InlineKeyboardButton("Обновить emavto", callback_data="run_emavto")],
         [InlineKeyboardButton("Статус обновлений", callback_data="status_updates")],
         [InlineKeyboardButton("Рекомендуемые — диапазоны", callback_data="reco_menu")],
+        [InlineKeyboardButton("Рекомендуемые — список", callback_data="featured_menu")],
+        [InlineKeyboardButton("Утиль-сбор", callback_data="util_menu")],
     ]
     text = "Бот готов. Выберите действие:"
     if update.message:
@@ -458,6 +573,13 @@ async def set_chunks_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # если ждём ввод диапазонов рекомендуемых — не трогаем
     if context.user_data.get(AWAITING_RECO):
         return await apply_reco_edit(update, context)
+    if context.user_data.get(AWAITING_FEATURED):
+        return await apply_featured_edit(update, context)
+    if context.user_data.get(AWAITING_FEATURED_SEARCH):
+        return await apply_featured_search(update, context)
+    state = context.user_data.get(UTIL_EDIT_STATE)
+    if state and state.get("awaiting_range"):
+        return await apply_util_range_edit(update, context)
     if not context.user_data.get(AWAITING_CHUNKS):
         return 0
     parts = (update.message.text or "").strip().split()
@@ -477,6 +599,74 @@ async def set_chunks_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     except Exception:
         await reply(update, "Не понял формат. Пример: 12 45 3000 0")
     context.user_data[AWAITING_CHUNKS] = False
+    return 0
+
+
+async def apply_featured_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = (update.message.text or "").strip() if update.message else ""
+    if not text:
+        await reply(update, "Пусто. Введите ID через пробел или запятую.")
+        return 0
+    ids = [int(x) for x in text.replace(",", " ").split() if x.strip().isdigit()]
+    db = SessionLocal()
+    try:
+        AdminService(db).set_featured("recommended", ids)
+        items = AdminService(db).list_featured("recommended")
+        await reply(update, f"Готово.\n{format_featured_list(items)}")
+    finally:
+        db.close()
+    context.user_data[AWAITING_FEATURED] = False
+    return 0
+
+
+async def apply_featured_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = (update.message.text or "").strip() if update.message else ""
+    if not query:
+        await reply(update, "Введите поисковый запрос (марка/модель).")
+        return 0
+    db = SessionLocal()
+    try:
+        svc = CarsService(db)
+        items = svc.search_featured_candidates(query, limit=10)
+        if not items:
+            await reply(update, "Ничего не найдено.")
+        else:
+            lines = ["Найдено (ID · марка/модель · цена):"]
+            for car in items:
+                title = f"{car.brand or ''} {car.model or ''}".strip()
+                lines.append(f"{car.id} · {title} · {int(car.display_price_rub or 0):,} ₽".replace(",", " "))
+            lines.append("\nОтправьте ID, которые нужно установить в список.")
+            await reply(update, "\n".join(lines))
+    finally:
+        db.close()
+    context.user_data[AWAITING_FEATURED_SEARCH] = False
+    context.user_data[AWAITING_FEATURED] = True
+    return 0
+
+
+async def apply_util_range_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    state = context.user_data.get(UTIL_EDIT_STATE) or {}
+    text = (update.message.text or "").strip() if update.message else ""
+    if not text:
+        await reply(update, "Введите диапазон и цену: 161-190 1677600")
+        return 0
+    try:
+        parts = text.replace("—", "-").split()
+        if len(parts) < 2 or "-" not in parts[0]:
+            await reply(update, "Формат: from-to price_rub (например: 161-190 1677600)")
+            return 0
+        from_s, to_s = parts[0].split("-", 1)
+        price = float(parts[1].replace(",", "."))
+        line = f"{state.get('age_bucket')},{state.get('table')},{state.get('power_type')},{from_s},{to_s},{price}"
+        data = load_customs_dict()
+        stats = apply_util_template(data, line)
+        bump_customs_version(data)
+        save_customs_dict(data)
+        reset_customs_config_cache()
+        await reply(update, f"Обновлено: {stats.updated}, ошибок: {stats.errors}.")
+    except Exception as exc:
+        await reply(update, f"Не удалось обновить: {exc}")
+    context.user_data[UTIL_EDIT_STATE] = None
     return 0
 
 
@@ -555,11 +745,34 @@ async def cb_calc_show(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not allowed_user(update):
         return 0
-    if not context.user_data.get(AWAITING_CALC):
-        return 0
     doc = update.message.document if update.message else None
     if not doc:
         await reply(update, "Пришлите файл Excel.")
+        return 0
+    if context.user_data.get(AWAITING_UTIL_TEMPLATE):
+        file = await doc.get_file()
+        import tempfile
+        import os
+        path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp:
+                path = tmp.name
+                await file.download_to_drive(path)
+            raw = Path(path).read_text(encoding="utf-8", errors="ignore")
+            data = load_customs_dict()
+            stats = apply_util_template(data, raw)
+            bump_customs_version(data)
+            save_customs_dict(data)
+            reset_customs_config_cache()
+            await reply(update, f"Готово. Обновлено: {stats.updated}, ошибок: {stats.errors}.")
+        except Exception as exc:
+            await reply(update, f"Не удалось обработать файл: {exc}")
+        finally:
+            context.user_data[AWAITING_UTIL_TEMPLATE] = False
+            if path and os.path.exists(path):
+                os.unlink(path)
+        return 0
+    if not context.user_data.get(AWAITING_CALC):
         return 0
     file = await doc.get_file()
     import tempfile
@@ -740,12 +953,71 @@ def main() -> None:
             await cmd_updates_status(update)
         elif data == "reco_menu":
             await show_recommended_menu(update)
+        elif data == "featured_menu":
+            await show_featured_menu(update, context)
+        elif data == "featured_set":
+            context.user_data[AWAITING_FEATURED] = True
+            await q.message.reply_text("Введите ID автомобилей через пробел или запятую.")
+        elif data == "featured_search":
+            context.user_data[AWAITING_FEATURED_SEARCH] = True
+            await q.message.reply_text("Введите поисковый запрос (марка/модель).")
+        elif data == "featured_template":
+            import tempfile
+            import os
+            db = SessionLocal()
+            try:
+                items = AdminService(db).list_featured("recommended")
+                lines = ["# featured_template v1", "# один ID на строку"]
+                for fc in items:
+                    lines.append(str(fc.car_id))
+                content = "\n".join(lines) + "\n"
+            finally:
+                db.close()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp:
+                tmp.write(content.encode("utf-8"))
+                tmp_path = tmp.name
+            try:
+                await q.message.reply_document(document=open(tmp_path, "rb"), filename="featured_template.txt")
+            finally:
+                os.unlink(tmp_path)
         elif data == "reco_age":
             await set_reco_prompt(update, context, "age")
         elif data == "reco_price":
             await set_reco_prompt(update, context, "price")
         elif data == "reco_mileage":
             await set_reco_prompt(update, context, "mileage")
+        elif data == "util_menu":
+            await show_util_menu(update, context)
+        elif data == "util_template":
+            import tempfile
+            import os
+            data = load_customs_dict()
+            content = build_util_template(data)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp:
+                tmp.write(content.encode("utf-8"))
+                tmp_path = tmp.name
+            try:
+                await q.message.reply_document(document=open(tmp_path, "rb"), filename="util_template.txt")
+            finally:
+                os.unlink(tmp_path)
+        elif data == "util_upload":
+            context.user_data[AWAITING_UTIL_TEMPLATE] = True
+            await q.message.reply_text("Пришлите файл .txt/.csv с шаблоном утиля.")
+        elif data == "util_edit":
+            await start_util_edit(update, context)
+        elif data == "util_age_under3":
+            await handle_util_age(update, "under_3", context)
+        elif data == "util_age_3_5":
+            await handle_util_age(update, "3_5", context)
+        elif data == "util_age_electric":
+            await handle_util_age(update, "electric", context)
+        elif data and data.startswith("util_table::"):
+            table_name = data.split("::", 1)[1]
+            await handle_util_table(update, table_name, context)
+        elif data == "util_power_kw":
+            await handle_util_power(update, "kw", context)
+        elif data == "util_power_hp":
+            await handle_util_power(update, "hp", context)
         elif data == "run_mobilede":
             await run_job(MOBILE_SCRIPT, "mobilede", update)
         elif data == "run_emavto":

@@ -452,6 +452,10 @@ def _home_context(
         car.display_country_label = label
         car.display_engine_type = ru_fuel(car.engine_type) or ru_fuel(normalize_fuel(car.engine_type)) or car.engine_type
         car.display_transmission = ru_transmission(car.transmission) or car.transmission
+        car.display_price_rub = display_price_rub(
+            car.total_price_rub_cached,
+            car.price_rub_cached,
+        )
     t0 = time.perf_counter()
     content = ContentService(db).content_map(
         [
