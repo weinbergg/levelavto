@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, Callable, List, Optional
 import re
 import unicodedata
 import colorsys
@@ -159,3 +159,76 @@ def color_group_label(key: str) -> str:
 
 def color_groups() -> List[ColorGroup]:
     return list(_GROUPS)
+
+
+def split_color_facets(
+    raw_colors: list[dict[str, Any]],
+    *,
+    top_limit: int = 12,
+    label_for: Optional[Callable[[str], Optional[str]]] = None,
+    hex_for: Optional[Callable[[str], Optional[str]]] = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    base_counts: dict[str, int] = {}
+    shades: list[dict[str, Any]] = []
+    seen_values: set[str] = set()
+
+    for raw in raw_colors or []:
+        value = str((raw or {}).get("value") or "").strip()
+        if not value:
+            continue
+        count = int((raw or {}).get("count") or 0)
+        group_key = normalize_color_group(value)
+        base_counts[group_key] = base_counts.get(group_key, 0) + count
+
+        value_key = value.casefold()
+        if value_key in seen_values:
+            continue
+        seen_values.add(value_key)
+
+        resolved_label = label_for(value) if label_for else None
+        shades.append(
+            {
+                "value": value,
+                "label": resolved_label or value,
+                "hex": hex_for(value) if hex_for else None,
+                "count": count,
+                "group": group_key,
+                "group_label": color_group_label(group_key),
+            }
+        )
+
+    basics: list[dict[str, Any]] = []
+    for key, count in base_counts.items():
+        basics.append(
+            {
+                "value": key,
+                "label": color_group_label(key),
+                "hex": hex_for(key) if hex_for else None,
+                "count": count,
+            }
+        )
+    basics.sort(key=lambda item: (-int(item.get("count") or 0), str(item.get("label") or "")))
+    basics = basics[:top_limit]
+
+    visible_groups = {item.get("value") for item in basics}
+    other: list[dict[str, Any]] = []
+    for item in shades:
+        group_key = item.get("group")
+        if group_key not in visible_groups:
+            continue
+        base_label = color_group_label(str(group_key or ""))
+        shade_label = str(item.get("label") or item.get("value") or "")
+        base_key = str(group_key or "")
+        if shade_label.casefold() == base_label.casefold() or shade_label.casefold() == base_key.casefold():
+            continue
+        other.append(
+            {
+                "value": item.get("value"),
+                "label": f"{base_label}: {shade_label}",
+                "hex": item.get("hex"),
+                "count": item.get("count"),
+            }
+        )
+
+    other.sort(key=lambda item: (-int(item.get("count") or 0), str(item.get("label") or "")))
+    return basics, other

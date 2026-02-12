@@ -179,12 +179,17 @@
   function setSelectOptions(select, items, { emptyLabel = 'Все', valueKey = 'value', labelKey = 'label' } = {}) {
     if (!select) return
     const current = select.value
+    const normalizedItems = (items || []).filter((item) => {
+      const isObj = item && typeof item === 'object'
+      const value = isObj ? (item[valueKey] ?? item.value) : item
+      return value != null && value !== ''
+    })
     select.innerHTML = ''
     const emptyOpt = document.createElement('option')
     emptyOpt.value = ''
     emptyOpt.textContent = emptyLabel
     select.appendChild(emptyOpt)
-    ;(items || []).forEach((item) => {
+    normalizedItems.forEach((item) => {
       const isObj = item && typeof item === 'object'
       const value = isObj ? (item[valueKey] ?? item.value) : item
       if (value == null || value === '') return
@@ -198,6 +203,7 @@
       const match = Array.from(select.options).find((o) => o.value === current)
       if (match) select.value = current
     }
+    select.disabled = normalizedItems.length === 0
   }
 
   function ensureOption(select, value, label = null) {
@@ -1132,6 +1138,7 @@
     const modelSelect = qs('#model-select')
     const brandSelect = qs('#brand')
     const generationSelect = qs('#generation')
+    const generationField = generationSelect ? generationSelect.closest('[data-generation-field]') : null
     const advancedLink = qs('#catalog-advanced-link')
     normalizeBrandOptions(brandSelect)
     let initialReapplyDone = false
@@ -1150,6 +1157,15 @@
         }
       })
       if (DEBUG_FILTERS) console.info('catalog: reapplySelected source=initial')
+    }
+
+    const syncGenerationVisibility = () => {
+      if (!generationSelect || !generationField) return
+      const generationValues = Array.from(generationSelect.options || []).filter((opt) => opt.value)
+      const hasGenerations = generationValues.length > 0
+      generationField.classList.toggle('is-hidden', !hasGenerations)
+      generationSelect.disabled = !hasGenerations
+      if (!hasGenerations) generationSelect.value = ''
     }
 
     const loadCatalogFilterBase = async () => {
@@ -1360,6 +1376,7 @@
         if (!res.ok) return
         const data = await res.json()
         setSelectOptions(generationSelect, data.generations || [], { emptyLabel: 'Любое', labelKey: 'label', valueKey: 'value' })
+        syncGenerationVisibility()
       } catch (e) {
         console.warn('filter model', e)
       }
@@ -1374,6 +1391,7 @@
         await updateCatalogModels()
         if (initialModelParam) setSelectValueInsensitive(modelSelect, initialModelParam)
       }
+      syncGenerationVisibility()
       loadCars(initialPage)
     }
     loadInitial()
@@ -1856,6 +1874,7 @@
       } else {
         select.value = ''
       }
+      select.disabled = deduped.length === 0
     }
 
     const payloadMap = {

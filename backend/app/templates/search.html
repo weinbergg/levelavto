@@ -161,7 +161,7 @@
             </div>
 
             <div class="advanced-row advanced-row--two">
-              <label class="field">Поколение
+              <label class="field{% if not generations %} is-hidden{% endif %}">Поколение
                 <select name="generation" {% if not generations %}disabled{% endif %}>
                   <option value="">Любое</option>
                   {% for g in generations %}
@@ -225,6 +225,14 @@
                 <input type="number" name="engine_cc_max" inputmode="numeric" min="0" step="100" value="{{ params.get('engine_cc_max','') }}">
               </label>
             </div>
+            {% if has_air_suspension %}
+            <div class="advanced-row advanced-row--two">
+              <label class="field field--checkbox">
+                <input type="checkbox" name="air_suspension" value="1" {% if params.get('air_suspension') %}checked{% endif %}>
+                Пневмоподвеска
+              </label>
+            </div>
+            {% endif %}
           </div>
         </div>
       </section>

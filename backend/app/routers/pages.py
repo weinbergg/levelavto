@@ -42,6 +42,7 @@ from ..utils.taxonomy import (
 from ..utils.price_utils import display_price_rub
 normalize_color = _normalize_color
 from ..utils.country_map import country_label_ru, resolve_display_country, normalize_country_code
+from ..utils.color_groups import split_color_facets
 from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
 from ..utils.home_content import build_home_content
 
@@ -86,23 +87,6 @@ MONTHS_RU = [
     "ноябрь",
     "декабрь",
 ]
-
-BASIC_COLORS = [
-    "white",
-    "black",
-    "gray",
-    "silver",
-    "blue",
-    "red",
-    "green",
-    "orange",
-    "yellow",
-    "brown",
-    "beige",
-    "purple",
-    "pink",
-]
-
 
 def _range_steps(max_val: Optional[float], base_step: int, min_val: int, max_options: int) -> List[int]:
     if not max_val or max_val <= 0:
@@ -194,7 +178,7 @@ def _build_filter_context(
         print(f"FILTER_CTX_STAGE name=countries ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     eu_source_ids = service.source_ids_for_region("EU")
     kr_source_ids = service.source_ids_for_region("KR")
-    has_air_suspension = False
+    has_air_suspension = service.has_air_suspension()
     t0 = time.perf_counter()
     reg_years = [int(r["value"]) for r in service.facet_counts(field="reg_year", filters=facet_filters)]
     if timing_enabled:
@@ -226,22 +210,14 @@ def _build_filter_context(
         print(f"FILTER_CTX_STAGE name=generations ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     t0 = time.perf_counter()
     colors = service.facet_counts(field="color", filters=facet_filters)
-    colors = [
-        {
-            "value": c["value"],
-            "label": ru_color(c["value"]) or display_color(c["value"]) or c["value"],
-            "hex": color_hex(c["value"]),
-            "count": c["count"],
-        }
-        for c in colors
-        if c.get("value")
-    ]
     if timing_enabled:
         print(f"FILTER_CTX_STAGE name=colors ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
-    basic_set = set(BASIC_COLORS)
-    basic_by_value = {c["value"]: c for c in colors if c.get("value") in basic_set}
-    colors_basic = [basic_by_value[c] for c in BASIC_COLORS if c in basic_by_value]
-    colors_other = [c for c in colors if c.get("value") not in basic_set]
+    colors_basic, colors_other = split_color_facets(
+        colors,
+        top_limit=12,
+        label_for=lambda value: ru_color(value) or display_color(value) or value,
+        hex_for=color_hex,
+    )
     countries_sorted = sorted(eu_countries, key=lambda c: (country_label_ru(c) or c).casefold())
     t0 = time.perf_counter()
     body_types = []
@@ -916,7 +892,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "engine_types": [],
             "transmissions": [],
             "drive_types": [],
-            "has_air_suspension": False,
+            "has_air_suspension": service.has_air_suspension(),
             "initial_items": initial_items,
             "fx_rates": fx_rates,
             "content": contact_content,

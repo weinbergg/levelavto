@@ -9,11 +9,14 @@ from ..utils.country_map import resolve_display_country, normalize_country_code,
 from ..utils.taxonomy import (
     normalize_fuel,
     ru_fuel,
+    ru_color,
+    ru_body,
     ru_transmission,
     color_hex,
 )
+from ..utils.localization import display_body, display_color
 from ..utils.price_utils import display_price_rub
-from ..utils.color_groups import normalize_color_group, color_group_label
+from ..utils.color_groups import split_color_facets
 from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
 from ..utils.redis_cache import (
     redis_get_json,
@@ -737,25 +740,12 @@ def filter_options(
 
 
 def _split_colors(raw_colors: List[dict]) -> tuple[list[dict], list[dict]]:
-    buckets: dict[str, int] = {}
-    for c in raw_colors:
-        value = (c.get("value") or "").strip()
-        if not value:
-            continue
-        group = normalize_color_group(value)
-        buckets[group] = buckets.get(group, 0) + int(c.get("count", 0) or 0)
-    basic: list[dict] = []
-    for key, cnt in buckets.items():
-        basic.append(
-            {
-                "value": key,
-                "label": color_group_label(key),
-                "hex": color_hex(key),
-                "count": cnt,
-            }
-        )
-    basic.sort(key=lambda x: (-x["count"], x["label"]))
-    return basic[:12], []
+    return split_color_facets(
+        raw_colors,
+        top_limit=12,
+        label_for=lambda value: ru_color(value) or display_color(value) or value,
+        hex_for=color_hex,
+    )
 
 
 @router.get("/filter_ctx_base")
@@ -842,12 +832,16 @@ def filter_ctx_base(
     )
     body_types = _sort_by_label(
         [
-            {"value": v["value"], "label": v["value"], "count": v.get("count", 0)}
+            {
+                "value": v["value"],
+                "label": ru_body(v["value"]) or display_body(v["value"]) or v["value"],
+                "count": v.get("count", 0),
+            }
             for v in service.facet_counts(field="body_type", filters=base_filters)
             if v.get("value")
         ]
     )
-    colors_basic, colors_other = _split_colors(service.facet_counts(field="color_group", filters=base_filters))
+    colors_basic, colors_other = _split_colors(service.facet_counts(field="color", filters=base_filters))
     payload = {
         "regions": regions,
         "countries": countries,

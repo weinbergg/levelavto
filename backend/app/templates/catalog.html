@@ -96,8 +96,8 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Поколение
-              <select name="generation" id="generation">
+            <label data-generation-field{% if not generations %} class="is-hidden"{% endif %}>Поколение
+              <select name="generation" id="generation" {% if not generations %}disabled{% endif %}>
                 <option value="">Любое</option>
                 {% for g in generations %}
                 <option value="{{ g }}" {% if params.get('generation') == g %}selected{% endif %}>{{ g }}</option>
@@ -118,6 +118,7 @@
                 ></button>
                 {% endfor %}
               </div>
+              {% if colors_other and colors_other|length > 0 %}
               <button
                 type="button"
                 class="btn btn-ghost btn-small color-toggle"
@@ -140,6 +141,7 @@
                 ></button>
                 {% endfor %}
               </div>
+              {% endif %}
               <input type="hidden" name="color" value="{{ params.get('color','') }}">
             </label>
             <label class="reg-range">Поставлен на учёт с / по
@@ -214,9 +216,12 @@
                 <input type="number" name="engine_cc_max" inputmode="numeric" min="0" step="100" value="{{ params.get('engine_cc_max','') }}">
               </label>
             </div>
-            <!-- interior filters moved to advanced search; hidden in main panel -->
-            {# фильтр пневмоподвески скрыт: данных нет или не используется #}
-            {# Цвет убран из основной панели; оставьте в расширенном поиске при наличии данных #}
+            {% if has_air_suspension %}
+            <label class="field--checkbox">
+              <input type="checkbox" name="air_suspension" value="1" {% if params.get('air_suspension') %}checked{% endif %}>
+              Пневмоподвеска
+            </label>
+            {% endif %}
             <label class="field--full">Поиск по ключевым словам
               <input type="text" name="q" value="{{ params.get('q','') }}" placeholder="Например: дизель, 4x4, панорама">
             </label>
