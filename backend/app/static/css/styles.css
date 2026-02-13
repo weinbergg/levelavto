@@ -1605,10 +1605,12 @@ body.filters-open {
 .advanced-basic {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 .advanced-row {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 .advanced-row--two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1619,11 +1621,13 @@ body.filters-open {
 .advanced-row .field {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 .field-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(140px, 1fr));
   gap: 8px;
+  min-width: 0;
 }
 .field-pair select,
 .field-pair__month select {
@@ -1635,12 +1639,14 @@ body.filters-open {
 .region-subfield {
   position: relative;
   min-height: 66px;
+  min-width: 0;
 }
 .region-sub {
   position: absolute;
   inset: 0;
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 .is-hidden-keep {
   opacity: 0;
@@ -1691,10 +1697,12 @@ body.filters-open {
   grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 1.2fr) auto;
   gap: 12px;
   align-items: end;
+  min-width: 0;
 }
 .search-row .field {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 .icon-btn {
   width: 46px;
@@ -3030,11 +3038,17 @@ select:focus {
     grid-template-columns: 280px 1fr;
   }
   .search-row {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .search-row .field:nth-child(3) {
+    grid-column: span 2;
   }
   .search-row .icon-btn {
     grid-column: span 2;
     justify-self: start;
+  }
+  .detail-state__grid {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 860px) {

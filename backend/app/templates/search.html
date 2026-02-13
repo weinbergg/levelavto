@@ -87,7 +87,7 @@
 
             <div class="advanced-row advanced-row--two">
               <label class="field">Кузов
-                <select name="body_type" {% if not body_types %}disabled{% endif %}>
+                <select name="body_type">
                   <option value="">Любой</option>
                   {% for t in body_types %}
                   <option value="{{ t.value }}" {% if params.get('body_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
@@ -183,7 +183,7 @@
           <div class="advanced-basic">
             <div class="advanced-row advanced-row--three">
               <label class="field">Топливо
-                <select name="engine_type" {% if not engine_types %}disabled{% endif %}>
+                <select name="engine_type">
                   <option value="">Любое</option>
                   {% for t in engine_types %}
                   <option value="{{ t.value }}" {% if params.get('engine_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
@@ -191,7 +191,7 @@
                 </select>
               </label>
               <label class="field">Трансмиссия
-                <select name="transmission" {% if not transmissions %}disabled{% endif %}>
+                <select name="transmission">
                   <option value="">Любая</option>
                   {% for t in transmissions %}
                   <option value="{{ t.value }}" {% if params.get('transmission') == t.value %}selected{% endif %}>{{ t.label }}</option>
@@ -199,7 +199,7 @@
                 </select>
               </label>
               <label class="field">Привод
-                <select name="drive_type" {% if not drive_types %}disabled{% endif %}>
+                <select name="drive_type">
                   <option value="">Любой</option>
                   {% for t in drive_types %}
                   <option value="{{ t.value }}" {% if params.get('drive_type') == t.value %}selected{% endif %}>{{ t.label }}</option>

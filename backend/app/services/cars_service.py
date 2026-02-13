@@ -1094,6 +1094,9 @@ class CarsService:
                     Car.country,
                     Car.source_id,
                     Car.color,
+                    Car.body_type,
+                    Car.transmission,
+                    Car.drive_type,
                     Car.engine_cc,
                     Car.power_hp,
                 )

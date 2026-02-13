@@ -160,6 +160,17 @@ def build_cars_list_key(
     )
 
 
+def build_cars_list_full_key(
+    params: Optional[Dict[str, Any]],
+    sort: Optional[str],
+    page: int,
+    page_size: int,
+) -> str:
+    cleaned = normalize_count_params(params or {})
+    items = tuple(sorted((str(k), str(v)) for k, v in cleaned.items()))
+    return f"cars_list_full:{items}:sort={sort or 'none'}:page={page}:size={page_size}:v{_dataset_version()}"
+
+
 def build_filter_payload_key(params: Optional[Dict[str, Any]] = None) -> str:
     if not params:
         return "filter_payload:all"
@@ -264,7 +275,9 @@ def normalize_count_params(params: Optional[Dict[str, Any]] = None) -> Dict[str,
         "mileage_min",
         "mileage_max",
         "reg_year_min",
+        "reg_month_min",
         "reg_year_max",
+        "reg_month_max",
         "year_min",
         "year_max",
         "engine_cc_min",
@@ -272,6 +285,20 @@ def normalize_count_params(params: Optional[Dict[str, Any]] = None) -> Dict[str,
         "power_hp_min",
         "power_hp_max",
         "condition",
+        "generation",
+        "q",
+        "num_seats",
+        "doors_count",
+        "emission_class",
+        "efficiency_class",
+        "climatisation",
+        "airbags",
+        "interior_design",
+        "air_suspension",
+        "price_rating_label",
+        "owners_count",
+        "line",
+        "source",
     ]
     cleaned: Dict[str, Any] = {}
     for key in keys:

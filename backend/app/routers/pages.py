@@ -35,6 +35,7 @@ from ..utils.taxonomy import (
     ru_color,
     ru_fuel,
     ru_transmission,
+    ru_drivetrain,
     normalize_fuel,
     normalize_color as _normalize_color,
     color_hex,
@@ -335,7 +336,7 @@ def _build_filter_context(
         print(f"FILTER_CTX_STAGE name=transmissions ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     t0 = time.perf_counter()
     drive_types = [
-        {"value": v["value"], "label": v["value"], "count": v["count"]}
+        {"value": v["value"], "label": ru_drivetrain(v["value"]) or v["value"], "count": v["count"]}
         for v in service.facet_counts(field="drive_type", filters=facet_filters)
     ]
     if timing_enabled:

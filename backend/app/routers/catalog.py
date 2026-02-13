@@ -12,6 +12,7 @@ from ..utils.taxonomy import (
     ru_color,
     ru_body,
     ru_transmission,
+    ru_drivetrain,
     color_hex,
 )
 from ..utils.localization import display_body, display_color
@@ -22,6 +23,7 @@ from ..utils.redis_cache import (
     redis_get_json,
     redis_set_json,
     build_cars_list_key,
+    build_cars_list_full_key,
     build_cars_count_simple_key,
     build_filter_payload_key,
     build_filter_ctx_base_key,
@@ -315,6 +317,54 @@ def list_cars(
             print("CARS_LIST_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
             return cached
         print("CARS_LIST_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
+    else:
+        full_cache_params = {
+            "region": canon.get("region"),
+            "country": canon.get("country"),
+            "brand": canon.get("brand"),
+            "model": canon.get("model"),
+            "generation": generation,
+            "color": color,
+            "body_type": body_type,
+            "engine_type": engine_type,
+            "transmission": transmission,
+            "drive_type": drive_type,
+            "price_min": price_min,
+            "price_max": price_max,
+            "power_hp_min": power_hp_min,
+            "power_hp_max": power_hp_max,
+            "engine_cc_min": engine_cc_min,
+            "engine_cc_max": engine_cc_max,
+            "year_min": year_min,
+            "year_max": year_max,
+            "mileage_min": mileage_min,
+            "mileage_max": mileage_max,
+            "kr_type": canon.get("kr_type"),
+            "reg_year_min": reg_year_min,
+            "reg_month_min": reg_month_min,
+            "reg_year_max": reg_year_max,
+            "reg_month_max": reg_month_max,
+            "condition": condition,
+            "q": q,
+            "line": "|".join(line or []),
+            "source": ",".join(source) if isinstance(source, list) else source,
+            "num_seats": num_seats,
+            "doors_count": doors_count,
+            "emission_class": emission_class,
+            "efficiency_class": efficiency_class,
+            "climatisation": climatisation,
+            "airbags": airbags,
+            "interior_design": interior_design,
+            "air_suspension": air_suspension,
+            "price_rating_label": price_rating_label,
+            "owners_count": owners_count,
+        }
+        cache_key = build_cars_list_full_key(full_cache_params, sort, page, page_size)
+        cached = redis_get_json(cache_key)
+        if cached is not None:
+            print("CARS_LIST_FULL_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
+            return cached
+        print("CARS_LIST_FULL_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
     if os.getenv("FILTERS_CANON") == "1":
         print(
             "FILTERS_CANON cars_count "
@@ -373,16 +423,17 @@ def list_cars(
         page=page,
         page_size=page_size,
         light=True,
-        use_fast_count=False,
+        use_fast_count=os.getenv("CATALOG_USE_FAST_COUNT", "1") != "0",
     )
     t1 = time.perf_counter()
     if items and not isinstance(items[0], dict):
         items = [dict(row) for row in items]
     image_counts = {}
     image_first = {}
+    with_photo_stats = os.getenv("CATALOG_WITH_PHOTO_STATS", "0") == "1"
     def _normalize_thumb(url: str | None) -> str | None:
         return normalize_classistatic_url(url)
-    if items:
+    if items and with_photo_stats:
         ids = [c.get("id") for c in items if c.get("id")]
         if ids:
             rows = (
@@ -405,6 +456,9 @@ def list_cars(
             image_first = {car_id: _normalize_thumb(url) for car_id, url in rows if url}
     t2 = time.perf_counter()
     payload_items = []
+    fx_rates = service.get_fx_rates() or {}
+    fx_eur = float(fx_rates.get("EUR") or 0)
+    fx_usd = float(fx_rates.get("USD") or 0)
     eu_sources = set(service._source_ids_for_europe())
     kr_sources = set(service._source_ids_for_hints(service.KOREA_SOURCE_HINTS))
     eu_countries = set(service.EU_COUNTRIES)
@@ -430,6 +484,19 @@ def list_cars(
             thumb_replaced += 1
         total_cached = c.get("total_price_rub_cached")
         price_cached = c.get("price_rub_cached")
+        display_rub = display_price_rub(
+            total_cached,
+            price_cached,
+            allow_price_fallback=str(c.get("country") or "").upper() == "KR",
+        )
+        if display_rub is None and c.get("price") is not None:
+            cur = str(c.get("currency") or "").upper()
+            if cur == "EUR" and fx_eur > 0:
+                display_rub = display_price_rub(None, float(c.get("price")) * fx_eur, allow_price_fallback=True)
+            elif cur == "USD" and fx_usd > 0:
+                display_rub = display_price_rub(None, float(c.get("price")) * fx_usd, allow_price_fallback=True)
+            elif cur in {"RUB", "₽"}:
+                display_rub = display_price_rub(None, float(c.get("price")), allow_price_fallback=True)
         payload_items.append(
             {
                 "id": c.get("id"),
@@ -441,23 +508,27 @@ def list_cars(
                 "mileage": c.get("mileage"),
                 "total_price_rub_cached": total_cached,
                 "price_rub_cached": price_cached,
-                "display_price_rub": display_price_rub(
-                    total_cached,
-                    price_cached,
-                    allow_price_fallback=str(c.get("country") or "").upper() == "KR",
-                ),
+                "display_price_rub": display_rub,
                 "calc_updated_at": c.get("calc_updated_at"),
                 "thumbnail_url": thumb_url,
                 "country": country_norm or country_raw,
                 "region": region_val,
                 "color": c.get("color"),
+                "display_color": ru_color(c.get("color")) or display_color(c.get("color")) or c.get("color"),
                 "color_hex": color_hex(c.get("color")),
                 "engine_cc": c.get("engine_cc"),
                 "power_hp": c.get("power_hp"),
+                "body_type": c.get("body_type"),
+                "display_body_type": ru_body(c.get("body_type")) or display_body(c.get("body_type")) or c.get("body_type"),
+                "transmission": c.get("transmission"),
+                "display_transmission": ru_transmission(c.get("transmission")) or c.get("transmission"),
+                "drive_type": c.get("drive_type"),
+                "display_drive_type": ru_drivetrain(c.get("drive_type")) or c.get("drive_type"),
                 "images_count": img_count,
                 "photos_count": img_count,
                 "price": c.get("price"),
                 "currency": c.get("currency"),
+                "display_country_label": country_label_ru(country_norm or country_raw) or (country_norm or country_raw),
             }
         )
     t3 = time.perf_counter()
@@ -487,7 +558,7 @@ def list_cars(
         "page": page,
         "page_size": page_size,
     }
-    if cache_ok and cache_key:
+    if cache_key:
         redis_set_json(cache_key, resp, ttl_sec=900)
     return resp
 
@@ -825,7 +896,11 @@ def filter_ctx_base(
     )
     drive_types = _sort_by_label(
         [
-            {"value": v["value"], "label": v["value"], "count": v.get("count", 0)}
+            {
+                "value": v["value"],
+                "label": ru_drivetrain(v["value"]) or v["value"],
+                "count": v.get("count", 0),
+            }
             for v in service.facet_counts(field="drive_type", filters=base_filters)
             if v.get("value")
         ]

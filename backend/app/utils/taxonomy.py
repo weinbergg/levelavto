@@ -63,6 +63,10 @@ def ru_transmission(val: Optional[str]) -> Optional[str]:
     return ru_label("transmission", val)
 
 
+def ru_drivetrain(val: Optional[str]) -> Optional[str]:
+    return ru_label("drivetrain", val)
+
+
 def _aliases_for(category: str, value: Optional[str]) -> List[str]:
     if not value:
         return []

@@ -1836,6 +1836,8 @@
     const regionSubKr = qs('[data-region-sub-kr]', form)
     const regionEuSelect = qs('[data-country]', form)
     const regionKrSelect = qs('[data-kr-type]', form)
+    const advancedGenerationSelect = qs('select[name="generation"]', form)
+    const advancedGenerationField = advancedGenerationSelect ? advancedGenerationSelect.closest('.field') : null
 
     const parseOptions = (raw) => {
       try {
@@ -1846,30 +1848,35 @@
       }
     }
 
-    const setSelectOptions = (select, options) => {
+    const setRegionSelectOptions = (select, options) => {
       if (!select) return
       const current = select.value
       const deduped = []
       const seen = new Set()
-      options.forEach((val) => {
-        const key = String(val)
-        if (key && !seen.has(key)) {
-          seen.add(key)
-          deduped.push(key)
-        }
+      options.forEach((item) => {
+        const isObj = item && typeof item === 'object'
+        const value = isObj ? (item.value ?? item.id ?? '') : item
+        if (value == null || value === '') return
+        const key = String(value)
+        if (seen.has(key)) return
+        seen.add(key)
+        deduped.push({
+          value: key,
+          label: isObj ? String(item.label ?? value) : key
+        })
       })
       select.innerHTML = ''
       const emptyOpt = document.createElement('option')
       emptyOpt.value = ''
       emptyOpt.textContent = 'Не важно'
       select.appendChild(emptyOpt)
-      deduped.forEach((val) => {
+      deduped.forEach((item) => {
         const opt = document.createElement('option')
-        opt.value = val
-        opt.textContent = val
+        opt.value = item.value
+        opt.textContent = item.label
         select.appendChild(opt)
       })
-      if (current && deduped.includes(current)) {
+      if (current && deduped.some((item) => item.value === current)) {
         select.value = current
       } else {
         select.value = ''
@@ -1960,7 +1967,7 @@
         } else {
           next = eu
         }
-        setSelectOptions(select, next)
+        setRegionSelectOptions(select, next)
       })
     }
 
@@ -1981,6 +1988,14 @@
       if (regionKrSelect) {
         regionKrSelect.disabled = !showKr
       }
+    }
+
+    const syncAdvancedGenerationVisibility = () => {
+      if (!advancedGenerationSelect || !advancedGenerationField) return
+      const hasItems = Array.from(advancedGenerationSelect.options || []).some((opt) => opt.value)
+      advancedGenerationField.classList.toggle('is-hidden', !hasItems)
+      advancedGenerationSelect.disabled = !hasItems
+      if (!hasItems) advancedGenerationSelect.value = ''
     }
 
     const parseLine = (line) => {
@@ -2244,6 +2259,7 @@
     updateRegionSub()
     updateRegionFilters()
     loadPayloadOptions()
+    syncAdvancedGenerationVisibility()
     bindRegMonthState(form)
     bindColorChips(form, scheduleCount)
     bindOtherColorsToggle(form)
@@ -2256,6 +2272,7 @@
       updateRegionSub()
       loadPayloadOptions()
       updateRegionFilters()
+      syncAdvancedGenerationVisibility()
       scheduleCount()
     })
     scheduleCount()
