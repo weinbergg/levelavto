@@ -9,6 +9,7 @@ REQUESTS="${REQUESTS:-30}"
 WARMUP="${WARMUP:-5}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-12}"
 COUNTRY="${COUNTRY:-DE}"
+BENCH_SEARCH="${BENCH_SEARCH:-1}"
 OUT_DIR="${OUT_DIR:-logs/perf_audit}"
 TS="$(date +%Y%m%d_%H%M%S)"
 RUN_DIR="$OUT_DIR/$TS"
@@ -37,6 +38,7 @@ require_cmd docker
   echo "- Requests per endpoint: $REQUESTS"
   echo "- Warmup requests: $WARMUP"
   echo "- Timeout per request: ${TIMEOUT_SEC}s"
+  echo "- Include search benchmark: $BENCH_SEARCH"
   echo
 } >"$REPORT_MD"
 
@@ -115,7 +117,9 @@ bench_endpoint "filter_ctx_base_eu" "/api/filter_ctx_base?region=EU"
 bench_endpoint "filter_payload_eu" "/api/filter_payload?region=EU&country=${COUNTRY}"
 bench_endpoint "cars_count_eu" "/api/cars_count?region=EU&country=${COUNTRY}"
 bench_endpoint "cars_list_eu" "/api/cars?region=EU&country=${COUNTRY}&sort=price_asc&page=1&page_size=12"
-bench_endpoint "cars_list_search" "/api/cars?region=EU&country=${COUNTRY}&q=diesel&sort=price_asc&page=1&page_size=12"
+if [ "$BENCH_SEARCH" = "1" ]; then
+  bench_endpoint "cars_list_search" "/api/cars?region=EU&country=${COUNTRY}&q=diesel&sort=price_asc&page=1&page_size=12"
+fi
 
 python3 - "$RAW_DIR" "$SUMMARY_JSON" >>"$REPORT_MD" <<'PY'
 import json
@@ -190,4 +194,3 @@ capture_cmd "web_logs_timing" docker compose logs --tail=300 web
 echo
 echo "[perf] report: $REPORT_MD"
 echo "[perf] summary: $SUMMARY_JSON"
-

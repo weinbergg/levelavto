@@ -660,6 +660,36 @@ class CarsService:
                 if variants:
                     conditions.append(Car.brand.in_(variants))
         if q:
+            # Fast path: map single-token fuel queries to structured engine_type filter.
+            # This avoids expensive broad payload scans for common searches like "diesel".
+            q_tokens = [t for t in re.split(r"[\s,]+", q.strip().lower()) if t]
+            if len(q_tokens) == 1 and not engine_type:
+                token = q_tokens[0]
+                quick_fuel_map = {
+                    "дизель": "diesel",
+                    "дизельный": "diesel",
+                    "дизельные": "diesel",
+                    "дизельное": "diesel",
+                    "diesel": "diesel",
+                    "бензин": "petrol",
+                    "бенз": "petrol",
+                    "petrol": "petrol",
+                    "gasoline": "petrol",
+                    "hybrid": "hybrid",
+                    "гибрид": "hybrid",
+                    "электро": "electric",
+                    "электр": "electric",
+                    "electric": "electric",
+                    "ev": "electric",
+                }
+                mapped = quick_fuel_map.get(token)
+                if mapped:
+                    engine_type = mapped
+                    q = None
+                elif token.startswith("дизел"):
+                    engine_type = "diesel"
+                    q = None
+        if q:
             tokens = [t for t in re.split(r"[\\s,]+", q.strip().lower()) if t]
             payload_text = func.lower(cast(Car.source_payload, String))
             token_groups = []
