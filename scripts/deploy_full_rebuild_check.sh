@@ -42,6 +42,9 @@ PREWARM_MAX_SEC="${PREWARM_MAX_SEC:-420}"
 PREWARM_INCLUDE_BRAND_CTX="${PREWARM_INCLUDE_BRAND_CTX:-0}"
 PREWARM_INCLUDE_MODEL_CTX="${PREWARM_INCLUDE_MODEL_CTX:-0}"
 PREWARM_INCLUDE_BRAND_LISTS="${PREWARM_INCLUDE_BRAND_LISTS:-1}"
+PREWARM_INCLUDE_BRAND_COUNTS="${PREWARM_INCLUDE_BRAND_COUNTS:-1}"
+PREWARM_COUNTRY_SWEEP="${PREWARM_COUNTRY_SWEEP:-0}"
+PREWARM_COUNTRIES="${PREWARM_COUNTRIES:-AT,NL,BE,FR,IT,ES}"
 PREWARM_EU_COUNTRY="${PREWARM_EU_COUNTRY:-DE}"
 HOT_CACHE_BRANDS="${HOT_CACHE_BRANDS:-}"
 PREWARM_HOT_BRANDS="${PREWARM_HOT_BRANDS:-$HOT_CACHE_BRANDS}"
@@ -114,6 +117,9 @@ if [[ "$RUN_PREWARM" == "1" ]]; then
     PREWARM_INCLUDE_BRAND_CTX="$PREWARM_INCLUDE_BRAND_CTX" \
     PREWARM_INCLUDE_MODEL_CTX="$PREWARM_INCLUDE_MODEL_CTX" \
     PREWARM_INCLUDE_BRAND_LISTS="$PREWARM_INCLUDE_BRAND_LISTS" \
+    PREWARM_INCLUDE_BRAND_COUNTS="$PREWARM_INCLUDE_BRAND_COUNTS" \
+    PREWARM_COUNTRY_SWEEP="$PREWARM_COUNTRY_SWEEP" \
+    PREWARM_COUNTRIES="$PREWARM_COUNTRIES" \
     PREWARM_EU_COUNTRY="$PREWARM_EU_COUNTRY" \
     PREWARM_HOT_BRANDS="$PREWARM_HOT_BRANDS" \
     python -m backend.app.scripts.prewarm_cache
@@ -133,19 +139,36 @@ http_probe "cars_list_de_bmw" "${BASE_URL}/api/cars?region=EU&country=DE&brand=B
 http_probe "filter_ctx_brand_grouped" "${BASE_URL}/api/filter_ctx_brand?region=EU&country=DE&brand=BMW"
 
 step "CHECK PAYLOAD SNIPPETS"
-curl -sS "${BASE_URL}/api/cars?region=EU&country=DE&brand=BMW&sort=price_asc&page=1&page_size=3" | python3 - <<'PY'
-import json,sys
-data=json.load(sys.stdin)
+cars_payload="$(mktemp)"
+ctx_payload="$(mktemp)"
+curl -fsS "${BASE_URL}/api/cars?region=EU&country=DE&brand=BMW&sort=price_asc&page=1&page_size=3" -o "$cars_payload"
+curl -fsS "${BASE_URL}/api/filter_ctx_brand?region=EU&country=DE&brand=BMW" -o "$ctx_payload"
+python3 - "$cars_payload" <<'PY'
+import json
+import os
+import sys
+path = sys.argv[1]
+if not os.path.exists(path) or os.path.getsize(path) == 0:
+    raise SystemExit(f"empty payload: {path}")
+with open(path, "r", encoding="utf-8") as fh:
+    data = json.load(fh)
 print("total=",data.get("total"))
 for i,c in enumerate(data.get("items",[])[:3],1):
     print(f"#{i} id={c.get('id')} model={c.get('model')} thumb={bool(c.get('thumbnail_url'))} price_note={c.get('price_note')}")
 PY
-curl -sS "${BASE_URL}/api/filter_ctx_brand?region=EU&country=DE&brand=BMW" | python3 - <<'PY'
-import json,sys
-data=json.load(sys.stdin)
+python3 - "$ctx_payload" <<'PY'
+import json
+import os
+import sys
+path = sys.argv[1]
+if not os.path.exists(path) or os.path.getsize(path) == 0:
+    raise SystemExit(f"empty payload: {path}")
+with open(path, "r", encoding="utf-8") as fh:
+    data = json.load(fh)
 print("models=",len(data.get("models",[])),"groups=",len(data.get("model_groups",[])))
 print("group_labels=", [g.get("label") for g in data.get("model_groups",[])[:8]])
 PY
+rm -f "$cars_payload" "$ctx_payload"
 
 if [[ "$RUN_PERF" == "1" ]]; then
   step "PERF AUDIT"

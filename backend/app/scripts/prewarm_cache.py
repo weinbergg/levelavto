@@ -9,7 +9,6 @@ from backend.app.routers.catalog import (
     filter_ctx_brand,
     filter_ctx_model,
     list_cars,
-    TOP_BRANDS,
 )
 from backend.app.utils.redis_cache import (
     redis_set_json,
@@ -68,48 +67,52 @@ def main() -> None:
     include_brand_ctx = os.getenv("PREWARM_INCLUDE_BRAND_CTX", "0") == "1"
     include_model_ctx = os.getenv("PREWARM_INCLUDE_MODEL_CTX", "0") == "1"
     include_brand_lists = os.getenv("PREWARM_INCLUDE_BRAND_LISTS", "1") != "0"
+    include_brand_counts = os.getenv("PREWARM_INCLUDE_BRAND_COUNTS", "1") != "0"
+    include_country_sweep = os.getenv("PREWARM_COUNTRY_SWEEP", "0") == "1"
     list_sort = os.getenv("PREWARM_LIST_SORT", "price_asc")
     list_page_size = int(os.getenv("PREWARM_LIST_PAGE_SIZE", "12") or 12)
     eu_country = os.getenv("PREWARM_EU_COUNTRY", "DE")
-    hot_brands_raw = os.getenv(
-        "PREWARM_HOT_BRANDS",
-        ",".join(
-            [
-                "BMW",
-                "Audi",
-                "Mercedes-Benz",
-                "Porsche",
-                "Skoda",
-                "Toyota",
-                "Volkswagen",
-                "Volvo",
-                "Aston Martin",
-                "Bentley",
-                "Bugatti",
-                "BYD",
-                "Cadillac",
-                "Ferrari",
-                "GMC",
-                "Hummer",
-                "Hyundai",
-                "Jaguar",
-                "Jeep",
-                "Kia",
-                "Lamborghini",
-                "Land Rover",
-                "Lexus",
-                "Lincoln",
-                "Lynk&Co",
-                "Maybach",
-                "Mazda",
-                "McLaren",
-                "Mini",
-                "Rolls-Royce",
-                "Tesla",
-                "Zeekr",
-            ]
-        ),
+    default_hot_brands = ",".join(
+        [
+            "BMW",
+            "Audi",
+            "Mercedes-Benz",
+            "Porsche",
+            "Skoda",
+            "Toyota",
+            "Volkswagen",
+            "Volvo",
+            "Aston Martin",
+            "Bentley",
+            "Bugatti",
+            "BYD",
+            "Cadillac",
+            "Ferrari",
+            "GMC",
+            "Hummer",
+            "Hyundai",
+            "Jaguar",
+            "Jeep",
+            "Kia",
+            "Lamborghini",
+            "Land Rover",
+            "Lexus",
+            "Lincoln",
+            "Lynk&Co",
+            "Maybach",
+            "Mazda",
+            "McLaren",
+            "Mini",
+            "Rolls-Royce",
+            "Tesla",
+            "Zeekr",
+        ]
     )
+    hot_brands_raw = os.getenv("PREWARM_HOT_BRANDS")
+    if not hot_brands_raw:
+        hot_brands_raw = default_hot_brands
+    country_sweep_raw = os.getenv("PREWARM_COUNTRIES", "AT,NL,BE,FR,IT,ES")
+    country_sweep = [c.strip().upper() for c in country_sweep_raw.split(",") if c.strip()]
     hot_brands = []
     for raw in hot_brands_raw.split(","):
         b = normalize_brand(raw.strip())
@@ -138,7 +141,7 @@ def main() -> None:
                 return
             key, ms = _prewarm_base(db, params)
             print(f"[prewarm] filter_ctx_base key={key} ms={ms:.2f}")
-        eu_countries = [eu_country, "AT", "NL", "BE", "FR", "IT", "ES"]
+        priority_countries = [eu_country]
         brand_tasks = [{"region": "EU", "country": eu_country, "brand": b} for b in hot_brands]
         if include_brand_ctx:
             for params in brand_tasks:
@@ -165,10 +168,15 @@ def main() -> None:
             {"region": "EU"},
             {"region": "KR"},
         ]
-        for c in eu_countries:
+        for c in priority_countries:
             count_keys.append({"region": "EU", "country": c})
-        for brand in hot_brands:
-            count_keys.append({"region": "EU", "country": eu_country, "brand": brand})
+        if include_country_sweep:
+            for c in country_sweep:
+                if c not in priority_countries:
+                    count_keys.append({"region": "EU", "country": c})
+        if include_brand_counts:
+            for brand in hot_brands:
+                count_keys.append({"region": "EU", "country": eu_country, "brand": brand})
         for params in count_keys:
             if _should_stop(started, max_sec):
                 print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
@@ -232,76 +240,7 @@ def main() -> None:
                 page_size=int(params.get("page_size") or 12),
             )
 
-        list_tasks = [
-            {"region": "EU"},
-            {"region": "KR"},
-            {"region": "EU", "country": eu_country},
-            {"region": "EU", "country": "AT"},
-        ]
-        for params in list_tasks:
-            if _should_stop(started, max_sec):
-                print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
-                return
-            params["sort"] = list_sort
-            params["page_size"] = list_page_size
-            _prewarm_list(params)
-            print(f"[prewarm] cars_list region={params.get('region')} country={params.get('country')}")
-        kr_sort_tasks = [
-            {"region": "KR", "sort": "price_asc"},
-            {"region": "KR", "sort": "price_desc"},
-        ]
-        for params in kr_sort_tasks:
-            if _should_stop(started, max_sec):
-                print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
-                return
-            list_cars(
-                None,
-                db=db,
-                region="KR",
-                country=None,
-                eu_country=None,
-                brand=None,
-                line=None,
-                source=None,
-                q=None,
-                model=None,
-                generation=None,
-                color=None,
-                body_type=None,
-                engine_type=None,
-                transmission=None,
-                drive_type=None,
-                num_seats=None,
-                doors_count=None,
-                emission_class=None,
-                efficiency_class=None,
-                climatisation=None,
-                airbags=None,
-                interior_design=None,
-                air_suspension=None,
-                price_rating_label=None,
-                owners_count=None,
-                price_min=None,
-                price_max=None,
-                power_hp_min=None,
-                power_hp_max=None,
-                engine_cc_min=None,
-                engine_cc_max=None,
-                year_min=None,
-                year_max=None,
-                mileage_min=None,
-                mileage_max=None,
-                kr_type=None,
-                reg_year_min=None,
-                reg_month_min=None,
-                reg_year_max=None,
-                reg_month_max=None,
-                condition=None,
-                sort=params.get("sort"),
-                page=1,
-                page_size=max(24, list_page_size),
-            )
-            print(f"[prewarm] cars_list region=KR sort={params.get('sort')}")
+        # Priority: warm exactly the brand pages that users open first.
         if include_brand_lists:
             for params in brand_tasks:
                 if _should_stop(started, max_sec):
@@ -358,6 +297,21 @@ def main() -> None:
                     f"[prewarm] cars_list brand={params.get('brand')} region={params.get('region')} "
                     f"country={params.get('country')} sort={list_sort} size={list_page_size}"
                 )
+
+        # Secondary: broad generic pages (can be disabled by PREWARM_MAX_SEC timeout).
+        list_tasks = [
+            {"region": "EU"},
+            {"region": "KR"},
+            {"region": "EU", "country": eu_country},
+        ]
+        for params in list_tasks:
+            if _should_stop(started, max_sec):
+                print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
+                return
+            params["sort"] = list_sort
+            params["page_size"] = list_page_size
+            _prewarm_list(params)
+            print(f"[prewarm] cars_list region={params.get('region')} country={params.get('country')}")
     print(f"[prewarm] done in {(time.perf_counter()-started)*1000:.2f} ms")
 
 

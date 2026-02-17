@@ -26,6 +26,8 @@ PREWARM_MAX_SEC=420 \
 PREWARM_INCLUDE_BRAND_CTX=0 \
 PREWARM_INCLUDE_MODEL_CTX=0 \
 PREWARM_INCLUDE_BRAND_LISTS=1 \
+PREWARM_INCLUDE_BRAND_COUNTS=1 \
+PREWARM_COUNTRY_SWEEP=0 \
 PREWARM_EU_COUNTRY=DE \
 HOT_CACHE_BRANDS="BMW,Audi,Mercedes-Benz,Porsche,Skoda,Toyota,Volkswagen,Volvo,Aston Martin,Bentley,Bugatti,BYD,Cadillac,Ferrari,GMC,Hummer,Hyundai,Jaguar,Jeep,Kia,Lamborghini,Land Rover,Lexus,Lincoln,Lynk&Co,Maybach,Mazda,McLaren,Mini,Rolls-Royce,Tesla,Zeekr" \
 ./scripts/deploy_full_rebuild_check.sh
