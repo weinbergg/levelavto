@@ -54,7 +54,7 @@ content %}
       {% for car in favorites %}
       <a class="card car-card" href="/car/{{ car.id }}">
         <div class="thumb-wrap">
-          <img class="thumb" src="{{ car.thumbnail_url or '' }}" alt="" loading="lazy" />
+          <img class="thumb" src="{{ car.thumbnail_url or '/static/img/no-photo.svg' }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='/static/img/no-photo.svg';" />
           <button class="fav-btn active" data-fav-button data-car-id="{{ car.id }}" aria-label="Убрать из избранного">★</button>
         </div>
         <div class="car-card__body">

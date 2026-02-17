@@ -250,12 +250,14 @@
           <span class="badge-tag badge-tag--alt">{{ home.recommended.badge_label }}</span>
           <img
             class="thumb"
-            src="{{ car.thumbnail_url or '' }}"
+            src="{{ car.thumbnail_url or '/static/img/no-photo.svg' }}"
             width="320"
             height="200"
             alt=""
             loading="lazy"
             decoding="async"
+            referrerpolicy="no-referrer"
+            onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
           />
         </div>
         <div class="car-card__body">
@@ -277,6 +279,9 @@
           {% if car.display_price_rub %}
           {% set display_price_round = ((car.display_price_rub + 9999) // 10000) * 10000 %}
             <span>{{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽</span>
+          {% endif %}
+          {% if car.price_note %}
+            <div class="price-note">{{ car.price_note }}</div>
           {% endif %}
           </div>
         </div>

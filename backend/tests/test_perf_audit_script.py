@@ -10,5 +10,7 @@ def test_perf_full_audit_script_exists_and_is_valid_bash():
     assert script.exists(), "scripts/perf_full_audit.sh must exist"
     content = script.read_text(encoding="utf-8")
     assert "BENCH_SEARCH" in content
+    assert "cars_count_country_brand" in content
+    assert "cars_list_country_brand_model" in content
     completed = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True)
     assert completed.returncode == 0, completed.stderr

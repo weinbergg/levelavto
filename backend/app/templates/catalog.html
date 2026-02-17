@@ -348,8 +348,8 @@
                   {% else %}
                     <div class="price-main">Цена уточняется</div>
                   {% endif %}
-                  {% if car.country and car.country|upper == 'KR' %}
-                    <div class="price-note">*Без учета утилизационного сбора РФ</div>
+                  {% if car.price_note %}
+                    <div class="price-note">{{ car.price_note }}</div>
                   {% endif %}
                 </div>
               </div>

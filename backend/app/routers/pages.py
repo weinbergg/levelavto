@@ -40,7 +40,7 @@ from ..utils.taxonomy import (
     normalize_color as _normalize_color,
     color_hex,
 )
-from ..utils.price_utils import display_price_rub
+from ..utils.price_utils import display_price_rub, price_without_util_note
 normalize_color = _normalize_color
 from ..utils.country_map import country_label_ru, resolve_display_country, normalize_country_code
 from ..utils.color_groups import split_color_facets
@@ -433,6 +433,13 @@ def _home_context(
             car.total_price_rub_cached,
             car.price_rub_cached,
         )
+        car.price_note = price_without_util_note(
+            display_price=car.display_price_rub,
+            total_price_rub_cached=car.total_price_rub_cached,
+            country=car.country,
+        )
+        if not getattr(car, "thumbnail_url", None):
+            car.thumbnail_url = "/static/img/no-photo.svg"
     t0 = time.perf_counter()
     content = ContentService(db).content_map(
         [
@@ -818,6 +825,11 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     c.get("price_rub_cached"),
                     allow_price_fallback=str(c.get("country") or "").upper() == "KR",
                 )
+                c["price_note"] = price_without_util_note(
+                    display_price=c.get("display_price_rub"),
+                    total_price_rub_cached=c.get("total_price_rub_cached"),
+                    country=c.get("country"),
+                )
             ids = [c.get("id") for c in initial_items if isinstance(c, dict) and c.get("id")]
             if ids:
                 rows = db.execute(
@@ -835,6 +847,8 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     thumb = _normalize_thumb(c.get("thumbnail_url"))
                     if thumb:
                         c["thumbnail_url"] = pick_classistatic_thumb(thumb)
+                    if not c.get("thumbnail_url"):
+                        c["thumbnail_url"] = "/static/img/no-photo.svg"
     except Exception:
         logger.exception("catalog_initial_items_failed")
     t0 = time.perf_counter()
@@ -1022,6 +1036,11 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             car.total_price_rub_cached,
             car.price_rub_cached,
             allow_price_fallback=str(car.country or "").upper() == "KR",
+        )
+        car.price_note = price_without_util_note(
+            display_price=car.display_price_rub,
+            total_price_rub_cached=car.total_price_rub_cached,
+            country=car.country,
         )
         if getattr(car, "images", None):
             for im in car.images:

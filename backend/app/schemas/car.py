@@ -18,6 +18,7 @@ class CarBase(BaseModel):
     price_rub_cached: Optional[float] = None
     total_price_rub_cached: Optional[float] = None
     display_price_rub: Optional[float] = None
+    price_note: Optional[str] = None
     calc_updated_at: Optional[datetime] = None
     registration_year: Optional[int] = None
     registration_month: Optional[int] = None

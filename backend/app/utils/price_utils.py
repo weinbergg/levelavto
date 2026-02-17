@@ -2,6 +2,8 @@ import math
 import os
 from typing import Optional
 
+PRICE_NOTE_WITHOUT_UTIL = "*Без учета утилизационного сбора РФ"
+
 
 def get_round_step_rub() -> int:
     try:
@@ -33,3 +35,23 @@ def display_price_rub(
     if raw is None:
         return None
     return ceil_to_step(raw, get_round_step_rub())
+
+
+def price_without_util_note(
+    *,
+    display_price: Optional[float],
+    total_price_rub_cached: Optional[float],
+    region: Optional[str] = None,
+    country: Optional[str] = None,
+) -> Optional[str]:
+    if display_price is None:
+        return None
+    if total_price_rub_cached is not None:
+        return None
+    reg = str(region or "").upper()
+    c = str(country or "").upper()
+    if reg in {"EU", "KR"}:
+        return PRICE_NOTE_WITHOUT_UTIL
+    if c.startswith("KR"):
+        return PRICE_NOTE_WITHOUT_UTIL
+    return None

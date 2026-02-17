@@ -19,6 +19,7 @@ from ..models import Car, Source, FeaturedCar
 from ..utils.localization import display_color
 from ..utils.color_groups import normalize_color_group_key
 from ..utils.country_map import normalize_country_code
+from ..utils.redis_cache import build_cars_count_key, redis_get_json, redis_set_json
 from ..utils.taxonomy import (
     normalize_color,
     normalize_fuel,
@@ -576,6 +577,7 @@ class CarsService:
         page: int = 1,
         page_size: int = 20,
         light: bool = False,
+        count_only: bool = False,
         use_fast_count: bool = True,
     ) -> Tuple[List[Car] | List[dict], int]:
         conditions = [self._available_expr()]
@@ -944,7 +946,58 @@ class CarsService:
             condition,
             kr_type,
         )
+        redis_count_key = None
         total = self._count_cache.get(count_key)
+        if total is None and os.getenv("CATALOG_REDIS_COUNT_CACHE", "1") != "0":
+            redis_params = {
+                "region": region,
+                "country": country,
+                "brand": brand,
+                "model": model,
+                "generation": generation,
+                "color": color,
+                "price_min": price_min,
+                "price_max": price_max,
+                "mileage_min": mileage_min,
+                "mileage_max": mileage_max,
+                "reg_year_min": reg_year_min,
+                "reg_month_min": reg_month_min,
+                "reg_year_max": reg_year_max,
+                "reg_month_max": reg_month_max,
+                "body_type": body_type,
+                "engine_type": engine_type,
+                "transmission": transmission,
+                "drive_type": drive_type,
+                "num_seats": num_seats,
+                "doors_count": doors_count,
+                "emission_class": emission_class,
+                "efficiency_class": efficiency_class,
+                "climatisation": climatisation,
+                "airbags": airbags,
+                "interior_design": interior_design,
+                "air_suspension": air_suspension,
+                "price_rating_label": price_rating_label,
+                "owners_count": owners_count,
+                "condition": condition,
+                "kr_type": kr_type,
+                "q": q,
+                "line": "|".join(lines or []),
+                "source": ",".join(source_key) if isinstance(source_key, list) else source_key,
+                "year_min": year_min,
+                "year_max": year_max,
+                "power_hp_min": power_hp_min,
+                "power_hp_max": power_hp_max,
+                "engine_cc_min": engine_cc_min,
+                "engine_cc_max": engine_cc_max,
+            }
+            redis_count_key = build_cars_count_key(redis_params)
+            redis_total = redis_get_json(redis_count_key)
+            if redis_total is not None:
+                try:
+                    total = int(redis_total)
+                    self._count_cache[count_key] = total
+                except Exception:
+                    total = None
         total_t0 = time.perf_counter()
         if total is not None:
             if use_fast_count and total == 0 and self._can_fast_count(
@@ -1050,11 +1103,16 @@ class CarsService:
                 total_stmt = select(func.count()).select_from(Car).where(where_expr)
                 total = self.db.execute(total_stmt).scalar_one()
             self._count_cache[count_key] = total
+            if redis_count_key:
+                redis_set_json(redis_count_key, int(total), ttl_sec=1800)
             elapsed = time.perf_counter() - total_t0
             if elapsed > 2:
                 self.logger.warning("count_slow total=%.3fs filters=%s", elapsed, count_key)
             elif elapsed > 1:
                 self.logger.info("count_warn total=%.3fs filters=%s", elapsed, count_key)
+
+        if count_only:
+            return [], int(total or 0)
 
         order_clause = []
         if sort == "price_asc":
@@ -1727,6 +1785,61 @@ class CarsService:
             if r.get("value")
         ]
         return sorted(models, key=lambda x: (x.get("label") or x.get("value") or "").strip().casefold())
+
+    def _model_family_key(self, brand: str, model: str) -> str:
+        raw = str(model or "").strip()
+        if not raw:
+            return "other"
+        token = re.split(r"[\s\-/]+", raw, maxsplit=1)[0].strip()
+        if not token:
+            return "other"
+        brand_norm = normalize_brand(brand).strip().upper()
+        token_up = token.upper()
+        if brand_norm == "BMW":
+            lead_num = re.match(r"^(\d+)", token_up)
+            if lead_num:
+                return f"{lead_num.group(1)}-series"
+            lead_alpha = re.match(r"^([A-Z]+)", token_up)
+            if lead_alpha:
+                return f"{lead_alpha.group(1)}-series"
+        lead_alpha = re.match(r"^([A-Z]+)", token_up)
+        if lead_alpha:
+            return lead_alpha.group(1)
+        lead_num = re.match(r"^(\d+)", token_up)
+        if lead_num:
+            return lead_num.group(1)
+        return "other"
+
+    def build_model_groups(
+        self, *, brand: Optional[str], models: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        norm_brand = normalize_brand(brand).strip() if brand else ""
+        grouped: Dict[str, Dict[str, Any]] = {}
+        for item in models:
+            value = str(item.get("value") or item.get("model") or "").strip()
+            if not value:
+                continue
+            key = self._model_family_key(norm_brand, value)
+            bucket = grouped.get(key)
+            if bucket is None:
+                label = key
+                if norm_brand.upper() == "BMW" and key.endswith("-series"):
+                    label = key.replace("-series", " серия").upper().replace(" СЕРИЯ", " серия")
+                elif key == "other":
+                    label = "Прочее"
+                bucket = {"key": key, "label": label, "count": 0, "models": []}
+                grouped[key] = bucket
+            bucket["models"].append(item)
+            bucket["count"] += int(item.get("count") or 0)
+
+        out = list(grouped.values())
+        for group in out:
+            group["models"] = sorted(
+                group["models"],
+                key=lambda x: (x.get("label") or x.get("value") or "").strip().casefold(),
+            )
+        out.sort(key=lambda x: (-int(x.get("count") or 0), str(x.get("label") or "")))
+        return out
 
     def drive_types(self) -> List[Dict[str, Any]]:
         rows = self.facet_counts(field="drive_type", filters={})

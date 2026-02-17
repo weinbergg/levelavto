@@ -977,7 +977,7 @@
         if (!priceText) priceText = 'Цена уточняется'
         const calcLine = `<div class="price-main">${priceText}</div>`
         const priceLines = []
-        const footnote = ''
+        const footnote = car.price_note ? `<div class="price-note">${escapeHtml(car.price_note)}</div>` : ''
         let regLabel = ''
         if (car.registration_year) {
           const m = Number(car.registration_month || 1)
@@ -1008,8 +1008,8 @@
         if (car.display_transmission || car.transmission) {
           specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/drive.svg" alt="">${car.display_transmission || car.transmission}</span>`)
         }
-        if (car.body_type) {
-          specLines.push(`<span class="spec-line">${car.body_type}</span>`)
+        if (car.display_body_type || car.body_type) {
+          specLines.push(`<span class="spec-line">${car.display_body_type || car.body_type}</span>`)
         }
         if (car.display_color || car.color) {
           const label = car.display_color || car.color
@@ -1343,16 +1343,8 @@
       const region = qs('[name="region"]')?.value || ''
       const country = qs('[name="country"]')?.value || ''
       const krType = qs('[name="kr_type"]')?.value || ''
-      const models = await fetchModels({ brand: normBrand, region, country, krType })
-      modelSelect.innerHTML = '<option value="">Все</option>'
-      models.forEach((m) => {
-        const value = m.value || m.model || m
-        if (!value) return
-        const opt = document.createElement('option')
-        opt.value = value
-        opt.textContent = m.label || value
-        modelSelect.appendChild(opt)
-      })
+      const payload = await fetchModels({ brand: normBrand, region, country, krType })
+      fillModelSelectWithGroups(modelSelect, payload, 'Все')
       if (initialModelParam) {
         setSelectValueInsensitive(modelSelect, initialModelParam)
       }
@@ -1516,7 +1508,7 @@
   }
 
   async function fetchModels({ brand, region, country, krType } = {}) {
-    if (!brand) return []
+    if (!brand) return { models: [], model_groups: [] }
     try {
       const params = new URLSearchParams()
       if (region) params.set('region', region)
@@ -1524,30 +1516,76 @@
       if (krType) params.set('kr_type', krType)
       params.set('brand', normalizeBrand(brand))
       const res = await fetch(`/api/filter_ctx_brand?${params.toString()}`)
-      if (!res.ok) return []
+      if (!res.ok) return { models: [], model_groups: [] }
       const data = await res.json()
-      return data.models || []
+      return {
+        models: data.models || [],
+        model_groups: data.model_groups || [],
+      }
     } catch (e) {
       console.error('models', e)
-      return []
+      return { models: [], model_groups: [] }
     }
   }
 
   async function fetchCatalogModels({ region, country, brand }) {
-    if (!brand) return []
+    if (!brand) return { models: [], model_groups: [] }
     try {
       const params = new URLSearchParams()
       if (region) params.set('region', region)
       if (country) params.set('country', country)
       params.set('brand', normalizeBrand(brand))
       const res = await fetch(`/api/filter_ctx_brand?${params.toString()}`)
-      if (!res.ok) return []
+      if (!res.ok) return { models: [], model_groups: [] }
       const data = await res.json()
-      return data.models || []
+      return {
+        models: data.models || [],
+        model_groups: data.model_groups || [],
+      }
     } catch (e) {
       console.warn('models ctx', e)
-      return []
+      return { models: [], model_groups: [] }
     }
+  }
+
+  function fillModelSelectWithGroups(select, payload, emptyLabel = 'Все') {
+    if (!select) return
+    const models = Array.isArray(payload?.models) ? payload.models : []
+    const groups = Array.isArray(payload?.model_groups) ? payload.model_groups : []
+    select.innerHTML = ''
+    const empty = document.createElement('option')
+    empty.value = ''
+    empty.textContent = emptyLabel
+    select.appendChild(empty)
+
+    const appendOption = (row) => {
+      const value = row?.value || row?.model || row
+      if (!value) return null
+      const opt = document.createElement('option')
+      opt.value = value
+      opt.textContent = row?.label || value
+      return opt
+    }
+
+    if (groups.length) {
+      groups.forEach((group) => {
+        const groupModels = Array.isArray(group?.models) ? group.models : []
+        if (!groupModels.length) return
+        const og = document.createElement('optgroup')
+        og.label = group?.label || 'Прочее'
+        groupModels.forEach((row) => {
+          const opt = appendOption(row)
+          if (opt) og.appendChild(opt)
+        })
+        if (og.children.length) select.appendChild(og)
+      })
+      return
+    }
+
+    models.forEach((row) => {
+      const opt = appendOption(row)
+      if (opt) select.appendChild(opt)
+    })
   }
 
   function setSelectValueInsensitive(select, value) {
@@ -1619,16 +1657,8 @@
       const region = regionSelect?.value || ''
       const country = regionSlotSelect?.name === 'country' ? (regionSlotSelect?.value || '') : ''
       const krType = regionSlotSelect?.name === 'kr_type' ? (regionSlotSelect?.value || '') : ''
-      const models = await fetchModels({ brand, region, country, krType })
-      modelSelect.innerHTML = '<option value="">Все</option>'
-      models.forEach((m) => {
-        const value = m.value || m.model || m
-        if (!value) return
-        const opt = document.createElement('option')
-        opt.value = value
-        opt.textContent = m.label || value
-        modelSelect.appendChild(opt)
-      })
+      const payload = await fetchModels({ brand, region, country, krType })
+      fillModelSelectWithGroups(modelSelect, payload, 'Все')
       modelSelect.disabled = false
     }
 
@@ -2046,14 +2076,8 @@
       const region = regionSelect?.value || ''
       const country = regionEuSelect?.value || ''
       const krType = regionKrSelect?.value || ''
-      const models = await fetchModels({ brand, region, country, krType })
-      modelSelect.innerHTML = '<option value="">Неважно</option>'
-      models.forEach(({ model }) => {
-        const opt = document.createElement('option')
-        opt.value = model
-        opt.textContent = model
-        modelSelect.appendChild(opt)
-      })
+      const payload = await fetchModels({ brand, region, country, krType })
+      fillModelSelectWithGroups(modelSelect, payload, 'Неважно')
       if (selected) modelSelect.value = selected
       modelSelect.disabled = false
     }
@@ -2154,10 +2178,10 @@
       debounce = setTimeout(async () => {
         try {
           const params = buildParams(true)
-          const res = await fetch(`/api/cars?${params.toString()}`)
+          const res = await fetch(`/api/advanced_count?${params.toString()}`)
           if (!res.ok) return
           const data = await res.json()
-          animateCount(countEl, data.total || 0)
+          animateCount(countEl, data.count || 0)
         } catch (e) {
           console.warn('advanced count', e)
         }
@@ -2198,6 +2222,7 @@
           const displayRub = car.display_price_rub
           let price = displayRub != null ? formatRub(displayRub) : ''
           if (!price) price = 'Цена уточняется'
+          const priceNote = car.price_note ? `<div class="price-note">${escapeHtml(car.price_note)}</div>` : ''
           card.innerHTML = `
             <div class="thumb-wrap">
               <img class="thumb" src="${thumb}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-thumb="${thumb}" data-orig="${origThumb}" data-id="${car.id}" onerror="this.onerror=null;this.src='/static/img/no-photo.svg';" />
@@ -2207,6 +2232,7 @@
                 <div class="car-card__title">${car.brand || ''} ${car.model || ''}</div>
               </div>
               <div class="car-card__price">${price}</div>
+              ${priceNote}
             </div>
           `
           const img = card.querySelector('img.thumb')
@@ -2400,6 +2426,12 @@
     }
   }
 
+  function initThumbFallbacks() {
+    qsa('img.thumb').forEach((img) => applyThumbFallback(img))
+    const primary = qs('#primaryImage')
+    if (primary) applyThumbFallback(primary)
+  }
+
   function initAll() {
     initNav()
     loadFavoritesState()
@@ -2411,6 +2443,7 @@
     applyLeadPrefill()
     initLeadFromDetail()
     initBackToTop()
+    initThumbFallbacks()
     convertInlinePrices()
   }
 

@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+import uuid
 from typing import Any, Optional, Dict, Tuple
 from decimal import Decimal
 from datetime import date, datetime
@@ -371,3 +372,48 @@ def redis_delete_by_pattern(pattern: str) -> int:
     except Exception as exc:
         logger.warning("redis scan/delete failed: %s", exc)
     return deleted
+
+
+def redis_try_lock(key: str, ttl_sec: int = 20) -> Optional[str]:
+    client = get_redis()
+    if client is None:
+        return None
+    token = uuid.uuid4().hex
+    try:
+        ok = client.set(key, token, nx=True, ex=ttl_sec)
+        if ok:
+            return token
+    except Exception as exc:
+        logger.warning("redis lock failed: %s", exc)
+    return None
+
+
+def redis_unlock(key: str, token: Optional[str]) -> bool:
+    if not token:
+        return False
+    client = get_redis()
+    if client is None:
+        return False
+    script = """
+if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('del', KEYS[1])
+else
+  return 0
+end
+"""
+    try:
+        return bool(client.eval(script, 1, key, token))
+    except Exception as exc:
+        logger.warning("redis unlock failed: %s", exc)
+        return False
+
+
+def redis_wait_json(key: str, timeout_ms: int = 1800, poll_ms: int = 120) -> Optional[Any]:
+    deadline = _now() + (max(timeout_ms, 0) / 1000.0)
+    interval = max(poll_ms, 50) / 1000.0
+    while _now() < deadline:
+        value = redis_get_json(key)
+        if value is not None:
+            return value
+        time.sleep(interval)
+    return None

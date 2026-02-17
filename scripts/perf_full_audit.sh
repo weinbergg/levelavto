@@ -9,6 +9,8 @@ REQUESTS="${REQUESTS:-30}"
 WARMUP="${WARMUP:-5}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-12}"
 COUNTRY="${COUNTRY:-DE}"
+BRAND="${BRAND:-BMW}"
+MODEL="${MODEL:-X5}"
 BENCH_SEARCH="${BENCH_SEARCH:-1}"
 OUT_DIR="${OUT_DIR:-logs/perf_audit}"
 TS="$(date +%Y%m%d_%H%M%S)"
@@ -39,6 +41,9 @@ require_cmd docker
   echo "- Warmup requests: $WARMUP"
   echo "- Timeout per request: ${TIMEOUT_SEC}s"
   echo "- Include search benchmark: $BENCH_SEARCH"
+  echo "- Country benchmark: $COUNTRY"
+  echo "- Brand benchmark: $BRAND"
+  echo "- Model benchmark: $MODEL"
   echo
 } >"$REPORT_MD"
 
@@ -86,6 +91,7 @@ capture_cmd "uname" uname -a
 capture_cmd "uptime" uptime
 capture_cmd "free_mb" free -m
 capture_cmd "disk_root" df -h /
+capture_cmd "disk_top_dirs" sh -lc "du -xh --max-depth=1 /opt/levelavto 2>/dev/null | sort -h | tail -n 20"
 
 append_section "Docker Snapshot"
 capture_cmd "docker_compose_ps" docker compose ps
@@ -117,6 +123,10 @@ bench_endpoint "filter_ctx_base_eu" "/api/filter_ctx_base?region=EU"
 bench_endpoint "filter_payload_eu" "/api/filter_payload?region=EU&country=${COUNTRY}"
 bench_endpoint "cars_count_eu" "/api/cars_count?region=EU&country=${COUNTRY}"
 bench_endpoint "cars_list_eu" "/api/cars?region=EU&country=${COUNTRY}&sort=price_asc&page=1&page_size=12"
+bench_endpoint "cars_count_country_brand" "/api/cars_count?region=EU&country=${COUNTRY}&brand=${BRAND}"
+bench_endpoint "cars_list_country_brand" "/api/cars?region=EU&country=${COUNTRY}&brand=${BRAND}&sort=price_asc&page=1&page_size=12"
+bench_endpoint "cars_count_country_brand_model" "/api/cars_count?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
+bench_endpoint "cars_list_country_brand_model" "/api/cars?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}&sort=price_asc&page=1&page_size=12"
 if [ "$BENCH_SEARCH" = "1" ]; then
   bench_endpoint "cars_list_search" "/api/cars?region=EU&country=${COUNTRY}&q=diesel&sort=price_asc&page=1&page_size=12"
 fi
