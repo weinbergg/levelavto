@@ -38,6 +38,14 @@ from .calculator_runtime import EstimateRequest, calculate, is_bev
 BRAND_ALIASES = {
     "alfa": "Alfa Romeo",
     "alfa romeo": "Alfa Romeo",
+    "mercedes": "Mercedes-Benz",
+    "mercedes benz": "Mercedes-Benz",
+    "mercedes-benz": "Mercedes-Benz",
+    "lynk co": "Lynk&Co",
+    "lynk&co": "Lynk&Co",
+    "landrover": "Land Rover",
+    "rolls royce": "Rolls-Royce",
+    "rolls-royce": "Rolls-Royce",
 }
 
 
@@ -57,6 +65,14 @@ def brand_variants(value: Optional[str]) -> List[str]:
     variants = {norm}
     if norm == "Alfa Romeo":
         variants.add("Alfa")
+    if norm == "Mercedes-Benz":
+        variants.update({"Mercedes", "Mercedes Benz"})
+    if norm == "Lynk&Co":
+        variants.add("Lynk Co")
+    if norm == "Land Rover":
+        variants.add("LandRover")
+    if norm == "Rolls-Royce":
+        variants.add("Rolls Royce")
     return sorted(variants, key=lambda v: v.lower())
 
 

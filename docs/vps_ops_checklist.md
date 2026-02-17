@@ -7,7 +7,7 @@ cd /opt/levelavto
 git pull
 docker compose build web
 docker compose up -d --force-recreate web
-docker compose exec -T web alembic upgrade head
+docker compose exec -T web alembic -c migrations/alembic.ini upgrade head
 ```
 
 ## 1.1) One-command full pipeline
@@ -15,6 +15,19 @@ docker compose exec -T web alembic upgrade head
 ```bash
 cd /opt/levelavto
 chmod +x scripts/deploy_full_rebuild_check.sh
+./scripts/deploy_full_rebuild_check.sh
+```
+
+### 1.2) One-command full pipeline (hot brands only, safe timeout)
+
+```bash
+cd /opt/levelavto
+PREWARM_MAX_SEC=420 \
+PREWARM_INCLUDE_BRAND_CTX=0 \
+PREWARM_INCLUDE_MODEL_CTX=0 \
+PREWARM_INCLUDE_BRAND_LISTS=1 \
+PREWARM_EU_COUNTRY=DE \
+HOT_CACHE_BRANDS="BMW,Audi,Mercedes-Benz,Porsche,Skoda,Toyota,Volkswagen,Volvo,Aston Martin,Bentley,Bugatti,BYD,Cadillac,Ferrari,GMC,Hummer,Hyundai,Jaguar,Jeep,Kia,Lamborghini,Land Rover,Lexus,Lincoln,Lynk&Co,Maybach,Mazda,McLaren,Mini,Rolls-Royce,Tesla,Zeekr" \
 ./scripts/deploy_full_rebuild_check.sh
 ```
 
@@ -100,6 +113,26 @@ crontab -l
 cd /opt/levelavto
 DRY_RUN=1 scripts/system_auto_cleanup.sh
 DRY_RUN=0 scripts/system_auto_cleanup.sh
+```
+
+## 7.1) Cache maintenance
+
+```bash
+cd /opt/levelavto
+chmod +x scripts/cache_maintenance.sh
+scripts/cache_maintenance.sh
+```
+
+Soft purge (heavy cache keys only):
+```bash
+cd /opt/levelavto
+PURGE_SOFT=1 scripts/cache_maintenance.sh
+```
+
+Hard purge + dataset version bump:
+```bash
+cd /opt/levelavto
+PURGE_HARD=1 BUMP_DATASET=1 scripts/cache_maintenance.sh
 ```
 
 ## 8) Cache prewarm after deploy/restart

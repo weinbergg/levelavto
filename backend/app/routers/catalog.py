@@ -40,7 +40,6 @@ from ..utils.redis_cache import (
 from ..models.car_image import CarImage
 from sqlalchemy import select, func
 import re
-import os
 import time
 import logging
 
@@ -51,18 +50,49 @@ TOP_BRANDS = [
     "BMW",
     "Mercedes-Benz",
     "Audi",
-    "Volkswagen",
-    "Toyota",
-    "Ford",
-    "Renault",
-    "Hyundai",
-    "Kia",
+    "Porsche",
     "Skoda",
-    "Peugeot",
-    "Opel",
+    "Toyota",
+    "Volkswagen",
+    "Volvo",
+    "Aston Martin",
+    "Bentley",
+    "Bugatti",
+    "BYD",
+    "Cadillac",
+    "Ferrari",
+    "GMC",
+    "Hummer",
+    "Hyundai",
+    "Jaguar",
+    "Jeep",
+    "Kia",
+    "Lamborghini",
+    "Land Rover",
+    "Lexus",
+    "Lincoln",
+    "Lynk&Co",
+    "Maybach",
+    "Mazda",
+    "McLaren",
+    "Mini",
+    "Rolls-Royce",
+    "Tesla",
+    "Zeekr",
 ]
 
-TOP_BRANDS_SET = {normalize_brand(b) for b in TOP_BRANDS}
+
+def _parse_hot_cache_brands() -> set[str]:
+    raw = os.getenv("HOT_CACHE_BRANDS", ",".join(TOP_BRANDS))
+    out: set[str] = set()
+    for part in raw.split(","):
+        value = normalize_brand(part.strip())
+        if value:
+            out.add(value)
+    return out
+
+
+TOP_BRANDS_SET = _parse_hot_cache_brands()
 
 
 def _cacheable_catalog_filters(
@@ -630,7 +660,8 @@ def list_cars(
         "page_size": page_size,
     }
     if cache_key:
-        redis_set_json(cache_key, resp, ttl_sec=900)
+        list_ttl = int(os.getenv("CARS_LIST_CACHE_TTL_SEC", "21600") or 21600)
+        redis_set_json(cache_key, resp, ttl_sec=max(300, list_ttl))
     if cache_lock_key and cache_lock_token:
         redis_unlock(cache_lock_key, cache_lock_token)
     return resp

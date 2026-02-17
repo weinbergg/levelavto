@@ -29,6 +29,7 @@ RUN_PREWARM="${RUN_PREWARM:-1}"
 RUN_RECALC="${RUN_RECALC:-0}"
 RUN_PERF="${RUN_PERF:-1}"
 RUN_CLEANUP="${RUN_CLEANUP:-0}"
+RUN_CACHE_MAINT="${RUN_CACHE_MAINT:-1}"
 
 BASE_URL="${BASE_URL:-http://localhost:8000}"
 PERF_COUNTRY="${PERF_COUNTRY:-DE}"
@@ -37,6 +38,13 @@ PERF_MODEL="${PERF_MODEL:-X5}"
 PERF_REQUESTS="${PERF_REQUESTS:-20}"
 PERF_WARMUP="${PERF_WARMUP:-3}"
 PERF_TIMEOUT="${PERF_TIMEOUT:-15}"
+PREWARM_MAX_SEC="${PREWARM_MAX_SEC:-420}"
+PREWARM_INCLUDE_BRAND_CTX="${PREWARM_INCLUDE_BRAND_CTX:-0}"
+PREWARM_INCLUDE_MODEL_CTX="${PREWARM_INCLUDE_MODEL_CTX:-0}"
+PREWARM_INCLUDE_BRAND_LISTS="${PREWARM_INCLUDE_BRAND_LISTS:-1}"
+PREWARM_EU_COUNTRY="${PREWARM_EU_COUNTRY:-DE}"
+HOT_CACHE_BRANDS="${HOT_CACHE_BRANDS:-}"
+PREWARM_HOT_BRANDS="${PREWARM_HOT_BRANDS:-$HOT_CACHE_BRANDS}"
 
 LOG_DIR="${LOG_DIR:-logs/deploy}"
 TS="$(date +%Y%m%d_%H%M%S)"
@@ -69,7 +77,7 @@ http_probe() {
 step "START"
 echo "[deploy] ts=${TS}"
 echo "[deploy] log=${LOG_FILE}"
-echo "[deploy] flags: pull=${RUN_PULL} build=${RUN_BUILD} recreate=${RUN_RECREATE} migrations=${RUN_MIGRATIONS} prewarm=${RUN_PREWARM} recalc=${RUN_RECALC} perf=${RUN_PERF} cleanup=${RUN_CLEANUP}"
+echo "[deploy] flags: pull=${RUN_PULL} build=${RUN_BUILD} recreate=${RUN_RECREATE} migrations=${RUN_MIGRATIONS} cache_maint=${RUN_CACHE_MAINT} prewarm=${RUN_PREWARM} recalc=${RUN_RECALC} perf=${RUN_PERF} cleanup=${RUN_CLEANUP}"
 
 if [[ "$RUN_PULL" == "1" ]]; then
   step "GIT PULL"
@@ -91,12 +99,24 @@ docker compose ps
 
 if [[ "$RUN_MIGRATIONS" == "1" ]]; then
   step "MIGRATIONS"
-  docker compose exec -T web alembic upgrade head
+  docker compose exec -T web alembic -c migrations/alembic.ini upgrade head
+fi
+
+if [[ "$RUN_CACHE_MAINT" == "1" ]]; then
+  step "CACHE MAINT (LOCK CLEANUP)"
+  PURGE_SOFT=0 PURGE_HARD=0 BUMP_DATASET=0 scripts/cache_maintenance.sh
 fi
 
 if [[ "$RUN_PREWARM" == "1" ]]; then
   step "PREWARM CACHE"
-  docker compose exec -T web python -m backend.app.scripts.prewarm_cache
+  docker compose exec -T web env \
+    PREWARM_MAX_SEC="$PREWARM_MAX_SEC" \
+    PREWARM_INCLUDE_BRAND_CTX="$PREWARM_INCLUDE_BRAND_CTX" \
+    PREWARM_INCLUDE_MODEL_CTX="$PREWARM_INCLUDE_MODEL_CTX" \
+    PREWARM_INCLUDE_BRAND_LISTS="$PREWARM_INCLUDE_BRAND_LISTS" \
+    PREWARM_EU_COUNTRY="$PREWARM_EU_COUNTRY" \
+    PREWARM_HOT_BRANDS="$PREWARM_HOT_BRANDS" \
+    python -m backend.app.scripts.prewarm_cache
 fi
 
 if [[ "$RUN_RECALC" == "1" ]]; then
@@ -153,4 +173,3 @@ docker compose logs --since=15m web | grep -E "ADVANCED_COUNT|CARS_COUNT|CARS_LI
 
 step "DONE"
 echo "[deploy] ok log=${LOG_FILE}"
-
