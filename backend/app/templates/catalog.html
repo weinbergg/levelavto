@@ -291,7 +291,7 @@
                   {% if loop.index0 < 2 %}fetchpriority="high"{% endif %}
                   alt=""
                   data-thumb="{{ thumb_src }}"
-                  data-orig="{{ car.thumbnail_url or '' }}"
+                  data-orig="{{ thumb_src }}"
                   data-id="{{ car.id }}"
                   onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
                   width="320"
@@ -346,7 +346,7 @@
                     {% set display_price_round = ((car.display_price_rub + 9999) // 10000) * 10000 %}
                     <div class="price-main">{{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽</div>
                   {% else %}
-                    <div class="price-main">Цена уточняется</div>
+                    <div class="price-main">—</div>
                   {% endif %}
                   {% if car.price_note %}
                     <div class="price-note">{{ car.price_note }}</div>

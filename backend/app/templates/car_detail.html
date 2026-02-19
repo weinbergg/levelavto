@@ -12,11 +12,16 @@
       <div class="detail-gallery card">
         {% set image_urls = car.images|map(attribute='url')|list if car.images else [] %}
         {% set primary = image_urls[0] if image_urls and image_urls|length > 0 else car.thumbnail_url %}
+        {% if primary and 'img.classistatic.de' in primary %}
+          {% set primary_src = "/thumb?u=" ~ (primary | urlencode) ~ "&w=1024&fmt=webp" %}
+        {% else %}
+          {% set primary_src = primary %}
+        {% endif %}
         <div class="detail-hero__main placeholder" data-images='{{ image_urls | tojson }}'>
           {% if primary %}
           <img
             id="primaryImage"
-            src="{{ primary }}"
+            src="{{ primary_src }}"
             alt="{{ car.brand }} {{ car.model }}"
             loading="eager"
             decoding="async"
@@ -41,7 +46,7 @@
             onclick="document.getElementById('primaryImage').src='{{ im.url }}'"
           >
             <img
-              src="{{ im.url }}"
+              src="{% if im.url and 'img.classistatic.de' in im.url %}/thumb?u={{ im.url | urlencode }}&w=240&fmt=webp{% else %}{{ im.url }}{% endif %}"
               alt="thumb {{ loop.index }}"
               loading="lazy"
               decoding="async"
@@ -68,7 +73,7 @@
                 {% set display_price_round = ((display_price + 9999) // 10000) * 10000 %}
                 {{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽
               {% else %}
-                Цена уточняется
+                —
               {% endif %}
             </div>
             <div class="detail-price__meta">
@@ -230,9 +235,10 @@
           if (!val) return ''
           if (val.startsWith('//')) return `https:${val}`
           if (val.startsWith('http://')) return val.replace('http://', 'https://')
+          if (val.startsWith('https://img.classistatic.de/')) return `/thumb?u=${encodeURIComponent(val)}&w=1024&fmt=webp`
           if (val.startsWith('https://') || val.startsWith('/')) return val
-          if (val.startsWith('api/v1/mo-prod/images/')) return `https://img.classistatic.de/${val}`
-          if (val.startsWith('img.classistatic.de/')) return `https://${val}`
+          if (val.startsWith('api/v1/mo-prod/images/')) return `/thumb?u=${encodeURIComponent(`https://img.classistatic.de/${val}`)}&w=1024&fmt=webp`
+          if (val.startsWith('img.classistatic.de/')) return `/thumb?u=${encodeURIComponent(`https://${val}`)}&w=1024&fmt=webp`
           return ''
         }
         const setImg = (next) => {

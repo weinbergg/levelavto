@@ -438,6 +438,9 @@ def _home_context(
             total_price_rub_cached=car.total_price_rub_cached,
             country=car.country,
         )
+        thumb = pick_classistatic_thumb(normalize_classistatic_url(getattr(car, "thumbnail_url", None)))
+        if thumb:
+            car.thumbnail_url = thumb
         if not getattr(car, "thumbnail_url", None):
             car.thumbnail_url = "/static/img/no-photo.svg"
     t0 = time.perf_counter()

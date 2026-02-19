@@ -97,6 +97,8 @@ def pick_classistatic_thumb(url: Optional[str], *, ttl_days: int = 14) -> Option
     if client and cache_key:
         cached = client.get(cache_key)
         if cached:
+            if cached == "none":
+                return None
             return _apply_rule(normalized, cached)
     timeout = (0.25, 0.6)
     for rule in _RULE_CANDIDATES:
@@ -105,7 +107,7 @@ def pick_classistatic_thumb(url: Optional[str], *, ttl_days: int = 14) -> Option
             if client and cache_key:
                 client.setex(cache_key, ttl_days * 86400, rule)
             return candidate
-    fallback_rule = "mo-1024.jpg"
+    # All known rules failed: cache negative result and let caller fallback to placeholder.
     if client and cache_key:
-        client.setex(cache_key, ttl_days * 86400, fallback_rule)
-    return _apply_rule(normalized, fallback_rule)
+        client.setex(cache_key, max(3600, ttl_days * 86400 // 4), "none")
+    return None

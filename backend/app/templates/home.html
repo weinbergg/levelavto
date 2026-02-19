@@ -250,7 +250,7 @@
           <span class="badge-tag badge-tag--alt">{{ home.recommended.badge_label }}</span>
           <img
             class="thumb"
-            src="{{ car.thumbnail_url or '/static/img/no-photo.svg' }}"
+            src="{% if car.thumbnail_url and 'img.classistatic.de' in car.thumbnail_url %}/thumb?u={{ car.thumbnail_url | urlencode }}&w=360&fmt=webp{% else %}{{ car.thumbnail_url or '/static/img/no-photo.svg' }}{% endif %}"
             width="320"
             height="200"
             alt=""

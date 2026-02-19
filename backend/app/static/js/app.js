@@ -936,7 +936,7 @@
           if (img) {
             const rawThumb = item.thumbnail_url || ''
             const src = normalizeThumbUrl(rawThumb, { thumb: true })
-            const orig = normalizeThumbUrl(rawThumb)
+            const orig = normalizeThumbUrl(rawThumb, { thumb: true })
             if (src !== '/static/img/no-photo.svg') {
               img.dataset.thumb = src
               img.setAttribute('src', src)
@@ -962,7 +962,7 @@
         const images = Array.isArray(car.images) && car.images.length ? car.images : (car.thumbnail_url ? [car.thumbnail_url] : [])
         const rawThumb = images[0] || ''
         const thumbSrc = normalizeThumbUrl(rawThumb, { thumb: true })
-        const origThumb = normalizeThumbUrl(rawThumb)
+        const origThumb = normalizeThumbUrl(rawThumb, { thumb: true })
         const hasGallery = images.length > 1
         const navControls = hasGallery
           ? `
@@ -974,7 +974,7 @@
         const more = (photosCount && photosCount > 1 && car.thumbnail_url) ? `<span class="more-badge">+${photosCount - 1} фото</span>` : ''
         const displayRub = car.display_price_rub
         let priceText = displayRub != null ? formatRub(displayRub) : ''
-        if (!priceText) priceText = 'Цена уточняется'
+        if (!priceText) priceText = '—'
         const calcLine = `<div class="price-main">${priceText}</div>`
         const priceLines = []
         const footnote = car.price_note ? `<div class="price-note">${escapeHtml(car.price_note)}</div>` : ''
@@ -1567,6 +1567,98 @@
       return opt
     }
 
+    const setAccordionState = (container, selectedValue) => {
+      if (!container) return
+      qsa('[data-model-value]', container).forEach((btn) => {
+        const active = String(btn.dataset.modelValue || '') === String(selectedValue || '')
+        btn.classList.toggle('is-active', active)
+      })
+      const selectedEl = qs('[data-model-selected]', container)
+      if (selectedEl) {
+        const selectedOpt = Array.from(select.options || []).find((o) => String(o.value) === String(selectedValue || ''))
+        selectedEl.textContent = selectedOpt?.textContent || emptyLabel
+      }
+    }
+
+    const renderAccordion = () => {
+      const host = select.closest('.field, label, .search-row')
+      if (!host) return
+      let container = host.querySelector(`[data-model-accordion-for="${select.id || select.name || 'model'}"]`)
+      if (!container) {
+        container = document.createElement('div')
+        container.className = 'model-accordion'
+        container.dataset.modelAccordionFor = select.id || select.name || 'model'
+        host.appendChild(container)
+      }
+      if (!groups.length) {
+        container.innerHTML = ''
+        container.classList.add('is-hidden')
+        select.classList.remove('model-select-native')
+        return
+      }
+
+      select.classList.add('model-select-native')
+      container.classList.remove('is-hidden')
+      container.innerHTML = ''
+
+      const selected = document.createElement('div')
+      selected.className = 'model-accordion__selected'
+      selected.innerHTML = `
+        <span class="muted">Выбрано:</span>
+        <strong data-model-selected>${emptyLabel}</strong>
+      `
+      container.appendChild(selected)
+
+      const clearBtn = document.createElement('button')
+      clearBtn.type = 'button'
+      clearBtn.className = 'btn btn-ghost btn-small'
+      clearBtn.textContent = emptyLabel
+      clearBtn.addEventListener('click', () => {
+        select.value = ''
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+        setAccordionState(container, '')
+      })
+      container.appendChild(clearBtn)
+
+      groups.forEach((group) => {
+        const details = document.createElement('details')
+        details.className = 'model-accordion__group'
+        const summary = document.createElement('summary')
+        const count = Number(group?.count || 0)
+        summary.textContent = `${group?.label || 'Прочее'}${count ? ` (${count})` : ''}`
+        details.appendChild(summary)
+
+        const modelsWrap = document.createElement('div')
+        modelsWrap.className = 'model-accordion__models'
+        const groupModels = Array.isArray(group?.models) ? group.models : []
+        groupModels.forEach((row) => {
+          const value = row?.value || row?.model || ''
+          if (!value) return
+          const btn = document.createElement('button')
+          btn.type = 'button'
+          btn.className = 'model-accordion__model'
+          btn.dataset.modelValue = value
+          btn.textContent = row?.label || value
+          btn.addEventListener('click', () => {
+            select.value = value
+            select.dispatchEvent(new Event('change', { bubbles: true }))
+            setAccordionState(container, value)
+          })
+          modelsWrap.appendChild(btn)
+        })
+        details.appendChild(modelsWrap)
+        container.appendChild(details)
+      })
+
+      setAccordionState(container, select.value || '')
+      if (!select.dataset.modelAccordionBound) {
+        select.addEventListener('change', () => {
+          setAccordionState(container, select.value || '')
+        })
+        select.dataset.modelAccordionBound = '1'
+      }
+    }
+
     if (groups.length) {
       groups.forEach((group) => {
         const groupModels = Array.isArray(group?.models) ? group.models : []
@@ -1579,6 +1671,7 @@
         })
         if (og.children.length) select.appendChild(og)
       })
+      renderAccordion()
       return
     }
 
@@ -1586,6 +1679,7 @@
       const opt = appendOption(row)
       if (opt) select.appendChild(opt)
     })
+    renderAccordion()
   }
 
   function setSelectValueInsensitive(select, value) {
@@ -2218,10 +2312,10 @@
           card.className = 'car-card'
           const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
           let thumb = normalizeThumbUrl(thumbRaw, { thumb: true })
-          const origThumb = normalizeThumbUrl(thumbRaw)
+          const origThumb = normalizeThumbUrl(thumbRaw, { thumb: true })
           const displayRub = car.display_price_rub
           let price = displayRub != null ? formatRub(displayRub) : ''
-          if (!price) price = 'Цена уточняется'
+          if (!price) price = '—'
           const priceNote = car.price_note ? `<div class="price-note">${escapeHtml(car.price_note)}</div>` : ''
           card.innerHTML = `
             <div class="thumb-wrap">
