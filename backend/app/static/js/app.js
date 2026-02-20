@@ -1552,7 +1552,7 @@
     if (!select) return
     const models = Array.isArray(payload?.models) ? payload.models : []
     const groups = Array.isArray(payload?.model_groups) ? payload.model_groups : []
-    const enableAccordion = window.ENABLE_MODEL_ACCORDION !== false
+    const enableAccordion = window.ENABLE_MODEL_ACCORDION === true
     select.innerHTML = ''
     const empty = document.createElement('option')
     empty.value = ''
