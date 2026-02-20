@@ -1552,7 +1552,7 @@
     if (!select) return
     const models = Array.isArray(payload?.models) ? payload.models : []
     const groups = Array.isArray(payload?.model_groups) ? payload.model_groups : []
-    const enableAccordion = window.ENABLE_MODEL_ACCORDION === true
+    const enableAccordion = window.ENABLE_MODEL_ACCORDION !== false
     select.innerHTML = ''
     const empty = document.createElement('option')
     empty.value = ''
@@ -1622,6 +1622,16 @@
       `
       container.appendChild(selected)
 
+      const root = document.createElement('details')
+      root.className = 'model-accordion__root'
+      const rootSummary = document.createElement('summary')
+      rootSummary.textContent = 'Серии и модели'
+      root.appendChild(rootSummary)
+      const rootBody = document.createElement('div')
+      rootBody.className = 'model-accordion__body'
+      root.appendChild(rootBody)
+      container.appendChild(root)
+
       const clearBtn = document.createElement('button')
       clearBtn.type = 'button'
       clearBtn.className = 'btn btn-ghost btn-small'
@@ -1630,8 +1640,9 @@
         select.value = ''
         select.dispatchEvent(new Event('change', { bubbles: true }))
         setAccordionState(container, '')
+        root.open = false
       })
-      container.appendChild(clearBtn)
+      rootBody.appendChild(clearBtn)
 
       groups.forEach((group) => {
         const details = document.createElement('details')
@@ -1656,11 +1667,12 @@
             select.value = value
             select.dispatchEvent(new Event('change', { bubbles: true }))
             setAccordionState(container, value)
+            root.open = false
           })
           modelsWrap.appendChild(btn)
         })
         details.appendChild(modelsWrap)
-        container.appendChild(details)
+        rootBody.appendChild(details)
       })
 
       setAccordionState(container, select.value || '')

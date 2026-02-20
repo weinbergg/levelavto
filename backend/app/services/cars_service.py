@@ -1794,7 +1794,11 @@ class CarsService:
             "kr_type": kr_type,
             "brand": norm_brand,
         }
-        rows = self._facet_counts_from_cars(field="model", filters=filters)
+        # Fast path uses aggregated counts tables; fallback to raw cars scan for KR sub-type filtering.
+        if kr_type:
+            rows = self._facet_counts_from_cars(field="model", filters=filters)
+        else:
+            rows = self.facet_counts(field="model", filters=filters)
         models = [
             {"value": r["value"], "label": r["value"], "count": int(r.get("count", 0))}
             for r in rows

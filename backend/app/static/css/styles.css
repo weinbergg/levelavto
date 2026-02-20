@@ -1803,6 +1803,23 @@ body.filters-open {
   margin-bottom: 8px;
 }
 
+.model-accordion__root > summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.model-accordion__root > summary::-webkit-details-marker {
+  display: none;
+}
+
+.model-accordion__body {
+  margin-top: 8px;
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
 .model-accordion__group {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding: 6px 0;

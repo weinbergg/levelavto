@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 _ALLOWED_HOSTS = {"img.classistatic.de"}
 _LOCK_TTL_SEC = 30
 _CACHE_TTL_SEC = 7 * 24 * 3600
+_NEGATIVE_TTL_NOT_FOUND_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_NOT_FOUND_SEC", "86400"))
+_NEGATIVE_TTL_ERROR_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_ERROR_SEC", "900"))
 
 
 def _cache_dir() -> str:
@@ -34,6 +36,37 @@ def _cache_path(url: str, width: int, fmt: str) -> str:
 
 def _meta_path(path: str) -> str:
     return f"{path}.meta"
+
+
+def _negative_path(path: str) -> str:
+    return f"{path}.neg"
+
+
+def _negative_is_fresh(path: str, ttl: int) -> bool:
+    neg = _negative_path(path)
+    try:
+        return os.path.exists(neg) and (time.time() - os.path.getmtime(neg)) <= ttl
+    except FileNotFoundError:
+        return False
+
+
+def _mark_negative(path: str, code: int) -> None:
+    ttl = _NEGATIVE_TTL_NOT_FOUND_SEC if code in (404, 410) else _NEGATIVE_TTL_ERROR_SEC
+    neg = _negative_path(path)
+    try:
+        with open(neg, "w", encoding="utf-8") as fh:
+            fh.write(f"{int(time.time())}|{int(code)}|{int(ttl)}")
+    except Exception:
+        return
+
+
+def _clear_negative(path: str) -> None:
+    neg = _negative_path(path)
+    try:
+        if os.path.exists(neg):
+            os.remove(neg)
+    except Exception:
+        pass
 
 
 def _is_fresh(path: str, ttl: int) -> bool:
@@ -165,6 +198,12 @@ def thumb(
             },
         )
 
+    # Negative cache for dead upstream URLs (prevents repeated expensive retries).
+    if _negative_is_fresh(path, _NEGATIVE_TTL_NOT_FOUND_SEC):
+        return _placeholder_response()
+    if _negative_is_fresh(path, _NEGATIVE_TTL_ERROR_SEC):
+        return _placeholder_response()
+
     if not _acquire_lock(path):
         # another worker is fetching; return placeholder to avoid stampede
         logger.info("thumb_lock_busy url=%s", src)
@@ -178,6 +217,7 @@ def thumb(
                 os.remove(tmp_fetch)
         except Exception:
             pass
+        _mark_negative(path, code)
         _release_lock(path)
         return _placeholder_response()
     if code == 413:
@@ -194,6 +234,7 @@ def thumb(
                 os.remove(tmp_fetch)
         except Exception:
             pass
+        _mark_negative(path, code)
         _release_lock(path)
         return _placeholder_response()
 
@@ -208,6 +249,7 @@ def thumb(
         save_fmt = "JPEG" if fmt == "jpg" else fmt.upper()
         img.save(tmp_path, format=save_fmt, quality=80, method=6)
         os.replace(tmp_path, path)
+        _clear_negative(path)
         logger.info("thumb_cache_write_ok path=%s bytes=%s fmt=%s w=%s", path, os.path.getsize(path), fmt, w)
         # touch meta for freshness
         try:
