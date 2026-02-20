@@ -1552,6 +1552,7 @@
     if (!select) return
     const models = Array.isArray(payload?.models) ? payload.models : []
     const groups = Array.isArray(payload?.model_groups) ? payload.model_groups : []
+    const enableAccordion = window.ENABLE_MODEL_ACCORDION === true
     select.innerHTML = ''
     const empty = document.createElement('option')
     empty.value = ''
@@ -1565,6 +1566,14 @@
       opt.value = value
       opt.textContent = row?.label || value
       return opt
+    }
+
+    const removeAccordion = () => {
+      const host = select.closest('.field, label, .search-row')
+      const key = select.id || select.name || 'model'
+      const container = host?.querySelector?.(`[data-model-accordion-for="${key}"]`)
+      if (container) container.remove()
+      select.classList.remove('model-select-native')
     }
 
     const setAccordionState = (container, selectedValue) => {
@@ -1581,6 +1590,10 @@
     }
 
     const renderAccordion = () => {
+      if (!enableAccordion) {
+        removeAccordion()
+        return
+      }
       const host = select.closest('.field, label, .search-row')
       if (!host) return
       let container = host.querySelector(`[data-model-accordion-for="${select.id || select.name || 'model'}"]`)
