@@ -1531,6 +1531,12 @@ body.filters-open {
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
+.filters-primary-grid .field--checkbox span,
+.search-filters .field--checkbox span {
+  line-height: 1;
+  font-weight: 500;
+  white-space: nowrap;
+}
 .filters-primary-grid .field--checkbox input,
 .search-filters .field--checkbox input {
   width: 18px;
@@ -1548,6 +1554,12 @@ body.filters-open {
 .filters-primary-grid .field--checkbox input:checked,
 .search-filters .field--checkbox input:checked {
   border-color: var(--accent);
+}
+.filters-primary-grid .field--checkbox:has(input:checked),
+.search-filters .field--checkbox:has(input:checked) {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: rgba(248, 113, 113, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.35);
 }
 .filters-advanced {
   border-top: 1px solid var(--color-border-subtle);
@@ -2995,6 +3007,18 @@ textarea {
   color-scheme: dark;
   background-color: #12151f;
   color: #f0f3ff;
+}
+/* keep checkbox controls compact; do not inherit generic 48px input sizing */
+.filters-primary-grid .field--checkbox input[type="checkbox"],
+.search-filters .field--checkbox input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 4px;
+  appearance: auto;
+  -webkit-appearance: checkbox;
 }
 .field input,
 .field select {

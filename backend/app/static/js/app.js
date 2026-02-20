@@ -166,6 +166,17 @@
     if (!img.dataset.fallbackBound) {
       img.dataset.fallbackBound = '1'
       img.onerror = () => {
+        // First failure on proxy thumb can be transient (e.g. lock busy -> 503).
+        // Retry once with cache-busting before falling back to origin/static placeholder.
+        const currentSrc = img.getAttribute('src') || ''
+        if (!img.dataset.thumbRetried && currentSrc.startsWith('/thumb?')) {
+          img.dataset.thumbRetried = '1'
+          const retrySrc = `${currentSrc}${currentSrc.includes('?') ? '&' : '?'}rt=${Date.now()}`
+          setTimeout(() => {
+            img.src = retrySrc
+          }, 120)
+          return
+        }
         if (img.dataset.fallbackApplied === '1') return
         img.dataset.fallbackApplied = '1'
         const orig = img.dataset.orig || ''

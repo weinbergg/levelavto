@@ -25,6 +25,9 @@
             alt="{{ car.brand }} {{ car.model }}"
             loading="eager"
             decoding="async"
+            referrerpolicy="no-referrer"
+            data-thumb="{{ primary_src or '' }}"
+            data-orig="{{ primary or '' }}"
             width="960"
             height="640"
           />
@@ -50,6 +53,9 @@
               alt="thumb {{ loop.index }}"
               loading="lazy"
               decoding="async"
+              referrerpolicy="no-referrer"
+              data-orig="{{ im.url or '' }}"
+              onerror="this.onerror=null; if (this.dataset.orig) { this.src=this.dataset.orig; } else { this.src='/static/img/no-photo.svg'; }"
               width="180"
               height="120"
             />
