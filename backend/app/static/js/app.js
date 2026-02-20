@@ -1583,24 +1583,55 @@
       return opt
     }
 
+    const isCatalogModelSelect = select?.form?.id === 'filters' && (select?.name === 'model' || select?.id === 'model-select')
+    const clearGeneratedModelLines = () => {
+      if (!isCatalogModelSelect || !select?.form) return
+      qsa('input[name="line"][data-generated-model-line="1"]', select.form).forEach((el) => el.remove())
+    }
+    const syncGeneratedModelLines = (selectedModels) => {
+      if (!isCatalogModelSelect || !select?.form) return
+      clearGeneratedModelLines()
+      const brandField = select.form.elements['brand']
+      const brand = normalizeBrand(brandField?.value || '')
+      const values = Array.isArray(selectedModels) ? selectedModels.filter(Boolean) : []
+      if (!brand || values.length <= 1) return
+      values.forEach((modelValue) => {
+        const hidden = document.createElement('input')
+        hidden.type = 'hidden'
+        hidden.name = 'line'
+        hidden.value = `${brand}|${modelValue}|`
+        hidden.dataset.generatedModelLine = '1'
+        select.form.appendChild(hidden)
+      })
+    }
+
     const removeAccordion = () => {
       const host = select.closest('.field, label, .search-row')
       const key = select.id || select.name || 'model'
       const container = host?.querySelector?.(`[data-model-accordion-for="${key}"]`)
       if (container) container.remove()
       select.classList.remove('model-select-native')
+      clearGeneratedModelLines()
     }
 
-    const setAccordionState = (container, selectedValue) => {
+    const setAccordionState = (container, selectedValue, selectedValues = []) => {
       if (!container) return
+      const selectedSet = new Set((selectedValues || []).map((v) => String(v || '')))
       qsa('[data-model-value]', container).forEach((btn) => {
-        const active = String(btn.dataset.modelValue || '') === String(selectedValue || '')
+        const value = String(btn.dataset.modelValue || '')
+        const active = selectedSet.size
+          ? selectedSet.has(value)
+          : value === String(selectedValue || '')
         btn.classList.toggle('is-active', active)
       })
       const selectedEl = qs('[data-model-selected]', container)
       if (selectedEl) {
-        const selectedOpt = Array.from(select.options || []).find((o) => String(o.value) === String(selectedValue || ''))
-        selectedEl.textContent = selectedOpt?.textContent || emptyLabel
+        if (selectedSet.size > 1) {
+          selectedEl.textContent = `Выбрано моделей: ${selectedSet.size}`
+        } else {
+          const selectedOpt = Array.from(select.options || []).find((o) => String(o.value) === String(selectedValue || ''))
+          selectedEl.textContent = selectedOpt?.textContent || emptyLabel
+        }
       }
     }
 
@@ -1652,12 +1683,27 @@
       clearBtn.className = 'btn btn-ghost btn-small'
       clearBtn.textContent = emptyLabel
       clearBtn.addEventListener('click', () => {
+        selectedModels.clear()
         select.value = ''
+        syncGeneratedModelLines([])
         select.dispatchEvent(new Event('change', { bubbles: true }))
-        setAccordionState(container, '')
+        setAccordionState(container, '', [])
         root.open = false
       })
       rootBody.appendChild(clearBtn)
+
+      const selectedModels = new Set()
+      const applySelection = () => {
+        const values = Array.from(selectedModels)
+        if (values.length === 1) {
+          select.value = values[0]
+        } else {
+          select.value = ''
+        }
+        syncGeneratedModelLines(values)
+        setAccordionState(container, select.value || '', values)
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+      }
 
       groups.forEach((group) => {
         const details = document.createElement('details')
@@ -1670,6 +1716,20 @@
         const modelsWrap = document.createElement('div')
         modelsWrap.className = 'model-accordion__models'
         const groupModels = Array.isArray(group?.models) ? group.models : []
+        if (groupModels.length) {
+          const allBtn = document.createElement('button')
+          allBtn.type = 'button'
+          allBtn.className = 'model-accordion__model model-accordion__model--all'
+          allBtn.textContent = 'Все в серии'
+          allBtn.addEventListener('click', () => {
+            groupModels.forEach((row) => {
+              const value = row?.value || row?.model || ''
+              if (value) selectedModels.add(value)
+            })
+            applySelection()
+          })
+          modelsWrap.appendChild(allBtn)
+        }
         groupModels.forEach((row) => {
           const value = row?.value || row?.model || ''
           if (!value) return
@@ -1679,9 +1739,12 @@
           btn.dataset.modelValue = value
           btn.textContent = row?.label || value
           btn.addEventListener('click', () => {
-            select.value = value
-            select.dispatchEvent(new Event('change', { bubbles: true }))
-            setAccordionState(container, value)
+            if (selectedModels.has(value)) {
+              selectedModels.delete(value)
+            } else {
+              selectedModels.add(value)
+            }
+            applySelection()
             root.open = false
           })
           modelsWrap.appendChild(btn)
@@ -1690,10 +1753,19 @@
         rootBody.appendChild(details)
       })
 
-      setAccordionState(container, select.value || '')
+      if (select.value) selectedModels.add(select.value)
+      setAccordionState(container, select.value || '', Array.from(selectedModels))
       if (!select.dataset.modelAccordionBound) {
         select.addEventListener('change', () => {
-          setAccordionState(container, select.value || '')
+          if (select.value) {
+            selectedModels.clear()
+            selectedModels.add(select.value)
+            syncGeneratedModelLines([select.value])
+          } else if (selectedModels.size <= 1) {
+            selectedModels.clear()
+            syncGeneratedModelLines([])
+          }
+          setAccordionState(container, select.value || '', Array.from(selectedModels))
         })
         select.dataset.modelAccordionBound = '1'
       }

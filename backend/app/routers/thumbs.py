@@ -10,7 +10,7 @@ from urllib.parse import urlparse, unquote
 
 import logging
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from PIL import Image
 
 router = APIRouter()
@@ -166,6 +166,16 @@ def _placeholder_response(cache_control: str = "public, max-age=604800") -> File
     )
 
 
+def _temporary_redirect_to_source(src: str) -> RedirectResponse:
+    return RedirectResponse(
+        url=src,
+        status_code=307,
+        headers={
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 def _acquire_lock(path: str) -> bool:
     lock_path = f"{path}.lock"
     now = time.time()
@@ -219,21 +229,13 @@ def thumb(
         if neg_code in (404, 410):
             # Permanent-ish missing upstream image, cacheable placeholder is fine.
             return _placeholder_response("public, max-age=86400")
-        # transient upstream/network issue: force img.onerror fallback to original URL
-        raise HTTPException(
-            status_code=503,
-            detail="thumbnail temporarily unavailable",
-            headers={"Cache-Control": "no-store", "Retry-After": "30"},
-        )
+        # transient upstream/network issue: return source URL directly
+        return _temporary_redirect_to_source(src)
 
     if not _acquire_lock(path):
-        # another worker is fetching; trigger client-side fallback and avoid stale placeholder caching
+        # another worker is fetching; avoid stampede and redirect to source meanwhile.
         logger.info("thumb_lock_busy url=%s", src)
-        raise HTTPException(
-            status_code=503,
-            detail="thumbnail is being prepared",
-            headers={"Cache-Control": "no-store", "Retry-After": "1"},
-        )
+        return _temporary_redirect_to_source(src)
 
     tmp_fetch = os.path.join(_cache_dir(), f".fetch-{uuid.uuid4().hex}")
     code = _fetch_with_curl(src, tmp_fetch, max_bytes=2_000_000)
@@ -262,11 +264,7 @@ def thumb(
             pass
         _mark_negative(path, code)
         _release_lock(path)
-        raise HTTPException(
-            status_code=503,
-            detail="thumbnail temporarily unavailable",
-            headers={"Cache-Control": "no-store", "Retry-After": "30"},
-        )
+        return _temporary_redirect_to_source(src)
 
     try:
         with open(tmp_fetch, "rb") as handle:
@@ -289,11 +287,7 @@ def thumb(
             pass
     except Exception:
         _release_lock(path)
-        raise HTTPException(
-            status_code=503,
-            detail="thumbnail processing failed",
-            headers={"Cache-Control": "no-store"},
-        )
+        return _temporary_redirect_to_source(src)
     finally:
         try:
             if os.path.exists(tmp_fetch):

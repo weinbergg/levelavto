@@ -1872,6 +1872,10 @@ body.filters-open {
   background: rgba(255, 98, 79, 0.2);
   border-color: rgba(255, 98, 79, 0.8);
 }
+.model-accordion__model--all {
+  font-weight: 700;
+  border-style: dashed;
+}
 
 input[type="number"] {
   -moz-appearance: textfield;
