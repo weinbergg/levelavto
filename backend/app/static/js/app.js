@@ -91,11 +91,15 @@
     return qs ? `/catalog?${qs}` : '/catalog'
   }
 
+  const THUMB_REV = '2'
+
   function thumbProxyUrl(url, width = 360) {
     if (!url) return '/static/img/no-photo.svg'
-    if (url.startsWith('/thumb?')) return url
+    if (url.startsWith('/thumb?')) {
+      return url.includes('rev=') ? url : `${url}&rev=${THUMB_REV}`
+    }
     if (!url.includes('img.classistatic.de')) return url
-    return `/thumb?u=${encodeURIComponent(url)}&w=${width}&fmt=webp`
+    return `/thumb?u=${encodeURIComponent(url)}&w=${width}&fmt=webp&rev=${THUMB_REV}`
   }
 
   function normalizeThumbUrl(src, opts = {}) {
@@ -936,7 +940,7 @@
           if (img) {
             const rawThumb = item.thumbnail_url || ''
             const src = normalizeThumbUrl(rawThumb, { thumb: true })
-            const orig = normalizeThumbUrl(rawThumb, { thumb: true })
+            const orig = normalizeThumbUrl(rawThumb)
             if (src !== '/static/img/no-photo.svg') {
               img.dataset.thumb = src
               img.setAttribute('src', src)
@@ -962,7 +966,7 @@
         const images = Array.isArray(car.images) && car.images.length ? car.images : (car.thumbnail_url ? [car.thumbnail_url] : [])
         const rawThumb = images[0] || ''
         const thumbSrc = normalizeThumbUrl(rawThumb, { thumb: true })
-        const origThumb = normalizeThumbUrl(rawThumb, { thumb: true })
+        const origThumb = normalizeThumbUrl(rawThumb)
         const hasGallery = images.length > 1
         const navControls = hasGallery
           ? `
@@ -2337,7 +2341,7 @@
           card.className = 'car-card'
           const thumbRaw = car.thumbnail_url || (Array.isArray(car.images) ? car.images[0] : '') || ''
           let thumb = normalizeThumbUrl(thumbRaw, { thumb: true })
-          const origThumb = normalizeThumbUrl(thumbRaw, { thumb: true })
+          const origThumb = normalizeThumbUrl(thumbRaw)
           const displayRub = car.display_price_rub
           let price = displayRub != null ? formatRub(displayRub) : ''
           if (!price) price = '—'

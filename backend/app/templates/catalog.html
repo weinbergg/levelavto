@@ -278,7 +278,7 @@
             <a class="car-card" href="/car/{{ car.id }}" data-id="{{ car.id }}">
               <div class="thumb-wrap">
                 {% if car.thumbnail_url %}
-                  {% set thumb_src = "/thumb?u=" ~ (car.thumbnail_url | urlencode) ~ "&w=360&fmt=webp" %}
+                  {% set thumb_src = "/thumb?u=" ~ (car.thumbnail_url | urlencode) ~ "&w=360&fmt=webp&rev=2" %}
                 {% else %}
                   {% set thumb_src = "/static/img/no-photo.svg" %}
                 {% endif %}
@@ -291,7 +291,7 @@
                   {% if loop.index0 < 2 %}fetchpriority="high"{% endif %}
                   alt=""
                   data-thumb="{{ thumb_src }}"
-                  data-orig="{{ thumb_src }}"
+                  data-orig="{{ car.thumbnail_url or '' }}"
                   data-id="{{ car.id }}"
                   onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
                   width="320"

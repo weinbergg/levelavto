@@ -42,12 +42,26 @@ def _negative_path(path: str) -> str:
     return f"{path}.neg"
 
 
-def _negative_is_fresh(path: str, ttl: int) -> bool:
+def _read_negative(path: str) -> tuple[int, int] | None:
     neg = _negative_path(path)
     try:
-        return os.path.exists(neg) and (time.time() - os.path.getmtime(neg)) <= ttl
-    except FileNotFoundError:
-        return False
+        if not os.path.exists(neg):
+            return None
+        with open(neg, "r", encoding="utf-8") as fh:
+            raw = (fh.read() or "").strip()
+        parts = raw.split("|")
+        if len(parts) >= 3:
+            code = int(parts[1])
+            ttl = int(parts[2])
+            if (time.time() - os.path.getmtime(neg)) <= ttl:
+                return code, ttl
+            return None
+        # backward compatibility: old format, treat as transient error marker
+        if (time.time() - os.path.getmtime(neg)) <= _NEGATIVE_TTL_ERROR_SEC:
+            return 0, _NEGATIVE_TTL_ERROR_SEC
+        return None
+    except Exception:
+        return None
 
 
 def _mark_negative(path: str, code: int) -> None:
@@ -141,13 +155,13 @@ def _fetch_with_curl(src: str, dest: str, max_bytes: int) -> int:
     return code
 
 
-def _placeholder_response() -> FileResponse:
+def _placeholder_response(cache_control: str = "public, max-age=604800") -> FileResponse:
     path = "/app/backend/app/static/img/no-photo.svg"
     return FileResponse(
         path,
         media_type="image/svg+xml",
         headers={
-            "Cache-Control": "public, max-age=604800",
+            "Cache-Control": cache_control,
         },
     )
 
@@ -198,16 +212,28 @@ def thumb(
             },
         )
 
-    # Negative cache for dead upstream URLs (prevents repeated expensive retries).
-    if _negative_is_fresh(path, _NEGATIVE_TTL_NOT_FOUND_SEC):
-        return _placeholder_response()
-    if _negative_is_fresh(path, _NEGATIVE_TTL_ERROR_SEC):
-        return _placeholder_response()
+    # Negative cache for dead/failed upstream URLs (prevents repeated expensive retries).
+    neg = _read_negative(path)
+    if neg:
+        neg_code, _ = neg
+        if neg_code in (404, 410):
+            # Permanent-ish missing upstream image, cacheable placeholder is fine.
+            return _placeholder_response("public, max-age=86400")
+        # transient upstream/network issue: force img.onerror fallback to original URL
+        raise HTTPException(
+            status_code=503,
+            detail="thumbnail temporarily unavailable",
+            headers={"Cache-Control": "no-store", "Retry-After": "30"},
+        )
 
     if not _acquire_lock(path):
-        # another worker is fetching; return placeholder to avoid stampede
+        # another worker is fetching; trigger client-side fallback and avoid stale placeholder caching
         logger.info("thumb_lock_busy url=%s", src)
-        return _placeholder_response()
+        raise HTTPException(
+            status_code=503,
+            detail="thumbnail is being prepared",
+            headers={"Cache-Control": "no-store", "Retry-After": "1"},
+        )
 
     tmp_fetch = os.path.join(_cache_dir(), f".fetch-{uuid.uuid4().hex}")
     code = _fetch_with_curl(src, tmp_fetch, max_bytes=2_000_000)
@@ -236,7 +262,11 @@ def thumb(
             pass
         _mark_negative(path, code)
         _release_lock(path)
-        return _placeholder_response()
+        raise HTTPException(
+            status_code=503,
+            detail="thumbnail temporarily unavailable",
+            headers={"Cache-Control": "no-store", "Retry-After": "30"},
+        )
 
     try:
         with open(tmp_fetch, "rb") as handle:
@@ -259,7 +289,11 @@ def thumb(
             pass
     except Exception:
         _release_lock(path)
-        return _placeholder_response()
+        raise HTTPException(
+            status_code=503,
+            detail="thumbnail processing failed",
+            headers={"Cache-Control": "no-store"},
+        )
     finally:
         try:
             if os.path.exists(tmp_fetch):
