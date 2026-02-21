@@ -10,6 +10,10 @@ echo "[mobilede_pipeline] step=mobilede_daily"
 docker compose run --rm web python -m backend.app.tools.mobilede_daily
 
 echo "[mobilede_pipeline] step=mirror_mobilede_thumbs"
+MIRROR_TG_ARGS=()
+if [ "${MIRROR_TELEGRAM:-0}" = "1" ]; then
+  MIRROR_TG_ARGS+=(--telegram --telegram-interval "${MIRROR_TELEGRAM_INTERVAL:-1800}")
+fi
 docker compose exec -T web python -m backend.app.scripts.mirror_mobilede_thumbs \
   --region EU \
   --source-key mobile \
@@ -18,6 +22,7 @@ docker compose exec -T web python -m backend.app.scripts.mirror_mobilede_thumbs 
   --limit "${MOBILEDE_MIRROR_LIMIT:-30000}" \
   --workers "${MOBILEDE_MIRROR_WORKERS:-12}" \
   --timeout "${MOBILEDE_MIRROR_TIMEOUT:-8}" \
+  "${MIRROR_TG_ARGS[@]}" \
   --report-json /app/artifacts/mirror_mobilede_daily.json \
   --report-csv /app/artifacts/mirror_mobilede_daily.csv
 

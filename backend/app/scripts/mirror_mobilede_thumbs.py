@@ -5,6 +5,8 @@ import csv
 import hashlib
 import io
 import json
+import os
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -17,6 +19,7 @@ from sqlalchemy import func, select
 from backend.app.db import SessionLocal
 from backend.app.models import Car, CarImage, Source
 from backend.app.utils.thumbs import normalize_classistatic_url
+from backend.app.utils.telegram import send_telegram_message
 
 
 def _media_root() -> Path:
@@ -104,6 +107,20 @@ def _download_and_convert(
     return {"id": car_id, "ok": False, "error": last_error}
 
 
+def _format_eta(seconds: float | None) -> str:
+    if seconds is None or seconds <= 0:
+        return "n/a"
+    sec = int(seconds)
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    s = sec % 60
+    if h > 0:
+        return f"{h}h {m}m {s}s"
+    if m > 0:
+        return f"{m}m {s}s"
+    return f"{s}s"
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Mirror mobile.de thumbnails into local /media storage")
     ap.add_argument("--region", default="EU")
@@ -120,6 +137,8 @@ def main() -> None:
     ap.add_argument("--report-json", default=None)
     ap.add_argument("--report-csv", default=None)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--telegram", action="store_true", help="send progress to Telegram if env configured")
+    ap.add_argument("--telegram-interval", type=int, default=1800, help="seconds between telegram updates")
     args = ap.parse_args()
 
     if args.region.upper() != "EU":
@@ -135,11 +154,60 @@ def main() -> None:
     last_id = 0
     problems: list[dict] = []
     report_rows: list[dict] = []
+    started_at = time.time()
+    last_notify = 0.0
+    token = os.getenv("TELEGRAM_BOT_TOKEN") if args.telegram else None
+    chat_id = os.getenv("TELEGRAM_CHAT_ID") if args.telegram else None
+    total_target = 0
+
+    def maybe_notify(stage: str) -> None:
+        nonlocal last_notify
+        if not token or not chat_id:
+            return
+        now = time.time()
+        if stage not in {"start", "done"} and now - last_notify < args.telegram_interval:
+            return
+        elapsed = max(now - started_at, 1.0)
+        rate = checked / elapsed if checked > 0 else 0.0
+        remaining = max(total_target - checked, 0) if total_target > 0 else 0
+        eta_sec = (remaining / rate) if (rate > 0 and total_target > 0) else None
+        percent = (checked * 100.0 / total_target) if total_target > 0 else 0.0
+        msg = (
+            f"mirror_mobilede_thumbs {stage}\n"
+            f"checked={checked}/{total_target or '?'} ({percent:.2f}%)\n"
+            f"mirrored={mirrored} failed={failed} already_local={already_local}\n"
+            f"updated_rows={updated_rows} rate={rate:.2f} cars/s\n"
+            f"remaining={remaining if total_target > 0 else '?'} eta={_format_eta(eta_sec)}"
+        )
+        ok = send_telegram_message(token, chat_id, msg)
+        if ok:
+            last_notify = now
 
     with SessionLocal() as db:
         since_ts = None
         if args.updated_since_hours and args.updated_since_hours > 0:
             since_ts = datetime.utcnow() - timedelta(hours=args.updated_since_hours)
+        count_query = (
+            db.query(func.count(Car.id))
+            .join(Source, Source.id == Car.source_id)
+            .filter(
+                Car.is_available.is_(True),
+                func.lower(Source.key).like(f"%{args.source_key.lower()}%"),
+                Car.country != "KR",
+            )
+        )
+        if args.only_missing_local:
+            count_query = count_query.filter(
+                (Car.thumbnail_local_path.is_(None))
+                | (Car.thumbnail_local_path == "")
+            )
+        if since_ts is not None:
+            count_query = count_query.filter(Car.updated_at >= since_ts)
+        total_target = int(count_query.scalar() or 0)
+        if args.limit > 0:
+            total_target = min(total_target, args.limit)
+        maybe_notify("start")
+
         while checked < args.limit:
             q = (
                 select(
@@ -253,6 +321,7 @@ def main() -> None:
                     )
                     updated_rows += 1
                 db.commit()
+            maybe_notify("progress")
 
     summary = {
         "scanned": scanned,
@@ -262,6 +331,8 @@ def main() -> None:
         "already_local": already_local,
         "updated_rows": updated_rows,
         "dry_run": bool(args.dry_run),
+        "total_target": total_target,
+        "elapsed_sec": int(max(time.time() - started_at, 0)),
     }
     if args.report_json:
         Path(args.report_json).parent.mkdir(parents=True, exist_ok=True)
@@ -283,6 +354,7 @@ def main() -> None:
         f"already_local={already_local} updated_rows={updated_rows} dry_run={int(args.dry_run)}",
         flush=True,
     )
+    maybe_notify("done")
 
 
 if __name__ == "__main__":
