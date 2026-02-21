@@ -1178,8 +1178,9 @@ class CarsService:
             (and_(Car.thumbnail_url.is_not(None), Car.thumbnail_url != ""), 1),
             else_=0,
         ).desc()
-        # Keep cars without photos at the very end for all catalog sorts.
-        use_thumb_rank = True
+        # For large price sorts in light mode, avoid extra DB sorting by thumbnail rank
+        # to keep first-page latency low. We'll push no-photo items to the end in-memory.
+        use_thumb_rank = not light or sort not in ("price_asc", "price_desc")
         if light:
             stmt = (
                 select(
@@ -1229,6 +1230,21 @@ class CarsService:
             items = list(self.db.execute(stmt).mappings().all())
         else:
             items = list(self.db.execute(stmt).scalars().all())
+        # Keep no-photo cards at the end without forcing expensive DB sort for light/price queries.
+        try:
+            if items and light:
+                with_thumb = []
+                without_thumb = []
+                for row in items:
+                    thumb = str(row.get("thumbnail_url") or "").strip()
+                    if thumb and thumb != "/static/img/no-photo.svg":
+                        with_thumb.append(row)
+                    else:
+                        without_thumb.append(row)
+                if without_thumb:
+                    items = with_thumb + without_thumb
+        except Exception:
+            self.logger.exception("reorder_no_photo_failed")
         # Guard against stale/undercounted fast_count: ensure total >= offset+items
         try:
             offset = (page - 1) * page_size
