@@ -1178,7 +1178,8 @@ class CarsService:
             (and_(Car.thumbnail_url.is_not(None), Car.thumbnail_url != ""), 1),
             else_=0,
         ).desc()
-        use_thumb_rank = not light or sort not in ("price_asc", "price_desc")
+        # Keep cars without photos at the very end for all catalog sorts.
+        use_thumb_rank = True
         if light:
             stmt = (
                 select(
