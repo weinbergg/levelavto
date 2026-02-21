@@ -44,7 +44,7 @@ from ..utils.price_utils import display_price_rub, price_without_util_note
 normalize_color = _normalize_color
 from ..utils.country_map import country_label_ru, resolve_display_country, normalize_country_code
 from ..utils.color_groups import split_color_facets
-from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
+from ..utils.thumbs import normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.home_content import build_home_content
 
 
@@ -438,7 +438,10 @@ def _home_context(
             total_price_rub_cached=car.total_price_rub_cached,
             country=car.country,
         )
-        thumb = pick_classistatic_thumb(normalize_classistatic_url(getattr(car, "thumbnail_url", None)))
+        thumb = resolve_thumbnail_url(
+            getattr(car, "thumbnail_url", None),
+            getattr(car, "thumbnail_local_path", None),
+        )
         if thumb:
             car.thumbnail_url = thumb
         if not getattr(car, "thumbnail_url", None):
@@ -816,7 +819,11 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             light=True,
         )
         def _normalize_thumb(url: str | None) -> str | None:
-            return normalize_classistatic_url(url)
+            normalized = normalize_classistatic_url(url)
+            if normalized:
+                return normalized
+            raw = (url or "").strip()
+            return raw or None
 
         if isinstance(items, list):
             initial_items = items
@@ -847,9 +854,12 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     cid = c.get("id")
                     if cid in first_urls and first_urls[cid]:
                         c["thumbnail_url"] = first_urls[cid]
-                    thumb = _normalize_thumb(c.get("thumbnail_url"))
+                    thumb = resolve_thumbnail_url(
+                        _normalize_thumb(c.get("thumbnail_url")),
+                        c.get("thumbnail_local_path"),
+                    )
                     if thumb:
-                        c["thumbnail_url"] = pick_classistatic_thumb(thumb)
+                        c["thumbnail_url"] = thumb
                     if not c.get("thumbnail_url"):
                         c["thumbnail_url"] = "/static/img/no-photo.svg"
     except Exception:
@@ -1054,9 +1064,12 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
                 except Exception:
                     continue
         try:
-            normalized_thumb = normalize_classistatic_url(getattr(car, "thumbnail_url", None))
-            if normalized_thumb:
-                car.thumbnail_url = normalized_thumb
+            resolved_thumb = resolve_thumbnail_url(
+                getattr(car, "thumbnail_url", None),
+                getattr(car, "thumbnail_local_path", None),
+            )
+            if resolved_thumb:
+                car.thumbnail_url = resolved_thumb
         except Exception:
             pass
     details = []

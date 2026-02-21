@@ -111,3 +111,20 @@ def pick_classistatic_thumb(url: Optional[str], *, ttl_days: int = 14) -> Option
     if client and cache_key:
         client.setex(cache_key, max(3600, ttl_days * 86400 // 4), "none")
     return None
+
+
+def resolve_thumbnail_url(
+    remote_url: Optional[str],
+    local_path: Optional[str] = None,
+) -> Optional[str]:
+    local = (local_path or "").strip()
+    if local.startswith("/media/"):
+        return local
+    normalized = normalize_classistatic_url(remote_url)
+    if normalized:
+        picked = pick_classistatic_thumb(normalized)
+        return picked or normalized
+    remote = (remote_url or "").strip()
+    if remote:
+        return remote
+    return None

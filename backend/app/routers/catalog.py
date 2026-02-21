@@ -18,7 +18,7 @@ from ..utils.taxonomy import (
 from ..utils.localization import display_body, display_color
 from ..utils.price_utils import display_price_rub, price_without_util_note
 from ..utils.color_groups import split_color_facets
-from ..utils.thumbs import normalize_classistatic_url, pick_classistatic_thumb
+from ..utils.thumbs import normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.redis_cache import (
     redis_get_json,
     redis_set_json,
@@ -513,7 +513,11 @@ def list_cars(
     image_first = {}
     with_photo_stats = os.getenv("CATALOG_WITH_PHOTO_STATS", "0") == "1"
     def _normalize_thumb(url: str | None) -> str | None:
-        return normalize_classistatic_url(url)
+        normalized = normalize_classistatic_url(url)
+        if normalized:
+            return normalized
+        raw = (url or "").strip()
+        return raw or None
     if items and with_photo_stats:
         ids = [c.get("id") for c in items if c.get("id")]
         if ids:
@@ -536,7 +540,13 @@ def list_cars(
             )
             image_first = {car_id: _normalize_thumb(url) for car_id, url in rows if url}
     elif items:
-        ids = [c.get("id") for c in items if c.get("id") and not c.get("thumbnail_url")]
+        ids = [
+            c.get("id")
+            for c in items
+            if c.get("id")
+            and not c.get("thumbnail_url")
+            and not c.get("thumbnail_local_path")
+        ]
         if ids:
             rows = (
                 db.execute(
@@ -570,9 +580,8 @@ def list_cars(
         else:
             region_val = "EU" if country_norm else None
         img_count = image_counts.get(c.get("id"), 0)
-        raw_thumb = _normalize_thumb(c.get("thumbnail_url"))
-        thumb_url = raw_thumb or image_first.get(c.get("id"))
-        thumb_url = pick_classistatic_thumb(thumb_url)
+        raw_thumb = _normalize_thumb(c.get("thumbnail_url")) or image_first.get(c.get("id"))
+        thumb_url = resolve_thumbnail_url(raw_thumb, c.get("thumbnail_local_path"))
         if not thumb_url:
             thumb_url = "/static/img/no-photo.svg"
         if isinstance(thumb_url, str) and "rule=mo-" in thumb_url:

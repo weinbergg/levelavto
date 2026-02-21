@@ -1175,7 +1175,13 @@ class CarsService:
             order_clause = [price_expr.asc().nullslast(), Car.id.desc()]
 
         thumb_rank = case(
-            (and_(Car.thumbnail_url.is_not(None), Car.thumbnail_url != ""), 1),
+            (
+                or_(
+                    and_(Car.thumbnail_local_path.is_not(None), Car.thumbnail_local_path != ""),
+                    and_(Car.thumbnail_url.is_not(None), Car.thumbnail_url != ""),
+                ),
+                1,
+            ),
             else_=0,
         ).desc()
         # For large price sorts in light mode, avoid extra DB sorting by thumbnail rank
@@ -1197,6 +1203,7 @@ class CarsService:
                     Car.price,
                     Car.currency,
                     Car.thumbnail_url,
+                    Car.thumbnail_local_path,
                     Car.country,
                     Car.source_id,
                     Car.color,
@@ -1236,7 +1243,7 @@ class CarsService:
                 with_thumb = []
                 without_thumb = []
                 for row in items:
-                    thumb = str(row.get("thumbnail_url") or "").strip()
+                    thumb = str(row.get("thumbnail_local_path") or row.get("thumbnail_url") or "").strip()
                     if thumb and thumb != "/static/img/no-photo.svg":
                         with_thumb.append(row)
                     else:
