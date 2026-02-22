@@ -924,6 +924,18 @@ class CarsService:
                 conditions.append(Car.mileage.is_not(None))
                 conditions.append(Car.mileage > 100)
 
+        # Optional strict catalog mode: hide cars without mirrored local photos.
+        if (
+            os.getenv("CATALOG_HIDE_NO_LOCAL_PHOTO", "0") == "1"
+            and (region or "").upper() == "EU"
+        ):
+            conditions.append(
+                and_(
+                    Car.thumbnail_local_path.is_not(None),
+                    Car.thumbnail_local_path != "",
+                )
+            )
+
         where_expr = and_(*conditions) if conditions else None
 
         # cached count for repeated requests
@@ -961,6 +973,7 @@ class CarsService:
             owners_count,
             condition,
             kr_type,
+            os.getenv("CATALOG_HIDE_NO_LOCAL_PHOTO", "0"),
         )
         redis_count_key = None
         total = self._count_cache.get(count_key)

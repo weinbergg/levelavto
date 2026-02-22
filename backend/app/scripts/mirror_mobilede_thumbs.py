@@ -125,6 +125,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Mirror mobile.de thumbnails into local /media storage")
     ap.add_argument("--region", default="EU")
     ap.add_argument("--source-key", default="mobile")
+    ap.add_argument("--country", default=None, help="ISO country code, e.g. DE")
+    ap.add_argument(
+        "--brands",
+        default=None,
+        help="Comma-separated brands filter, case-insensitive, e.g. BMW,Mercedes-Benz,Ford",
+    )
     ap.add_argument("--batch", type=int, default=500)
     ap.add_argument("--limit", type=int, default=20000)
     ap.add_argument("--workers", type=int, default=10)
@@ -143,6 +149,8 @@ def main() -> None:
 
     if args.region.upper() != "EU":
         raise SystemExit("Only region=EU is supported in this script")
+    country_filter = (args.country or "").strip().upper() or None
+    brand_filters = [b.strip().lower() for b in str(args.brands or "").split(",") if b.strip()]
 
     base_dir = _media_root()
     scanned = 0
@@ -196,6 +204,10 @@ def main() -> None:
                 Car.country != "KR",
             )
         )
+        if country_filter:
+            count_query = count_query.filter(func.upper(Car.country) == country_filter)
+        if brand_filters:
+            count_query = count_query.filter(func.lower(Car.brand).in_(brand_filters))
         if args.only_missing_local:
             count_query = count_query.filter(
                 (Car.thumbnail_local_path.is_(None))
@@ -225,6 +237,10 @@ def main() -> None:
                 .order_by(Car.id.asc())
                 .limit(args.batch)
             )
+            if country_filter:
+                q = q.where(func.upper(Car.country) == country_filter)
+            if brand_filters:
+                q = q.where(func.lower(Car.brand).in_(brand_filters))
             if args.only_missing_local:
                 q = q.where(
                     (Car.thumbnail_local_path.is_(None))

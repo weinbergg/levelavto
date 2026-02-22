@@ -117,9 +117,12 @@ def resolve_thumbnail_url(
     remote_url: Optional[str],
     local_path: Optional[str] = None,
 ) -> Optional[str]:
+    strict_local_only = os.getenv("THUMB_STRICT_LOCAL_ONLY", "0") == "1"
     local = (local_path or "").strip()
     if local.startswith("/media/"):
         return local
+    if strict_local_only:
+        return None
     normalized = normalize_classistatic_url(remote_url)
     if normalized:
         picked = pick_classistatic_thumb(normalized)
