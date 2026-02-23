@@ -145,6 +145,13 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--telegram", action="store_true", help="send progress to Telegram if env configured")
     ap.add_argument("--telegram-interval", type=int, default=1800, help="seconds between telegram updates")
+    ap.add_argument("--state-file", default=None, help="Path to JSON state file for resume cursor (last_id)")
+    ap.add_argument("--reset-state", action="store_true", help="Ignore existing state-file and start from id=0")
+    ap.add_argument(
+        "--cycle",
+        action="store_true",
+        help="When cursor reaches end, continue from id=0 in the same run until --limit is reached",
+    )
     args = ap.parse_args()
 
     if args.region.upper() != "EU":
@@ -167,6 +174,36 @@ def main() -> None:
     token = os.getenv("TELEGRAM_BOT_TOKEN") if args.telegram else None
     chat_id = os.getenv("TELEGRAM_CHAT_ID") if args.telegram else None
     total_target = 0
+    state_path = Path(args.state_file) if args.state_file else None
+
+    def load_state() -> int:
+        if state_path is None or args.reset_state:
+            return 0
+        try:
+            if not state_path.exists():
+                return 0
+            data = json.loads(state_path.read_text(encoding="utf-8"))
+            return int(data.get("last_id") or 0)
+        except Exception:
+            return 0
+
+    def save_state(cursor_id: int) -> None:
+        if state_path is None:
+            return
+        try:
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "last_id": int(cursor_id),
+                "updated_at": datetime.utcnow().isoformat(),
+                "checked": checked,
+                "mirrored": mirrored,
+                "failed": failed,
+                "already_local": already_local,
+                "updated_rows": updated_rows,
+            }
+            state_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
 
     def maybe_notify(stage: str) -> None:
         nonlocal last_notify
@@ -192,6 +229,7 @@ def main() -> None:
             last_notify = now
 
     with SessionLocal() as db:
+        last_id = load_state()
         since_ts = None
         if args.updated_since_hours and args.updated_since_hours > 0:
             since_ts = datetime.utcnow() - timedelta(hours=args.updated_since_hours)
@@ -251,6 +289,10 @@ def main() -> None:
 
             rows = db.execute(q).all()
             if not rows:
+                if args.cycle and last_id > 0:
+                    last_id = 0
+                    save_state(last_id)
+                    continue
                 break
             scanned += len(rows)
             last_id = rows[-1][0]
@@ -337,6 +379,7 @@ def main() -> None:
                     )
                     updated_rows += 1
                 db.commit()
+            save_state(last_id)
             maybe_notify("progress")
 
     summary = {
@@ -352,7 +395,7 @@ def main() -> None:
     }
     if args.report_json:
         Path(args.report_json).parent.mkdir(parents=True, exist_ok=True)
-        payload = {**summary, "problems": problems[:1000]}
+        payload = {**summary, "problems": problems[:1000], "last_id": last_id}
         Path(args.report_json).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     if args.report_csv:
         csv_path = Path(args.report_csv)
