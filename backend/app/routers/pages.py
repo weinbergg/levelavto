@@ -1050,6 +1050,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     templates = request.app.state.templates
     service = CarsService(db)
     car = service.get_car(car_id)
+    detail_images: list[str] = []
     if car:
         code, label = resolve_display_country(car)
         car.display_country_code = code
@@ -1064,12 +1065,27 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             total_price_rub_cached=car.total_price_rub_cached,
             country=car.country,
         )
+        def _normalize_detail_image(url: str | None) -> str | None:
+            raw = (url or "").strip()
+            if not raw:
+                return None
+            normalized = normalize_classistatic_url(raw)
+            if normalized:
+                return normalized
+            if raw.startswith("//"):
+                return f"https:{raw}"
+            if raw.startswith("http://"):
+                return f"https://{raw[7:]}"
+            if raw.startswith("https://") or raw.startswith("/media/"):
+                return raw
+            return None
+
         if getattr(car, "images", None):
             for im in car.images:
                 try:
-                    normalized = normalize_classistatic_url(getattr(im, "url", None))
+                    normalized = _normalize_detail_image(getattr(im, "url", None))
                     if normalized:
-                        im.url = normalized
+                        detail_images.append(normalized)
                 except Exception:
                     continue
         try:
@@ -1079,6 +1095,8 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             )
             if resolved_thumb:
                 car.thumbnail_url = resolved_thumb
+                if not detail_images:
+                    detail_images.append(resolved_thumb)
         except Exception:
             pass
     details = []
@@ -1239,6 +1257,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         {
             "request": request,
             "car": car,
+            "detail_images": detail_images,
             "user": getattr(request.state, "user", None),
             "car_details": details,
             "car_options": options,
