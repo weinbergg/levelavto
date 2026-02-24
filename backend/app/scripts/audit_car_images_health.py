@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,6 +17,7 @@ from sqlalchemy import func, select
 from backend.app.db import SessionLocal
 from backend.app.models import Car, CarImage, Source
 from backend.app.utils.thumbs import normalize_classistatic_url
+from backend.app.utils.telegram import send_telegram_message
 
 
 @dataclass
@@ -81,6 +84,8 @@ def main() -> None:
     ap.add_argument("--fix-sync-thumbnail", action="store_true")
     ap.add_argument("--clear-thumbnail-when-no-valid", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--telegram", action="store_true", help="send progress to Telegram if env configured")
+    ap.add_argument("--telegram-interval", type=int, default=1800, help="seconds between Telegram updates")
     ap.add_argument("--report-json", default="/app/artifacts/audit_car_images_health.json")
     ap.add_argument("--report-csv", default="/app/artifacts/audit_car_images_health.csv")
     args = ap.parse_args()
@@ -93,6 +98,41 @@ def main() -> None:
     thumbnails_updated = 0
     thumbnails_cleared = 0
     rows_report: list[dict] = []
+    started_at = time.time()
+    last_notify = 0.0
+    total_images = 0
+    token = os.getenv("TELEGRAM_BOT_TOKEN") if args.telegram else None
+    chat_id = os.getenv("TELEGRAM_CHAT_ID") if args.telegram else None
+
+    def maybe_notify(stage: str) -> None:
+        nonlocal last_notify
+        if not token or not chat_id:
+            return
+        now = time.time()
+        if stage not in {"start", "done"} and now - last_notify < max(30, args.telegram_interval):
+            return
+        elapsed = max(now - started_at, 1.0)
+        rate = checked / elapsed if checked else 0.0
+        remaining = max(total_images - checked, 0)
+        eta_sec = (remaining / rate) if rate > 0 else None
+        if eta_sec is None:
+            eta_str = "n/a"
+        else:
+            sec = int(eta_sec)
+            h = sec // 3600
+            m = (sec % 3600) // 60
+            s = sec % 60
+            eta_str = f"{h}h {m}m {s}s" if h else (f"{m}m {s}s" if m else f"{s}s")
+        pct = (checked * 100.0 / total_images) if total_images else 0.0
+        msg = (
+            f"audit_car_images_health {stage}\n"
+            f"checked={checked}/{total_images or '?'} ({pct:.2f}%)\n"
+            f"broken={broken} deleted={deleted}\n"
+            f"thumb_updated={thumbnails_updated} thumb_cleared={thumbnails_cleared}\n"
+            f"rate={rate:.2f} img/s remaining={remaining if total_images else '?'} eta={eta_str}"
+        )
+        if send_telegram_message(token, chat_id, msg):
+            last_notify = now
 
     with SessionLocal() as db:
         car_q = (
@@ -128,6 +168,8 @@ def main() -> None:
                 continue
             per_car_count[int(car_id)] = c + 1
             payload.append((int(image_id), int(car_id), str(raw_url or "")))
+        total_images = len(payload)
+        maybe_notify("start")
 
         broken_image_ids: list[int] = []
         first_valid_by_car: dict[int, str] = {}
@@ -171,6 +213,7 @@ def main() -> None:
                     if cid not in first_valid_by_car and row.get("checked_url"):
                         first_valid_by_car[cid] = str(row["checked_url"])
                 rows_report.append(row)
+                maybe_notify("progress")
 
         if not args.dry_run and (args.fix_delete_broken or args.fix_sync_thumbnail):
             if args.fix_delete_broken and broken_image_ids:
@@ -190,6 +233,7 @@ def main() -> None:
                         car.thumbnail_url = None
                         thumbnails_cleared += 1
             db.commit()
+        maybe_notify("done")
 
     rows_report.sort(key=lambda r: (0 if not r["ok"] else 1, int(r["car_id"]), int(r["image_id"])))
     summary = {
