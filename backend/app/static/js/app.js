@@ -2560,44 +2560,77 @@
       images = []
     }
     if (!Array.isArray(images) || images.length < 2) return
-    images = images
-      .map((u) => normalizeThumbUrl(u, { thumb: true }))
-      .filter((u) => u && u !== '/static/img/no-photo.svg')
+    images = images.map((u) => normalizeThumbUrl(u, { thumb: true }))
     if (images.length < 2) return
+    const isUsable = (src) => Boolean(src && src !== '/static/img/no-photo.svg')
     let idx = Math.max(0, images.indexOf(img.getAttribute('src')))
-    const setImage = (nextIdx) => {
-      idx = (nextIdx + images.length) % images.length
-      const nextSrc = images[idx]
-      if (nextSrc && nextSrc !== '/static/img/no-photo.svg') {
-        delete img.dataset.thumbRetried
-        delete img.dataset.fallbackApplied
-        img.src = nextSrc
-        applyThumbFallback(img)
-      }
+    if (!isUsable(images[idx])) {
+      const firstOk = images.findIndex((src) => isUsable(src))
+      idx = firstOk >= 0 ? firstOk : 0
     }
+    const thumbs = qsa('.detail-hero__thumbs .thumb')
+    const markThumbState = (i) => {
+      const btn = thumbs[i]
+      if (!btn) return
+      const broken = !isUsable(images[i])
+      btn.classList.toggle('is-broken', broken)
+      btn.disabled = broken
+    }
+    const syncActive = () => {
+      thumbs.forEach((btn, i) => btn.classList.toggle('active', i === idx))
+    }
+    const setImageByIndex = (nextIdx) => {
+      if (!images.length) return
+      const normalizedIdx = (nextIdx + images.length) % images.length
+      if (!isUsable(images[normalizedIdx])) return
+      idx = normalizedIdx
+      delete img.dataset.thumbRetried
+      delete img.dataset.fallbackApplied
+      img.src = images[idx]
+      applyThumbFallback(img)
+      syncActive()
+    }
+    const move = (step) => {
+      if (!images.length) return
+      for (let i = 1; i <= images.length; i += 1) {
+        const candidate = (idx + step * i + images.length) % images.length
+        if (isUsable(images[candidate])) {
+          setImageByIndex(candidate)
+          return
+        }
+      }
+      img.src = '/static/img/no-photo.svg'
+    }
+    thumbs.forEach((btn, i) => {
+      const thumbImg = btn.querySelector('img')
+      markThumbState(i)
+      thumbImg?.addEventListener('error', () => {
+        images[i] = '/static/img/no-photo.svg'
+        markThumbState(i)
+        if (i === idx) move(1)
+      })
+    })
     applyThumbFallback(img)
     const prevBtn = qs('[data-detail-prev]')
     const nextBtn = qs('[data-detail-next]')
     prevBtn?.addEventListener('click', (e) => {
       e.preventDefault()
-      setImage(idx - 1)
+      move(-1)
     })
     nextBtn?.addEventListener('click', (e) => {
       e.preventDefault()
-      setImage(idx + 1)
+      move(1)
     })
-    const thumbs = qsa('.detail-hero__thumbs .thumb')
     thumbs.forEach((btn, i) => {
       btn.addEventListener('click', () => {
-        idx = i
-        const nextSrc = normalizeThumbUrl(images[idx] || '', { thumb: true })
-        if (nextSrc) {
-          delete img.dataset.thumbRetried
-          delete img.dataset.fallbackApplied
-          img.src = nextSrc
-          applyThumbFallback(img)
-        }
+        if (!isUsable(images[i])) return
+        setImageByIndex(i)
       })
+    })
+    img.addEventListener('error', () => {
+      images[idx] = '/static/img/no-photo.svg'
+      markThumbState(idx)
+      move(1)
     })
     let startX = null
     main.addEventListener('touchstart', (e) => {
@@ -2608,10 +2641,16 @@
       const endX = e.changedTouches[0].clientX
       const diff = endX - startX
       if (Math.abs(diff) > 30) {
-        setImage(diff > 0 ? idx - 1 : idx + 1)
+        move(diff > 0 ? -1 : 1)
       }
       startX = null
     })
+    syncActive()
+    if (isUsable(images[idx])) {
+      setImageByIndex(idx)
+    } else {
+      move(1)
+    }
   }
 
   function initDetailActions() {
