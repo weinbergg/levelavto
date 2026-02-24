@@ -2589,17 +2589,13 @@
       idx = (nextIdx + images.length) % images.length
       const nextSrc = images[idx]
       if (nextSrc && nextSrc !== '/static/img/no-photo.svg') {
+        delete img.dataset.thumbRetried
+        delete img.dataset.fallbackApplied
         img.src = nextSrc
+        applyThumbFallback(img)
       }
     }
-    if (!img.dataset.fallbackBound) {
-      img.dataset.fallbackBound = '1'
-      img.onerror = () => {
-        if (img.dataset.fallbackApplied === '1') return
-        img.dataset.fallbackApplied = '1'
-        img.src = '/static/img/no-photo.svg'
-      }
-    }
+    applyThumbFallback(img)
     const prevBtn = qs('[data-detail-prev]')
     const nextBtn = qs('[data-detail-next]')
     prevBtn?.addEventListener('click', (e) => {
@@ -2615,7 +2611,12 @@
       btn.addEventListener('click', () => {
         idx = i
         const nextSrc = normalizeThumbUrl(images[idx] || '', { thumb: true })
-        if (nextSrc) img.src = nextSrc
+        if (nextSrc) {
+          delete img.dataset.thumbRetried
+          delete img.dataset.fallbackApplied
+          img.src = nextSrc
+          applyThumbFallback(img)
+        }
       })
     })
     let startX = null
