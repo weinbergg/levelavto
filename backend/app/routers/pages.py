@@ -74,7 +74,13 @@ def _get_cars_count(service: CarsService, params: Dict[str, Any], timing_enabled
         return int(cached)
     if timing_enabled:
         print(f"CARS_COUNT_CACHE hit=0 source=fallback key={cache_key}", flush=True)
-    total = service.count_cars(**normalized)
+    # Fast path for unfiltered homepage/search counters.
+    # list_cars(count_only) can be too slow on cold cache for the full dataset.
+    count_params = {k: v for k, v in normalized.items() if k != "hide_no_local_photo"}
+    if not count_params:
+        total = service.total_cars()
+    else:
+        total = service.count_cars(**count_params)
     _TOTAL_CARS_CACHE[cache_key] = int(total)
     redis_set_json(cache_key, int(total), ttl_sec=1200)
     return int(total)
