@@ -229,13 +229,14 @@ def thumb(
         if neg_code in (404, 410):
             # Permanent-ish missing upstream image, cacheable placeholder is fine.
             return _placeholder_response("public, max-age=86400")
-        # transient upstream/network issue: return source URL directly
-        return _temporary_redirect_to_source(src)
+        # transient upstream/network issue: fail fast with short-lived placeholder
+        return _placeholder_response("public, max-age=30")
 
     if not _acquire_lock(path):
-        # another worker is fetching; avoid stampede and redirect to source meanwhile.
+        # another worker is fetching; avoid stampede.
+        # Placeholder is more stable than redirect to flaky upstream.
         logger.info("thumb_lock_busy url=%s", src)
-        return _temporary_redirect_to_source(src)
+        return _placeholder_response("public, max-age=30")
 
     tmp_fetch = os.path.join(_cache_dir(), f".fetch-{uuid.uuid4().hex}")
     code = _fetch_with_curl(src, tmp_fetch, max_bytes=2_000_000)
@@ -264,7 +265,7 @@ def thumb(
             pass
         _mark_negative(path, code)
         _release_lock(path)
-        return _temporary_redirect_to_source(src)
+        return _placeholder_response("public, max-age=30")
 
     try:
         with open(tmp_fetch, "rb") as handle:
@@ -287,7 +288,7 @@ def thumb(
             pass
     except Exception:
         _release_lock(path)
-        return _temporary_redirect_to_source(src)
+        return _placeholder_response("public, max-age=30")
     finally:
         try:
             if os.path.exists(tmp_fetch):
