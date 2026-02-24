@@ -3,6 +3,7 @@ import os
 from typing import Optional
 
 PRICE_NOTE_WITHOUT_UTIL = "*Без учета утилизационного сбора РФ"
+PRICE_NOTE_EUROPE = "Цена в Европе"
 
 
 def get_round_step_rub() -> int:
@@ -50,8 +51,8 @@ def price_without_util_note(
         return None
     reg = str(region or "").upper()
     c = str(country or "").upper()
-    if reg in {"EU", "KR"}:
+    if reg == "KR" or c.startswith("KR"):
         return PRICE_NOTE_WITHOUT_UTIL
-    if c.startswith("KR"):
-        return PRICE_NOTE_WITHOUT_UTIL
+    if reg == "EU" or c:
+        return PRICE_NOTE_EUROPE
     return None

@@ -131,24 +131,11 @@
     if (!img) return
     const rawSrc = img.getAttribute('src') || ''
     const rawData = img.dataset.thumb || ''
-    const rawOrig = img.dataset.orig || ''
     let normalized = normalizeThumbUrl(rawSrc, { thumb: true })
     if (normalized === '/static/img/no-photo.svg' && rawData) {
       const dataNormalized = normalizeThumbUrl(rawData, { thumb: true })
       if (dataNormalized !== '/static/img/no-photo.svg') {
         normalized = dataNormalized
-      }
-    }
-    if (normalized === '/static/img/no-photo.svg' && rawOrig) {
-      const origNormalized = normalizeThumbUrl(rawOrig)
-      if (origNormalized !== '/static/img/no-photo.svg') {
-        normalized = origNormalized
-      }
-    }
-    if (normalized === '/static/img/no-photo.svg' && rawSrc) {
-      const trimmed = String(rawSrc || '').trim()
-      if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
-        normalized = trimmed
       }
     }
     if (img.getAttribute('src') !== normalized) {
@@ -167,7 +154,7 @@
       img.dataset.fallbackBound = '1'
       img.onerror = () => {
         // First failure on proxy thumb can be transient (e.g. lock busy -> 503).
-        // Retry once with cache-busting before falling back to origin/static placeholder.
+        // Retry once with cache-busting before falling back to static placeholder.
         const currentSrc = img.getAttribute('src') || ''
         if (!img.dataset.thumbRetried && currentSrc.startsWith('/thumb?')) {
           img.dataset.thumbRetried = '1'
@@ -177,15 +164,8 @@
           }, 120)
           return
         }
-        if (img.dataset.fallbackApplied === '1') return
+        if (img.dataset.fallbackApplied) return
         img.dataset.fallbackApplied = '1'
-        const orig = img.dataset.orig || ''
-        const origNormalized = normalizeThumbUrl(orig)
-        if (origNormalized && origNormalized !== '/static/img/no-photo.svg') {
-          img.src = origNormalized
-          img.dataset.fallbackApplied = '2'
-          return
-        }
         img.src = '/static/img/no-photo.svg'
       }
     }
