@@ -2580,7 +2580,9 @@
       images = []
     }
     if (!Array.isArray(images) || images.length < 2) return
-    images = images.map((u) => normalizeThumbUrl(u)).filter((u) => u && u !== '/static/img/no-photo.svg')
+    images = images
+      .map((u) => normalizeThumbUrl(u, { thumb: true }))
+      .filter((u) => u && u !== '/static/img/no-photo.svg')
     if (images.length < 2) return
     let idx = Math.max(0, images.indexOf(img.getAttribute('src')))
     const setImage = (nextIdx) => {
@@ -2612,7 +2614,7 @@
     thumbs.forEach((btn, i) => {
       btn.addEventListener('click', () => {
         idx = i
-        const nextSrc = normalizeThumbUrl(images[idx] || '')
+        const nextSrc = normalizeThumbUrl(images[idx] || '', { thumb: true })
         if (nextSrc) img.src = nextSrc
       })
     })

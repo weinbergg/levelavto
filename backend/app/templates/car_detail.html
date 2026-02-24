@@ -46,7 +46,6 @@
             type="button"
             class="thumb"
             data-thumb-index="{{ loop.index0 }}"
-            onclick="document.getElementById('primaryImage').src='{{ im.url }}'"
           >
             <img
               src="{% if im.url and 'img.classistatic.de' in im.url %}/thumb?u={{ im.url | urlencode }}&w=240&fmt=webp&rev=2{% else %}{{ im.url }}{% endif %}"
