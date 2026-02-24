@@ -133,11 +133,17 @@ def build_cars_count_key(params: Optional[Dict[str, Any]] = None) -> str:
     return f"cars_count:{items}:v{_dataset_version()}"
 
 
-def build_cars_count_simple_key(region: Optional[str], country: Optional[str], brand: Optional[str]) -> str:
-    return "cars_count:{r}:{c}:{b}:v{v}".format(
+def build_cars_count_simple_key(
+    region: Optional[str],
+    country: Optional[str],
+    brand: Optional[str],
+    hide_no_local_photo: Optional[str] = None,
+) -> str:
+    return "cars_count:{r}:{c}:{b}:photo={p}:v{v}".format(
         r=region or "all",
         c=country or "all",
         b=brand or "all",
+        p=hide_no_local_photo or "0",
         v=_dataset_version(),
     )
 
@@ -149,14 +155,16 @@ def build_cars_list_key(
     sort: Optional[str],
     page: int,
     page_size: int,
+    hide_no_local_photo: Optional[str] = None,
 ) -> str:
-    return "cars_list:{r}:{c}:{b}:{sort}:{page}:{size}:v{v}".format(
+    return "cars_list:{r}:{c}:{b}:{sort}:{page}:{size}:photo={p}:v{v}".format(
         r=region or "all",
         c=country or "all",
         b=brand or "all",
         sort=sort or "none",
         page=page,
         size=page_size,
+        p=hide_no_local_photo or "0",
         v=_dataset_version(),
     )
 
@@ -300,6 +308,7 @@ def normalize_count_params(params: Optional[Dict[str, Any]] = None) -> Dict[str,
         "owners_count",
         "line",
         "source",
+        "hide_no_local_photo",
     ]
     cleaned: Dict[str, Any] = {}
     for key in keys:

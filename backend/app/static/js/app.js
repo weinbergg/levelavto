@@ -518,8 +518,18 @@
       }
     }
     region.addEventListener('change', update)
-    countrySelect?.addEventListener('change', update)
-    krSelect?.addEventListener('change', update)
+    countrySelect?.addEventListener('change', () => {
+      if (countrySelect.value && region.value !== 'EU') {
+        region.value = 'EU'
+      }
+      update()
+    })
+    krSelect?.addEventListener('change', () => {
+      if (krSelect.value && region.value !== 'KR') {
+        region.value = 'KR'
+      }
+      update()
+    })
     update()
   }
 
@@ -615,7 +625,9 @@
       if (!value || ['page', 'page_size'].includes(key)) return
       // skip sort in active chips to avoid debug-look
       if (key === 'sort') return
-      const label = labels[key] || key
+      const hasLabel = Object.prototype.hasOwnProperty.call(labels, key)
+      if (!hasLabel) return
+      const label = labels[key]
       if (label === null) return
       let displayValue = value
       if (key === 'country') {
@@ -677,6 +689,9 @@
       chip.innerHTML = `<span>${label}: ${value}</span><span class="chip-close">×</span>`
       chip.addEventListener('click', () => {
         const toClear = keys || [key]
+        if (!keys && key === 'region') {
+          toClear.push('country', 'kr_type')
+        }
         toClear.forEach((item) => {
           const el = form.elements[item]
           if (el) el.value = ''
@@ -695,6 +710,7 @@
         if (toClear.includes('color')) {
           syncColorChips(form)
         }
+        updateCatalogUrlFromParams(collectParams(1))
         loadCars(1)
       })
       container.appendChild(chip)
@@ -748,6 +764,15 @@
       if (regionVal === 'KR') {
         params.set('country', 'KR')
         if (krSel && krSel.value) params.set('kr_type', String(krSel.value).toUpperCase())
+      }
+    } else {
+      if (countrySel && countrySel.value) {
+        params.set('region', 'EU')
+        params.set('country', String(countrySel.value).toUpperCase())
+      } else if (krSel && krSel.value) {
+        params.set('region', 'KR')
+        params.set('country', 'KR')
+        params.set('kr_type', String(krSel.value).toUpperCase())
       }
     }
     params.set('page', String(page || 1))

@@ -924,11 +924,13 @@ class CarsService:
                 conditions.append(Car.mileage.is_not(None))
                 conditions.append(Car.mileage > 100)
 
-        # Optional strict catalog mode: hide cars without mirrored local photos.
-        if (
+        strict_local_photo_mode = (
             os.getenv("CATALOG_HIDE_NO_LOCAL_PHOTO", "0") == "1"
             and (region or "").upper() == "EU"
-        ):
+        )
+
+        # Optional strict catalog mode: hide cars without mirrored local photos.
+        if strict_local_photo_mode:
             conditions.append(
                 and_(
                     Car.thumbnail_local_path.is_not(None),
@@ -973,7 +975,7 @@ class CarsService:
             owners_count,
             condition,
             kr_type,
-            os.getenv("CATALOG_HIDE_NO_LOCAL_PHOTO", "0"),
+            "1" if strict_local_photo_mode else "0",
         )
         redis_count_key = None
         total = self._count_cache.get(count_key)
@@ -1018,6 +1020,7 @@ class CarsService:
                 "power_hp_max": power_hp_max,
                 "engine_cc_min": engine_cc_min,
                 "engine_cc_max": engine_cc_max,
+                "hide_no_local_photo": "1" if strict_local_photo_mode else "0",
             }
             redis_count_key = build_cars_count_key(redis_params)
             redis_total = redis_get_json(redis_count_key)
@@ -1029,7 +1032,7 @@ class CarsService:
                     total = None
         total_t0 = time.perf_counter()
         if total is not None:
-            if use_fast_count and total == 0 and self._can_fast_count(
+            if (use_fast_count and not strict_local_photo_mode) and total == 0 and self._can_fast_count(
                 region=region,
                 country=country,
                 brand=brand,
@@ -1081,7 +1084,7 @@ class CarsService:
                     self._count_cache[count_key] = total
         if total is None:
             total = None
-            if use_fast_count and self._can_fast_count(
+            if (use_fast_count and not strict_local_photo_mode) and self._can_fast_count(
                 region=region,
                 country=country,
                 brand=brand,

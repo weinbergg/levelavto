@@ -8,6 +8,7 @@ from ..schemas import CarDetailOut
 from ..utils.country_map import resolve_display_country, normalize_country_code, country_label_ru
 from ..utils.taxonomy import (
     normalize_fuel,
+    normalize_color,
     ru_fuel,
     ru_color,
     ru_body,
@@ -93,6 +94,11 @@ def _parse_hot_cache_brands() -> set[str]:
 
 
 TOP_BRANDS_SET = _parse_hot_cache_brands()
+
+
+def _strict_photo_cache_mode(region: Optional[str]) -> str:
+    enabled = os.getenv("CATALOG_HIDE_NO_LOCAL_PHOTO", "0") == "1"
+    return "1" if (enabled and (region or "").upper() == "EU") else "0"
 
 
 def _cacheable_catalog_filters(
@@ -370,6 +376,7 @@ def list_cars(
     cache_key = None
     cache_lock_key = None
     cache_lock_token = None
+    strict_photo_mode = _strict_photo_cache_mode(canon.get("region"))
     if cache_ok:
         cache_key = build_cars_list_key(
             canon.get("region"),
@@ -378,6 +385,7 @@ def list_cars(
             sort,
             page,
             page_size,
+            strict_photo_mode,
         )
         cached = redis_get_json(cache_key)
         if cached is not None:
@@ -432,6 +440,7 @@ def list_cars(
             "air_suspension": air_suspension,
             "price_rating_label": price_rating_label,
             "owners_count": owners_count,
+            "hide_no_local_photo": strict_photo_mode,
         }
         cache_key = build_cars_list_full_key(full_cache_params, sort, page, page_size)
         cached = redis_get_json(cache_key)
@@ -625,7 +634,7 @@ def list_cars(
                 "region": region_val,
                 "color": c.get("color"),
                 "display_color": ru_color(c.get("color")) or display_color(c.get("color")) or c.get("color"),
-                "color_hex": color_hex(c.get("color")),
+                "color_hex": color_hex(normalize_color(c.get("color")) or c.get("color")),
                 "engine_cc": c.get("engine_cc"),
                 "power_hp": c.get("power_hp"),
                 "body_type": c.get("body_type"),
@@ -740,6 +749,8 @@ def cars_count(
         "condition": condition,
     }
     normalized = normalize_count_params(params)
+    strict_photo_mode = _strict_photo_cache_mode(canon.get("region"))
+    normalized["hide_no_local_photo"] = strict_photo_mode
     cache_ok = _cacheable_catalog_filters(
         region=canon.get("region"),
         country=canon.get("country"),
@@ -802,6 +813,7 @@ def cars_count(
             canon.get("region"),
             canon.get("country"),
             canon.get("brand"),
+            strict_photo_mode,
         )
         cached = redis_get_json(cache_key_simple)
         if cached is not None:
@@ -909,6 +921,7 @@ def advanced_count(request: Request, db: Session = Depends(get_db)):
         "owners_count": qp.get("owners_count"),
     }
     normalized = normalize_count_params(raw_params)
+    normalized["hide_no_local_photo"] = _strict_photo_cache_mode(canon.get("region"))
     cache_key = build_cars_count_key(normalized)
     cached = redis_get_json(cache_key)
     if cached is not None:

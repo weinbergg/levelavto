@@ -1521,7 +1521,10 @@ body.filters-open {
 .search-filters .field--checkbox {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
   min-height: 38px;
   padding: 6px 10px;
   border: 1px solid var(--border-1);
@@ -1533,9 +1536,9 @@ body.filters-open {
 }
 .filters-primary-grid .field--checkbox span,
 .search-filters .field--checkbox span {
-  line-height: 1;
+  line-height: 1.2;
   font-weight: 500;
-  white-space: nowrap;
+  white-space: normal;
 }
 .filters-primary-grid .field--checkbox input,
 .search-filters .field--checkbox input {

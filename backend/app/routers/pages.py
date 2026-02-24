@@ -56,6 +56,11 @@ _TOTAL_CARS_CACHE: TTLCache = TTLCache(maxsize=32, ttl=300)
 
 def _get_cars_count(service: CarsService, params: Dict[str, Any], timing_enabled: bool) -> int:
     normalized = normalize_count_params(params)
+    strict_photo_mode = (
+        os.getenv("CATALOG_HIDE_NO_LOCAL_PHOTO", "0") == "1"
+        and str(normalized.get("region") or "").upper() == "EU"
+    )
+    normalized["hide_no_local_photo"] = "1" if strict_photo_mode else "0"
     cache_key = build_cars_count_key(normalized)
     cached = redis_get_json(cache_key)
     if cached is not None:
@@ -586,8 +591,6 @@ def _home_context(
     ]
     t0 = time.perf_counter()
     count_params = normalize_filter_params(dict(request.query_params))
-    if not count_params.get("region"):
-        count_params["region"] = "EU"
     total_cars = _get_cars_count(service, count_params, timing_enabled)
     _stage("total_cars_ms", t0)
     context = {
