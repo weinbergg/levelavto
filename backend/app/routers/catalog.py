@@ -600,7 +600,7 @@ def list_cars(
         display_rub = display_price_rub(
             total_cached,
             price_cached,
-            allow_price_fallback=str(c.get("country") or "").upper() == "KR",
+            allow_price_fallback=True,
         )
         if display_rub is None and c.get("price") is not None:
             cur = str(c.get("currency") or "").upper()
@@ -1007,11 +1007,12 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     detail.display_price_rub = display_price_rub(
         car.total_price_rub_cached,
         car.price_rub_cached,
-        allow_price_fallback=str(car.country or "").upper() == "KR",
+        allow_price_fallback=True,
     )
     detail.price_note = price_without_util_note(
         display_price=detail.display_price_rub,
         total_price_rub_cached=car.total_price_rub_cached,
+        region="KR" if str(car.country or "").upper().startswith("KR") else ("EU" if str(car.country or "").upper() and str(car.country or "").upper() != "RU" else None),
         country=car.country,
     )
     if car.source:

@@ -53,6 +53,8 @@ def price_without_util_note(
     c = str(country or "").upper()
     if reg == "KR" or c.startswith("KR"):
         return PRICE_NOTE_WITHOUT_UTIL
-    if reg == "EU" or c:
+    if reg == "EU":
+        return PRICE_NOTE_EUROPE
+    if not reg and c and c != "RU" and not c.startswith("KR"):
         return PRICE_NOTE_EUROPE
     return None

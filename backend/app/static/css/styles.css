@@ -2220,12 +2220,11 @@ input[type="number"]::-webkit-outer-spin-button {
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
   min-height: 220px;
   align-items: stretch;
-  contain: layout paint style;
   position: relative;
   z-index: 0;
 }
 .car-card:hover {
-  transform: scale(1.03);
+  transform: translateY(-2px);
   box-shadow: var(--shadow-2);
   z-index: 5;
 }
@@ -2320,7 +2319,8 @@ input[type="number"]::-webkit-outer-spin-button {
 .thumb {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
   border-radius: var(--r-md);
   border: 1px solid var(--border-1);
   background: #0b0e14;
@@ -2341,9 +2341,12 @@ input[type="number"]::-webkit-outer-spin-button {
 .car-card__body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: 12px;
   align-items: start;
   min-height: 120px;
+}
+.car-card__body > div:first-child {
+  min-width: 0;
 }
 
 /* Featured / highlights in catalog */
@@ -2370,10 +2373,12 @@ input[type="number"]::-webkit-outer-spin-button {
   margin: 0;
   font-size: 18px;
   color: var(--text-1);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  line-height: 1.25;
+  max-height: calc(1.25em * 2);
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
 }
 .car-card__meta {
   color: var(--text-3);
@@ -2942,13 +2947,38 @@ input[type="number"]::-webkit-outer-spin-button {
   border-radius: 14px;
 }
 .detail-origin-link {
-  margin-top: 16px;
-  display: flex;
-  justify-content: center;
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  z-index: 35;
+  margin: 0;
+  display: block;
+  pointer-events: none;
 }
 .detail-origin-link .btn {
-  width: 100%;
-  max-width: 420px;
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 10px;
+  opacity: 0.82;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+}
+.detail-origin-link .btn:hover {
+  opacity: 1;
+}
+@media (max-width: 860px) {
+  .car-card .thumb {
+    object-fit: contain;
+  }
+  .detail-origin-link {
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  .detail-origin-link .btn {
+    font-size: 11px;
+    padding: 6px 9px;
+  }
 }
 
 @media (max-width: 720px) {

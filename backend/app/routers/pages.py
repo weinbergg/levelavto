@@ -842,11 +842,12 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                 c["display_price_rub"] = display_price_rub(
                     c.get("total_price_rub_cached"),
                     c.get("price_rub_cached"),
-                    allow_price_fallback=str(c.get("country") or "").upper() == "KR",
+                    allow_price_fallback=True,
                 )
                 c["price_note"] = price_without_util_note(
                     display_price=c.get("display_price_rub"),
                     total_price_rub_cached=c.get("total_price_rub_cached"),
+                    region=params.get("region"),
                     country=c.get("country"),
                 )
             ids = [c.get("id") for c in initial_items if isinstance(c, dict) and c.get("id")]
@@ -1058,11 +1059,12 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         car.display_price_rub = display_price_rub(
             car.total_price_rub_cached,
             car.price_rub_cached,
-            allow_price_fallback=str(car.country or "").upper() == "KR",
+            allow_price_fallback=True,
         )
         car.price_note = price_without_util_note(
             display_price=car.display_price_rub,
             total_price_rub_cached=car.total_price_rub_cached,
+            region="KR" if str(car.country or "").upper().startswith("KR") else ("EU" if str(car.country or "").upper() and str(car.country or "").upper() != "RU" else None),
             country=car.country,
         )
         def _normalize_detail_image(url: str | None) -> str | None:
