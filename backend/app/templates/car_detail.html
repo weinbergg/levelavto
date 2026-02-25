@@ -16,15 +16,15 @@
         {% if not primary_raw %}
           {% set primary_src = '/static/img/no-photo.svg' %}
         {% elif 'img.classistatic.de' in primary_raw %}
-          {% set primary_src = "/thumb?u=" ~ (primary_raw | urlencode) ~ "&w=1024&fmt=webp&rev=2" %}
+          {% set primary_src = primary_raw %}
         {% elif primary_raw.startswith('/api/v1/mo-prod/images/') %}
-          {% set primary_src = "/thumb?u=" ~ (("https://img.classistatic.de" ~ primary_raw) | urlencode) ~ "&w=1024&fmt=webp&rev=2" %}
+          {% set primary_src = "https://img.classistatic.de" ~ primary_raw %}
         {% elif primary_raw.startswith('api/v1/mo-prod/images/') %}
-          {% set primary_src = "/thumb?u=" ~ (("https://img.classistatic.de/" ~ primary_raw) | urlencode) ~ "&w=1024&fmt=webp&rev=2" %}
+          {% set primary_src = "https://img.classistatic.de/" ~ primary_raw %}
         {% elif primary_raw.startswith('/media/') or primary_raw.startswith('https://') or primary_raw.startswith('http://') %}
           {% set primary_src = primary_raw %}
         {% elif primary_raw|length == 36 and primary_raw.count('-') == 4 %}
-          {% set primary_src = "/thumb?u=" ~ (("https://img.classistatic.de/api/v1/mo-prod/images/" ~ primary_raw[:2] ~ "/" ~ primary_raw ~ "?rule=mo-1024.jpg") | urlencode) ~ "&w=1024&fmt=webp&rev=2" %}
+          {% set primary_src = "https://img.classistatic.de/api/v1/mo-prod/images/" ~ primary_raw[:2] ~ "/" ~ primary_raw ~ "?rule=mo-1024.jpg" %}
         {% else %}
           {% set primary_src = '/static/img/no-photo.svg' %}
         {% endif %}
