@@ -277,8 +277,21 @@
           {% for car in initial_items %}
             <a class="car-card" href="/car/{{ car.id }}" data-id="{{ car.id }}">
               <div class="thumb-wrap">
-                {% if car.thumbnail_url %}
-                  {% set thumb_src = "/thumb?u=" ~ (car.thumbnail_url | urlencode) ~ "&w=360&fmt=webp&rev=2" %}
+                {% set t_raw = (car.thumbnail_url or '')|trim %}
+                {% if not t_raw %}
+                  {% set thumb_src = "/static/img/no-photo.svg" %}
+                {% elif t_raw.startswith('/thumb?') %}
+                  {% set thumb_src = t_raw %}
+                {% elif 'img.classistatic.de' in t_raw %}
+                  {% set thumb_src = "/thumb?u=" ~ (t_raw | urlencode) ~ "&w=360&fmt=webp&rev=2" %}
+                {% elif t_raw.startswith('/api/v1/mo-prod/images/') %}
+                  {% set thumb_src = "/thumb?u=" ~ (("https://img.classistatic.de" ~ t_raw) | urlencode) ~ "&w=360&fmt=webp&rev=2" %}
+                {% elif t_raw.startswith('api/v1/mo-prod/images/') %}
+                  {% set thumb_src = "/thumb?u=" ~ (("https://img.classistatic.de/" ~ t_raw) | urlencode) ~ "&w=360&fmt=webp&rev=2" %}
+                {% elif t_raw.startswith('/media/') or t_raw.startswith('https://') or t_raw.startswith('http://') %}
+                  {% set thumb_src = t_raw %}
+                {% elif t_raw|length == 36 and t_raw.count('-') == 4 %}
+                  {% set thumb_src = "/thumb?u=" ~ (("https://img.classistatic.de/api/v1/mo-prod/images/" ~ t_raw[:2] ~ "/" ~ t_raw ~ "?rule=mo-1024.jpg") | urlencode) ~ "&w=360&fmt=webp&rev=2" %}
                 {% else %}
                   {% set thumb_src = "/static/img/no-photo.svg" %}
                 {% endif %}

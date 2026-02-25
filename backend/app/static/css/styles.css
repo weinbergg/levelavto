@@ -2033,6 +2033,25 @@ input[type="number"]::-webkit-outer-spin-button {
   min-width: 0;
   align-items: stretch;
 }
+.catalog #cards .car-card {
+  grid-template-columns: minmax(260px, 34%) minmax(0, 1fr);
+  align-items: start;
+}
+.catalog #cards .thumb-wrap {
+  width: 100%;
+  max-width: 380px;
+  justify-self: start;
+}
+.catalog #cards .car-card__body {
+  min-width: 0;
+  padding-left: 8px;
+}
+.catalog #cards .car-card__title,
+.catalog #cards .car-card__meta,
+.catalog #cards .specs {
+  position: relative;
+  z-index: 1;
+}
 .catalog-topbar {
   display: grid;
   gap: 10px;
@@ -2077,9 +2096,8 @@ input[type="number"]::-webkit-outer-spin-button {
   grid-template-columns: 1fr;
   gap: var(--space-lg);
   align-items: stretch;
-  content-visibility: auto;
-  contain-intrinsic-size: 600px;
-  contain: layout style;
+  content-visibility: visible;
+  contain: none;
   overflow: visible;
 }
 .cards-highlights {
@@ -2239,11 +2257,11 @@ input[type="number"]::-webkit-outer-spin-button {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: rgba(11, 14, 20, 0.72);
   color: #fff;
   font-size: 0;
   line-height: 0;
@@ -2256,25 +2274,23 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .thumb-nav::before {
   content: "";
-  width: 9px;
-  height: 9px;
-  border-top: 2px solid #fff;
-  border-right: 2px solid #fff;
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid rgba(255, 255, 255, 0.95);
+  border-right: 2px solid rgba(255, 255, 255, 0.95);
   transform: rotate(45deg);
 }
 .thumb-nav--prev {
-  left: 8px;
+  left: 10px;
 }
 .thumb-nav--prev::before {
   transform: rotate(-135deg);
-  margin-left: 2px;
 }
 .thumb-nav--next {
-  right: 8px;
+  right: 10px;
 }
 .thumb-nav--next::before {
   transform: rotate(45deg);
-  margin-right: 2px;
 }
 .car-card:hover .thumb-nav {
   opacity: 1;
@@ -2741,25 +2757,25 @@ input[type="number"]::-webkit-outer-spin-button {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: rgba(11, 14, 20, 0.72);
   color: #fff;
   font-size: 0;
   line-height: 0;
   display: grid;
   place-items: center;
-  opacity: 0.85;
+  opacity: 0.88;
   cursor: pointer;
 }
 .detail-nav::before {
   content: "";
-  width: 11px;
-  height: 11px;
-  border-top: 2px solid #fff;
-  border-right: 2px solid #fff;
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid rgba(255, 255, 255, 0.95);
+  border-right: 2px solid rgba(255, 255, 255, 0.95);
   transform: rotate(45deg);
 }
 .detail-nav:hover {
@@ -2771,14 +2787,12 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .detail-nav--prev::before {
   transform: rotate(-135deg);
-  margin-left: 3px;
 }
 .detail-nav--next {
   right: 12px;
 }
 .detail-nav--next::before {
   transform: rotate(45deg);
-  margin-right: 3px;
 }
 .detail-hero__thumbs .thumb.is-broken {
   opacity: 0.45;
@@ -2968,6 +2982,15 @@ input[type="number"]::-webkit-outer-spin-button {
   opacity: 1;
 }
 @media (max-width: 860px) {
+  .catalog #cards .car-card {
+    grid-template-columns: 1fr;
+  }
+  .catalog #cards .thumb-wrap {
+    max-width: none;
+  }
+  .catalog #cards .car-card__body {
+    padding-left: 0;
+  }
   .car-card .thumb {
     object-fit: contain;
   }
