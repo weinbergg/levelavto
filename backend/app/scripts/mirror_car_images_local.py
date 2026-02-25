@@ -7,6 +7,7 @@ import json
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -136,6 +137,7 @@ def main() -> None:
     ap.add_argument("--region", default="EU")
     ap.add_argument("--country", default="AT")
     ap.add_argument("--source-key", default="mobile")
+    ap.add_argument("--brands", default="", help="Comma-separated brand list, e.g. BMW,Mercedes-Benz")
     ap.add_argument("--limit-cars", type=int, default=5000)
     ap.add_argument("--max-images-per-car", type=int, default=20)
     ap.add_argument("--workers", type=int, default=16)
@@ -153,6 +155,8 @@ def main() -> None:
     args = ap.parse_args()
 
     country = (args.country or "").strip().upper() or None
+    brands = [b.strip() for b in (args.brands or "").split(",") if b.strip()]
+    brands_lc = [b.lower() for b in brands]
     base_dir = _media_root()
     started = time.time()
     last_log = 0.0
@@ -233,6 +237,8 @@ def main() -> None:
             car_q = car_q.filter(Car.country.like("KR%"))
         if country:
             car_q = car_q.filter(func.upper(Car.country) == country)
+        if brands_lc:
+            car_q = car_q.filter(func.lower(func.trim(Car.brand)).in_(brands_lc))
         car_ids = [int(v[0]) for v in car_q.order_by(Car.id.asc()).limit(max(1, args.limit_cars)).all()]
         if not car_ids:
             print("[mirror_car_images_local] no cars matched", flush=True)
@@ -349,6 +355,7 @@ def main() -> None:
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "country": country,
+        "brands": brands,
         "checked": checked,
         "total": total,
         "mirrored": mirrored,
