@@ -2246,8 +2246,8 @@ input[type="number"]::-webkit-outer-spin-button {
   border: 1px solid rgba(255, 255, 255, 0.35);
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
-  font-size: 18px;
-  line-height: 1;
+  font-size: 0;
+  line-height: 0;
   display: grid;
   place-items: center;
   opacity: 0;
@@ -2255,11 +2255,27 @@ input[type="number"]::-webkit-outer-spin-button {
   transition: opacity 160ms ease, transform 160ms ease;
   z-index: 2;
 }
+.thumb-nav::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-top: 2px solid #fff;
+  border-right: 2px solid #fff;
+  transform: rotate(45deg);
+}
 .thumb-nav--prev {
   left: 8px;
 }
+.thumb-nav--prev::before {
+  transform: rotate(-135deg);
+  margin-left: 2px;
+}
 .thumb-nav--next {
   right: 8px;
+}
+.thumb-nav--next::before {
+  transform: rotate(45deg);
+  margin-right: 2px;
 }
 .car-card:hover .thumb-nav {
   opacity: 1;
@@ -2726,14 +2742,20 @@ input[type="number"]::-webkit-outer-spin-button {
   border: 1px solid rgba(255, 255, 255, 0.35);
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
-  font-size: 24px;
-  line-height: 1;
-  font-weight: 600;
+  font-size: 0;
+  line-height: 0;
   display: grid;
   place-items: center;
   opacity: 0.85;
-  padding-bottom: 1px;
   cursor: pointer;
+}
+.detail-nav::before {
+  content: "";
+  width: 11px;
+  height: 11px;
+  border-top: 2px solid #fff;
+  border-right: 2px solid #fff;
+  transform: rotate(45deg);
 }
 .detail-nav:hover {
   opacity: 1;
@@ -2742,8 +2764,16 @@ input[type="number"]::-webkit-outer-spin-button {
 .detail-nav--prev {
   left: 12px;
 }
+.detail-nav--prev::before {
+  transform: rotate(-135deg);
+  margin-left: 3px;
+}
 .detail-nav--next {
   right: 12px;
+}
+.detail-nav--next::before {
+  transform: rotate(45deg);
+  margin-right: 3px;
 }
 .detail-hero__thumbs .thumb.is-broken {
   opacity: 0.45;

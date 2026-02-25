@@ -172,6 +172,7 @@ def main() -> None:
     rewritten = 0
     deleted = 0
     thumb_updated = 0
+    skipped_by_cap = 0
     problems: list[dict] = []
 
     def snapshot() -> tuple[float, int, float, str]:
@@ -252,14 +253,23 @@ def main() -> None:
 
         per_car_count: dict[int, int] = {}
         payload: list[tuple[int, int, str, int, bool]] = []
+        has_cap = args.max_images_per_car > 0
         for image_id, car_id, url, pos, is_primary in rows:
             cid = int(car_id)
             count = per_car_count.get(cid, 0)
-            if count >= args.max_images_per_car:
+            if has_cap and count >= args.max_images_per_car:
+                skipped_by_cap += 1
                 continue
             per_car_count[cid] = count + 1
             payload.append((int(image_id), cid, str(url or ""), int(pos or 0), bool(is_primary)))
         total = len(payload)
+        if has_cap and skipped_by_cap > 0:
+            print(
+                "[mirror_car_images_local] "
+                f"skipped_by_cap={skipped_by_cap} (max_images_per_car={args.max_images_per_car}). "
+                "Use --max-images-per-car 0 to process all images for selected cars.",
+                flush=True,
+            )
         log("start")
         notify("start")
 
@@ -363,6 +373,7 @@ def main() -> None:
         "rewritten": rewritten,
         "deleted": deleted,
         "thumb_updated": thumb_updated,
+        "skipped_by_cap": skipped_by_cap,
         "dry_run": bool(args.dry_run),
         "format": args.format,
         "quality": args.quality,
@@ -375,7 +386,7 @@ def main() -> None:
     print(
         "[mirror_car_images_local] "
         f"checked={checked} mirrored={mirrored} failed={failed} rewritten={rewritten} "
-        f"deleted={deleted} thumb_updated={thumb_updated} json={report_path}",
+        f"deleted={deleted} thumb_updated={thumb_updated} skipped_by_cap={skipped_by_cap} json={report_path}",
         flush=True,
     )
 
