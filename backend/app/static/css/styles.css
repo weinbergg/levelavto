@@ -2099,7 +2099,8 @@ input[type="number"]::-webkit-outer-spin-button {
 .cards-highlights .thumb {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #0b0e14;
 }
 .cards-highlights .car-card__body {
   grid-template-columns: 1fr;
@@ -2231,6 +2232,9 @@ input[type="number"]::-webkit-outer-spin-button {
 .thumb-wrap {
   position: relative;
   overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--r-md);
+  background: #0b0e14;
 }
 .thumb-nav {
   position: absolute;
@@ -2299,8 +2303,8 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .thumb {
   width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  height: 100%;
+  object-fit: contain;
   border-radius: var(--r-md);
   border: 1px solid var(--border-1);
   background: #0b0e14;
@@ -2653,7 +2657,7 @@ input[type="number"]::-webkit-outer-spin-button {
   width: 100%;
   border-radius: 12px;
   border: 1px solid var(--color-border-subtle);
-  object-fit: cover;
+  object-fit: contain;
 }
 .detail-hero__main {
   background: radial-gradient(
@@ -2666,7 +2670,7 @@ input[type="number"]::-webkit-outer-spin-button {
   border: 1px solid var(--color-border-subtle);
   padding: 6px;
   min-height: 280px;
-  aspect-ratio: 3 / 2;
+  aspect-ratio: 4 / 3;
   background-size: cover;
   background-position: center;
   display: grid;
@@ -2677,7 +2681,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .detail-hero__main img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 10px;
 }
 .empty-placeholder {
@@ -2704,8 +2708,9 @@ input[type="number"]::-webkit-outer-spin-button {
 .detail-hero__thumbs img {
   width: 100%;
   aspect-ratio: 4/3;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 8px;
+  background: #0b0e14;
 }
 .detail-hero__thumbs .thumb.active {
   border-color: var(--color-accent);
@@ -2958,6 +2963,26 @@ input[type="number"]::-webkit-outer-spin-button {
   }
   .detail-price {
     text-align: left;
+  }
+}
+
+@media (max-width: 1024px) and (orientation: portrait) {
+  .thumb-wrap {
+    aspect-ratio: 4 / 3;
+  }
+  .detail-hero__main {
+    aspect-ratio: 4 / 3;
+    min-height: 240px;
+  }
+}
+
+@media (max-width: 1024px) and (orientation: landscape) {
+  .thumb-wrap {
+    aspect-ratio: 16 / 10;
+  }
+  .detail-hero__main {
+    aspect-ratio: 16 / 10;
+    min-height: 220px;
   }
 }
 
