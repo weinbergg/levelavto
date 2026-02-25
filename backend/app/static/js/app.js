@@ -127,13 +127,14 @@
     return url
   }
 
-  function applyThumbFallback(img) {
+  function applyThumbFallback(img, opts = {}) {
     if (!img) return
+    const useThumbProxy = opts.thumbProxy !== false
     const rawSrc = img.getAttribute('src') || ''
     const rawData = img.dataset.thumb || ''
-    let normalized = normalizeThumbUrl(rawSrc, { thumb: true })
+    let normalized = normalizeThumbUrl(rawSrc, { thumb: useThumbProxy })
     if (normalized === '/static/img/no-photo.svg' && rawData) {
-      const dataNormalized = normalizeThumbUrl(rawData, { thumb: true })
+      const dataNormalized = normalizeThumbUrl(rawData, { thumb: useThumbProxy })
       if (dataNormalized !== '/static/img/no-photo.svg') {
         normalized = dataNormalized
       }
@@ -2560,7 +2561,7 @@
       images = []
     }
     if (!Array.isArray(images) || images.length < 2) return
-    images = images.map((u) => normalizeThumbUrl(u, { thumb: true }))
+    images = images.map((u) => normalizeThumbUrl(u))
     if (images.length < 2) return
     const isUsable = (src) => Boolean(src && src !== '/static/img/no-photo.svg')
     let idx = Math.max(0, images.indexOf(img.getAttribute('src')))
@@ -2587,7 +2588,7 @@
       delete img.dataset.thumbRetried
       delete img.dataset.fallbackApplied
       img.src = images[idx]
-      applyThumbFallback(img)
+      applyThumbFallback(img, { thumbProxy: false })
       syncActive()
     }
     const move = (step) => {
@@ -2610,7 +2611,7 @@
         if (i === idx) move(1)
       })
     })
-    applyThumbFallback(img)
+    applyThumbFallback(img, { thumbProxy: false })
     const prevBtn = qs('[data-detail-prev]')
     const nextBtn = qs('[data-detail-next]')
     prevBtn?.addEventListener('click', (e) => {
@@ -2682,7 +2683,7 @@
   function initThumbFallbacks() {
     qsa('img.thumb').forEach((img) => applyThumbFallback(img))
     const primary = qs('#primaryImage')
-    if (primary) applyThumbFallback(primary)
+    if (primary) applyThumbFallback(primary, { thumbProxy: false })
   }
 
   function initAll() {
