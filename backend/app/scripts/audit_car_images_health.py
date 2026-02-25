@@ -86,6 +86,7 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--telegram", action="store_true", help="send progress to Telegram if env configured")
     ap.add_argument("--telegram-interval", type=int, default=1800, help="seconds between Telegram updates")
+    ap.add_argument("--log-interval", type=int, default=300, help="seconds between stdout progress logs")
     ap.add_argument("--report-json", default="/app/artifacts/audit_car_images_health.json")
     ap.add_argument("--report-csv", default="/app/artifacts/audit_car_images_health.csv")
     args = ap.parse_args()
@@ -100,18 +101,13 @@ def main() -> None:
     rows_report: list[dict] = []
     started_at = time.time()
     last_notify = 0.0
+    last_log = 0.0
     total_images = 0
     token = os.getenv("TELEGRAM_BOT_TOKEN") if args.telegram else None
     chat_id = os.getenv("TELEGRAM_CHAT_ID") if args.telegram else None
 
-    def maybe_notify(stage: str) -> None:
-        nonlocal last_notify
-        if not token or not chat_id:
-            return
-        now = time.time()
-        if stage not in {"start", "done"} and now - last_notify < max(30, args.telegram_interval):
-            return
-        elapsed = max(now - started_at, 1.0)
+    def _progress_snapshot() -> tuple[float, int, str, float]:
+        elapsed = max(time.time() - started_at, 1.0)
         rate = checked / elapsed if checked else 0.0
         remaining = max(total_images - checked, 0)
         eta_sec = (remaining / rate) if rate > 0 else None
@@ -124,6 +120,16 @@ def main() -> None:
             s = sec % 60
             eta_str = f"{h}h {m}m {s}s" if h else (f"{m}m {s}s" if m else f"{s}s")
         pct = (checked * 100.0 / total_images) if total_images else 0.0
+        return pct, remaining, eta_str, rate
+
+    def maybe_notify(stage: str) -> None:
+        nonlocal last_notify
+        if not token or not chat_id:
+            return
+        now = time.time()
+        if stage not in {"start", "done"} and now - last_notify < max(30, args.telegram_interval):
+            return
+        pct, remaining, eta_str, rate = _progress_snapshot()
         msg = (
             f"audit_car_images_health {stage}\n"
             f"checked={checked}/{total_images or '?'} ({pct:.2f}%)\n"
@@ -131,8 +137,27 @@ def main() -> None:
             f"thumb_updated={thumbnails_updated} thumb_cleared={thumbnails_cleared}\n"
             f"rate={rate:.2f} img/s remaining={remaining if total_images else '?'} eta={eta_str}"
         )
-        if send_telegram_message(token, chat_id, msg):
+        ok = send_telegram_message(token, chat_id, msg)
+        if ok:
             last_notify = now
+        else:
+            print("[audit_car_images_health] telegram_send_failed", flush=True)
+
+    def maybe_log(stage: str) -> None:
+        nonlocal last_log
+        now = time.time()
+        if stage not in {"start", "done"} and now - last_log < max(5, args.log_interval):
+            return
+        pct, remaining, eta_str, rate = _progress_snapshot()
+        print(
+            "[audit_car_images_health] "
+            f"stage={stage} checked={checked}/{total_images or '?'} ({pct:.2f}%) "
+            f"broken={broken} deleted={deleted} thumb_updated={thumbnails_updated} "
+            f"thumb_cleared={thumbnails_cleared} rate={rate:.2f}/s "
+            f"remaining={remaining if total_images else '?'} eta={eta_str}",
+            flush=True,
+        )
+        last_log = now
 
     with SessionLocal() as db:
         car_q = (
@@ -169,7 +194,13 @@ def main() -> None:
             per_car_count[int(car_id)] = c + 1
             payload.append((int(image_id), int(car_id), str(raw_url or "")))
         total_images = len(payload)
+        maybe_log("start")
         maybe_notify("start")
+        if token and chat_id:
+            test_ok = send_telegram_message(token, chat_id, "audit_car_images_health heartbeat: start")
+            print(f"[audit_car_images_health] telegram_start_ok={int(bool(test_ok))}", flush=True)
+        elif args.telegram:
+            print("[audit_car_images_health] telegram_missing_env", flush=True)
 
         broken_image_ids: list[int] = []
         first_valid_by_car: dict[int, str] = {}
@@ -213,6 +244,7 @@ def main() -> None:
                     if cid not in first_valid_by_car and row.get("checked_url"):
                         first_valid_by_car[cid] = str(row["checked_url"])
                 rows_report.append(row)
+                maybe_log("progress")
                 maybe_notify("progress")
 
         if not args.dry_run and (args.fix_delete_broken or args.fix_sync_thumbnail):
@@ -233,6 +265,7 @@ def main() -> None:
                         car.thumbnail_url = None
                         thumbnails_cleared += 1
             db.commit()
+        maybe_log("done")
         maybe_notify("done")
 
     rows_report.sort(key=lambda r: (0 if not r["ok"] else 1, int(r["car_id"]), int(r["image_id"])))
