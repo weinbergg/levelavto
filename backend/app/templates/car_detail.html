@@ -219,6 +219,26 @@
         </div>
       </div>
     </div>
+    {% set original_raw = (car.source_url or '')|trim %}
+    {% if original_raw %}
+    {% if original_raw.startswith('//') %}
+      {% set original_url = 'https:' ~ original_raw %}
+    {% elif original_raw.startswith('http://') or original_raw.startswith('https://') %}
+      {% set original_url = original_raw %}
+    {% else %}
+      {% set original_url = 'https://' ~ original_raw %}
+    {% endif %}
+    <div class="card detail-origin-link">
+      <a
+        class="btn btn-secondary"
+        href="{{ original_url }}"
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+      >
+        Открыть оригинальное объявление
+      </a>
+    </div>
+    {% endif %}
     {% endif %}
   </div>
 </section>
