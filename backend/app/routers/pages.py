@@ -1071,6 +1071,8 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             raw = (url or "").strip()
             if not raw:
                 return None
+            if raw.startswith("/thumb?"):
+                return raw
             normalized = normalize_classistatic_url(raw)
             if normalized:
                 return normalized

@@ -62,7 +62,7 @@
             {% set thumb_src = "/thumb?u=" ~ (("https://img.classistatic.de" ~ im_raw) | urlencode) ~ "&w=240&fmt=webp&rev=2" %}
           {% elif im_raw.startswith('api/v1/mo-prod/images/') %}
             {% set thumb_src = "/thumb?u=" ~ (("https://img.classistatic.de/" ~ im_raw) | urlencode) ~ "&w=240&fmt=webp&rev=2" %}
-          {% elif im_raw.startswith('/media/') or im_raw.startswith('https://') or im_raw.startswith('http://') %}
+          {% elif im_raw.startswith('/media/') or im_raw.startswith('/thumb?') or im_raw.startswith('https://') or im_raw.startswith('http://') %}
             {% set thumb_src = im_raw %}
           {% elif im_raw|length == 36 and im_raw.count('-') == 4 %}
             {% set thumb_src = "/thumb?u=" ~ (("https://img.classistatic.de/api/v1/mo-prod/images/" ~ im_raw[:2] ~ "/" ~ im_raw ~ "?rule=mo-1024.jpg") | urlencode) ~ "&w=240&fmt=webp&rev=2" %}

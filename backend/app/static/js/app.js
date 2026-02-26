@@ -93,8 +93,31 @@
 
   const THUMB_REV = '2'
 
+  function tryParseUrl(url) {
+    try {
+      return new URL(url, window.location.origin)
+    } catch (_) {
+      return null
+    }
+  }
+
+  function isThumbProxyPath(pathname) {
+    return pathname === '/thumb' || pathname.endsWith('/thumb')
+  }
+
+  function normalizeThumbProxy(url) {
+    const parsed = tryParseUrl(url)
+    if (!parsed || !isThumbProxyPath(parsed.pathname)) return null
+    const u = parsed.searchParams.get('u')
+    if (!u) return '/static/img/no-photo.svg'
+    const out = `/thumb?u=${encodeURIComponent(u)}&w=${parsed.searchParams.get('w') || '360'}&fmt=${parsed.searchParams.get('fmt') || 'webp'}&rev=${THUMB_REV}`
+    return out
+  }
+
   function thumbProxyUrl(url, width = 360) {
     if (!url) return '/static/img/no-photo.svg'
+    const normalizedProxy = normalizeThumbProxy(url)
+    if (normalizedProxy) return normalizedProxy
     if (url.startsWith('/thumb?')) {
       return url.includes('rev=') ? url : `${url}&rev=${THUMB_REV}`
     }
@@ -107,6 +130,10 @@
     if (!val) return '/static/img/no-photo.svg'
     let url = val
     while (url.startsWith('.')) url = url.slice(1)
+    const normalizedProxy = normalizeThumbProxy(url)
+    if (normalizedProxy) {
+      return opts.thumb ? normalizedProxy : (new URL(normalizedProxy, window.location.origin).searchParams.get('u') || '/static/img/no-photo.svg')
+    }
     if (url.startsWith('//')) url = `https:${url}`
     if (url.startsWith('http://')) url = url.replace('http://', 'https://')
     if (url.startsWith('api/v1/mo-prod/images/')) url = `https://img.classistatic.de/${url}`
