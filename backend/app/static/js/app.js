@@ -149,7 +149,7 @@
     }
     // Keep original classistatic rule to avoid 404 on some sizes.
     if (opts.thumb) {
-      return thumbProxyUrl(url)
+      return thumbProxyUrl(url, Number(opts.width) || 360)
     }
     return url
   }
@@ -2588,7 +2588,7 @@
       images = []
     }
     if (!Array.isArray(images) || images.length < 2) return
-    images = images.map((u) => normalizeThumbUrl(u))
+    images = images.map((u) => normalizeThumbUrl(u, { thumb: true, width: 1024 }))
     if (images.length < 2) return
     const isUsable = (src) => Boolean(src && src !== '/static/img/no-photo.svg')
     let idx = Math.max(0, images.indexOf(img.getAttribute('src')))
@@ -2615,7 +2615,7 @@
       delete img.dataset.thumbRetried
       delete img.dataset.fallbackApplied
       img.src = images[idx]
-      applyThumbFallback(img, { thumbProxy: false })
+      applyThumbFallback(img, { thumbProxy: true })
       syncActive()
     }
     const move = (step) => {
@@ -2638,7 +2638,8 @@
         if (i === idx) move(1)
       })
     })
-    applyThumbFallback(img, { thumbProxy: false })
+    setImageByIndex(idx)
+    applyThumbFallback(img, { thumbProxy: true })
     const prevBtn = qs('[data-detail-prev]')
     const nextBtn = qs('[data-detail-next]')
     prevBtn?.addEventListener('click', (e) => {
