@@ -1540,9 +1540,7 @@ body.filters-open {
   flex: 1 1 auto;
   line-height: 1.2;
   font-weight: 500;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  white-space: nowrap;
 }
 .filters-primary-grid .field--checkbox input,
 .search-filters .field--checkbox input {

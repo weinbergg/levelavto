@@ -70,6 +70,24 @@ def _probe(url: str, timeout_sec: float) -> ProbeResult:
     except requests.RequestException as exc:
         return ProbeResult(ok=False, status=0, reason=str(exc)[:140], checked_url=url)
 
+def _probe_fast_head(url: str, timeout_sec: float) -> ProbeResult:
+    # Faster mode for large overnight sweeps:
+    # one HEAD request only, no GET fallback body reads.
+    if url.startswith("/media/"):
+        return ProbeResult(ok=True, status=200, reason="local_media", checked_url=url)
+    headers = {"User-Agent": "levelavto-image-audit/1.0"}
+    try:
+        resp = requests.head(url, timeout=timeout_sec, allow_redirects=True, headers=headers)
+        status = int(resp.status_code)
+        if status < 400:
+            return ProbeResult(ok=True, status=status, reason="ok_head_fast", checked_url=url)
+        # 405/403 are often anti-bot head-blocks; don't delete aggressively in fast mode.
+        if status in (403, 405):
+            return ProbeResult(ok=True, status=status, reason="head_blocked_assume_ok", checked_url=url)
+        return ProbeResult(ok=False, status=status, reason=f"http_{status}", checked_url=url)
+    except requests.RequestException as exc:
+        return ProbeResult(ok=False, status=0, reason=str(exc)[:140], checked_url=url)
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Audit/fix broken car_images URLs for detail gallery stability")
@@ -80,6 +98,7 @@ def main() -> None:
     ap.add_argument("--max-images-per-car", type=int, default=30)
     ap.add_argument("--workers", type=int, default=12)
     ap.add_argument("--timeout", type=float, default=5.0)
+    ap.add_argument("--fast-head-only", action="store_true", help="probe with single HEAD request (faster, less strict)")
     ap.add_argument("--fix-delete-broken", action="store_true")
     ap.add_argument("--fix-sync-thumbnail", action="store_true")
     ap.add_argument("--clear-thumbnail-when-no-valid", action="store_true")
@@ -219,7 +238,7 @@ def main() -> None:
                     "ok": False,
                     "reason": "invalid_format",
                 }
-            pr = _probe(normalized, timeout_sec=args.timeout)
+            pr = _probe_fast_head(normalized, timeout_sec=args.timeout) if args.fast_head_only else _probe(normalized, timeout_sec=args.timeout)
             return {
                 "image_id": image_id,
                 "car_id": car_id,
