@@ -93,7 +93,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Audit/fix broken car_images URLs for detail gallery stability")
     ap.add_argument("--region", default="EU")
     ap.add_argument("--country", default=None, help="ISO code, e.g. AT")
-    ap.add_argument("--source-key", default="mobile")
+    ap.add_argument("--source-key", default="mobile", help="substring for Source.key; use 'all' to disable source filter")
     ap.add_argument("--limit-cars", type=int, default=5000)
     ap.add_argument("--max-images-per-car", type=int, default=30)
     ap.add_argument("--workers", type=int, default=12)
@@ -182,11 +182,11 @@ def main() -> None:
         car_q = (
             db.query(Car.id)
             .join(Source, Source.id == Car.source_id)
-            .filter(
-                Car.is_available.is_(True),
-                func.lower(Source.key).like(f"%{args.source_key.lower()}%"),
-            )
+            .filter(Car.is_available.is_(True))
         )
+        source_key = (args.source_key or "").strip().lower()
+        if source_key not in {"", "all", "*"}:
+            car_q = car_q.filter(func.lower(Source.key).like(f"%{source_key}%"))
         if args.region.upper() == "EU":
             car_q = car_q.filter(Car.country != "RU", ~Car.country.like("KR%"))
         elif args.region.upper() == "KR":
