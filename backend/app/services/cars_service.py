@@ -597,6 +597,7 @@ class CarsService:
         light: bool = False,
         count_only: bool = False,
         use_fast_count: bool = True,
+        hide_no_local_photo: bool = False,
     ) -> Tuple[List[Car] | List[dict], int]:
         conditions = [self._available_expr()]
         if region and not country:
@@ -927,10 +928,7 @@ class CarsService:
                 conditions.append(Car.mileage.is_not(None))
                 conditions.append(Car.mileage > 100)
 
-        strict_local_photo_mode = (
-            os.getenv("CATALOG_HIDE_NO_LOCAL_PHOTO", "0") == "1"
-            and (region or "").upper() == "EU"
-        )
+        strict_local_photo_mode = bool(hide_no_local_photo and (region or "").upper() == "EU")
 
         # Optional strict catalog mode: hide cars without mirrored local photos.
         if strict_local_photo_mode:
@@ -2098,6 +2096,7 @@ class CarsService:
         transmission: Optional[str] = None,
         drive_type: Optional[str] = None,
         condition: Optional[str] = None,
+        hide_no_local_photo: bool = False,
     ) -> int:
         _, total = self.list_cars(
             region=region,
@@ -2127,6 +2126,7 @@ class CarsService:
             page_size=1,
             light=True,
             use_fast_count=False,
+            hide_no_local_photo=hide_no_local_photo,
         )
         return int(total)
 

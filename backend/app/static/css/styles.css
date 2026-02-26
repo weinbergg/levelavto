@@ -1536,9 +1536,13 @@ body.filters-open {
 }
 .filters-primary-grid .field--checkbox span,
 .search-filters .field--checkbox span {
+  min-width: 0;
+  flex: 1 1 auto;
   line-height: 1.2;
   font-weight: 500;
   white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .filters-primary-grid .field--checkbox input,
 .search-filters .field--checkbox input {

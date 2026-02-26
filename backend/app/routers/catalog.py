@@ -97,7 +97,9 @@ TOP_BRANDS_SET = _parse_hot_cache_brands()
 
 
 def _strict_photo_cache_mode(region: Optional[str]) -> str:
-    enabled = os.getenv("CATALOG_HIDE_NO_LOCAL_PHOTO", "0") == "1"
+    # Disabled by default to avoid accidentally hiding most EU inventory.
+    # Enable explicit query-level strict mode with CATALOG_HIDE_NO_LOCAL_PHOTO_QUERY=1.
+    enabled = os.getenv("CATALOG_HIDE_NO_LOCAL_PHOTO_QUERY", "0") == "1"
     return "1" if (enabled and (region or "").upper() == "EU") else "0"
 
 
@@ -514,6 +516,7 @@ def list_cars(
         page_size=page_size,
         light=True,
         use_fast_count=os.getenv("CATALOG_USE_FAST_COUNT", "1") != "0",
+        hide_no_local_photo=(strict_photo_mode == "1"),
     )
     t1 = time.perf_counter()
     if items and not isinstance(items[0], dict):
@@ -848,6 +851,7 @@ def cars_count(
             reg_year_min=reg_year_min,
             reg_year_max=reg_year_max,
             condition=condition,
+            hide_no_local_photo=(strict_photo_mode == "1"),
         )
         redis_set_json(cache_key, int(total), ttl_sec=1800)
         if cache_ok and cache_key_simple:
@@ -982,6 +986,7 @@ def advanced_count(request: Request, db: Session = Depends(get_db)):
             light=True,
             count_only=True,
             use_fast_count=os.getenv("CATALOG_USE_FAST_COUNT", "1") != "0",
+            hide_no_local_photo=(_strict_photo_cache_mode(canon.get("region")) == "1"),
         )
         redis_set_json(cache_key, int(total), ttl_sec=1800)
         return {"count": int(total)}
