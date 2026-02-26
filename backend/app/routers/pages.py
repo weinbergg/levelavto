@@ -28,7 +28,7 @@ from ..utils.redis_cache import (
 )
 from ..models import Car, Source, CarImage
 from ..auth import get_current_user
-from urllib.parse import quote
+from urllib.parse import quote, urlparse, parse_qs, unquote
 from ..utils.localization import display_body, display_color
 from ..utils.taxonomy import (
     ru_body,
@@ -1071,8 +1071,16 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             raw = (url or "").strip()
             if not raw:
                 return None
-            if raw.startswith("/thumb?"):
-                return raw
+            if raw.startswith("/thumb?") or raw.startswith("http://") or raw.startswith("https://"):
+                try:
+                    parsed = urlparse(raw if raw.startswith("/thumb?") else str(raw))
+                    if parsed.path == "/thumb" or parsed.path.endswith("/thumb"):
+                        params = parse_qs(parsed.query or "")
+                        src = (params.get("u") or [None])[0]
+                        if src:
+                            raw = unquote(src).strip()
+                except Exception:
+                    pass
             normalized = normalize_classistatic_url(raw)
             if normalized:
                 return normalized

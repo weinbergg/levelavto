@@ -261,7 +261,7 @@ class CarsService:
                 FROM car_counts_model
                 WHERE (:region IS NULL OR region = :region)
                   AND (:country IS NULL OR country = :country)
-                  AND brand = ANY(:brand_variants)
+                  AND LOWER(TRIM(brand)) = ANY(:brand_variants_lc)
                   AND model = :model
                 """
             )
@@ -272,7 +272,7 @@ class CarsService:
                 FROM car_counts_brand
                 WHERE (:region IS NULL OR region = :region)
                   AND (:country IS NULL OR country = :country)
-                  AND brand = ANY(:brand_variants)
+                  AND LOWER(TRIM(brand)) = ANY(:brand_variants_lc)
                 """
             )
         else:
@@ -292,7 +292,7 @@ class CarsService:
                     "country": country_norm,
                     "brand": brand_norm or None,
                     "model": model_norm or None,
-                    "brand_variants": brand_variants_list or [brand_norm] if brand_norm else None,
+                    "brand_variants_lc": [v.lower() for v in (brand_variants_list or [brand_norm] if brand_norm else []) if v],
                 },
             ).first()
         except ProgrammingError:
@@ -390,7 +390,9 @@ class CarsService:
             b = normalize_brand(brand).strip()
             if b:
                 variants = brand_variants(b)
-                conditions.append(Car.brand.in_(variants))
+                variants_lc = [v.lower() for v in variants if v]
+                if variants_lc:
+                    conditions.append(func.lower(func.trim(Car.brand)).in_(variants_lc))
         if model:
             mv = str(model).strip()
             if mv:
@@ -464,12 +466,12 @@ class CarsService:
         if params.get("brand"):
             brand_list = brand_variants(params["brand"])
             if brand_list:
-                params["brand_variants"] = brand_list
+                params["brand_variants_lc"] = [v.lower() for v in brand_list if v]
 
         where_clauses = []
         for key in allowed_filters:
             if key == "brand" and brand_list:
-                where_clauses.append("brand = ANY(:brand_variants)")
+                where_clauses.append("LOWER(TRIM(brand)) = ANY(:brand_variants_lc)")
                 continue
             if key in params:
                 where_clauses.append(f"{key} = :{key}")
@@ -675,8 +677,9 @@ class CarsService:
             b = normalize_brand(brand).strip().strip(".,;")
             if b:
                 variants = brand_variants(b)
-                if variants:
-                    conditions.append(Car.brand.in_(variants))
+                variants_lc = [v.lower() for v in variants if v]
+                if variants_lc:
+                    conditions.append(func.lower(func.trim(Car.brand)).in_(variants_lc))
         if q:
             # Fast path: map single-token fuel queries to structured engine_type filter.
             # This avoids expensive broad payload scans for common searches like "diesel".
@@ -1783,20 +1786,24 @@ class CarsService:
             """
             SELECT model, SUM(total) AS count
             FROM car_counts_model
-            WHERE brand = ANY(:brand_variants) AND model IS NOT NULL AND model <> ''
+            WHERE LOWER(TRIM(brand)) = ANY(:brand_variants_lc) AND model IS NOT NULL AND model <> ''
             GROUP BY model
             ORDER BY count DESC, model ASC
             LIMIT 200
             """
         )
         try:
-            rows = self.db.execute(stmt, {"brand_variants": brand_variants(norm_brand)}).all()
+            rows = self.db.execute(
+                stmt,
+                {"brand_variants_lc": [v.lower() for v in brand_variants(norm_brand)]},
+            ).all()
             models = [{"model": r[0], "count": int(r[1])} for r in rows if r[0]]
         except ProgrammingError:
             self.db.rollback()
+            variants_lc = [v.lower() for v in brand_variants(norm_brand) if v]
             fb_stmt = (
                 select(Car.model, func.count())
-                .where(self._available_expr(), Car.brand.in_(brand_variants(norm_brand)))
+                .where(self._available_expr(), func.lower(func.trim(Car.brand)).in_(variants_lc))
                 .group_by(Car.model)
                 .order_by(func.count().desc(), Car.model.asc())
                 .limit(200)

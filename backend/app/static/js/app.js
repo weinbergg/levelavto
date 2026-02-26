@@ -105,13 +105,29 @@
     return pathname === '/thumb' || pathname.endsWith('/thumb')
   }
 
+  function normalizeThumbSourceUrl(uRaw) {
+    const u = String(uRaw || '').trim()
+    if (!u) return '/static/img/no-photo.svg'
+    if (u.startsWith('/media/') || u.startsWith('/static/')) return u
+    if (u.startsWith('//')) return `https:${u}`
+    if (u.startsWith('http://')) return u.replace('http://', 'https://')
+    if (u.startsWith('https://')) return u
+    if (u.startsWith('/api/v1/mo-prod/images/')) return `https://img.classistatic.de${u}`
+    if (u.startsWith('api/v1/mo-prod/images/')) return `https://img.classistatic.de/${u}`
+    if (u.startsWith('img.classistatic.de/')) return `https://${u}`
+    return u
+  }
+
   function normalizeThumbProxy(url) {
     const parsed = tryParseUrl(url)
     if (!parsed || !isThumbProxyPath(parsed.pathname)) return null
-    const u = parsed.searchParams.get('u')
-    if (!u) return '/static/img/no-photo.svg'
-    const out = `/thumb?u=${encodeURIComponent(u)}&w=${parsed.searchParams.get('w') || '360'}&fmt=${parsed.searchParams.get('fmt') || 'webp'}&rev=${THUMB_REV}`
-    return out
+    const u = normalizeThumbSourceUrl(parsed.searchParams.get('u'))
+    if (!u || u === '/static/img/no-photo.svg') return '/static/img/no-photo.svg'
+    // Local/static files should never go through /thumb proxy.
+    if (u.startsWith('/media/') || u.startsWith('/static/')) return u
+    // Proxy is only for classistatic URLs.
+    if (!u.includes('img.classistatic.de')) return u
+    return `/thumb?u=${encodeURIComponent(u)}&w=${parsed.searchParams.get('w') || '360'}&fmt=${parsed.searchParams.get('fmt') || 'webp'}&rev=${THUMB_REV}`
   }
 
   function thumbProxyUrl(url, width = 360) {
@@ -132,7 +148,11 @@
     while (url.startsWith('.')) url = url.slice(1)
     const normalizedProxy = normalizeThumbProxy(url)
     if (normalizedProxy) {
-      return opts.thumb ? normalizedProxy : (new URL(normalizedProxy, window.location.origin).searchParams.get('u') || '/static/img/no-photo.svg')
+      if (opts.thumb) return normalizedProxy
+      const parsed = tryParseUrl(normalizedProxy)
+      if (!parsed) return normalizedProxy
+      const u = parsed.searchParams.get('u')
+      return u ? normalizeThumbSourceUrl(u) : normalizedProxy
     }
     if (url.startsWith('//')) url = `https:${url}`
     if (url.startsWith('http://')) url = url.replace('http://', 'https://')
