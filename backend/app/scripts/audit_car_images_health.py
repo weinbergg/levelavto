@@ -99,6 +99,8 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=12)
     ap.add_argument("--timeout", type=float, default=5.0)
     ap.add_argument("--fast-head-only", action="store_true", help="probe with single HEAD request (faster, less strict)")
+    ap.add_argument("--submit-batch", type=int, default=5000, help="number of probe tasks submitted at once")
+    ap.add_argument("--report-max-rows", type=int, default=200000, help="max rows kept in json/csv report")
     ap.add_argument("--fix-delete-broken", action="store_true")
     ap.add_argument("--fix-sync-thumbnail", action="store_true")
     ap.add_argument("--clear-thumbnail-when-no-valid", action="store_true")
@@ -122,6 +124,7 @@ def main() -> None:
     last_notify = 0.0
     last_log = 0.0
     total_images = 0
+    selected_cars_count = 0
     token = os.getenv("TELEGRAM_BOT_TOKEN") if args.telegram else None
     chat_id = os.getenv("TELEGRAM_CHAT_ID") if args.telegram else None
 
@@ -193,27 +196,20 @@ def main() -> None:
             car_q = car_q.filter(Car.country.like("KR%"))
         if country_filter:
             car_q = car_q.filter(func.upper(Car.country) == country_filter)
-        car_ids = [int(v[0]) for v in car_q.order_by(Car.id.asc()).limit(max(1, args.limit_cars)).all()]
-        if not car_ids:
+        car_q = car_q.order_by(Car.id.asc()).limit(max(1, args.limit_cars))
+        car_ids_subq = car_q.subquery()
+        selected_cars_count = int(
+            db.execute(select(func.count()).select_from(car_ids_subq)).scalar_one() or 0
+        )
+        if selected_cars_count <= 0:
             print("[audit_car_images_health] no cars matched")
             return
 
-        img_rows = db.execute(
+        img_stmt = (
             select(CarImage.id, CarImage.car_id, CarImage.url)
-            .where(CarImage.car_id.in_(car_ids))
+            .join(car_ids_subq, CarImage.car_id == car_ids_subq.c.id)
             .order_by(CarImage.car_id.asc(), CarImage.position.asc(), CarImage.id.asc())
-        ).all()
-
-        per_car_count: dict[int, int] = {}
-        payload: list[tuple[int, int, str]] = []
-        has_cap = args.max_images_per_car > 0
-        for image_id, car_id, raw_url in img_rows:
-            c = per_car_count.get(int(car_id), 0)
-            if has_cap and c >= args.max_images_per_car:
-                continue
-            per_car_count[int(car_id)] = c + 1
-            payload.append((int(image_id), int(car_id), str(raw_url or "")))
-        total_images = len(payload)
+        )
         maybe_log("start")
         maybe_notify("start")
         if token and chat_id:
@@ -224,7 +220,6 @@ def main() -> None:
 
         broken_image_ids: list[int] = []
         first_valid_by_car: dict[int, str] = {}
-        cars_with_any_valid: set[int] = set()
 
         def run_probe(item: tuple[int, int, str]) -> dict:
             image_id, car_id, raw = item
@@ -250,8 +245,15 @@ def main() -> None:
                 "reason": pr.reason,
             }
 
-        with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
-            futures = [pool.submit(run_probe, item) for item in payload]
+        submit_batch = max(100, int(args.submit_batch or 5000))
+        report_max_rows = max(1000, int(args.report_max_rows or 200000))
+        stream_fetch_size = max(1000, min(10000, submit_batch))
+        has_cap = args.max_images_per_car > 0
+        per_car_count: dict[int, int] = {}
+
+        def process_chunk(pool: ThreadPoolExecutor, chunk: list[tuple[int, int, str]]) -> None:
+            nonlocal checked, broken
+            futures = [pool.submit(run_probe, item) for item in chunk]
             for fut in as_completed(futures):
                 row = fut.result()
                 checked += 1
@@ -260,21 +262,43 @@ def main() -> None:
                     broken_image_ids.append(int(row["image_id"]))
                 else:
                     cid = int(row["car_id"])
-                    cars_with_any_valid.add(cid)
                     if cid not in first_valid_by_car and row.get("checked_url"):
                         first_valid_by_car[cid] = str(row["checked_url"])
-                rows_report.append(row)
+                if len(rows_report) < report_max_rows:
+                    rows_report.append(row)
                 maybe_log("progress")
                 maybe_notify("progress")
 
+        payload_chunk: list[tuple[int, int, str]] = []
+        with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
+            result = db.execute(img_stmt.execution_options(stream_results=True))
+            for image_id, car_id, raw_url in result.yield_per(stream_fetch_size):
+                cid = int(car_id)
+                cnt = per_car_count.get(cid, 0)
+                if has_cap and cnt >= args.max_images_per_car:
+                    continue
+                per_car_count[cid] = cnt + 1
+                payload_chunk.append((int(image_id), cid, str(raw_url or "")))
+                total_images += 1
+                if len(payload_chunk) >= submit_batch:
+                    process_chunk(pool, payload_chunk)
+                    payload_chunk = []
+            if payload_chunk:
+                process_chunk(pool, payload_chunk)
+
         if not args.dry_run and (args.fix_delete_broken or args.fix_sync_thumbnail):
             if args.fix_delete_broken and broken_image_ids:
-                db.query(CarImage).filter(CarImage.id.in_(broken_image_ids)).delete(synchronize_session=False)
-                deleted = len(broken_image_ids)
+                delete_batch = 5000
+                for i in range(0, len(broken_image_ids), delete_batch):
+                    chunk_ids = broken_image_ids[i : i + delete_batch]
+                    if not chunk_ids:
+                        continue
+                    db.query(CarImage).filter(CarImage.id.in_(chunk_ids)).delete(synchronize_session=False)
+                    deleted += len(chunk_ids)
 
             if args.fix_sync_thumbnail:
-                cars = db.query(Car).filter(Car.id.in_(car_ids)).all()
-                for car in cars:
+                cars_q = db.query(Car).join(car_ids_subq, Car.id == car_ids_subq.c.id)
+                for car in cars_q.yield_per(2000):
                     target = first_valid_by_car.get(int(car.id))
                     current = (car.thumbnail_url or "").strip()
                     if target:
@@ -295,12 +319,15 @@ def main() -> None:
         "country": country_filter,
         "source_key": args.source_key,
         "cars_limit": args.limit_cars,
+        "cars_selected": selected_cars_count,
         "images_checked": checked,
         "images_broken": broken,
         "broken_pct": round((broken / checked * 100.0), 2) if checked else 0.0,
         "images_deleted": deleted,
         "thumbnails_updated": thumbnails_updated,
         "thumbnails_cleared": thumbnails_cleared,
+        "report_rows_kept": len(rows_report),
+        "report_rows_dropped": max(0, checked - len(rows_report)),
         "dry_run": bool(args.dry_run),
     }
 

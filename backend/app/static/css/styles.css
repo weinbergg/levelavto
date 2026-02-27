@@ -1519,10 +1519,11 @@ body.filters-open {
 }
 .filters-primary-grid .field--checkbox,
 .search-filters .field--checkbox {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
+  column-gap: 10px;
   width: 100%;
   box-sizing: border-box;
   min-height: 38px;
@@ -1537,10 +1538,12 @@ body.filters-open {
 .filters-primary-grid .field--checkbox span,
 .search-filters .field--checkbox span {
   min-width: 0;
-  flex: 1 1 auto;
   line-height: 1.2;
   font-weight: 500;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  hyphens: none;
 }
 .filters-primary-grid .field--checkbox input,
 .search-filters .field--checkbox input {
