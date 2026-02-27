@@ -206,9 +206,10 @@ def main() -> None:
 
         per_car_count: dict[int, int] = {}
         payload: list[tuple[int, int, str]] = []
+        has_cap = args.max_images_per_car > 0
         for image_id, car_id, raw_url in img_rows:
             c = per_car_count.get(int(car_id), 0)
-            if c >= args.max_images_per_car:
+            if has_cap and c >= args.max_images_per_car:
                 continue
             per_car_count[int(car_id)] = c + 1
             payload.append((int(image_id), int(car_id), str(raw_url or "")))
