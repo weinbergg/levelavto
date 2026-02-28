@@ -7,6 +7,7 @@ from backend.app.db import SessionLocal
 from backend.app.models import Car
 from backend.app.services.cars_service import CarsService
 from backend.app.utils.telegram import send_telegram_message
+from sqlalchemy import or_
 
 
 def main() -> None:
@@ -15,6 +16,11 @@ def main() -> None:
     ap.add_argument("--country", default=None)
     ap.add_argument("--batch", type=int, default=2000)
     ap.add_argument("--only-missing", action="store_true")
+    ap.add_argument(
+        "--only-missing-registration",
+        action="store_true",
+        help="recalculate only cars with missing registration_year or registration_month",
+    )
     ap.add_argument("--since-minutes", type=int, default=None)
     ap.add_argument("--chunk", type=int, default=50000, help="ids per window (avoid huge offsets)")
     ap.add_argument("--sleep", type=int, default=0, help="seconds to sleep between windows")
@@ -64,6 +70,10 @@ def main() -> None:
             base = base.filter(Car.country == args.country.upper())
         if args.only_missing:
             base = base.filter(Car.total_price_rub_cached.is_(None))
+        if args.only_missing_registration:
+            base = base.filter(
+                or_(Car.registration_year.is_(None), Car.registration_month.is_(None))
+            )
         if args.since_minutes:
             since_ts = datetime.utcnow() - timedelta(minutes=args.since_minutes)
             base = base.filter(Car.updated_at >= since_ts)
@@ -85,7 +95,8 @@ def main() -> None:
                     cars = db.query(Car).filter(Car.id.in_(batch_ids)).all()
                     for car in cars:
                         try:
-                            res = svc.ensure_calc_cache(car)
+                            force_recalc = bool(args.only_missing_registration)
+                            res = svc.ensure_calc_cache(car, force=force_recalc)
                             if res is None:
                                 skipped += 1
                                 continue

@@ -92,7 +92,16 @@
       <div class="detail-info card">
         <div class="detail-heading">
           <h1 class="detail-title">{{ car.brand or '' }} {{ car.model or '' }}</h1>
-          {% set meta = [] %} {% if car.year %}{% set _ = meta.append(car.year) %}{% endif %} {% if car.display_engine_type or car.engine_type %}{% set _ = meta.append(car.display_engine_type or car.engine_type) %}{% endif %}
+          {% set months_ru = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'] %}
+          {% set meta = [] %}
+          {% if car.registration_year and car.registration_month and 1 <= car.registration_month <= 12 %}
+            {% set _ = meta.append(months_ru[car.registration_month - 1] ~ ' ' ~ car.registration_year) %}
+          {% elif car.registration_year %}
+            {% set _ = meta.append(car.registration_year) %}
+          {% elif car.year %}
+            {% set _ = meta.append(car.year) %}
+          {% endif %}
+          {% if car.display_engine_type or car.engine_type %}{% set _ = meta.append(car.display_engine_type or car.engine_type) %}{% endif %}
           {% set gross = pricing.gross_eur if pricing else None %}
           {% set net = pricing.net_eur if pricing else None %}
           {% set vat_pct = pricing.vat_percent if pricing else None %}

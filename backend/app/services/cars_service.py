@@ -1458,11 +1458,16 @@ class CarsService:
         if not used_price:
             self.logger.info("calc_skip_no_price car=%s src=%s", car.id, getattr(car.source, "key", None))
             return _fallback_total("no_price")
-        reg_year = car.registration_year or car.year
-        reg_month = car.registration_month or 1
-        if reg_year is None:
-            self.logger.info("calc_skip_no_reg_year car=%s src=%s", car.id, getattr(car.source, "key", None))
-            return _fallback_total("no_reg_year")
+        now_dt = datetime.utcnow()
+        reg_fallback_current = False
+        # Business rule: if registration date is missing, treat car as newly registered (current month/year).
+        if car.registration_year and car.registration_month:
+            reg_year = int(car.registration_year)
+            reg_month = int(car.registration_month)
+        else:
+            reg_year = int(now_dt.year)
+            reg_month = int(now_dt.month)
+            reg_fallback_current = True
         # кеш
         cfg_svc = CalculatorConfigService(self.db)
         cfg = None
@@ -1536,8 +1541,8 @@ class CarsService:
         scenario = None
         if is_electric:
             scenario = "electric"
-        elif not (car.registration_year and car.registration_month):
-            scenario = "3_5"
+        elif reg_fallback_current:
+            scenario = "under_3"
         req = EstimateRequest(
             scenario=scenario,
             price_net_eur=price_net_eur,
