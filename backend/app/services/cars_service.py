@@ -1434,6 +1434,7 @@ class CarsService:
             car.total_price_rub_cached = total
             if car.calc_breakdown_json is None:
                 car.calc_breakdown_json = []
+            _upsert_version(car.calc_breakdown_json, "__without_util_fee", "1")
             _upsert_version(car.calc_breakdown_json, "__customs_version", customs_version or "")
             car.calc_updated_at = datetime.utcnow()
             self.db.commit()
@@ -1578,6 +1579,8 @@ class CarsService:
             _upsert_version(display, "__config_version", cfg_version)
         if customs_version:
             _upsert_version(display, "__customs_version", customs_version)
+        if result.get("without_util_fee"):
+            _upsert_version(display, "__without_util_fee", "1")
         total_rub = float(result.get("total_rub") or 0)
         car.total_price_rub_cached = total_rub
         car.calc_breakdown_json = display

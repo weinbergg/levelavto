@@ -42,11 +42,18 @@ def price_without_util_note(
     *,
     display_price: Optional[float],
     total_price_rub_cached: Optional[float],
+    calc_breakdown: Optional[list] = None,
     region: Optional[str] = None,
     country: Optional[str] = None,
 ) -> Optional[str]:
     if display_price is None:
         return None
+    has_without_util_marker = any(
+        isinstance(row, dict) and row.get("title") == "__without_util_fee"
+        for row in (calc_breakdown or [])
+    )
+    if has_without_util_marker:
+        return PRICE_NOTE_WITHOUT_UTIL
     if total_price_rub_cached is not None:
         return None
     reg = str(region or "").upper()

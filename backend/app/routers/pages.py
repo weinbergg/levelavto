@@ -447,6 +447,7 @@ def _home_context(
         car.price_note = price_without_util_note(
             display_price=car.display_price_rub,
             total_price_rub_cached=car.total_price_rub_cached,
+            calc_breakdown=car.calc_breakdown_json,
             country=car.country,
         )
         thumb = resolve_thumbnail_url(
@@ -847,6 +848,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                 c["price_note"] = price_without_util_note(
                     display_price=c.get("display_price_rub"),
                     total_price_rub_cached=c.get("total_price_rub_cached"),
+                    calc_breakdown=c.get("calc_breakdown_json"),
                     region=params.get("region"),
                     country=c.get("country"),
                 )
@@ -1064,6 +1066,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         car.price_note = price_without_util_note(
             display_price=car.display_price_rub,
             total_price_rub_cached=car.total_price_rub_cached,
+            calc_breakdown=car.calc_breakdown_json,
             region="KR" if str(car.country or "").upper().startswith("KR") else ("EU" if str(car.country or "").upper() and str(car.country or "").upper() != "RU" else None),
             country=car.country,
         )

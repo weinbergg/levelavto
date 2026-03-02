@@ -628,6 +628,7 @@ def list_cars(
                 "price_note": price_without_util_note(
                     display_price=display_rub,
                     total_price_rub_cached=total_cached,
+                    calc_breakdown=c.get("calc_breakdown_json"),
                     region=region_val,
                     country=country_norm or country_raw,
                 ),
@@ -1017,6 +1018,7 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     detail.price_note = price_without_util_note(
         display_price=detail.display_price_rub,
         total_price_rub_cached=car.total_price_rub_cached,
+        calc_breakdown=car.calc_breakdown_json,
         region="KR" if str(car.country or "").upper().startswith("KR") else ("EU" if str(car.country or "").upper() and str(car.country or "").upper() != "RU" else None),
         country=car.country,
     )

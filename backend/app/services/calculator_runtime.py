@@ -215,19 +215,26 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
             duty_eur = calc_duty_eur(req.engine_cc, customs_cfg)
             duty_rub = Decimal(str(duty_eur)) * eur_rate
 
-        util_rub = calc_util_fee_rub(
-            engine_cc=req.engine_cc,
-            kw=req.power_kw,
-            hp=int(req.power_hp) if req.power_hp is not None else None,
-            cfg=customs_cfg,
-            age_bucket=scenario_key,
-        )
+        power_kw_val = float(req.power_kw) if req.power_kw is not None else None
+        power_hp_val = float(req.power_hp) if req.power_hp is not None else None
+        has_power = bool((power_kw_val and power_kw_val > 0) or (power_hp_val and power_hp_val > 0))
+        util_rub = None
+        if has_power:
+            util_rub = calc_util_fee_rub(
+                engine_cc=req.engine_cc,
+                kw=power_kw_val,
+                hp=int(power_hp_val) if power_hp_val is not None else None,
+                cfg=customs_cfg,
+                age_bucket=scenario_key,
+            )
 
         if duty_rub != 0:
             breakdown.append({"title": LABELS["duty"], "amount": out(duty_rub), "currency": "RUB"})
-        breakdown.append({"title": LABELS["util_fee"], "amount": int(util_rub), "currency": "RUB"})
+        if util_rub is not None:
+            breakdown.append({"title": LABELS["util_fee"], "amount": int(util_rub), "currency": "RUB"})
 
-        total_rub = subtotal_rub + duty_rub + Decimal(str(util_rub)) + sum(rub_fields.values(), Decimal("0"))
+        util_component = Decimal(str(util_rub)) if util_rub is not None else Decimal("0")
+        total_rub = subtotal_rub + duty_rub + util_component + sum(rub_fields.values(), Decimal("0"))
         total_rub = _ceil_rub(total_rub)
         breakdown.append({"title": LABELS["total_rub"], "amount": total_rub, "currency": "RUB"})
         return {
@@ -235,6 +242,7 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
             "total_rub": total_rub,
             "breakdown": breakdown,
             "euro_rate_used": float(eur_rate),
+            "without_util_fee": not has_power,
         }
 
     # electric (BEV only)
