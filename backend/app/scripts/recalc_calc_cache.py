@@ -7,7 +7,7 @@ from backend.app.db import SessionLocal
 from backend.app.models import Car
 from backend.app.services.cars_service import CarsService
 from backend.app.utils.telegram import send_telegram_message
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 
 def main() -> None:
@@ -27,6 +27,11 @@ def main() -> None:
     ap.add_argument("--telegram", action="store_true", help="send progress to Telegram if env configured")
     ap.add_argument("--telegram-interval", type=int, default=900, help="seconds between telegram updates")
     ap.add_argument("--rate-shift", type=float, default=0.0, help="add rub to EUR/USD rates when recalculating")
+    ap.add_argument(
+        "--brands",
+        default="",
+        help="comma-separated brand list (case-insensitive), e.g. BMW,Mercedes-Benz",
+    )
     args = ap.parse_args()
 
     updated = skipped = errors = 0
@@ -52,6 +57,7 @@ def main() -> None:
 
     with SessionLocal() as db:
         svc = CarsService(db)
+        brands = [b.strip().lower() for b in (args.brands or "").split(",") if b.strip()]
         if args.rate_shift:
             # warm cache with shifted rate so subsequent calls reuse it
             rates = svc.get_fx_rates(allow_fetch=True) or {}
@@ -68,6 +74,8 @@ def main() -> None:
             base = base.filter(~Car.country.like("KR%"))
         if args.country:
             base = base.filter(Car.country == args.country.upper())
+        if brands:
+            base = base.filter(func.lower(func.trim(Car.brand)).in_(brands))
         if args.only_missing:
             base = base.filter(Car.total_price_rub_cached.is_(None))
         if args.only_missing_registration:
