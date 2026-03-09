@@ -15,8 +15,9 @@ PAUSE="${CHUNK_PAUSE_SEC:-60}"
 RUNTIME="${CHUNK_MAX_RUNTIME_SEC:-3600}"
 TOTAL="${CHUNK_TOTAL_PAGES:-0}"
 STOP_FILE="${EMAVTO_STOP_FILE:-/tmp/emavto_stop}"
+MIN_PRICE_USD="${EMAVTO_MIN_PRICE_USD:-5000}"
 
-echo "[nightly] start $(date -Iseconds) pages=${PAGES} pause=${PAUSE}s runtime=${RUNTIME}s total=${TOTAL}"
+echo "[nightly] start $(date -Iseconds) pages=${PAGES} pause=${PAUSE}s runtime=${RUNTIME}s total=${TOTAL} min_price_usd=${MIN_PRICE_USD}"
 
 if [[ -f "${STOP_FILE}" ]]; then
   rm -f "${STOP_FILE}"
@@ -27,6 +28,7 @@ ${DOCKER_CMD} exec -T web python -m backend.app.tools.emavto_chunk_runner \
   --pause-sec "${PAUSE}" \
   --max-runtime-sec "${RUNTIME}" \
   --total-pages "${TOTAL}" \
+  --min-price-usd "${MIN_PRICE_USD}" \
   --mode incremental \
   --start-page 1
 

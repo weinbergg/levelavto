@@ -43,6 +43,7 @@ CHUNK_PAGES = int(os.environ.get("CHUNK_PAGES", "10"))
 CHUNK_PAUSE_SEC = int(os.environ.get("CHUNK_PAUSE_SEC", "60"))
 CHUNK_MAX_RUNTIME_SEC = int(os.environ.get("CHUNK_MAX_RUNTIME_SEC", "3600"))
 CHUNK_TOTAL_PAGES = int(os.environ.get("CHUNK_TOTAL_PAGES", "0"))
+CHUNK_MIN_PRICE_USD = int(os.environ.get("EMAVTO_MIN_PRICE_USD", "5000"))
 
 MODE_FULL = "full"
 MODE_INCREMENTAL = "incremental"
@@ -61,6 +62,8 @@ def build_chunk_cmd(mode: str = MODE_FULL, start_page: str | None = None) -> lis
         str(CHUNK_MAX_RUNTIME_SEC),
         "--total-pages",
         str(CHUNK_TOTAL_PAGES),
+        "--min-price-usd",
+        str(CHUNK_MIN_PRICE_USD),
         "--mode",
         mode,
     ]
@@ -276,7 +279,7 @@ async def handle_util_age(update: Update, age_bucket: str, context: ContextTypes
     data = load_customs_dict()
     tables = _util_table_names(data)
     context.user_data[UTIL_EDIT_STATE] = {"stage": "table", "age_bucket": age_bucket}
-    kb = [[InlineKeyboardButton(name, callback_data=f\"util_table::{name}\")] for name in tables]
+    kb = [[InlineKeyboardButton(name, callback_data=f"util_table::{name}")] for name in tables]
     kb.append([InlineKeyboardButton("Назад", callback_data="util_menu")])
     await update.callback_query.message.reply_text(
         f"Выберите таблицу (объём): {age_bucket}", reply_markup=InlineKeyboardMarkup(kb)

@@ -55,6 +55,7 @@ emavto_klg:
   query_params: {}
   defaults:
     currency: "USD"
+    min_price_usd: 5000
     list_rps: 0.8
     list_concurrency: 1
     detail_rps: 0.35

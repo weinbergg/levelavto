@@ -21,6 +21,7 @@ def run_chunk(
     start_page: int,
     pages: int,
     max_runtime_sec: int,
+    min_price_usd: int = 0,
     backfill_missing: bool = False,
     mode: str = "full",
 ) -> tuple[int, int, int, int, int, int]:
@@ -30,6 +31,7 @@ def run_chunk(
         "pages": pages,
         "max_pages": pages,  # ensure fetch_items limits list pages to this chunk
         "max_runtime_sec": max_runtime_sec,
+        "min_price_usd": int(min_price_usd or 0),
         "details": None,
     }
     # mode override for incremental
@@ -150,6 +152,12 @@ def main() -> None:
                     help="Path to stop file; if exists before a chunk, runner stops")
     ap.add_argument("--mode", type=str, default="full",
                     choices=["full", "incremental"], help="Run mode: full or incremental")
+    ap.add_argument(
+        "--min-price-usd",
+        type=int,
+        default=int(os.environ.get("EMAVTO_MIN_PRICE_USD", "0")),
+        help="Skip ads with source USD price lower than this value (0=disabled)",
+    )
     ap.add_argument("--backfill-missing", action="store_true",
                     help="After main loop, try to доfetch missing details within half runtime")
     args = ap.parse_args()
@@ -192,9 +200,17 @@ def main() -> None:
                 pages_this = min(pages_this, total_pages_left)
 
             print(
-                f"[runner] chunk start page={current_page} pages={pages_this}")
+                f"[runner] chunk start page={current_page} pages={pages_this} min_price_usd={args.min_price_usd}")
             chunk_items, inserted, updated, last_page, missing, tasks_total = run_chunk(
-                parser, ds, source, current_page, pages_this, args.max_runtime_sec, args.backfill_missing, args.mode
+                parser,
+                ds,
+                source,
+                current_page,
+                pages_this,
+                args.max_runtime_sec,
+                args.min_price_usd,
+                args.backfill_missing,
+                args.mode,
             )
             expected = pages_this * 50
             print(

@@ -43,6 +43,7 @@ class EmAvtoKlgParser(BaseParser):
             d.get("max_pages_full", config.pagination.max_pages))
         self.max_pages_incremental = int(
             d.get("max_pages_incremental", config.pagination.max_pages))
+        self.min_price_usd = int(d.get("min_price_usd", 0) or 0)
         self.progress: Dict[str, Any] = {}
         self.metrics: Dict[str, Any] = {
             "list_requests": 0,
@@ -51,6 +52,7 @@ class EmAvtoKlgParser(BaseParser):
             "list_429": 0,
             "list_latency": [],
             "detail_latency": [],
+            "skipped_below_min_price": 0,
         }
         self.last_tasks_total: int = 0
         self.last_details_done: int = 0
@@ -73,6 +75,7 @@ class EmAvtoKlgParser(BaseParser):
         max_pages = int(profile.get("max_pages") or (
             self.max_pages_full if mode == "full" else self.max_pages_incremental))
         max_items = int(profile.get("max_items") or 0)
+        min_price_usd = int(profile.get("min_price_usd") or self.min_price_usd or 0)
         skip_details = bool(profile.get("skip_details", False))
         # default 30m for larger batches
         deadline_sec = int(profile.get("max_runtime_sec") or 1800)
@@ -98,6 +101,7 @@ class EmAvtoKlgParser(BaseParser):
                 profile,
                 skip_details,
                 max_items,
+                min_price_usd,
                 deadline,
             )
             if not ok:
@@ -191,6 +195,12 @@ class EmAvtoKlgParser(BaseParser):
             self.metrics["list_429"],
             self.metrics["detail_429"],
         )
+        if self.metrics["skipped_below_min_price"]:
+            logger.info(
+                "[emavto_klg] skipped_below_min_price=%s min_price_usd=%s",
+                self.metrics["skipped_below_min_price"],
+                min_price_usd,
+            )
         if deadline_hit:
             logger.warning(
                 "[emavto_klg] deadline_hit max_runtime_sec=%s tasks_total=%s details_done=%s missing=%s",
@@ -265,6 +275,7 @@ class EmAvtoKlgParser(BaseParser):
         profile: Dict[str, Any],
         skip_details: bool,
         max_items: int,
+        min_price_usd: int,
         deadline: float,
     ) -> bool:
         query = self._build_query(profile, page)
@@ -303,6 +314,9 @@ class EmAvtoKlgParser(BaseParser):
             details_text = r.get("details") or ""
             mileage, year, fuel = self._parse_emavto_details(details_text)
             price = self._parse_price_usd(r.get("price"))
+            if min_price_usd > 0 and price is not None and price < min_price_usd:
+                self.metrics["skipped_below_min_price"] += 1
+                continue
             if skip_details:
                 car = CarParsed(
                     source_key=self.config.key,
