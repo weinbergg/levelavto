@@ -6,7 +6,7 @@ import os
 import subprocess
 import time
 import uuid
-from urllib.parse import urlparse, unquote
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse, unquote
 
 import logging
 from fastapi import APIRouter, HTTPException, Query
@@ -21,6 +21,7 @@ _LOCK_TTL_SEC = 30
 _CACHE_TTL_SEC = 7 * 24 * 3600
 _NEGATIVE_TTL_NOT_FOUND_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_NOT_FOUND_SEC", "86400"))
 _NEGATIVE_TTL_ERROR_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_ERROR_SEC", "900"))
+_CLASSISTATIC_RULE_CANDIDATES = ("mo-1024.jpg", "mo-640.jpg", "mo-360.jpg", "mo-240.jpg")
 
 
 def _cache_dir() -> str:
@@ -104,6 +105,38 @@ def _normalize_source_url(u: str | None, url: str | None) -> str:
     if parsed.hostname not in _ALLOWED_HOSTS:
         raise HTTPException(status_code=400, detail="invalid host")
     return src
+
+
+def _classistatic_variants(src: str) -> list[str]:
+    parsed = urlparse(src)
+    if parsed.hostname not in _ALLOWED_HOSTS:
+        return [src]
+    params = parse_qsl(parsed.query, keep_blank_values=True)
+    base_params: list[tuple[str, str]] = []
+    current_rule: str | None = None
+    for k, v in params:
+        if k.lower() == "rule":
+            current_rule = v
+            continue
+        base_params.append((k, v))
+
+    rules: list[str] = []
+    if current_rule:
+        rules.append(current_rule)
+    for rule in _CLASSISTATIC_RULE_CANDIDATES:
+        if rule not in rules:
+            rules.append(rule)
+
+    variants: list[str] = []
+    seen: set[str] = set()
+    for rule in rules:
+        query = urlencode([*base_params, ("rule", rule)], doseq=True)
+        candidate = urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, query, parsed.fragment))
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        variants.append(candidate)
+    return variants or [src]
 
 
 def _fetch_with_curl(src: str, dest: str, max_bytes: int) -> int:
@@ -237,31 +270,37 @@ def thumb(
         return _placeholder_response("public, max-age=30")
 
     tmp_fetch = os.path.join(_cache_dir(), f".fetch-{uuid.uuid4().hex}")
-    code = _fetch_with_curl(src, tmp_fetch, max_bytes=2_000_000)
-    if code in (404, 410):
+    codes: list[int] = []
+    used_src = src
+    ok = False
+    for candidate in _classistatic_variants(src):
+        used_src = candidate
+        code = _fetch_with_curl(candidate, tmp_fetch, max_bytes=2_000_000)
+        codes.append(code)
+        if code == 200:
+            ok = True
+            break
+        if code == 413:
+            try:
+                if os.path.exists(tmp_fetch):
+                    os.remove(tmp_fetch)
+            except Exception:
+                pass
+            _release_lock(path)
+            raise HTTPException(status_code=413, detail="upstream too large")
+
+    if not ok:
         try:
             if os.path.exists(tmp_fetch):
                 os.remove(tmp_fetch)
         except Exception:
             pass
-        _mark_negative(path, code)
-        _release_lock(path)
-        return _placeholder_response()
-    if code == 413:
-        try:
-            if os.path.exists(tmp_fetch):
-                os.remove(tmp_fetch)
-        except Exception:
-            pass
-        _release_lock(path)
-        raise HTTPException(status_code=413, detail="upstream too large")
-    if code != 200:
-        try:
-            if os.path.exists(tmp_fetch):
-                os.remove(tmp_fetch)
-        except Exception:
-            pass
-        _mark_negative(path, code)
+        final_code = next((c for c in reversed(codes) if c), 0)
+        if codes and all(c in (404, 410) for c in codes if c):
+            _mark_negative(path, final_code or 404)
+            _release_lock(path)
+            return _placeholder_response()
+        _mark_negative(path, final_code)
         _release_lock(path)
         return _placeholder_response("public, max-age=30")
 
@@ -277,7 +316,14 @@ def thumb(
         img.save(tmp_path, format=save_fmt, quality=80, method=6)
         os.replace(tmp_path, path)
         _clear_negative(path)
-        logger.info("thumb_cache_write_ok path=%s bytes=%s fmt=%s w=%s", path, os.path.getsize(path), fmt, w)
+        logger.info(
+            "thumb_cache_write_ok path=%s bytes=%s fmt=%s w=%s src=%s",
+            path,
+            os.path.getsize(path),
+            fmt,
+            w,
+            used_src,
+        )
         # touch meta for freshness
         try:
             with open(_meta_path(path), "w") as mh:
