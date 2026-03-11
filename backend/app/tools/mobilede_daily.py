@@ -41,6 +41,8 @@ def rotate_backups(directory: Path, keep: int = 5) -> None:
 def download_file(for_date: dt.date, dest: Path) -> None:
     if not LOGIN or not PASSWORD:
         raise RuntimeError("MOBILEDE_LOGIN/MOBILEDE_PASSWORD must be set in environment")
+    # Ensure target directory exists before disk usage check.
+    dest.parent.mkdir(parents=True, exist_ok=True)
     try:
         usage = shutil.disk_usage(dest.parent)
         if usage.free < MIN_FREE_GB * 1024 * 1024 * 1024:
@@ -52,7 +54,6 @@ def download_file(for_date: dt.date, dest: Path) -> None:
     url = f"{HOST}/mobilede/{for_date:%Y-%m-%d}/{FILENAME}"
     auth_header = base64.b64encode(f"{LOGIN}:{PASSWORD}".encode()).decode()
     headers = {"authorization": f"Basic {auth_header}"}
-    dest.parent.mkdir(parents=True, exist_ok=True)
     with requests.get(url, headers=headers, stream=True, timeout=60) as r:
         r.raise_for_status()
         with open(dest, "wb") as f:
