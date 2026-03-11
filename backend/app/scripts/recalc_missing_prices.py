@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import time
 from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy import and_, or_
 
@@ -30,6 +32,12 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=500)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--sleep", type=float, default=0.0, help="Sleep between batches (sec)")
+    ap.add_argument(
+        "--only-missing-total",
+        action="store_true",
+        help="Compatibility flag: this script always recalculates only rows with missing total.",
+    )
+    ap.add_argument("--report-json", default=None, help="Optional report path")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -109,7 +117,23 @@ def main() -> None:
             flush=True,
         )
 
+        if args.report_json:
+            report = {
+                "generated_at": datetime.utcnow().isoformat(),
+                "region": args.region,
+                "country": args.country,
+                "batch": int(args.batch),
+                "limit": args.limit,
+                "dry_run": bool(args.dry_run),
+                "checked": checked,
+                "updated": updated,
+                "failed": failed,
+                "elapsed_sec": round(elapsed, 2),
+            }
+            path = Path(args.report_json)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
 
 if __name__ == "__main__":
     main()
-

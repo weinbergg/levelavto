@@ -1110,8 +1110,10 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             )
             if resolved_thumb:
                 car.thumbnail_url = resolved_thumb
-                if not detail_images:
-                    detail_images.append(resolved_thumb)
+                if resolved_thumb in detail_images:
+                    detail_images = [resolved_thumb] + [u for u in detail_images if u != resolved_thumb]
+                else:
+                    detail_images.insert(0, resolved_thumb)
         except Exception:
             pass
     details = []
