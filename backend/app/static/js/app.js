@@ -2731,7 +2731,7 @@
   function initThumbFallbacks() {
     qsa('img.thumb').forEach((img) => applyThumbFallback(img))
     const primary = qs('#primaryImage')
-    if (primary) applyThumbFallback(primary, { thumbProxy: false })
+    if (primary) applyThumbFallback(primary, { thumbProxy: true })
   }
 
   function initAll() {
