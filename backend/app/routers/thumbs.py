@@ -109,7 +109,18 @@ def _normalize_source_url(u: str | None, url: str | None) -> str:
     return src
 
 
-def _classistatic_variants(src: str) -> list[str]:
+def _preferred_classistatic_rules(width: int) -> list[str]:
+    if width <= 240:
+        return ["mo-240.jpg", "mo-360.jpg", "mo-640.jpg", "mo-1024.jpg"]
+    if width <= 360:
+        return ["mo-360.jpg", "mo-240.jpg", "mo-640.jpg", "mo-1024.jpg"]
+    if width <= 640:
+        return ["mo-640.jpg", "mo-360.jpg", "mo-240.jpg", "mo-1024.jpg"]
+    # Large gallery images are more reliable when we try the lighter 640 rule first.
+    return ["mo-640.jpg", "mo-1024.jpg", "mo-360.jpg", "mo-240.jpg"]
+
+
+def _classistatic_variants(src: str, width: int) -> list[str]:
     parsed = urlparse(src)
     if parsed.hostname not in _ALLOWED_HOSTS:
         return [src]
@@ -123,7 +134,10 @@ def _classistatic_variants(src: str) -> list[str]:
         base_params.append((k, v))
 
     rules: list[str] = []
-    if current_rule:
+    for rule in _preferred_classistatic_rules(width):
+        if rule not in rules:
+            rules.append(rule)
+    if current_rule and current_rule not in rules:
         rules.append(current_rule)
     for rule in _CLASSISTATIC_RULE_CANDIDATES:
         if rule not in rules:
@@ -261,7 +275,7 @@ def thumb(
     codes: list[int] = []
     used_src = src
     ok = False
-    for candidate in _classistatic_variants(src):
+    for candidate in _classistatic_variants(src, w):
         used_src = candidate
         code = _fetch_with_curl(candidate, tmp_fetch, max_bytes=2_000_000)
         codes.append(code)
