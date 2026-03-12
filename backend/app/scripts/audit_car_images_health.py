@@ -5,6 +5,7 @@ import csv
 import json
 import os
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -120,6 +121,8 @@ def main() -> None:
     thumbnails_updated = 0
     thumbnails_cleared = 0
     rows_report: list[dict] = []
+    reason_counts: Counter[str] = Counter()
+    status_counts: Counter[str] = Counter()
     started_at = time.time()
     last_notify = 0.0
     last_log = 0.0
@@ -257,6 +260,8 @@ def main() -> None:
             for fut in as_completed(futures):
                 row = fut.result()
                 checked += 1
+                reason_counts[str(row.get("reason") or "unknown")] += 1
+                status_counts[str(row.get("status") or 0)] += 1
                 if not row["ok"]:
                     broken += 1
                     broken_image_ids.append(int(row["image_id"]))
@@ -326,6 +331,8 @@ def main() -> None:
         "images_deleted": deleted,
         "thumbnails_updated": thumbnails_updated,
         "thumbnails_cleared": thumbnails_cleared,
+        "reason_counts": dict(reason_counts.most_common(20)),
+        "status_counts": dict(status_counts.most_common(20)),
         "report_rows_kept": len(rows_report),
         "report_rows_dropped": max(0, checked - len(rows_report)),
         "dry_run": bool(args.dry_run),
@@ -362,6 +369,12 @@ def main() -> None:
         f"deleted={deleted} thumb_updated={thumbnails_updated} thumb_cleared={thumbnails_cleared} "
         f"json={json_path} csv={csv_path}"
     )
+    if reason_counts:
+        top_reasons = ", ".join(f"{reason}={count}" for reason, count in reason_counts.most_common(10))
+        print(f"[audit_car_images_health] top_reasons {top_reasons}")
+    if status_counts:
+        top_statuses = ", ".join(f"{status}={count}" for status, count in status_counts.most_common(10))
+        print(f"[audit_car_images_health] top_statuses {top_statuses}")
 
 
 if __name__ == "__main__":
