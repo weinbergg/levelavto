@@ -138,7 +138,7 @@
           {% endif %}
           <p class="muted">
             {% if car.display_country_label or car.country %}Страна: {{ car.display_country_label or car.country }} · {% endif %} Фото:
-            {{ image_urls|length if image_urls else 0 }}
+            <span id="detailPhotoCount">{{ image_urls|length if image_urls else 0 }}</span>
           </p>
           {% if user %}
           <button class="fav-btn" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>

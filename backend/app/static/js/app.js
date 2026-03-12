@@ -2617,12 +2617,26 @@
       idx = firstOk >= 0 ? firstOk : 0
     }
     const thumbs = qsa('.detail-hero__thumbs .thumb')
+    const thumbsWrap = qs('.detail-hero__thumbs')
+    const prevBtn = qs('[data-detail-prev]')
+    const nextBtn = qs('[data-detail-next]')
+    const photoCount = qs('#detailPhotoCount')
     const markThumbState = (i) => {
       const btn = thumbs[i]
       if (!btn) return
       const broken = !isUsable(images[i])
       btn.classList.toggle('is-broken', broken)
       btn.disabled = broken
+      btn.hidden = broken
+    }
+    const refreshGalleryChrome = () => {
+      const usableCount = images.filter((src) => isUsable(src)).length
+      if (photoCount) photoCount.textContent = String(usableCount)
+      if (thumbsWrap) {
+        thumbsWrap.hidden = usableCount <= 1
+      }
+      if (prevBtn) prevBtn.hidden = usableCount <= 1
+      if (nextBtn) nextBtn.hidden = usableCount <= 1
     }
     const syncActive = () => {
       thumbs.forEach((btn, i) => btn.classList.toggle('active', i === idx))
@@ -2655,13 +2669,13 @@
       thumbImg?.addEventListener('error', () => {
         images[i] = '/static/img/no-photo.svg'
         markThumbState(i)
+        refreshGalleryChrome()
         if (i === idx) move(1)
       })
     })
     setImageByIndex(idx)
     applyThumbFallback(img, { thumbProxy: true })
-    const prevBtn = qs('[data-detail-prev]')
-    const nextBtn = qs('[data-detail-next]')
+    refreshGalleryChrome()
     prevBtn?.addEventListener('click', (e) => {
       e.preventDefault()
       move(-1)
@@ -2679,6 +2693,7 @@
     img.addEventListener('error', () => {
       images[idx] = '/static/img/no-photo.svg'
       markThumbState(idx)
+      refreshGalleryChrome()
       move(1)
     })
     let startX = null
@@ -2695,6 +2710,7 @@
       startX = null
     })
     syncActive()
+    refreshGalleryChrome()
     if (isUsable(images[idx])) {
       setImageByIndex(idx)
     } else {
