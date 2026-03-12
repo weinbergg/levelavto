@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import io
 import os
-import subprocess
 import time
 import uuid
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse, unquote
@@ -12,6 +11,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
 from PIL import Image
+import requests
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -22,10 +22,8 @@ _CACHE_TTL_SEC = 7 * 24 * 3600
 _NEGATIVE_TTL_NOT_FOUND_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_NOT_FOUND_SEC", "86400"))
 _NEGATIVE_TTL_ERROR_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_ERROR_SEC", "120"))
 _CLASSISTATIC_RULE_CANDIDATES = ("mo-1024.jpg", "mo-640.jpg", "mo-360.jpg", "mo-240.jpg")
-_FETCH_HTTP_MODE = (os.getenv("THUMB_FETCH_HTTP_MODE", "http1.1") or "http1.1").strip().lower()
 _FETCH_CONNECT_TIMEOUT_SEC = str(int(os.getenv("THUMB_FETCH_CONNECT_TIMEOUT_SEC", "4")))
 _FETCH_MAX_TIME_SEC = str(int(os.getenv("THUMB_FETCH_MAX_TIME_SEC", "12")))
-_FETCH_RETRY = str(int(os.getenv("THUMB_FETCH_RETRY", "1")))
 
 
 def _cache_dir() -> str:
@@ -144,56 +142,36 @@ def _classistatic_variants(src: str) -> list[str]:
 
 
 def _fetch_with_curl(src: str, dest: str, max_bytes: int) -> int:
-    cmd = [
-        "curl",
-        "-L",
-        "--connect-timeout",
-        _FETCH_CONNECT_TIMEOUT_SEC,
-        "--max-time",
-        _FETCH_MAX_TIME_SEC,
-        "--retry",
-        _FETCH_RETRY,
-        "--retry-delay",
-        "1",
-        "--retry-all-errors",
-        "-A",
-        "Mozilla/5.0",
-        "-sS",
-        "-w",
-        "%{http_code}",
-        "-o",
-        dest,
-        src,
-    ]
-    if _FETCH_HTTP_MODE == "http1.1":
-        cmd.insert(1, "--http1.1")
-    elif _FETCH_HTTP_MODE == "http2":
-        cmd.insert(1, "--http2")
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-    except FileNotFoundError:
-        logger.error("curl not found in container")
+        timeout = (float(_FETCH_CONNECT_TIMEOUT_SEC), float(_FETCH_MAX_TIME_SEC))
+        headers = {"User-Agent": "Mozilla/5.0"}
+        with requests.get(src, timeout=timeout, stream=True, allow_redirects=True, headers=headers) as resp:
+            code = int(resp.status_code or 0)
+            if code != 200:
+                return code
+            total = 0
+            with open(dest, "wb") as fh:
+                for chunk in resp.iter_content(chunk_size=128 * 1024):
+                    if not chunk:
+                        continue
+                    total += len(chunk)
+                    if total > max_bytes:
+                        fh.close()
+                        try:
+                            os.remove(dest)
+                        except FileNotFoundError:
+                            pass
+                        return 413
+                    fh.write(chunk)
+            return 200
+    except requests.RequestException as exc:
+        logger.warning("thumb_fetch_failed url=%s err=%s", src, str(exc)[:200])
+        try:
+            if os.path.exists(dest):
+                os.remove(dest)
+        except Exception:
+            pass
         return 0
-    code = 0
-    try:
-        code = int((proc.stdout or "").strip() or "0")
-    except Exception:
-        code = 0
-    if proc.returncode != 0:
-        logger.warning(
-            "thumb_fetch_failed url=%s code=%s err=%s",
-            src,
-            code,
-            (proc.stderr or "").strip(),
-        )
-        return code or 0
-    try:
-        if os.path.getsize(dest) > max_bytes:
-            os.remove(dest)
-            return 413
-    except FileNotFoundError:
-        return 0
-    return code
 
 
 def _placeholder_response(cache_control: str = "public, max-age=604800") -> FileResponse:
