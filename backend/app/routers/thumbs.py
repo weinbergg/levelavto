@@ -20,8 +20,12 @@ _ALLOWED_HOSTS = {"img.classistatic.de"}
 _LOCK_TTL_SEC = 30
 _CACHE_TTL_SEC = 7 * 24 * 3600
 _NEGATIVE_TTL_NOT_FOUND_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_NOT_FOUND_SEC", "86400"))
-_NEGATIVE_TTL_ERROR_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_ERROR_SEC", "900"))
+_NEGATIVE_TTL_ERROR_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_ERROR_SEC", "120"))
 _CLASSISTATIC_RULE_CANDIDATES = ("mo-1024.jpg", "mo-640.jpg", "mo-360.jpg", "mo-240.jpg")
+_FETCH_HTTP_MODE = (os.getenv("THUMB_FETCH_HTTP_MODE", "http1.1") or "http1.1").strip().lower()
+_FETCH_CONNECT_TIMEOUT_SEC = str(int(os.getenv("THUMB_FETCH_CONNECT_TIMEOUT_SEC", "4")))
+_FETCH_MAX_TIME_SEC = str(int(os.getenv("THUMB_FETCH_MAX_TIME_SEC", "12")))
+_FETCH_RETRY = str(int(os.getenv("THUMB_FETCH_RETRY", "1")))
 
 
 def _cache_dir() -> str:
@@ -142,14 +146,16 @@ def _classistatic_variants(src: str) -> list[str]:
 def _fetch_with_curl(src: str, dest: str, max_bytes: int) -> int:
     cmd = [
         "curl",
-        "--http2",
         "-L",
         "--connect-timeout",
-        "2",
+        _FETCH_CONNECT_TIMEOUT_SEC,
         "--max-time",
-        "5",
+        _FETCH_MAX_TIME_SEC,
         "--retry",
-        "0",
+        _FETCH_RETRY,
+        "--retry-delay",
+        "1",
+        "--retry-all-errors",
         "-A",
         "Mozilla/5.0",
         "-sS",
@@ -159,6 +165,10 @@ def _fetch_with_curl(src: str, dest: str, max_bytes: int) -> int:
         dest,
         src,
     ]
+    if _FETCH_HTTP_MODE == "http1.1":
+        cmd.insert(1, "--http1.1")
+    elif _FETCH_HTTP_MODE == "http2":
+        cmd.insert(1, "--http2")
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
     except FileNotFoundError:
