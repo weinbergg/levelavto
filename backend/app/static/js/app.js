@@ -91,7 +91,7 @@
     return qs ? `/catalog?${qs}` : '/catalog'
   }
 
-  const THUMB_REV = '3'
+  const THUMB_REV = '4'
 
   function tryParseUrl(url) {
     try {
@@ -2608,7 +2608,7 @@
       images = []
     }
     if (!Array.isArray(images) || images.length < 2) return
-    images = images.map((u) => normalizeThumbUrl(u, { thumb: true, width: 1024 }))
+    images = images.map((u) => normalizeThumbUrl(u, { thumb: true, width: 360 }))
     if (images.length < 2) return
     const isUsable = (src) => Boolean(src && src !== '/static/img/no-photo.svg')
     let idx = Math.max(0, images.indexOf(img.getAttribute('src')))
