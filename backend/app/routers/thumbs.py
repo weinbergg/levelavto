@@ -23,7 +23,7 @@ _NEGATIVE_TTL_NOT_FOUND_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_NOT_FOUND_SEC", 
 _NEGATIVE_TTL_ERROR_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_ERROR_SEC", "120"))
 _CLASSISTATIC_RULE_CANDIDATES = ("mo-1024.jpg", "mo-640.jpg", "mo-360.jpg", "mo-240.jpg")
 _FETCH_CONNECT_TIMEOUT_SEC = str(int(os.getenv("THUMB_FETCH_CONNECT_TIMEOUT_SEC", "4")))
-_FETCH_MAX_TIME_SEC = str(int(os.getenv("THUMB_FETCH_MAX_TIME_SEC", "12")))
+_FETCH_MAX_TIME_SEC = str(int(os.getenv("THUMB_FETCH_MAX_TIME_SEC", "4")))
 
 
 def _cache_dir() -> str:

@@ -91,7 +91,7 @@
     return qs ? `/catalog?${qs}` : '/catalog'
   }
 
-  const THUMB_REV = '2'
+  const THUMB_REV = '3'
 
   function tryParseUrl(url) {
     try {
