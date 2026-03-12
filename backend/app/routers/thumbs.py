@@ -290,6 +290,7 @@ def thumb(
         if code == 200:
             ok = True
             break
+        logger.info("thumb_variant_failed src=%s candidate=%s code=%s", src, candidate, code)
         if code == 413:
             try:
                 if os.path.exists(tmp_fetch):
@@ -306,6 +307,7 @@ def thumb(
         except Exception:
             pass
         final_code = next((c for c in reversed(codes) if c), 0)
+        logger.warning("thumb_fetch_exhausted src=%s codes=%s", src, codes)
         if codes and all(c in (404, 410) for c in codes if c):
             _mark_negative(path, final_code or 404)
             _release_lock(path)
@@ -341,6 +343,7 @@ def thumb(
         except Exception:
             pass
     except Exception:
+        logger.exception("thumb_decode_failed src=%s used_src=%s", src, used_src)
         _release_lock(path)
         return _placeholder_response("public, max-age=30")
     finally:
