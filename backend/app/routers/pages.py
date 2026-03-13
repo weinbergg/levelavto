@@ -1104,13 +1104,18 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
                 except Exception:
                     continue
         try:
+            local_detail = next((u for u in detail_images if isinstance(u, str) and u.startswith("/media/")), None)
             resolved_thumb = resolve_thumbnail_url(
                 getattr(car, "thumbnail_url", None),
                 getattr(car, "thumbnail_local_path", None),
             )
             if resolved_thumb:
                 car.thumbnail_url = resolved_thumb
-                if resolved_thumb in detail_images:
+                if local_detail:
+                    detail_images = [local_detail] + [u for u in detail_images if u != local_detail]
+                    if resolved_thumb not in detail_images:
+                        detail_images.insert(1 if len(detail_images) > 0 else 0, resolved_thumb)
+                elif resolved_thumb in detail_images:
                     detail_images = [resolved_thumb] + [u for u in detail_images if u != resolved_thumb]
                 else:
                     detail_images.insert(0, resolved_thumb)

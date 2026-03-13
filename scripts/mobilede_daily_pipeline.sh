@@ -26,6 +26,17 @@ docker compose exec -T web python -m backend.app.scripts.mirror_mobilede_thumbs 
   --report-json /app/artifacts/mirror_mobilede_daily.json \
   --report-csv /app/artifacts/mirror_mobilede_daily.csv
 
+if [ "${MOBILEDE_HERO_ENABLED:-1}" = "1" ]; then
+  echo "[mobilede_pipeline] step=mirror_mobilede_hero"
+  HERO_UPDATED_SINCE_HOURS="${MOBILEDE_HERO_SINCE_HOURS:-${MOBILEDE_MIRROR_SINCE_HOURS:-36}}" \
+  HERO_LIMIT="${MOBILEDE_HERO_LIMIT:-30000}" \
+  HERO_WORKERS="${MOBILEDE_HERO_WORKERS:-8}" \
+  HERO_TIMEOUT="${MOBILEDE_HERO_TIMEOUT:-8}" \
+  HERO_MAX_WIDTH="${MOBILEDE_HERO_MAX_WIDTH:-1280}" \
+  HERO_QUALITY="${MOBILEDE_HERO_QUALITY:-82}" \
+  bash scripts/mirror_de_hero_images.sh
+fi
+
 echo "[mobilede_pipeline] step=recalc_missing_prices"
 docker compose exec -T web python -m backend.app.scripts.recalc_missing_prices \
   --region EU \

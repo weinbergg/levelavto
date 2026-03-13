@@ -7,7 +7,7 @@ import json
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -139,13 +139,17 @@ def main() -> None:
     ap.add_argument("--source-key", default="mobile")
     ap.add_argument("--brands", default="", help="Comma-separated brand list, e.g. BMW,Mercedes-Benz")
     ap.add_argument("--limit-cars", type=int, default=5000)
+    ap.add_argument("--offset-cars", type=int, default=0)
     ap.add_argument("--max-images-per-car", type=int, default=20)
+    ap.add_argument("--order-by", choices=["id_asc", "updated_desc", "listing_desc"], default="id_asc")
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--timeout", type=float, default=6.0)
     ap.add_argument("--max-bytes", type=int, default=8_000_000)
     ap.add_argument("--max-width", type=int, default=1280)
     ap.add_argument("--quality", type=int, default=76)
     ap.add_argument("--format", choices=["webp", "jpg"], default="webp")
+    ap.add_argument("--updated-since-hours", type=float, default=0.0)
+    ap.add_argument("--skip-sync-thumbnail", action="store_true")
     ap.add_argument("--delete-unmirrored", action="store_true", help="delete image rows failed to mirror")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--telegram", action="store_true")
@@ -238,9 +242,20 @@ def main() -> None:
             car_q = car_q.filter(Car.country.like("KR%"))
         if country:
             car_q = car_q.filter(func.upper(Car.country) == country)
+        if args.updated_since_hours and args.updated_since_hours > 0:
+            since_ts = datetime.now(timezone.utc) - timedelta(hours=float(args.updated_since_hours))
+            car_q = car_q.filter(Car.updated_at >= since_ts)
         if brands_lc:
             car_q = car_q.filter(func.lower(func.trim(Car.brand)).in_(brands_lc))
-        car_ids = [int(v[0]) for v in car_q.order_by(Car.id.asc()).limit(max(1, args.limit_cars)).all()]
+        if args.order_by == "updated_desc":
+            car_q = car_q.order_by(Car.updated_at.desc(), Car.id.desc())
+        elif args.order_by == "listing_desc":
+            car_q = car_q.order_by(Car.listing_sort_ts.desc().nullslast(), Car.id.desc())
+        else:
+            car_q = car_q.order_by(Car.id.asc())
+        if args.offset_cars and args.offset_cars > 0:
+            car_q = car_q.offset(max(0, args.offset_cars))
+        car_ids = [int(v[0]) for v in car_q.limit(max(1, args.limit_cars)).all()]
         if not car_ids:
             print("[mirror_car_images_local] no cars matched", flush=True)
             return
@@ -335,27 +350,28 @@ def main() -> None:
                     db.delete(row)
                     deleted += 1
 
-            # Sync car thumbnail_local_path to first local image.
-            local_first_by_car: dict[int, str] = {}
-            for image_id, car_id, _, pos, is_primary in normalized_payload:
-                res = results_by_id.get(image_id)
-                if not res or not res.get("ok"):
-                    continue
-                web = str(res.get("web_path") or "")
-                if not web.startswith("/media/"):
-                    continue
-                if car_id not in local_first_by_car:
-                    local_first_by_car[car_id] = web
-                if is_primary or pos == 0:
-                    local_first_by_car[car_id] = web
+            if not args.skip_sync_thumbnail:
+                # Sync car thumbnail_local_path to first local image.
+                local_first_by_car: dict[int, str] = {}
+                for image_id, car_id, _, pos, is_primary in normalized_payload:
+                    res = results_by_id.get(image_id)
+                    if not res or not res.get("ok"):
+                        continue
+                    web = str(res.get("web_path") or "")
+                    if not web.startswith("/media/"):
+                        continue
+                    if car_id not in local_first_by_car:
+                        local_first_by_car[car_id] = web
+                    if is_primary or pos == 0:
+                        local_first_by_car[car_id] = web
 
-            cars = db.query(Car).filter(Car.id.in_(car_ids)).all()
-            for car in cars:
-                local = local_first_by_car.get(int(car.id))
-                if local:
-                    if (car.thumbnail_local_path or "").strip() != local:
-                        car.thumbnail_local_path = local
-                        thumb_updated += 1
+                cars = db.query(Car).filter(Car.id.in_(car_ids)).all()
+                for car in cars:
+                    local = local_first_by_car.get(int(car.id))
+                    if local:
+                        if (car.thumbnail_local_path or "").strip() != local:
+                            car.thumbnail_local_path = local
+                            thumb_updated += 1
 
             db.commit()
 
@@ -378,6 +394,10 @@ def main() -> None:
         "format": args.format,
         "quality": args.quality,
         "max_width": args.max_width,
+        "order_by": args.order_by,
+        "offset_cars": args.offset_cars,
+        "updated_since_hours": args.updated_since_hours,
+        "skip_sync_thumbnail": bool(args.skip_sync_thumbnail),
         "problems": problems[:5000],
     }
     report_path = Path(args.report_json)
