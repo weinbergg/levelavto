@@ -13,6 +13,8 @@ UPDATED_SINCE_HOURS="${HERO_UPDATED_SINCE_HOURS:-0}"
 REPORT_JSON="${HERO_REPORT_JSON:-/app/artifacts/mirror_de_hero_images.json}"
 ORDER_BY="${HERO_ORDER_BY:-updated_desc}"
 OFFSET="${HERO_OFFSET:-0}"
+TELEGRAM="${HERO_TELEGRAM:-0}"
+TELEGRAM_INTERVAL="${HERO_TELEGRAM_INTERVAL:-1800}"
 
 ARGS=(
   --region EU
@@ -35,6 +37,10 @@ if [ "${UPDATED_SINCE_HOURS}" != "0" ]; then
   ARGS+=(--updated-since-hours "$UPDATED_SINCE_HOURS")
 fi
 
-echo "[mirror_de_hero_images] start $(date -Iseconds) limit=${LIMIT} offset=${OFFSET} updated_since_hours=${UPDATED_SINCE_HOURS} order_by=${ORDER_BY} workers=${WORKERS} width=${MAX_WIDTH}"
+if [ "${TELEGRAM}" = "1" ]; then
+  ARGS+=(--telegram --telegram-interval "$TELEGRAM_INTERVAL")
+fi
+
+echo "[mirror_de_hero_images] start $(date -Iseconds) limit=${LIMIT} offset=${OFFSET} updated_since_hours=${UPDATED_SINCE_HOURS} order_by=${ORDER_BY} workers=${WORKERS} width=${MAX_WIDTH} telegram=${TELEGRAM}"
 docker compose exec -T web python -m backend.app.scripts.mirror_car_images_local "${ARGS[@]}"
 echo "[mirror_de_hero_images] done $(date -Iseconds)"
