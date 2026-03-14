@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import requests
 from PIL import Image
@@ -23,6 +24,9 @@ from backend.app.utils.thumbs import normalize_classistatic_url
 
 def _media_root() -> Path:
     return Path(__file__).resolve().parents[3] / "фото-видео"
+
+
+_CLASSISTATIC_RULES = ("mo-640.jpg", "mo-360.jpg", "mo-240.jpg", "mo-1024.jpg")
 
 
 def _normalize(url: str | None) -> str | None:
@@ -41,6 +45,56 @@ def _normalize(url: str | None) -> str | None:
     if raw.startswith("/media/"):
         return raw
     return None
+
+
+def _candidate_urls(url: str | None, *, max_width: int) -> list[str]:
+    normalized = _normalize(url)
+    if not normalized:
+        return []
+    if normalized.startswith("/media/"):
+        return [normalized]
+    parsed = urlparse(normalized)
+    if parsed.hostname != "img.classistatic.de":
+        return [normalized]
+
+    params = parse_qsl(parsed.query, keep_blank_values=True)
+    base_params: list[tuple[str, str]] = []
+    current_rule: str | None = None
+    for key, value in params:
+        if key.lower() == "rule":
+            current_rule = value
+            continue
+        base_params.append((key, value))
+
+    rules: list[str] = []
+    if max_width <= 360:
+        rules.extend(["mo-360.jpg", "mo-240.jpg"])
+    else:
+        rules.extend(["mo-640.jpg", "mo-360.jpg", "mo-240.jpg"])
+    if current_rule and current_rule not in rules:
+        rules.append(current_rule)
+    for rule in _CLASSISTATIC_RULES:
+        if rule not in rules:
+            rules.append(rule)
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for rule in rules:
+        query = urlencode([*base_params, ("rule", rule)], doseq=True)
+        candidate = urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, query, parsed.fragment))
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        out.append(candidate)
+    return out or [normalized]
+
+
+def _request_timeout(src_url: str, timeout_sec: float) -> tuple[float, float]:
+    # Large classistatic variants frequently stall on RU VPS. Give them a short
+    # chance, then fall back to smaller rules instead of burning the whole batch.
+    if "img.classistatic.de" in src_url and ("rule=mo-640" in src_url or "rule=mo-1024" in src_url):
+        return (3.0, min(timeout_sec, 2.5))
+    return (3.0, timeout_sec)
 
 
 def _target_paths(
@@ -62,7 +116,7 @@ def _download_convert(
     *,
     image_id: int,
     car_id: int,
-    src_url: str,
+    candidates: list[str],
     base_dir: Path,
     timeout_sec: float,
     max_bytes: int,
@@ -70,66 +124,79 @@ def _download_convert(
     quality: int,
     fmt: str,
 ) -> dict:
-    if src_url.startswith("/media/"):
-        return {
-            "image_id": image_id,
-            "car_id": car_id,
-            "ok": True,
-            "web_path": src_url,
-            "cached": True,
-            "source": "already_local",
-        }
-    dst_abs, dst_web = _target_paths(base_dir, car_id, image_id, src_url, fmt)
-    if dst_abs.exists() and dst_abs.stat().st_size > 0:
-        return {
-            "image_id": image_id,
-            "car_id": car_id,
-            "ok": True,
-            "web_path": dst_web,
-            "cached": True,
-            "source": "cache_hit",
-        }
-    try:
-        with requests.get(src_url, timeout=(3.0, timeout_sec), stream=True, allow_redirects=True) as resp:
-            if resp.status_code != 200:
-                return {"image_id": image_id, "car_id": car_id, "ok": False, "error": f"http_{resp.status_code}"}
-            buf = io.BytesIO()
-            total = 0
-            for chunk in resp.iter_content(chunk_size=128 * 1024):
-                if not chunk:
+    last_error = "no_candidates"
+    for src_url in candidates:
+        if src_url.startswith("/media/"):
+            return {
+                "image_id": image_id,
+                "car_id": car_id,
+                "ok": True,
+                "web_path": src_url,
+                "cached": True,
+                "source": "already_local",
+            }
+        dst_abs, dst_web = _target_paths(base_dir, car_id, image_id, src_url, fmt)
+        if dst_abs.exists() and dst_abs.stat().st_size > 0:
+            return {
+                "image_id": image_id,
+                "car_id": car_id,
+                "ok": True,
+                "web_path": dst_web,
+                "cached": True,
+                "source": "cache_hit",
+                "url": src_url,
+            }
+        try:
+            with requests.get(
+                src_url,
+                timeout=_request_timeout(src_url, timeout_sec),
+                stream=True,
+                allow_redirects=True,
+            ) as resp:
+                if resp.status_code != 200:
+                    last_error = f"http_{resp.status_code}"
                     continue
-                total += len(chunk)
-                if total > max_bytes:
-                    return {"image_id": image_id, "car_id": car_id, "ok": False, "error": "too_large"}
-                buf.write(chunk)
-        buf.seek(0)
-        img = Image.open(buf).convert("RGB")
-        if max_width > 0 and img.width > max_width:
-            h = int(img.height * max_width / img.width)
-            img = img.resize((max_width, h), Image.LANCZOS)
-        dst_abs.parent.mkdir(parents=True, exist_ok=True)
-        tmp_abs = dst_abs.with_suffix(f".tmp.{fmt}")
-        save_fmt = "JPEG" if fmt in {"jpg", "jpeg"} else "WEBP"
-        save_kwargs = {"format": save_fmt, "quality": quality}
-        if save_fmt == "WEBP":
-            save_kwargs["method"] = 6
-        img.save(tmp_abs, **save_kwargs)
-        tmp_abs.replace(dst_abs)
-        return {
-            "image_id": image_id,
-            "car_id": car_id,
-            "ok": True,
-            "web_path": dst_web,
-            "cached": False,
-            "source": "download",
-        }
-    except Exception as exc:  # noqa: BLE001
-        return {
-            "image_id": image_id,
-            "car_id": car_id,
-            "ok": False,
-            "error": str(exc)[:180],
-        }
+                buf = io.BytesIO()
+                total = 0
+                for chunk in resp.iter_content(chunk_size=128 * 1024):
+                    if not chunk:
+                        continue
+                    total += len(chunk)
+                    if total > max_bytes:
+                        last_error = "too_large"
+                        raise ValueError("too_large")
+                    buf.write(chunk)
+            buf.seek(0)
+            img = Image.open(buf).convert("RGB")
+            if max_width > 0 and img.width > max_width:
+                h = int(img.height * max_width / img.width)
+                img = img.resize((max_width, h), Image.LANCZOS)
+            dst_abs.parent.mkdir(parents=True, exist_ok=True)
+            tmp_abs = dst_abs.with_suffix(f".tmp.{fmt}")
+            save_fmt = "JPEG" if fmt in {"jpg", "jpeg"} else "WEBP"
+            save_kwargs = {"format": save_fmt, "quality": quality}
+            if save_fmt == "WEBP":
+                save_kwargs["method"] = 6
+            img.save(tmp_abs, **save_kwargs)
+            tmp_abs.replace(dst_abs)
+            return {
+                "image_id": image_id,
+                "car_id": car_id,
+                "ok": True,
+                "web_path": dst_web,
+                "cached": False,
+                "source": "download",
+                "url": src_url,
+            }
+        except Exception as exc:  # noqa: BLE001
+            last_error = str(exc)[:180]
+            continue
+    return {
+        "image_id": image_id,
+        "car_id": car_id,
+        "ok": False,
+        "error": last_error,
+    }
 
 
 def main() -> None:
@@ -288,17 +355,17 @@ def main() -> None:
         log("start")
         notify("start")
 
-        normalized_payload: list[tuple[int, int, str, int, bool]] = []
+        normalized_payload: list[tuple[int, int, list[str], int, bool]] = []
         invalid_ids: set[int] = set()
         for image_id, car_id, url, pos, is_primary in payload:
-            n = _normalize(url)
-            if not n:
+            candidates = _candidate_urls(url, max_width=args.max_width)
+            if not candidates:
                 invalid_ids.add(image_id)
                 failed += 1
                 checked += 1
                 problems.append({"image_id": image_id, "car_id": car_id, "error": "invalid_url", "url": url})
                 continue
-            normalized_payload.append((image_id, car_id, n, pos, is_primary))
+            normalized_payload.append((image_id, car_id, candidates, pos, is_primary))
 
         results_by_id: dict[int, dict] = {}
         with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
@@ -307,7 +374,7 @@ def main() -> None:
                     _download_convert,
                     image_id=image_id,
                     car_id=car_id,
-                    src_url=src_url,
+                    candidates=candidates,
                     base_dir=base_dir,
                     timeout_sec=args.timeout,
                     max_bytes=args.max_bytes,
@@ -315,7 +382,7 @@ def main() -> None:
                     quality=args.quality,
                     fmt=args.format,
                 )
-                for image_id, car_id, src_url, _, _ in normalized_payload
+                for image_id, car_id, candidates, _, _ in normalized_payload
             ]
             for fut in as_completed(futures):
                 res = fut.result()
