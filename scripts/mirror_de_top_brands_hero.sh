@@ -6,6 +6,11 @@ cd "$ROOT_DIR"
 
 mkdir -p artifacts logs
 
+RUN_LOG="${RUN_LOG:-$ROOT_DIR/logs/mirror_de_top_brands_hero.log}"
+mkdir -p "$(dirname "$RUN_LOG")"
+touch "$RUN_LOG"
+exec > >(tee -a "$RUN_LOG") 2>&1
+
 TOP_N="${TOP_N:-6}"
 BRANDS_CSV="${BRANDS_CSV:-}"
 
@@ -54,6 +59,8 @@ tg() {
     return 0
   fi
   curl -sS -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+    --connect-timeout 5 \
+    --max-time 15 \
     --data-urlencode "chat_id=${TG_CHAT}" \
     --data-urlencode "text=${msg}" >/dev/null || true
 }
