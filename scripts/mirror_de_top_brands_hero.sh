@@ -11,7 +11,7 @@ mkdir -p "$(dirname "$RUN_LOG")"
 touch "$RUN_LOG"
 exec > >(tee -a "$RUN_LOG") 2>&1
 
-TOP_N="${TOP_N:-6}"
+TOP_N="${TOP_N:-5}"
 BRANDS_CSV="${BRANDS_CSV:-}"
 
 HOT_ENABLED="${HOT_ENABLED:-1}"
@@ -25,6 +25,9 @@ MAX_WIDTH="${MAX_WIDTH:-1280}"
 QUALITY="${QUALITY:-82}"
 FORMAT="${FORMAT:-webp}"
 ORDER_BY="${ORDER_BY:-id_asc}"
+HOT_WALL_TIMEOUT_SEC="${HOT_WALL_TIMEOUT_SEC:-7200}"
+CHUNK_WALL_TIMEOUT_SEC="${CHUNK_WALL_TIMEOUT_SEC:-7200}"
+CONTINUE_ON_CHUNK_FAILURE="${CONTINUE_ON_CHUNK_FAILURE:-1}"
 
 TELEGRAM="${TELEGRAM:-1}"
 TELEGRAM_INTERVAL="${TELEGRAM_INTERVAL:-1800}"
@@ -156,6 +159,23 @@ print(value if value is not None else "")
 PY
 }
 
+run_mirror_cmd() {
+  local wall_timeout="$1"
+  local log_file="$2"
+  shift 2
+  set +e
+  if command -v timeout >/dev/null 2>&1; then
+    timeout --foreground "$wall_timeout" "$@" 2>&1 | tee "$log_file"
+    local rc="${PIPESTATUS[0]}"
+    set -e
+    return "$rc"
+  fi
+  "$@" 2>&1 | tee "$log_file"
+  local rc="$?"
+  set -e
+  return "$rc"
+}
+
 run_one_chunk() {
   local brand="$1"
   local offset="$2"
@@ -170,7 +190,9 @@ run_one_chunk() {
     tg_args+=(--telegram --telegram-interval "$TELEGRAM_INTERVAL")
   fi
 
-  docker compose exec -T web python -m backend.app.scripts.mirror_car_images_local \
+  local rc=0
+  if run_mirror_cmd "$CHUNK_WALL_TIMEOUT_SEC" "$log_file" \
+    docker compose exec -T web python -m backend.app.scripts.mirror_car_images_local \
     --region EU \
     --country DE \
     --source-key mobile \
@@ -186,19 +208,35 @@ run_one_chunk() {
     --format "$FORMAT" \
     --skip-sync-thumbnail \
     "${tg_args[@]}" \
-    --report-json "$report_container" 2>&1 | tee "$log_file" >&2
+    --report-json "$report_container"; then
+    rc=0
+  else
+    rc="$?"
+  fi
 
   local checked mirrored rewritten failed
-  checked="$(parse_report_field "$report_host" checked)"
-  mirrored="$(parse_report_field "$report_host" mirrored)"
-  rewritten="$(parse_report_field "$report_host" rewritten)"
-  failed="$(parse_report_field "$report_host" failed)"
-  printf '%s\t%s\t%s\t%s\n' "$checked" "$mirrored" "$rewritten" "$failed"
+  if [ -f "$report_host" ]; then
+    checked="$(parse_report_field "$report_host" checked)"
+    mirrored="$(parse_report_field "$report_host" mirrored)"
+    rewritten="$(parse_report_field "$report_host" rewritten)"
+    failed="$(parse_report_field "$report_host" failed)"
+  else
+    checked=0
+    mirrored=0
+    rewritten=0
+    failed="$limit"
+  fi
+  if [ "$rc" -eq 124 ]; then
+    echo "[mirror_de_top_brands] chunk_timeout brand=${brand} offset=${offset} limit=${limit} wall=${CHUNK_WALL_TIMEOUT_SEC}s"
+  elif [ "$rc" -ne 0 ]; then
+    echo "[mirror_de_top_brands] chunk_failed brand=${brand} offset=${offset} limit=${limit} rc=${rc}"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\n' "$checked" "$mirrored" "$rewritten" "$failed" "$rc"
 }
 
 run_hot_pass() {
   local brand="$1"
-  local safe report_host report_container result checked mirrored rewritten failed
+  local safe report_host report_container checked mirrored rewritten failed rc=0
   local tg_args=()
   safe="$(safe_brand "$brand")"
   report_host="$ROOT_DIR/artifacts/mirror_de_top_hot_${safe}.json"
@@ -210,7 +248,8 @@ run_hot_pass() {
   echo "[mirror_de_top_brands] hot brand=${brand} hours=${HOT_HOURS} limit=${HOT_LIMIT}"
   tg "de_top_brands hot start: ${brand} limit=${HOT_LIMIT} hours=${HOT_HOURS}"
 
-  docker compose exec -T web python -m backend.app.scripts.mirror_car_images_local \
+  if run_mirror_cmd "$HOT_WALL_TIMEOUT_SEC" "logs/mirror_de_top_hot_${safe}.log" \
+    docker compose exec -T web python -m backend.app.scripts.mirror_car_images_local \
     --region EU \
     --country DE \
     --source-key mobile \
@@ -226,14 +265,30 @@ run_hot_pass() {
     --format "$FORMAT" \
     --skip-sync-thumbnail \
     "${tg_args[@]}" \
-    --report-json "$report_container" | tee "logs/mirror_de_top_hot_${safe}.log"
+    --report-json "$report_container"; then
+    rc=0
+  else
+    rc="$?"
+  fi
 
-  checked="$(parse_report_field "$report_host" checked)"
-  mirrored="$(parse_report_field "$report_host" mirrored)"
-  rewritten="$(parse_report_field "$report_host" rewritten)"
-  failed="$(parse_report_field "$report_host" failed)"
+  if [ -f "$report_host" ]; then
+    checked="$(parse_report_field "$report_host" checked)"
+    mirrored="$(parse_report_field "$report_host" mirrored)"
+    rewritten="$(parse_report_field "$report_host" rewritten)"
+    failed="$(parse_report_field "$report_host" failed)"
+  else
+    checked=0
+    mirrored=0
+    rewritten=0
+    failed="$HOT_LIMIT"
+  fi
+  if [ "$rc" -eq 124 ]; then
+    echo "[mirror_de_top_brands] hot_timeout brand=${brand} limit=${HOT_LIMIT} wall=${HOT_WALL_TIMEOUT_SEC}s"
+  elif [ "$rc" -ne 0 ]; then
+    echo "[mirror_de_top_brands] hot_failed brand=${brand} limit=${HOT_LIMIT} rc=${rc}"
+  fi
   state_set "$brand" hot_done 1
-  tg "de_top_brands hot done: ${brand} checked=${checked} mirrored=${mirrored} rewritten=${rewritten} failed=${failed}"
+  tg "de_top_brands hot done: ${brand} checked=${checked} mirrored=${mirrored} rewritten=${rewritten} failed=${failed} rc=${rc}"
 }
 
 brands=()
@@ -295,8 +350,14 @@ for idx in "${!brands[@]}"; do
     mirrored="$(printf '%s' "$result" | awk -F'\t' '{print $2}')"
     rewritten="$(printf '%s' "$result" | awk -F'\t' '{print $3}')"
     failed="$(printf '%s' "$result" | awk -F'\t' '{print $4}')"
+    rc="$(printf '%s' "$result" | awk -F'\t' '{print $5}')"
 
-    tg "de_top_brands chunk ${brand}: offset=${offset}/${total} checked=${checked} mirrored=${mirrored} rewritten=${rewritten} failed=${failed}"
+    tg "de_top_brands chunk ${brand}: offset=${offset}/${total} checked=${checked} mirrored=${mirrored} rewritten=${rewritten} failed=${failed} rc=${rc}"
+
+    if [ "${CONTINUE_ON_CHUNK_FAILURE}" != "1" ] && [ "${rc}" != "0" ]; then
+      echo "[mirror_de_top_brands] stop_on_failure brand=${brand} offset=${offset} rc=${rc}"
+      exit 1
+    fi
 
     offset="$((offset + CHUNK_LIMIT))"
     state_set "$brand" offset "$offset"
