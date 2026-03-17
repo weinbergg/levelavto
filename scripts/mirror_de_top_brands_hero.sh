@@ -33,6 +33,7 @@ TIMEOUT="${TIMEOUT:-8}"
 MAX_WIDTH="${MAX_WIDTH:-1280}"
 QUALITY="${QUALITY:-82}"
 FORMAT="${FORMAT:-webp}"
+MAX_IMAGES_PER_CAR="${MAX_IMAGES_PER_CAR:-1}"
 ORDER_BY="${ORDER_BY:-id_asc}"
 HOT_WALL_TIMEOUT_SEC="${HOT_WALL_TIMEOUT_SEC:-7200}"
 CHUNK_WALL_TIMEOUT_SEC="${CHUNK_WALL_TIMEOUT_SEC:-7200}"
@@ -208,7 +209,7 @@ run_one_chunk() {
     --brands "$brand" \
     --limit-cars "$limit" \
     --offset-cars "$offset" \
-    --max-images-per-car 1 \
+    --max-images-per-car "$MAX_IMAGES_PER_CAR" \
     --order-by "$ORDER_BY" \
     --workers "$WORKERS" \
     --timeout "$TIMEOUT" \
@@ -264,7 +265,7 @@ run_hot_pass() {
     --source-key mobile \
     --brands "$brand" \
     --limit-cars "$HOT_LIMIT" \
-    --max-images-per-car 1 \
+    --max-images-per-car "$MAX_IMAGES_PER_CAR" \
     --order-by listing_desc \
     --updated-since-hours "$HOT_HOURS" \
     --workers "$WORKERS" \
@@ -322,7 +323,7 @@ if [ "${#brands[@]}" -eq 0 ]; then
   exit 1
 fi
 
-tg "de_top_brands start: brands=$(IFS=,; echo "${brands[*]}") chunk=${CHUNK_LIMIT} hot=${HOT_ENABLED}"
+tg "de_top_brands start: brands=$(IFS=,; echo "${brands[*]}") chunk=${CHUNK_LIMIT} hot=${HOT_ENABLED} max_images_per_car=${MAX_IMAGES_PER_CAR}"
 
 for idx in "${!brands[@]}"; do
   brand="${brands[$idx]}"
