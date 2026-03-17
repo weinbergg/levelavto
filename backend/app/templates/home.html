@@ -30,6 +30,15 @@
       </div>
       <form class="search-form" id="home-search" method="get" action="/catalog">
         {% set params = request.query_params %}
+        <div class="catalog-search home-search-query">
+          <input
+            type="text"
+            name="q"
+            value="{{ params.get('q', '') }}"
+            placeholder="Поиск по марке, модели, комплектации, ключевым словам"
+            aria-label="Поиск по каталогу"
+          />
+        </div>
         <div class="filter-grid filter-grid--overlay filter-grid--compact">
           <div class="field">
             <label for="home-region">Регион</label>

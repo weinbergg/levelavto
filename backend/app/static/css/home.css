@@ -41,6 +41,16 @@
   background: #1b1f26;
   color: #f4f5f7;
 }
+.search-card--overlay .catalog-search input {
+  min-width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #f4f5f7;
+}
+.home-search-query {
+  width: 100%;
+  margin-bottom: 4px;
+}
 .filter-grid--overlay.filter-grid--compact {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;

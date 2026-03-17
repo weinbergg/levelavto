@@ -7,7 +7,11 @@ cd "$ROOT_DIR"
 echo "[mobilede_pipeline] start $(date -Iseconds)"
 
 echo "[mobilede_pipeline] step=mobilede_daily"
-docker compose run --rm web python -m backend.app.tools.mobilede_daily
+DAILY_ARGS=()
+if [ "${MOBILEDE_ALLOW_DEACTIVATE:-0}" = "1" ]; then
+  DAILY_ARGS+=(--allow-deactivate)
+fi
+docker compose run --rm web python -m backend.app.tools.mobilede_daily "${DAILY_ARGS[@]}"
 
 echo "[mobilede_pipeline] step=mirror_mobilede_thumbs"
 MIRROR_TG_ARGS=()

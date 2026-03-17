@@ -34,7 +34,7 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    updated = skipped = errors = 0
+    updated = skipped = errors = processed = 0
     last_notify = 0.0
     token = os.getenv("TELEGRAM_BOT_TOKEN") if args.telegram else None
     chat_id = os.getenv("TELEGRAM_CHAT_ID") if args.telegram else None
@@ -49,7 +49,7 @@ def main() -> None:
         msg = (
             f"recalc_calc_cache {stage}\\n"
             f"region={args.region} country={args.country or 'ALL'}\\n"
-            f"updated={updated} skipped={skipped} errors={errors}"
+            f"processed={processed} updated={updated} skipped={skipped} errors={errors}"
         )
         ok = send_telegram_message(token, chat_id, msg)
         if ok:
@@ -94,14 +94,18 @@ def main() -> None:
 
         total = base.count()
         start = min_id
+        started_at = time.time()
+        window_no = 0
         while start <= max_id:
             end = min(start + args.chunk - 1, max_id)
+            window_no += 1
             ids = [r[0] for r in base.filter(Car.id.between(start, end)).order_by(Car.id.asc()).all()]
             if ids:
                 for i in range(0, len(ids), args.batch):
                     batch_ids = ids[i : i + args.batch]
                     cars = db.query(Car).filter(Car.id.in_(batch_ids)).all()
                     for car in cars:
+                        processed += 1
                         try:
                             force_recalc = bool(args.only_missing_registration)
                             res = svc.ensure_calc_cache(car, force=force_recalc)
@@ -112,6 +116,14 @@ def main() -> None:
                         except Exception:
                             errors += 1
                     db.commit()
+                elapsed = max(time.time() - started_at, 1.0)
+                rate = processed / elapsed if processed else 0.0
+                print(
+                    f"[recalc_calc_cache] progress window={window_no} ids={start}-{end} "
+                    f"processed={processed}/{total} updated={updated} skipped={skipped} errors={errors} "
+                    f"rate={rate:.2f}/s",
+                    flush=True,
+                )
             start = end + 1
             maybe_notify("progress")
             if args.sleep:
@@ -119,7 +131,7 @@ def main() -> None:
 
     maybe_notify("done")
     print(
-        f"[recalc_calc_cache] total={total} updated={updated} skipped={skipped} errors={errors}"
+        f"[recalc_calc_cache] total={total} processed={processed} updated={updated} skipped={skipped} errors={errors}"
     )
 
 

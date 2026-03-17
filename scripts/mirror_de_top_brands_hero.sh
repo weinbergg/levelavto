@@ -6,6 +6,15 @@ cd "$ROOT_DIR"
 
 mkdir -p artifacts logs
 
+LOCK_FILE="${LOCK_FILE:-$ROOT_DIR/artifacts/mirror_de_top_brands_hero.lock}"
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$LOCK_FILE"
+  if ! flock -n 9; then
+    echo "[mirror_de_top_brands] lock_busy file=$LOCK_FILE"
+    exit 0
+  fi
+fi
+
 RUN_LOG="${RUN_LOG:-$ROOT_DIR/logs/mirror_de_top_brands_hero.log}"
 mkdir -p "$(dirname "$RUN_LOG")"
 touch "$RUN_LOG"

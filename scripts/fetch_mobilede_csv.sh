@@ -15,6 +15,7 @@ WEB="${WEB_SERVICE:-web}"
 TMP_DIR="${MOBILEDE_TMP_DIR:-/opt/levelavto/tmp}"
 KEEP_CSV="${KEEP_CSV:-0}"
 MIN_FREE_GB="${MOBILEDE_MIN_FREE_GB:-20}"
+ALLOW_DEACTIVATE="${MOBILEDE_ALLOW_DEACTIVATE:-0}"
 
 if [[ -z "$USER" || -z "$PASS" ]]; then
   echo "[fetch-mobilede] MOBILEDE_USER/PASS not set" >&2
@@ -60,9 +61,17 @@ if ! download "$fetch_date"; then
   download "$fetch_date"
 fi
 
-# Import without deactivation (skip missing)
+# Import. By default keep historical behavior and skip deactivation unless
+# MOBILEDE_ALLOW_DEACTIVATE=1 is explicitly enabled for a verified full feed.
 echo "[fetch-mobilede] importing..."
-docker compose exec "$WEB" python -m backend.app.tools.mobilede_csv_import --file "/app/tmp/mobilede_active_offers_${fetch_date}.csv" --skip-deactivate --stats-file backend/app/runtime/jobs/mobilede_last.json
+IMPORT_ARGS=(
+  --file "/app/tmp/mobilede_active_offers_${fetch_date}.csv"
+  --stats-file backend/app/runtime/jobs/mobilede_last.json
+)
+if [[ "$ALLOW_DEACTIVATE" != "1" ]]; then
+  IMPORT_ARGS+=(--skip-deactivate)
+fi
+docker compose exec "$WEB" python -m backend.app.tools.mobilede_csv_import "${IMPORT_ARGS[@]}"
 python -m backend.app.tools.notify_tg --job mobilede --result backend/app/runtime/jobs/mobilede_last.json || true
 echo "[fetch-mobilede] invalidating redis cache keys..."
 del_pattern() {
