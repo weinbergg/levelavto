@@ -13,6 +13,9 @@ if [ "${MOBILEDE_ALLOW_DEACTIVATE:-0}" = "1" ]; then
 fi
 docker compose run --rm web python -m backend.app.tools.mobilede_daily "${DAILY_ARGS[@]}"
 
+echo "[mobilede_pipeline] step=car_counts_refresh"
+docker compose exec -T web python -m backend.app.tools.car_counts_refresh --report
+
 echo "[mobilede_pipeline] step=mirror_mobilede_thumbs"
 MIRROR_TG_ARGS=()
 if [ "${MIRROR_TELEGRAM:-0}" = "1" ]; then
@@ -50,6 +53,12 @@ docker compose exec -T web python -m backend.app.scripts.recalc_missing_prices \
   --limit "${MISSING_PRICE_LIMIT:-50000}" \
   --only-missing-total \
   --report-json /app/artifacts/recalc_missing_prices_daily.json
+
+if [ "${MOBILEDE_PRUNE_UNUSED_MEDIA:-1}" = "1" ]; then
+  echo "[mobilede_pipeline] step=prune_unused_local_media"
+  docker compose exec -T web python -m backend.app.scripts.prune_unused_local_media \
+    --report-json /app/artifacts/prune_unused_local_media_daily.json
+fi
 
 echo "[mobilede_pipeline] step=prewarm"
 PREWARM_MAX_SEC="${PREWARM_MAX_SEC:-900}" \
