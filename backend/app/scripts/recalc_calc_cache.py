@@ -27,12 +27,19 @@ def main() -> None:
     ap.add_argument("--telegram", action="store_true", help="send progress to Telegram if env configured")
     ap.add_argument("--telegram-interval", type=int, default=900, help="seconds between telegram updates")
     ap.add_argument("--rate-shift", type=float, default=0.0, help="add rub to EUR/USD rates when recalculating")
+    ap.add_argument("--shard-total", type=int, default=1, help="total number of parallel shards")
+    ap.add_argument("--shard-index", type=int, default=0, help="zero-based shard index")
     ap.add_argument(
         "--brands",
         default="",
         help="comma-separated brand list (case-insensitive), e.g. BMW,Mercedes-Benz",
     )
     args = ap.parse_args()
+
+    if args.shard_total < 1:
+        raise SystemExit("--shard-total must be >= 1")
+    if args.shard_index < 0 or args.shard_index >= args.shard_total:
+        raise SystemExit("--shard-index must be in [0, --shard-total)")
 
     updated = skipped = errors = processed = 0
     last_notify = 0.0
@@ -49,6 +56,7 @@ def main() -> None:
         msg = (
             f"recalc_calc_cache {stage}\\n"
             f"region={args.region} country={args.country or 'ALL'}\\n"
+            f"shard={args.shard_index + 1}/{args.shard_total}\\n"
             f"processed={processed} updated={updated} skipped={skipped} errors={errors}"
         )
         ok = send_telegram_message(token, chat_id, msg)
@@ -74,6 +82,8 @@ def main() -> None:
             base = base.filter(~Car.country.like("KR%"))
         if args.country:
             base = base.filter(Car.country == args.country.upper())
+        if args.shard_total > 1:
+            base = base.filter((Car.id % args.shard_total) == args.shard_index)
         if brands:
             base = base.filter(func.lower(func.trim(Car.brand)).in_(brands))
         if args.only_missing:
@@ -119,7 +129,8 @@ def main() -> None:
                 elapsed = max(time.time() - started_at, 1.0)
                 rate = processed / elapsed if processed else 0.0
                 print(
-                    f"[recalc_calc_cache] progress window={window_no} ids={start}-{end} "
+                    f"[recalc_calc_cache] progress shard={args.shard_index + 1}/{args.shard_total} "
+                    f"window={window_no} ids={start}-{end} "
                     f"processed={processed}/{total} updated={updated} skipped={skipped} errors={errors} "
                     f"rate={rate:.2f}/s",
                     flush=True,
@@ -131,7 +142,8 @@ def main() -> None:
 
     maybe_notify("done")
     print(
-        f"[recalc_calc_cache] total={total} processed={processed} updated={updated} skipped={skipped} errors={errors}"
+        f"[recalc_calc_cache] shard={args.shard_index + 1}/{args.shard_total} "
+        f"total={total} processed={processed} updated={updated} skipped={skipped} errors={errors}"
     )
 
 
