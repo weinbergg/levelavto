@@ -152,6 +152,20 @@ class ParsingDataService:
                     CarImage.car_id == car_row.id).order_by(CarImage.position.asc())).scalars().all()
                 # decide images list
                 candidate_images: List[str] = images[:]
+                if candidate_images and old_imgs:
+                    # Preserve already mirrored local media for surviving ads by position.
+                    # The feed refresh rewrites image URLs every run; keeping local URLs
+                    # avoids losing improved gallery images for active cars.
+                    local_by_pos = {
+                        int(img.position or 0): str(img.url or "")
+                        for img in old_imgs
+                        if str(img.url or "").startswith("/media/")
+                    }
+                    merged_images: List[str] = []
+                    for pos, url in enumerate(candidate_images):
+                        local_url = local_by_pos.get(pos)
+                        merged_images.append(local_url or url)
+                    candidate_images = merged_images
                 if not candidate_images and old_imgs:
                     candidate_images = [img.url for img in old_imgs]
                 if not candidate_images and car_row.thumbnail_url:
