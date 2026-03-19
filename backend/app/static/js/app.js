@@ -92,6 +92,7 @@
   }
 
   const THUMB_REV = '4'
+  const DETAIL_PRIMARY_WIDTH = 960
 
   function tryParseUrl(url) {
     try {
@@ -2610,7 +2611,7 @@
       images = []
     }
     if (!Array.isArray(images) || images.length < 2) return
-    images = images.map((u) => normalizeThumbUrl(u, { thumb: true, width: 360 }))
+    images = images.map((u) => normalizeThumbUrl(u, { thumb: true, width: DETAIL_PRIMARY_WIDTH }))
     if (images.length < 2) return
     const isUsable = (src) => Boolean(src && src !== '/static/img/no-photo.svg')
     let idx = Math.max(0, images.indexOf(img.getAttribute('src')))

@@ -26,7 +26,7 @@ def _media_root() -> Path:
     return Path(__file__).resolve().parents[3] / "фото-видео"
 
 
-_CLASSISTATIC_RULES = ("mo-640.jpg", "mo-360.jpg", "mo-240.jpg", "mo-1024.jpg")
+_CLASSISTATIC_RULES = ("mo-1024.jpg", "mo-640.jpg", "mo-360.jpg", "mo-240.jpg")
 
 
 def _normalize(url: str | None) -> str | None:
@@ -67,10 +67,16 @@ def _candidate_urls(url: str | None, *, max_width: int) -> list[str]:
         base_params.append((key, value))
 
     rules: list[str] = []
-    if max_width <= 360:
-        rules.extend(["mo-360.jpg", "mo-240.jpg"])
+    if max_width <= 240:
+        rules.extend(["mo-240.jpg", "mo-360.jpg", "mo-640.jpg", "mo-1024.jpg"])
+    elif max_width <= 360:
+        rules.extend(["mo-360.jpg", "mo-640.jpg", "mo-240.jpg", "mo-1024.jpg"])
+    elif max_width <= 640:
+        rules.extend(["mo-640.jpg", "mo-1024.jpg", "mo-360.jpg", "mo-240.jpg"])
     else:
-        rules.extend(["mo-640.jpg", "mo-360.jpg", "mo-240.jpg"])
+        # For detail/gallery images we prefer a larger upstream source first,
+        # then fall back to lighter variants when classistatic stalls.
+        rules.extend(["mo-1024.jpg", "mo-640.jpg", "mo-360.jpg", "mo-240.jpg"])
     if current_rule and current_rule not in rules:
         rules.append(current_rule)
     for rule in _CLASSISTATIC_RULES:
@@ -90,9 +96,11 @@ def _candidate_urls(url: str | None, *, max_width: int) -> list[str]:
 
 
 def _request_timeout(src_url: str, timeout_sec: float) -> tuple[float, float]:
-    # Large classistatic variants frequently stall on RU VPS. Give them a short
-    # chance, then fall back to smaller rules instead of burning the whole batch.
-    if "img.classistatic.de" in src_url and ("rule=mo-640" in src_url or "rule=mo-1024" in src_url):
+    # Large classistatic variants frequently stall on RU VPS. Keep the attempt
+    # short, but give 1024 a slightly longer read timeout before we fall back.
+    if "img.classistatic.de" in src_url and "rule=mo-1024" in src_url:
+        return (3.0, min(timeout_sec, 3.5))
+    if "img.classistatic.de" in src_url and "rule=mo-640" in src_url:
         return (3.0, min(timeout_sec, 2.5))
     return (3.0, timeout_sec)
 

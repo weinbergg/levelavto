@@ -113,11 +113,11 @@ def _preferred_classistatic_rules(width: int) -> list[str]:
     if width <= 240:
         return ["mo-240.jpg", "mo-360.jpg", "mo-640.jpg", "mo-1024.jpg"]
     if width <= 360:
-        return ["mo-360.jpg", "mo-240.jpg", "mo-640.jpg", "mo-1024.jpg"]
+        return ["mo-360.jpg", "mo-640.jpg", "mo-240.jpg", "mo-1024.jpg"]
     if width <= 640:
-        return ["mo-640.jpg", "mo-360.jpg", "mo-240.jpg", "mo-1024.jpg"]
-    # Large gallery images are more reliable when we try the lighter 640 rule first.
-    return ["mo-640.jpg", "mo-1024.jpg", "mo-360.jpg", "mo-240.jpg"]
+        return ["mo-640.jpg", "mo-1024.jpg", "mo-360.jpg", "mo-240.jpg"]
+    # Main gallery/detail images should try the larger upstream source first.
+    return ["mo-1024.jpg", "mo-640.jpg", "mo-360.jpg", "mo-240.jpg"]
 
 
 def _classistatic_variants(src: str, width: int) -> list[str]:
