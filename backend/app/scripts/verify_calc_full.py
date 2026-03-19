@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import decimal
 import json
 import os
 from datetime import datetime, timezone
@@ -15,6 +16,14 @@ from backend.app.services.calculator_runtime import _calc_age_months, is_bev
 from backend.app.services.cars_service import CarsService
 from backend.app.services.customs_config import calc_duty_eur, calc_util_fee_rub, get_customs_config
 from backend.app.utils.telegram import send_telegram_message
+
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, decimal.Decimal):
+        return float(value)
+    if isinstance(value, set):
+        return sorted(value)
+    raise TypeError(f"Object of type {value.__class__.__name__} is not JSON serializable")
 
 
 def _parse_countries(val: str | None) -> list[str] | None:
@@ -265,7 +274,7 @@ def main() -> None:
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as fh:
-        json.dump(report, fh, ensure_ascii=False, indent=2)
+        json.dump(report, fh, ensure_ascii=False, indent=2, default=_json_default)
 
     if args.telegram:
         token = os.getenv("TELEGRAM_BOT_TOKEN")
