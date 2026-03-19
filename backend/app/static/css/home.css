@@ -58,6 +58,13 @@
 .filter-grid--overlay .field--dynamic {
   min-height: 100%;
 }
+.search-card--overlay .field-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.search-card--overlay .field-pair select {
+  min-height: 46px;
+  height: 46px;
+}
 @media (max-width: 1200px) {
   .filter-grid--overlay.filter-grid--compact {
     grid-template-columns: repeat(3, minmax(0, 1fr));

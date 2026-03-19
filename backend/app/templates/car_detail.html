@@ -110,8 +110,7 @@
           <div class="detail-price">
             <div class="detail-price__total">
               {% if display_price %}
-                {% set display_price_round = ((display_price + 9999) // 10000) * 10000 %}
-                {{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽
+                {{ '{:,.0f}'.format(display_price).replace(',', ' ') }} ₽
               {% else %}
                 —
               {% endif %}
@@ -150,7 +149,7 @@
           {% endif %} {% if car.body_type %}
           <div class="chip">Кузов: {{ car.display_body_type or car.body_type }}</div>
           {% endif %} {% if car.drive_type %}
-          <div class="chip">Привод: {{ car.drive_type }}</div>
+          <div class="chip">Привод: {{ car.display_drive_type or car.drive_type }}</div>
           {% endif %} {% if car.color %}
           <div class="chip">Цвет: {{ car.display_color or car.color }}</div>
           {% endif %} {% if car.display_country_label or car.country %}

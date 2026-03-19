@@ -15,6 +15,8 @@ from ..utils.taxonomy import (
     ru_transmission,
     ru_drivetrain,
     color_hex,
+    build_labeled_options,
+    translate_payload_value,
 )
 from ..utils.localization import display_body, display_color
 from ..utils.price_utils import display_price_rub, price_without_util_note
@@ -637,16 +639,24 @@ def list_cars(
                 "country": country_norm or country_raw,
                 "region": region_val,
                 "color": c.get("color"),
-                "display_color": ru_color(c.get("color")) or display_color(c.get("color")) or c.get("color"),
+                "display_color": (
+                    ru_color(c.get("color"))
+                    or display_color(c.get("color"))
+                    or (ru_color(normalize_color(c.get("color"))) if normalize_color(c.get("color")) else None)
+                    or (display_color(normalize_color(c.get("color"))) if normalize_color(c.get("color")) else None)
+                    or c.get("color")
+                ),
                 "color_hex": color_hex(normalize_color(c.get("color")) or c.get("color")),
                 "engine_cc": c.get("engine_cc"),
                 "power_hp": c.get("power_hp"),
+                "engine_type": c.get("engine_type"),
+                "display_engine_type": translate_payload_value("engine_type", c.get("engine_type")) or c.get("engine_type"),
                 "body_type": c.get("body_type"),
                 "display_body_type": ru_body(c.get("body_type")) or display_body(c.get("body_type")) or c.get("body_type"),
                 "transmission": c.get("transmission"),
-                "display_transmission": ru_transmission(c.get("transmission")) or c.get("transmission"),
+                "display_transmission": translate_payload_value("transmission", c.get("transmission")) or c.get("transmission"),
                 "drive_type": c.get("drive_type"),
-                "display_drive_type": ru_drivetrain(c.get("drive_type")) or c.get("drive_type"),
+                "display_drive_type": translate_payload_value("drive_type", c.get("drive_type")) or c.get("drive_type"),
                 "images_count": img_count,
                 "photos_count": img_count,
                 "price": c.get("price"),
@@ -1028,10 +1038,8 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     display_code, display_label = resolve_display_country(car)
     detail.display_country_code = display_code
     detail.display_country_label = display_label
-    detail.display_engine_type = ru_fuel(car.engine_type) or ru_fuel(
-        normalize_fuel(car.engine_type)) or car.engine_type
-    detail.display_transmission = ru_transmission(
-        car.transmission) or car.transmission
+    detail.display_engine_type = translate_payload_value("engine_type", car.engine_type) or car.engine_type
+    detail.display_transmission = translate_payload_value("transmission", car.transmission) or car.transmission
     return detail.model_dump()
 
 
@@ -1175,14 +1183,22 @@ def filter_ctx_base(
     )
     engine_types = _sort_by_label(
         [
-            {"value": v["value"], "label": ru_fuel(v["value"]) or v["value"], "count": v.get("count", 0)}
+            {
+                "value": v["value"],
+                "label": translate_payload_value("engine_type", v["value"]) or v["value"],
+                "count": v.get("count", 0),
+            }
             for v in service.facet_counts(field="engine_type", filters=base_filters)
             if v.get("value")
         ]
     )
     transmissions = _sort_by_label(
         [
-            {"value": v["value"], "label": ru_transmission(v["value"]) or v["value"], "count": v.get("count", 0)}
+            {
+                "value": v["value"],
+                "label": translate_payload_value("transmission", v["value"]) or v["value"],
+                "count": v.get("count", 0),
+            }
             for v in service.facet_counts(field="transmission", filters=base_filters)
             if v.get("value")
         ]
@@ -1191,7 +1207,7 @@ def filter_ctx_base(
         [
             {
                 "value": v["value"],
-                "label": ru_drivetrain(v["value"]) or v["value"],
+                "label": translate_payload_value("drive_type", v["value"]) or v["value"],
                 "count": v.get("count", 0),
             }
             for v in service.facet_counts(field="drive_type", filters=base_filters)
@@ -1405,24 +1421,24 @@ def filter_payload(
     eu_payload = service.payload_values_bulk(payload_keys, source_ids=service.source_ids_for_region("EU"))
     kr_payload = service.payload_values_bulk(payload_keys, source_ids=service.source_ids_for_region("KR"))
     data = {
-        "seats_options_eu": eu_payload.get("num_seats", []),
-        "doors_options_eu": eu_payload.get("doors_count", []),
-        "owners_options_eu": eu_payload.get("owners_count", []),
-        "emission_classes_eu": eu_payload.get("emission_class", []),
-        "efficiency_classes_eu": eu_payload.get("efficiency_class", []),
-        "climatisation_options_eu": eu_payload.get("climatisation", []),
-        "airbags_options_eu": eu_payload.get("airbags", []),
-        "interior_design_options_eu": eu_payload.get("interior_design", []),
-        "price_rating_labels_eu": eu_payload.get("price_rating_label", []),
-        "seats_options_kr": kr_payload.get("num_seats", []),
-        "doors_options_kr": kr_payload.get("doors_count", []),
-        "owners_options_kr": kr_payload.get("owners_count", []),
-        "emission_classes_kr": kr_payload.get("emission_class", []),
-        "efficiency_classes_kr": kr_payload.get("efficiency_class", []),
-        "climatisation_options_kr": kr_payload.get("climatisation", []),
-        "airbags_options_kr": kr_payload.get("airbags", []),
-        "interior_design_options_kr": kr_payload.get("interior_design", []),
-        "price_rating_labels_kr": kr_payload.get("price_rating_label", []),
+        "seats_options_eu": build_labeled_options(eu_payload.get("num_seats", []), "num_seats"),
+        "doors_options_eu": build_labeled_options(eu_payload.get("doors_count", []), "doors_count"),
+        "owners_options_eu": build_labeled_options(eu_payload.get("owners_count", []), "owners_count"),
+        "emission_classes_eu": build_labeled_options(eu_payload.get("emission_class", []), "emission_class"),
+        "efficiency_classes_eu": build_labeled_options(eu_payload.get("efficiency_class", []), "efficiency_class"),
+        "climatisation_options_eu": build_labeled_options(eu_payload.get("climatisation", []), "climatisation"),
+        "airbags_options_eu": build_labeled_options(eu_payload.get("airbags", []), "airbags"),
+        "interior_design_options_eu": build_labeled_options(eu_payload.get("interior_design", []), "interior_design"),
+        "price_rating_labels_eu": build_labeled_options(eu_payload.get("price_rating_label", []), "price_rating_label"),
+        "seats_options_kr": build_labeled_options(kr_payload.get("num_seats", []), "num_seats"),
+        "doors_options_kr": build_labeled_options(kr_payload.get("doors_count", []), "doors_count"),
+        "owners_options_kr": build_labeled_options(kr_payload.get("owners_count", []), "owners_count"),
+        "emission_classes_kr": build_labeled_options(kr_payload.get("emission_class", []), "emission_class"),
+        "efficiency_classes_kr": build_labeled_options(kr_payload.get("efficiency_class", []), "efficiency_class"),
+        "climatisation_options_kr": build_labeled_options(kr_payload.get("climatisation", []), "climatisation"),
+        "airbags_options_kr": build_labeled_options(kr_payload.get("airbags", []), "airbags"),
+        "interior_design_options_kr": build_labeled_options(kr_payload.get("interior_design", []), "interior_design"),
+        "price_rating_labels_kr": build_labeled_options(kr_payload.get("price_rating_label", []), "price_rating_label"),
     }
     redis_set_json(cache_key, data, ttl_sec=3600)
     total_ms = (time.perf_counter() - start) * 1000

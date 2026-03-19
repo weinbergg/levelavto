@@ -144,38 +144,44 @@
               {% endif %}
               <input type="hidden" name="color" value="{{ params.get('color','') }}">
             </label>
-            <label class="reg-range">Поставлен на учёт с / по
-              <div class="reg-range__inputs">
-                <div class="reg-range__col">
+            <div class="filters-range filters-range--reg">
+              <label>Год, от
+                <div class="field-pair">
                   <select name="reg_year_min" id="reg-year-min">
                     <option value="">Не важно</option>
                     {% for y in reg_years %}
                     <option value="{{ y }}" {% if params.get('reg_year_min')|int == y %}selected{% endif %}>{{ y }}</option>
                     {% endfor %}
                   </select>
-                  <select name="reg_month_min" id="reg-month-min" data-reg-month="min">
-                    <option value="">Месяц</option>
-                    {% for m in reg_months %}
-                    <option value="{{ m.value }}" {% if params.get('reg_month_min')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
-                    {% endfor %}
-                  </select>
+                  <div class="field-pair__month" data-reg-month="min">
+                    <select name="reg_month_min" id="reg-month-min">
+                      <option value="">Месяц</option>
+                      {% for m in reg_months %}
+                      <option value="{{ m.value }}" {% if params.get('reg_month_min')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
                 </div>
-                <div class="reg-range__col">
+              </label>
+              <label>Год, до
+                <div class="field-pair">
                   <select name="reg_year_max" id="reg-year-max">
                     <option value="">Не важно</option>
                     {% for y in reg_years %}
                     <option value="{{ y }}" {% if params.get('reg_year_max')|int == y %}selected{% endif %}>{{ y }}</option>
                     {% endfor %}
                   </select>
-                  <select name="reg_month_max" id="reg-month-max" data-reg-month="max">
-                    <option value="">Месяц</option>
-                    {% for m in reg_months %}
-                    <option value="{{ m.value }}" {% if params.get('reg_month_max')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
-                    {% endfor %}
-                  </select>
+                  <div class="field-pair__month" data-reg-month="max">
+                    <select name="reg_month_max" id="reg-month-max">
+                      <option value="">Месяц</option>
+                      {% for m in reg_months %}
+                      <option value="{{ m.value }}" {% if params.get('reg_month_max')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
                 </div>
-              </div>
-            </label>
+              </label>
+            </div>
             <label>Топливо
               <select name="engine_type">
                 <option value="">Любое</option>
@@ -201,18 +207,18 @@
               </select>
             </label>
             <div class="filters-range">
-              <label>Мощность от, л.с
+              <label><span class="field-label field-label--wrap">Мощность от, л.с</span>
                 <input type="number" name="power_hp_min" inputmode="numeric" min="0" step="10" value="{{ params.get('power_hp_min','') }}">
               </label>
-              <label>Мощность до, л.с
+              <label><span class="field-label field-label--wrap">Мощность до, л.с</span>
                 <input type="number" name="power_hp_max" inputmode="numeric" min="0" step="10" value="{{ params.get('power_hp_max','') }}">
               </label>
             </div>
             <div class="filters-range">
-              <label>Объём двигателя от, см³
+              <label><span class="field-label field-label--wrap">Объём двигателя от, см³</span>
                 <input type="number" name="engine_cc_min" inputmode="numeric" min="0" step="100" value="{{ params.get('engine_cc_min','') }}">
               </label>
-              <label>Объём двигателя до, см³
+              <label><span class="field-label field-label--wrap">Объём двигателя до, см³</span>
                 <input type="number" name="engine_cc_max" inputmode="numeric" min="0" step="100" value="{{ params.get('engine_cc_max','') }}">
               </label>
             </div>
@@ -230,9 +236,6 @@
 
         <div class="filters-actions">
           <button class="btn btn-ghost" id="resetFilters" type="button">Сбросить</button>
-        </div>
-        <div class="filters-extra">
-          <a class="btn btn-secondary" id="catalog-advanced-link" href="/search">Расширенный поиск</a>
         </div>
         {% for line in params.getlist('line') %}
         <input type="hidden" name="line" value="{{ line }}">
@@ -326,7 +329,7 @@
                   {% elif car.year %}
                     {% set _ = meta.append(car.year) %}
                   {% endif %}
-                  {% if car.engine_type %}{% set _ = meta.append(car.engine_type) %}{% endif %}
+                  {% if car.display_engine_type or car.engine_type %}{% set _ = meta.append(car.display_engine_type or car.engine_type) %}{% endif %}
                   {% if meta %}
                     <div class="car-card__meta">{{ meta|join(' · ') }}</div>
                   {% endif %}
@@ -341,13 +344,13 @@
                       <li><span class="spec-line">Объём: {{ '{:,.0f}'.format(car.engine_cc).replace(',', ' ') }} см³</span></li>
                     {% endif %}
                     {% if car.transmission %}
-                      <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/drive.svg" alt=""> {{ car.transmission }}</span></li>
+                      <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/drive.svg" alt=""> {{ car.display_transmission or car.transmission }}</span></li>
                     {% endif %}
                     {% if car.body_type %}
-                      <li><span class="spec-line">{{ car.body_type }}</span></li>
+                      <li><span class="spec-line">{{ car.display_body_type or car.body_type }}</span></li>
                     {% endif %}
                     {% if car.color %}
-                      <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt=""> {{ car.color }}</span></li>
+                      <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt=""> {{ car.display_color or car.color }}</span></li>
                     {% endif %}
                     {% if car.country %}
                       <li><span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt=""> {{ country_labels.get(car.country|upper, car.country) }}</span></li>
@@ -356,8 +359,7 @@
                 </div>
                 <div class="car-card__price">
                   {% if car.display_price_rub %}
-                    {% set display_price_round = ((car.display_price_rub + 9999) // 10000) * 10000 %}
-                    <div class="price-main">{{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽</div>
+                    <div class="price-main">{{ '{:,.0f}'.format(car.display_price_rub).replace(',', ' ') }} ₽</div>
                   {% else %}
                     <div class="price-main">—</div>
                   {% endif %}

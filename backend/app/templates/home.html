@@ -92,26 +92,42 @@
             />
           </div>
           <div class="field">
-            <label for="home-reg-year-min">Поставлен на учёт с, год</label>
-            <input
-              id="home-reg-year-min"
-              name="reg_year_min"
-              type="number"
-              inputmode="numeric"
-              min="1900"
-              step="1"
-            />
+            <label for="home-reg-year-min">Год, от</label>
+            <div class="field-pair field-pair--home">
+              <select id="home-reg-year-min" name="reg_year_min">
+                <option value="">Не важно</option>
+                {% for y in reg_years %}
+                <option value="{{ y }}" {% if params.get('reg_year_min')|int == y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+              </select>
+              <div class="field-pair__month">
+                <select id="home-reg-month-min" name="reg_month_min">
+                  <option value="">Месяц</option>
+                  {% for m in reg_months %}
+                  <option value="{{ m.value }}" {% if params.get('reg_month_min')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
           </div>
           <div class="field">
-            <label for="home-reg-year-max">Поставлен на учёт по, год</label>
-            <input
-              id="home-reg-year-max"
-              name="reg_year_max"
-              type="number"
-              inputmode="numeric"
-              min="1900"
-              step="1"
-            />
+            <label for="home-reg-year-max">Год, до</label>
+            <div class="field-pair field-pair--home">
+              <select id="home-reg-year-max" name="reg_year_max">
+                <option value="">Не важно</option>
+                {% for y in reg_years %}
+                <option value="{{ y }}" {% if params.get('reg_year_max')|int == y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+              </select>
+              <div class="field-pair__month">
+                <select id="home-reg-month-max" name="reg_month_max">
+                  <option value="">Месяц</option>
+                  {% for m in reg_months %}
+                  <option value="{{ m.value }}" {% if params.get('reg_month_max')|int == m.value %}selected{% endif %}>{{ m.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
         <div class="inline-actions">
@@ -280,14 +296,13 @@
             </div>
             <ul class="specs">
               <li>Пробег: {{ car.mileage or '—' }}</li>
-              <li>Кузов: {{ car.body_type or '—' }}</li>
+              <li>Кузов: {{ car.display_body_type or car.body_type or '—' }}</li>
               <li>Страна: {{ car.display_country_label or car.country or '—' }}</li>
             </ul>
           </div>
           <div class="car-card__price">
           {% if car.display_price_rub %}
-          {% set display_price_round = ((car.display_price_rub + 9999) // 10000) * 10000 %}
-            <span>{{ '{:,.0f}'.format(display_price_round).replace(',', ' ') }} ₽</span>
+            <span>{{ '{:,.0f}'.format(car.display_price_rub).replace(',', ' ') }} ₽</span>
           {% endif %}
           {% if car.price_note %}
             <div class="price-note">{{ car.price_note }}</div>

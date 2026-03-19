@@ -36,6 +36,8 @@ from ..utils.taxonomy import (
     ru_fuel,
     ru_transmission,
     ru_drivetrain,
+    translate_payload_value,
+    build_labeled_options,
     normalize_fuel,
     normalize_color as _normalize_color,
     color_hex,
@@ -55,6 +57,34 @@ _TOTAL_CARS_CACHE: TTLCache = TTLCache(maxsize=32, ttl=300)
 
 
 def _get_cars_count(service: CarsService, params: Dict[str, Any], timing_enabled: bool) -> int:
+    def _to_int(value: Any) -> Optional[int]:
+        if value is None or value == "":
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _to_float(value: Any) -> Optional[float]:
+        if value is None or value == "":
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _to_bool(value: Any) -> Optional[bool]:
+        if value is None or value == "":
+            return None
+        if isinstance(value, bool):
+            return value
+        s = str(value).strip().lower()
+        if s in {"1", "true", "yes", "on"}:
+            return True
+        if s in {"0", "false", "no", "off"}:
+            return False
+        return None
+
     normalized = normalize_count_params(params)
     strict_photo_mode = (
         os.getenv("CATALOG_HIDE_NO_LOCAL_PHOTO", "0") == "1"
@@ -79,6 +109,76 @@ def _get_cars_count(service: CarsService, params: Dict[str, Any], timing_enabled
     count_params = {k: v for k, v in normalized.items() if k != "hide_no_local_photo"}
     if not count_params:
         total = service.total_cars()
+    elif any(
+        count_params.get(key)
+        for key in (
+            "q",
+            "line",
+            "source",
+            "num_seats",
+            "doors_count",
+            "emission_class",
+            "efficiency_class",
+            "climatisation",
+            "airbags",
+            "interior_design",
+            "air_suspension",
+            "price_rating_label",
+            "owners_count",
+            "year_min",
+            "year_max",
+            "reg_month_min",
+            "reg_month_max",
+            "generation",
+        )
+    ):
+        _, total = service.list_cars(
+            region=count_params.get("region"),
+            country=count_params.get("country"),
+            brand=count_params.get("brand"),
+            model=count_params.get("model"),
+            generation=count_params.get("generation"),
+            color=count_params.get("color"),
+            body_type=count_params.get("body_type"),
+            engine_type=count_params.get("engine_type"),
+            transmission=count_params.get("transmission"),
+            drive_type=count_params.get("drive_type"),
+            kr_type=count_params.get("kr_type"),
+            price_min=_to_float(count_params.get("price_min")),
+            price_max=_to_float(count_params.get("price_max")),
+            power_hp_min=_to_float(count_params.get("power_hp_min")),
+            power_hp_max=_to_float(count_params.get("power_hp_max")),
+            engine_cc_min=_to_int(count_params.get("engine_cc_min")),
+            engine_cc_max=_to_int(count_params.get("engine_cc_max")),
+            year_min=_to_int(count_params.get("year_min")),
+            year_max=_to_int(count_params.get("year_max")),
+            mileage_min=_to_int(count_params.get("mileage_min")),
+            mileage_max=_to_int(count_params.get("mileage_max")),
+            reg_year_min=_to_int(count_params.get("reg_year_min")),
+            reg_month_min=_to_int(count_params.get("reg_month_min")),
+            reg_year_max=_to_int(count_params.get("reg_year_max")),
+            reg_month_max=_to_int(count_params.get("reg_month_max")),
+            condition=count_params.get("condition"),
+            q=count_params.get("q"),
+            lines=[count_params["line"]] if count_params.get("line") else None,
+            source_key=count_params.get("source"),
+            num_seats=count_params.get("num_seats"),
+            doors_count=count_params.get("doors_count"),
+            emission_class=count_params.get("emission_class"),
+            efficiency_class=count_params.get("efficiency_class"),
+            climatisation=count_params.get("climatisation"),
+            airbags=count_params.get("airbags"),
+            interior_design=count_params.get("interior_design"),
+            air_suspension=_to_bool(count_params.get("air_suspension")),
+            price_rating_label=count_params.get("price_rating_label"),
+            owners_count=count_params.get("owners_count"),
+            page=1,
+            page_size=1,
+            light=True,
+            count_only=True,
+            use_fast_count=True,
+            hide_no_local_photo=(normalized.get("hide_no_local_photo") == "1"),
+        )
     else:
         total = service.count_cars(**count_params)
     _TOTAL_CARS_CACHE[cache_key] = int(total)
@@ -267,24 +367,24 @@ def _build_filter_context(
         airbags_options = []
         interior_design_options = []
         price_rating_labels = []
-        seats_options_eu = _sort_numeric_strings(eu_payload.get("num_seats", []))
-        doors_options_eu = _sort_numeric_strings(eu_payload.get("doors_count", []))
-        owners_options_eu = _sort_numeric_strings(eu_payload.get("owners_count", []))
-        emission_classes_eu = eu_payload.get("emission_class", [])
-        efficiency_classes_eu = eu_payload.get("efficiency_class", [])
-        climatisation_options_eu = eu_payload.get("climatisation", [])
-        airbags_options_eu = eu_payload.get("airbags", [])
-        interior_design_options_eu = eu_payload.get("interior_design", [])
-        price_rating_labels_eu = eu_payload.get("price_rating_label", [])
-        seats_options_kr = _sort_numeric_strings(kr_payload.get("num_seats", []))
-        doors_options_kr = _sort_numeric_strings(kr_payload.get("doors_count", []))
-        owners_options_kr = _sort_numeric_strings(kr_payload.get("owners_count", []))
-        emission_classes_kr = kr_payload.get("emission_class", [])
-        efficiency_classes_kr = kr_payload.get("efficiency_class", [])
-        climatisation_options_kr = kr_payload.get("climatisation", [])
-        airbags_options_kr = kr_payload.get("airbags", [])
-        interior_design_options_kr = kr_payload.get("interior_design", [])
-        price_rating_labels_kr = kr_payload.get("price_rating_label", [])
+        seats_options_eu = build_labeled_options(_sort_numeric_strings(eu_payload.get("num_seats", [])), "num_seats")
+        doors_options_eu = build_labeled_options(_sort_numeric_strings(eu_payload.get("doors_count", [])), "doors_count")
+        owners_options_eu = build_labeled_options(_sort_numeric_strings(eu_payload.get("owners_count", [])), "owners_count")
+        emission_classes_eu = build_labeled_options(eu_payload.get("emission_class", []), "emission_class")
+        efficiency_classes_eu = build_labeled_options(eu_payload.get("efficiency_class", []), "efficiency_class")
+        climatisation_options_eu = build_labeled_options(eu_payload.get("climatisation", []), "climatisation")
+        airbags_options_eu = build_labeled_options(eu_payload.get("airbags", []), "airbags")
+        interior_design_options_eu = build_labeled_options(eu_payload.get("interior_design", []), "interior_design")
+        price_rating_labels_eu = build_labeled_options(eu_payload.get("price_rating_label", []), "price_rating_label")
+        seats_options_kr = build_labeled_options(_sort_numeric_strings(kr_payload.get("num_seats", [])), "num_seats")
+        doors_options_kr = build_labeled_options(_sort_numeric_strings(kr_payload.get("doors_count", [])), "doors_count")
+        owners_options_kr = build_labeled_options(_sort_numeric_strings(kr_payload.get("owners_count", [])), "owners_count")
+        emission_classes_kr = build_labeled_options(kr_payload.get("emission_class", []), "emission_class")
+        efficiency_classes_kr = build_labeled_options(kr_payload.get("efficiency_class", []), "efficiency_class")
+        climatisation_options_kr = build_labeled_options(kr_payload.get("climatisation", []), "climatisation")
+        airbags_options_kr = build_labeled_options(kr_payload.get("airbags", []), "airbags")
+        interior_design_options_kr = build_labeled_options(kr_payload.get("interior_design", []), "interior_design")
+        price_rating_labels_kr = build_labeled_options(kr_payload.get("price_rating_label", []), "price_rating_label")
     else:
         seats_options = []
         doors_options = []
@@ -333,21 +433,33 @@ def _build_filter_context(
         print(f"FILTER_CTX_STAGE name=brands ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     t0 = time.perf_counter()
     engine_types = [
-        {"value": v["value"], "label": ru_fuel(v["value"]) or v["value"], "count": v["count"]}
+        {
+            "value": v["value"],
+            "label": translate_payload_value("engine_type", v["value"]) or v["value"],
+            "count": v["count"],
+        }
         for v in service.facet_counts(field="engine_type", filters=facet_filters)
     ]
     if timing_enabled:
         print(f"FILTER_CTX_STAGE name=engine_types ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     t0 = time.perf_counter()
     transmissions = [
-        {"value": v["value"], "label": ru_transmission(v["value"]) or v["value"], "count": v["count"]}
+        {
+            "value": v["value"],
+            "label": translate_payload_value("transmission", v["value"]) or v["value"],
+            "count": v["count"],
+        }
         for v in service.facet_counts(field="transmission", filters=facet_filters)
     ]
     if timing_enabled:
         print(f"FILTER_CTX_STAGE name=transmissions ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     t0 = time.perf_counter()
     drive_types = [
-        {"value": v["value"], "label": ru_drivetrain(v["value"]) or v["value"], "count": v["count"]}
+        {
+            "value": v["value"],
+            "label": translate_payload_value("drive_type", v["value"]) or v["value"],
+            "count": v["count"],
+        }
         for v in service.facet_counts(field="drive_type", filters=facet_filters)
     ]
     if timing_enabled:
@@ -438,8 +550,18 @@ def _home_context(
         code, label = resolve_display_country(car)
         car.display_country_code = code
         car.display_country_label = label
-        car.display_engine_type = ru_fuel(car.engine_type) or ru_fuel(normalize_fuel(car.engine_type)) or car.engine_type
-        car.display_transmission = ru_transmission(car.transmission) or car.transmission
+        car.display_engine_type = translate_payload_value("engine_type", car.engine_type) or car.engine_type
+        car.display_transmission = translate_payload_value("transmission", car.transmission) or car.transmission
+        car.display_drive_type = translate_payload_value("drive_type", car.drive_type) or car.drive_type
+        car.display_body_type = ru_body(car.body_type) or display_body(car.body_type) or car.body_type
+        normalized_color = normalize_color(getattr(car, "color", None))
+        car.display_color = (
+            ru_color(getattr(car, "color", None))
+            or display_color(getattr(car, "color", None))
+            or (ru_color(normalized_color) if normalized_color else None)
+            or (display_color(normalized_color) if normalized_color else None)
+            or car.color
+        )
         car.display_price_rub = display_price_rub(
             car.total_price_rub_cached,
             car.price_rub_cached,
@@ -799,8 +921,9 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         except (TypeError, ValueError):
             return None
     initial_items: List[dict] = []
+    initial_total: Optional[int] = None
     try:
-        items, _ = service.list_cars(
+        items, initial_total = service.list_cars(
             region=params.get("region"),
             country=params.get("country"),
             kr_type=params.get("kr_type"),
@@ -851,6 +974,18 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     calc_breakdown=c.get("calc_breakdown_json"),
                     region=params.get("region"),
                     country=c.get("country"),
+                )
+                c["display_engine_type"] = translate_payload_value("engine_type", c.get("engine_type")) or c.get("engine_type")
+                c["display_transmission"] = translate_payload_value("transmission", c.get("transmission")) or c.get("transmission")
+                c["display_drive_type"] = translate_payload_value("drive_type", c.get("drive_type")) or c.get("drive_type")
+                c["display_body_type"] = ru_body(c.get("body_type")) or display_body(c.get("body_type")) or c.get("body_type")
+                normalized_color = normalize_color(c.get("color"))
+                c["display_color"] = (
+                    ru_color(c.get("color"))
+                    or display_color(c.get("color"))
+                    or (ru_color(normalized_color) if normalized_color else None)
+                    or (display_color(normalized_color) if normalized_color else None)
+                    or c.get("color")
                 )
             ids = [c.get("id") for c in initial_items if isinstance(c, dict) and c.get("id")]
             if ids:
@@ -975,7 +1110,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "contact_wa",
             "contact_ig",
         ])
-    total_cars = _get_cars_count(service, params, timing_enabled)
+    total_cars = initial_total if initial_total is not None else _get_cars_count(service, params, timing_enabled)
     request.state.perf = {
         "db_ms": float((time.perf_counter() - t0) * 1000),
         "redis_ms": 0.0,
@@ -1125,121 +1260,33 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     options = []
     calc = None
     if car:
+        calc = service.ensure_calc_cache(car)
         car.display_body_type = ru_body(getattr(car, "body_type", None)) or display_body(getattr(car, "body_type", None)) or car.body_type
-        car.display_color = ru_color(getattr(car, "color", None)) or display_color(getattr(car, "color", None)) or car.color
-        car.display_engine_type = ru_fuel(getattr(car, "engine_type", None)) or ru_fuel(normalize_fuel(getattr(car, "engine_type", None))) or car.engine_type
-        car.display_transmission = ru_transmission(getattr(car, "transmission", None)) or car.transmission
+        normalized_color = normalize_color(getattr(car, "color", None))
+        car.display_color = (
+            ru_color(getattr(car, "color", None))
+            or display_color(getattr(car, "color", None))
+            or (ru_color(normalized_color) if normalized_color else None)
+            or (display_color(normalized_color) if normalized_color else None)
+            or car.color
+        )
+        car.display_engine_type = translate_payload_value("engine_type", getattr(car, "engine_type", None)) or car.engine_type
+        car.display_transmission = translate_payload_value("transmission", getattr(car, "transmission", None)) or car.transmission
+        car.display_drive_type = translate_payload_value("drive_type", getattr(car, "drive_type", None)) or car.drive_type
+        car.display_price_rub = display_price_rub(
+            car.total_price_rub_cached,
+            car.price_rub_cached,
+            allow_price_fallback=True,
+        )
+        car.price_note = price_without_util_note(
+            display_price=car.display_price_rub,
+            total_price_rub_cached=car.total_price_rub_cached,
+            calc_breakdown=car.calc_breakdown_json,
+            region="KR" if str(car.country or "").upper().startswith("KR") else ("EU" if str(car.country or "").upper() and str(car.country or "").upper() != "RU" else None),
+            country=car.country,
+        )
         payload = car.source_payload or {}
         pricing = service.price_info(car)
-
-        def translate_value(val: Any) -> Any:
-            if not isinstance(val, str):
-                return val
-            s = val.strip()
-            low = s.lower()
-            exact = {
-                "automatic climate control": "климат-контроль",
-                "automatic climate control, 2 zones": "климат-контроль, 2 зоны",
-                "automatic climate control, 3 zones": "климат-контроль, 3 зоны",
-                "automatic climate control, 4 zones": "климат-контроль, 4 зоны",
-                "automatic climatisation": "климат-контроль",
-                "automatic climatisation, 2 zones": "климат-контроль, 2 зоны",
-                "automatic climatisation, 3 zones": "климат-контроль, 3 зоны",
-                "automatic climatisation, 4 zones": "климат-контроль, 4 зоны",
-                "airbags": "подушки безопасности",
-                "front and side airbags": "фронтальные и боковые подушки",
-                "front, side and more airbags": "фронтальные, боковые и дополнительные подушки",
-                "front and side and more airbags": "фронтальные, боковые и дополнительные подушки",
-                "parking sensors front and rear": "парктроники спереди и сзади",
-                "front and rear parking sensors": "парктроники спереди и сзади",
-                "parking assists": "ассистенты парковки",
-                "park assist": "ассистент парковки",
-                "front, rear": "спереди и сзади",
-                "360° camera": "камера 360°",
-                "rear, front, 360° camera": "камеры спереди, сзади и 360°",
-                "front, rear, 360° camera": "камеры спереди, сзади и 360°",
-                "rear view camera": "камера заднего вида",
-                "backup camera": "камера заднего вида",
-                "reverse camera": "камера заднего вида",
-                "full leather": "кожа",
-                "part leather": "частичная кожа",
-                "alcantara": "алькантара",
-                "no_rating": "нет оценки",
-                "very_good_price": "отличная цена",
-                "good_price": "хорошая цена",
-                "average_price": "средняя цена",
-                "high_price": "высокая цена",
-                "dealer": "дилер",
-                "private": "частное лицо",
-                "petrol": "бензин",
-                "diesel": "дизель",
-                "electric": "электромобиль",
-                "hybrid": "гибрид",
-                "automatic": "автомат",
-                "manual": "механика",
-                "awd": "полный привод",
-                "4x4": "полный привод",
-                "fwd": "передний привод",
-                "rwd": "задний привод",
-                "abs": "ABS",
-                "alarm system": "сигнализация",
-                "alloy wheels": "легкосплавные диски",
-                "apple carplay": "Apple CarPlay",
-                "android auto": "Android Auto",
-                "air suspension": "пневмоподвеска",
-                "navigation system": "навигация",
-                "heated seats": "подогрев сидений",
-                "heated steering wheel": "подогрев руля",
-                "led headlights": "LED-фары",
-                "cruise control": "круиз-контроль",
-                "adaptive cruise control": "адаптивный круиз-контроль",
-                "lane change assist": "ассистент смены полосы",
-                "blind spot assist": "контроль слепых зон",
-                "panoramic roof": "панорамная крыша",
-                "sunroof": "люк",
-                "keyless central locking": "бесключевой доступ",
-                "isofix": "ISOFIX",
-                "dab radio": "DAB-радио",
-                "bluetooth": "Bluetooth",
-                "head-up display": "проекционный дисплей",
-                "hill-start assist": "помощь при старте в гору",
-                "start-stop system": "система старт-стоп",
-                "trailer coupling": "фаркоп",
-                "tinted windows": "тонировка",
-                "warranty": "гарантия",
-                "full service history": "полная сервисная история",
-                "non-smoker vehicle": "не курили в салоне",
-                "rain sensor": "датчик дождя",
-                "light sensor": "датчик света",
-                "tyre pressure monitoring": "контроль давления в шинах",
-                "usb port": "USB",
-                "touchscreen": "сенсорный экран",
-            }
-            if low in exact:
-                return exact[low]
-            replacements = [
-                ("climatisation", "климат-контроль"),
-                ("climatization", "климат-контроль"),
-                ("climate control", "климат-контроль"),
-                ("airbags", "подушки безопасности"),
-                ("navigation", "навигация"),
-                ("leather", "кожа"),
-                ("sport package", "спорт пакет"),
-                ("park assist", "ассистент парковки"),
-                ("360° camera", "камера 360°"),
-                ("front, rear", "спереди и сзади"),
-                ("rear view camera", "камера заднего вида"),
-                ("backup camera", "камера заднего вида"),
-                ("reverse camera", "камера заднего вида"),
-                ("parking sensors", "парктроники"),
-                ("multifunction steering wheel", "мульти-руль"),
-                ("leather", "кожа"),
-            ]
-            out = s
-            for src, dst in replacements:
-                if src in low:
-                    out = out.replace(src, dst).replace(src.title(), dst)
-            return out
 
         def push(label: str, value: Any, *, as_color: bool = False) -> None:
             if value is None:
@@ -1247,11 +1294,9 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             if isinstance(value, str) and not value.strip():
                 return
             if as_color:
-                norm = _normalize_color(value)
-                ru = ru_color(norm) or translate_value(value)
-                details.append({"label": label, "value": ru})
+                details.append({"label": label, "value": translate_payload_value("manufacturer_color", str(value)) or value})
                 return
-            details.append({"label": label, "value": translate_value(value)})
+            details.append({"label": label, "value": translate_payload_value(label, str(value)) or value})
 
         push("Мест", payload.get("num_seats"))
         push("Дверей", payload.get("doors_count"))
@@ -1269,11 +1314,14 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
 
         raw_options = payload.get("options")
         if isinstance(raw_options, list):
-            options = [translate_value(str(opt).strip()) for opt in raw_options if str(opt).strip()]
+            options = [
+                translate_payload_value("options", str(opt).strip()) or str(opt).strip()
+                for opt in raw_options
+                if str(opt).strip()
+            ]
         elif isinstance(raw_options, str):
             opt = raw_options.strip()
-            options = [translate_value(opt)] if opt else []
-        calc = service.ensure_calc_cache(car)
+            options = [translate_payload_value("options", opt) or opt] if opt else []
     return templates.TemplateResponse(
         "car_detail.html",
         {

@@ -50,8 +50,8 @@
 
   function formatRub(val) {
     const n = Number(val)
-    const rounded = Math.ceil(n / 10000) * 10000
-    return `${rounded.toLocaleString('ru-RU')} ₽`
+    if (!Number.isFinite(n)) return '—'
+    return `${Math.round(n).toLocaleString('ru-RU')} ₽`
   }
 
   function animateCount(el, nextValue, duration = 400) {
@@ -490,7 +490,6 @@
         month.value = ''
       }
       month.disabled = !hasYear
-      label.classList.toggle('is-hidden', !hasYear)
     })
   }
 
@@ -926,7 +925,6 @@
       renderSkeleton(cards)
     }
     try {
-      const fx = await getFx()
       const params = paramsPreview
       const reqId = ++catalogReqId
       catalogController?.abort()
@@ -1928,7 +1926,7 @@
     function buildHomeParams(withPaging = false) {
       const data = new FormData(form)
       const params = new URLSearchParams()
-      const numericKeys = ['price_max', 'mileage_max', 'reg_year_min', 'reg_year_max']
+      const numericKeys = ['price_max', 'mileage_max', 'reg_year_min', 'reg_month_min', 'reg_year_max', 'reg_month_max']
       const skipKeys = ['region_extra']
       let regionVal = ''
       for (const [k, v] of data.entries()) {
@@ -1985,6 +1983,11 @@
       if (!countEl) return
       clearTimeout(debounce)
       debounce = setTimeout(async () => {
+        const queryValue = String(form.elements['q']?.value || '').trim()
+        if (queryValue.length >= 2) {
+          updateAdvancedLink()
+          return
+        }
         pendingController?.abort()
         pendingController = new AbortController()
         try {
@@ -2460,7 +2463,6 @@
       params.set('page', '1')
       params.set('page_size', '6')
       try {
-        const fx = await getFx()
         const res = await fetch(`/api/cars?${params.toString()}`)
         if (!res.ok) return
         const data = await res.json()

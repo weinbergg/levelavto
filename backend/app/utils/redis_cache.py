@@ -182,14 +182,14 @@ def build_cars_list_full_key(
 
 def build_filter_payload_key(params: Optional[Dict[str, Any]] = None) -> str:
     if not params:
-        return "filter_payload:all"
+        return f"filter_payload:all:v{_dataset_version()}"
     key = (
         str(params.get("region") or ""),
         str(params.get("country") or ""),
         str(params.get("brand") or ""),
         str(params.get("model") or ""),
     )
-    return f"filter_payload:{key}"
+    return f"filter_payload:{key}:v{_dataset_version()}"
 
 
 def build_filter_ctx_base_key(params: Optional[Dict[str, Any]] = None) -> str:

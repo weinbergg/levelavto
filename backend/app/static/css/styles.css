@@ -1440,6 +1440,14 @@ body.filters-open {
 }
 .filters-range {
   grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.filters-range label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
 }
 .filters-row {
   display: grid;
@@ -1648,6 +1656,7 @@ body.filters-open {
   grid-template-columns: repeat(2, minmax(140px, 1fr));
   gap: 8px;
   min-width: 0;
+  align-items: start;
 }
 .field-pair select,
 .field-pair__month select {
@@ -1655,6 +1664,15 @@ body.filters-open {
 }
 .field-pair__month {
   min-width: 0;
+  display: block;
+}
+.field-label {
+  display: block;
+  line-height: 1.2;
+  white-space: normal;
+}
+.field-label--wrap {
+  max-width: 14ch;
 }
 .region-subfield {
   position: relative;

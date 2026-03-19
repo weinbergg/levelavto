@@ -4,8 +4,9 @@ import csv
 import hashlib
 import re
 from pathlib import Path
-from typing import Dict, Optional, Set, Tuple, List
+from typing import Dict, Optional, Set, Tuple, List, Any
 
+from .localization import display_color
 
 def _load_taxonomy() -> Tuple[Dict[str, Dict[str, str]], Dict[str, Dict[str, Set[str]]]]:
     base = Path(__file__).resolve().parents[1] / "resources"
@@ -205,3 +206,185 @@ def is_color_base(val: Optional[str]) -> bool:
 
 def normalize_fuel(val: Optional[str]) -> Optional[str]:
     return _normalize_alias("fuel", val)
+
+
+_FREE_TEXT_EXACT = {
+    "automatic climate control": "климат-контроль",
+    "automatic climate control, 2 zones": "климат-контроль, 2 зоны",
+    "automatic climate control, 3 zones": "климат-контроль, 3 зоны",
+    "automatic climate control, 4 zones": "климат-контроль, 4 зоны",
+    "automatic climatisation": "климат-контроль",
+    "automatic climatisation, 2 zones": "климат-контроль, 2 зоны",
+    "automatic climatisation, 3 zones": "климат-контроль, 3 зоны",
+    "automatic climatisation, 4 zones": "климат-контроль, 4 зоны",
+    "airbags": "подушки безопасности",
+    "front and side airbags": "фронтальные и боковые подушки",
+    "front, side and more airbags": "фронтальные, боковые и дополнительные подушки",
+    "front and side and more airbags": "фронтальные, боковые и дополнительные подушки",
+    "parking sensors front and rear": "парктроники спереди и сзади",
+    "front and rear parking sensors": "парктроники спереди и сзади",
+    "parking assists": "ассистенты парковки",
+    "park assist": "ассистент парковки",
+    "front, rear": "спереди и сзади",
+    "360° camera": "камера 360°",
+    "rear, front, 360° camera": "камеры спереди, сзади и 360°",
+    "front, rear, 360° camera": "камеры спереди, сзади и 360°",
+    "rear view camera": "камера заднего вида",
+    "backup camera": "камера заднего вида",
+    "reverse camera": "камера заднего вида",
+    "full leather": "кожа",
+    "part leather": "частичная кожа",
+    "cloth": "ткань",
+    "fabric": "ткань",
+    "velour": "велюр",
+    "alcantara": "алькантара",
+    "suede": "замша",
+    "no_rating": "нет оценки",
+    "very_good_price": "отличная цена",
+    "good_price": "хорошая цена",
+    "average_price": "средняя цена",
+    "high_price": "высокая цена",
+    "dealer": "дилер",
+    "private": "частное лицо",
+    "automatic": "автомат",
+    "manual": "механика",
+    "awd": "полный привод",
+    "4x4": "полный привод",
+    "fwd": "передний привод",
+    "rwd": "задний привод",
+    "abs": "ABS",
+    "alarm system": "сигнализация",
+    "alloy wheels": "легкосплавные диски",
+    "apple carplay": "Apple CarPlay",
+    "android auto": "Android Auto",
+    "air suspension": "пневмоподвеска",
+    "navigation system": "навигация",
+    "heated seats": "подогрев сидений",
+    "heated steering wheel": "подогрев руля",
+    "led headlights": "LED-фары",
+    "cruise control": "круиз-контроль",
+    "adaptive cruise control": "адаптивный круиз-контроль",
+    "lane change assist": "ассистент смены полосы",
+    "blind spot assist": "контроль слепых зон",
+    "panoramic roof": "панорамная крыша",
+    "sunroof": "люк",
+    "keyless central locking": "бесключевой доступ",
+    "isofix": "ISOFIX",
+    "dab radio": "DAB-радио",
+    "bluetooth": "Bluetooth",
+    "head-up display": "проекционный дисплей",
+    "hill-start assist": "помощь при старте в гору",
+    "start-stop system": "система старт-стоп",
+    "trailer coupling": "фаркоп",
+    "tinted windows": "тонировка",
+    "warranty": "гарантия",
+    "full service history": "полная сервисная история",
+    "non-smoker vehicle": "в салоне не курили",
+    "rain sensor": "датчик дождя",
+    "light sensor": "датчик света",
+    "tyre pressure monitoring": "контроль давления в шинах",
+    "usb port": "USB",
+    "touchscreen": "сенсорный экран",
+    "other, e10-enabled": "бензин (E10)",
+    "ethanol (ffv, e85, etc.)": "этанол (E85/FFV)",
+}
+
+_FREE_TEXT_REPLACEMENTS = (
+    ("climatisation", "климат-контроль"),
+    ("climatization", "климат-контроль"),
+    ("climate control", "климат-контроль"),
+    ("airbags", "подушки безопасности"),
+    ("navigation", "навигация"),
+    ("sport package", "спорт-пакет"),
+    ("park assist", "ассистент парковки"),
+    ("360° camera", "камера 360°"),
+    ("rear view camera", "камера заднего вида"),
+    ("backup camera", "камера заднего вида"),
+    ("reverse camera", "камера заднего вида"),
+    ("parking sensors", "парктроники"),
+    ("multifunction steering wheel", "мульти-руль"),
+)
+
+
+def translate_payload_value(field: Optional[str], value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return str(value)
+    raw = value.strip()
+    if not raw:
+        return None
+    low = raw.lower()
+    field_key = (field or "").strip().lower()
+
+    if field_key in {"engine_type", "fuel"}:
+        return ru_fuel(raw) or ru_fuel(normalize_fuel(raw)) or _FREE_TEXT_EXACT.get(low) or raw
+    if field_key == "transmission":
+        return ru_transmission(raw) or _FREE_TEXT_EXACT.get(low) or raw
+    if field_key in {"drive_type", "drivetrain"}:
+        return ru_drivetrain(raw) or _FREE_TEXT_EXACT.get(low) or raw
+    if field_key == "body_type":
+        return ru_body(raw) or raw
+    if field_key in {"color", "manufacturer_color"}:
+        normalized_color = normalize_color(raw)
+        return (
+            ru_color(raw)
+            or display_color(raw)
+            or (ru_color(normalized_color) if normalized_color else None)
+            or (display_color(normalized_color) if normalized_color else None)
+            or raw
+        )
+
+    if low in _FREE_TEXT_EXACT:
+        return _FREE_TEXT_EXACT[low]
+
+    # Translate comma-separated payload phrases like "cloth, beige".
+    if "," in raw:
+        parts = [part.strip() for part in raw.split(",") if part.strip()]
+        if len(parts) > 1:
+            translated_parts = [translate_payload_value(field, part) or part for part in parts]
+            return ", ".join(translated_parts)
+
+    mapped = (
+        ru_fuel(raw)
+        or ru_fuel(normalize_fuel(raw))
+        or ru_transmission(raw)
+        or ru_drivetrain(raw)
+        or ru_body(raw)
+    )
+    if mapped:
+        return mapped
+
+    normalized_color = normalize_color(raw)
+    if normalized_color and normalized_color != low:
+        color_label = ru_color(normalized_color) or display_color(normalized_color)
+        if color_label:
+            return color_label
+
+    translated = raw
+    changed = False
+    for src, dst in _FREE_TEXT_REPLACEMENTS:
+        if src in translated.lower():
+            translated = re.sub(re.escape(src), dst, translated, flags=re.IGNORECASE)
+            changed = True
+    return translated if changed else raw
+
+
+def build_labeled_options(values: List[Any], field: str) -> List[Dict[str, str]]:
+    out: List[Dict[str, str]] = []
+    seen: Set[str] = set()
+    for value in values or []:
+        raw = str(value or "").strip()
+        if not raw:
+            continue
+        key = raw.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(
+            {
+                "value": raw,
+                "label": translate_payload_value(field, raw) or raw,
+            }
+        )
+    return out

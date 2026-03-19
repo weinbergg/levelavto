@@ -112,8 +112,8 @@
               </label>
             </div>
 
-            <div class="advanced-row advanced-row--two">
-              <label class="field">Поставлен на учёт с
+            <div class="advanced-row advanced-row--two advanced-row--reg">
+              <label class="field">Год, от
                 <div class="field-pair">
                   <select name="reg_year_min" id="reg-year-min" {% if not reg_years %}disabled{% endif %}>
                     <option value="">Не важно</option>
@@ -131,7 +131,7 @@
                   </div>
                 </div>
               </label>
-              <label class="field">Поставлен на учёт по
+              <label class="field">Год, до
                 <div class="field-pair">
                   <select name="reg_year_max" id="reg-year-max" {% if not reg_years %}disabled{% endif %}>
                     <option value="">Не важно</option>
@@ -209,19 +209,19 @@
             </div>
 
             <div class="advanced-row advanced-row--two">
-              <label class="field">Мощность от, л.с
+              <label class="field"><span class="field-label field-label--wrap">Мощность от, л.с</span>
                 <input type="number" name="power_hp_min" inputmode="numeric" min="0" step="10" value="{{ params.get('power_hp_min','') }}">
               </label>
-              <label class="field">Мощность до, л.с
+              <label class="field"><span class="field-label field-label--wrap">Мощность до, л.с</span>
                 <input type="number" name="power_hp_max" inputmode="numeric" min="0" step="10" value="{{ params.get('power_hp_max','') }}">
               </label>
             </div>
 
             <div class="advanced-row advanced-row--two">
-              <label class="field">Объём двигателя от, см³
+              <label class="field"><span class="field-label field-label--wrap">Объём двигателя от, см³</span>
                 <input type="number" name="engine_cc_min" inputmode="numeric" min="0" step="100" value="{{ params.get('engine_cc_min','') }}">
               </label>
-              <label class="field">Объём двигателя до, см³
+              <label class="field"><span class="field-label field-label--wrap">Объём двигателя до, см³</span>
                 <input type="number" name="engine_cc_max" inputmode="numeric" min="0" step="100" value="{{ params.get('engine_cc_max','') }}">
               </label>
             </div>
@@ -303,8 +303,8 @@
                 data-options-kr='{{ interior_design_options_kr | tojson }}'
               >
                 <option value="">Не важно</option>
-                {% for v in interior_design_options_eu %}
-                <option value="{{ v }}" {% if params.get('interior_design') == v %}selected{% endif %}>{{ v }}</option>
+                {% for opt in interior_design_options_eu %}
+                <option value="{{ opt.value }}" {% if params.get('interior_design') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -327,8 +327,8 @@
                 data-options-kr='{{ seats_options_kr | tojson }}'
               >
                 <option value="">Не важно</option>
-                {% for v in seats_options_eu %}
-                <option value="{{ v }}" {% if params.get('num_seats') == v %}selected{% endif %}>{{ v }}</option>
+                {% for opt in seats_options_eu %}
+                <option value="{{ opt.value }}" {% if params.get('num_seats') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -342,8 +342,8 @@
                 data-options-kr='{{ doors_options_kr | tojson }}'
               >
                 <option value="">Не важно</option>
-                {% for v in doors_options_eu %}
-                <option value="{{ v }}" {% if params.get('doors_count') == v %}selected{% endif %}>{{ v }}</option>
+                {% for opt in doors_options_eu %}
+                <option value="{{ opt.value }}" {% if params.get('doors_count') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -357,8 +357,8 @@
                 data-options-kr='{{ owners_options_kr | tojson }}'
               >
                 <option value="">Не важно</option>
-                {% for v in owners_options_eu %}
-                <option value="{{ v }}" {% if params.get('owners_count') == v %}selected{% endif %}>{{ v }}</option>
+                {% for opt in owners_options_eu %}
+                <option value="{{ opt.value }}" {% if params.get('owners_count') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -372,8 +372,8 @@
                 data-options-kr='{{ climatisation_options_kr | tojson }}'
               >
                 <option value="">Не важно</option>
-                {% for v in climatisation_options_eu %}
-                <option value="{{ v }}" {% if params.get('climatisation') == v %}selected{% endif %}>{{ v }}</option>
+                {% for opt in climatisation_options_eu %}
+                <option value="{{ opt.value }}" {% if params.get('climatisation') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -387,8 +387,8 @@
                 data-options-kr='{{ airbags_options_kr | tojson }}'
               >
                 <option value="">Не важно</option>
-                {% for v in airbags_options_eu %}
-                <option value="{{ v }}" {% if params.get('airbags') == v %}selected{% endif %}>{{ v }}</option>
+                {% for opt in airbags_options_eu %}
+                <option value="{{ opt.value }}" {% if params.get('airbags') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -402,8 +402,8 @@
                 data-options-kr='{{ emission_classes_kr | tojson }}'
               >
                 <option value="">Не важно</option>
-                {% for v in emission_classes_eu %}
-                <option value="{{ v }}" {% if params.get('emission_class') == v %}selected{% endif %}>{{ v }}</option>
+                {% for opt in emission_classes_eu %}
+                <option value="{{ opt.value }}" {% if params.get('emission_class') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -417,8 +417,8 @@
                 data-options-kr='{{ efficiency_classes_kr | tojson }}'
               >
                 <option value="">Не важно</option>
-                {% for v in efficiency_classes_eu %}
-                <option value="{{ v }}" {% if params.get('efficiency_class') == v %}selected{% endif %}>{{ v }}</option>
+                {% for opt in efficiency_classes_eu %}
+                <option value="{{ opt.value }}" {% if params.get('efficiency_class') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -432,8 +432,8 @@
                 data-options-kr='{{ price_rating_labels_kr | tojson }}'
               >
                 <option value="">Не важно</option>
-                {% for v in price_rating_labels_eu %}
-                <option value="{{ v }}" {% if params.get('price_rating_label') == v %}selected{% endif %}>{{ v }}</option>
+                {% for opt in price_rating_labels_eu %}
+                <option value="{{ opt.value }}" {% if params.get('price_rating_label') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             </label>
