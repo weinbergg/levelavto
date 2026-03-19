@@ -209,6 +209,9 @@ def normalize_fuel(val: Optional[str]) -> Optional[str]:
 
 
 _FREE_TEXT_EXACT = {
+    "a/c (man.)": "кондиционер",
+    "air conditioner": "кондиционер",
+    "automatic air conditioning": "автоматический климат-контроль",
     "automatic climate control": "климат-контроль",
     "automatic climate control, 2 zones": "климат-контроль, 2 зоны",
     "automatic climate control, 3 zones": "климат-контроль, 3 зоны",
@@ -218,6 +221,9 @@ _FREE_TEXT_EXACT = {
     "automatic climatisation, 3 zones": "климат-контроль, 3 зоны",
     "automatic climatisation, 4 zones": "климат-контроль, 4 зоны",
     "airbags": "подушки безопасности",
+    "driver airbag": "подушка безопасности водителя",
+    "passenger airbag": "подушка безопасности пассажира",
+    "front airbags": "фронтальные подушки безопасности",
     "front and side airbags": "фронтальные и боковые подушки",
     "front, side and more airbags": "фронтальные, боковые и дополнительные подушки",
     "front and side and more airbags": "фронтальные, боковые и дополнительные подушки",
@@ -244,6 +250,8 @@ _FREE_TEXT_EXACT = {
     "good_price": "хорошая цена",
     "average_price": "средняя цена",
     "high_price": "высокая цена",
+    "reasonable_price": "адекватная цена",
+    "increased_price": "завышенная цена",
     "dealer": "дилер",
     "private": "частное лицо",
     "automatic": "автомат",
@@ -285,6 +293,18 @@ _FREE_TEXT_EXACT = {
     "tyre pressure monitoring": "контроль давления в шинах",
     "usb port": "USB",
     "touchscreen": "сенсорный экран",
+    "black": "чёрный",
+    "blue": "синий",
+    "brown": "коричневый",
+    "beige": "бежевый",
+    "white": "белый",
+    "grey": "серый",
+    "gray": "серый",
+    "silver": "серебристый",
+    "red": "красный",
+    "green": "зелёный",
+    "yellow": "жёлтый",
+    "orange": "оранжевый",
     "other, e10-enabled": "бензин (E10)",
     "ethanol (ffv, e85, etc.)": "этанол (E85/FFV)",
 }
@@ -318,7 +338,7 @@ def translate_payload_value(field: Optional[str], value: Optional[str]) -> Optio
     field_key = (field or "").strip().lower()
 
     if field_key in {"engine_type", "fuel"}:
-        return ru_fuel(raw) or ru_fuel(normalize_fuel(raw)) or _FREE_TEXT_EXACT.get(low) or raw
+        return _FREE_TEXT_EXACT.get(low) or ru_fuel(raw) or ru_fuel(normalize_fuel(raw)) or raw
     if field_key == "transmission":
         return ru_transmission(raw) or _FREE_TEXT_EXACT.get(low) or raw
     if field_key in {"drive_type", "drivetrain"}:
@@ -351,12 +371,14 @@ def translate_payload_value(field: Optional[str], value: Optional[str]) -> Optio
         or ru_transmission(raw)
         or ru_drivetrain(raw)
         or ru_body(raw)
+        or ru_color(raw)
+        or display_color(raw)
     )
     if mapped:
         return mapped
 
     normalized_color = normalize_color(raw)
-    if normalized_color and normalized_color != low:
+    if normalized_color:
         color_label = ru_color(normalized_color) or display_color(normalized_color)
         if color_label:
             return color_label

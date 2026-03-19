@@ -1110,7 +1110,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "contact_wa",
             "contact_ig",
         ])
-    total_cars = initial_total if initial_total is not None else _get_cars_count(service, params, timing_enabled)
+    total_cars = _get_cars_count(service, params, timing_enabled)
     request.state.perf = {
         "db_ms": float((time.perf_counter() - t0) * 1000),
         "redis_ms": 0.0,
