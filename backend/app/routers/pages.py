@@ -46,7 +46,7 @@ from ..utils.price_utils import display_price_rub, price_without_util_note
 normalize_color = _normalize_color
 from ..utils.country_map import country_label_ru, resolve_display_country, normalize_country_code
 from ..utils.color_groups import split_color_facets
-from ..utils.thumbs import normalize_classistatic_url, resolve_thumbnail_url
+from ..utils.thumbs import local_media_exists, normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.home_content import build_home_content
 
 
@@ -1226,7 +1226,9 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
                 return f"https:{raw}"
             if raw.startswith("http://"):
                 return f"https://{raw[7:]}"
-            if raw.startswith("https://") or raw.startswith("/media/"):
+            if raw.startswith("/media/"):
+                return raw if local_media_exists(raw) else None
+            if raw.startswith("https://"):
                 return raw
             return None
 
@@ -1302,26 +1304,42 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         push("Дверей", payload.get("doors_count"))
         push("Владельцев", payload.get("owners_count"))
         push("Экокласс", payload.get("emission_class"))
+        push("Класс CO₂", payload.get("envkv_co2_class") or payload.get("envkv_co2_class_value"))
         push("Эффективность", payload.get("efficiency_class"))
         push("Климат", payload.get("climatisation"))
         push("Интерьер", payload.get("interior_design"))
         push("Парктроники", payload.get("park_assists"))
         push("Подушки", payload.get("airbags"))
         push("Цвет производителя", payload.get("manufacturer_color"), as_color=True)
-        push("Расход топлива", payload.get("fuel_consumption"))
-        push("CO₂", payload.get("co_emission"))
+        push("Расход топлива", payload.get("envkv_energy_consumption") or payload.get("fuel_consumption"))
+        push("CO₂", payload.get("envkv_co2_emissions") or payload.get("co_emission"))
         push("Оценка цены", payload.get("price_rating_label"))
 
         raw_options = payload.get("options")
+        raw_features = payload.get("features")
+        merged_options: list[str] = []
+        seen_options: set[str] = set()
+
+        def collect_option(value: Any) -> None:
+            raw = str(value or "").strip()
+            if not raw or raw in seen_options:
+                return
+            seen_options.add(raw)
+            merged_options.append(translate_payload_value("options", raw) or raw)
+
         if isinstance(raw_options, list):
-            options = [
-                translate_payload_value("options", str(opt).strip()) or str(opt).strip()
-                for opt in raw_options
-                if str(opt).strip()
-            ]
+            for opt in raw_options:
+                collect_option(opt)
         elif isinstance(raw_options, str):
-            opt = raw_options.strip()
-            options = [translate_payload_value("options", opt) or opt] if opt else []
+            collect_option(raw_options)
+
+        if isinstance(raw_features, list):
+            for opt in raw_features:
+                collect_option(opt)
+        elif isinstance(raw_features, str):
+            collect_option(raw_features)
+
+        options = merged_options
     return templates.TemplateResponse(
         "car_detail.html",
         {

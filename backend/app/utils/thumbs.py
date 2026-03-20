@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from pathlib import Path
 from typing import Optional
 
 import requests
@@ -14,6 +15,21 @@ _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     re.IGNORECASE,
 )
+
+
+def _media_root() -> Path:
+    return Path(__file__).resolve().parents[3] / "фото-видео"
+
+
+def local_media_exists(url: Optional[str]) -> bool:
+    raw = str(url or "").strip()
+    if not raw.startswith("/media/"):
+        return False
+    try:
+        rel = raw.removeprefix("/media/").lstrip("/")
+        return (_media_root() / rel).exists()
+    except Exception:
+        return False
 
 
 def _now() -> float:
@@ -119,7 +135,7 @@ def resolve_thumbnail_url(
 ) -> Optional[str]:
     strict_local_only = os.getenv("THUMB_STRICT_LOCAL_ONLY", "0") == "1"
     local = (local_path or "").strip()
-    if local.startswith("/media/"):
+    if local_media_exists(local):
         return local
     if strict_local_only:
         return None

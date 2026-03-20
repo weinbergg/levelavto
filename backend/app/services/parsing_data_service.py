@@ -122,7 +122,7 @@ class ParsingDataService:
                     existing.is_available = True
                     updated += 1
                 else:
-                    if existing.source_payload is None and payload.get("source_payload") is not None:
+                    if payload.get("source_payload") is not None and existing.source_payload != payload["source_payload"]:
                         existing.source_payload = payload["source_payload"]
                         updated += 1
                     if existing.price_rub_cached is None and payload.get("price_rub_cached") is not None:

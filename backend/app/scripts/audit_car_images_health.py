@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 
 from backend.app.db import SessionLocal
 from backend.app.models import Car, CarImage, Source
-from backend.app.utils.thumbs import normalize_classistatic_url
+from backend.app.utils.thumbs import local_media_exists, normalize_classistatic_url
 from backend.app.utils.telegram import send_telegram_message
 
 
@@ -46,9 +46,10 @@ def _normalize_image_url(url: str | None) -> Optional[str]:
 
 
 def _probe(url: str, timeout_sec: float) -> ProbeResult:
-    # Local media path - no remote probe required.
     if url.startswith("/media/"):
-        return ProbeResult(ok=True, status=200, reason="local_media", checked_url=url)
+        if local_media_exists(url):
+            return ProbeResult(ok=True, status=200, reason="local_media", checked_url=url)
+        return ProbeResult(ok=False, status=404, reason="local_missing", checked_url=url)
     headers = {"User-Agent": "levelavto-image-audit/1.0"}
     try:
         resp = requests.head(url, timeout=timeout_sec, allow_redirects=True, headers=headers)
@@ -75,7 +76,9 @@ def _probe_fast_head(url: str, timeout_sec: float) -> ProbeResult:
     # Faster mode for large overnight sweeps:
     # one HEAD request only, no GET fallback body reads.
     if url.startswith("/media/"):
-        return ProbeResult(ok=True, status=200, reason="local_media", checked_url=url)
+        if local_media_exists(url):
+            return ProbeResult(ok=True, status=200, reason="local_media", checked_url=url)
+        return ProbeResult(ok=False, status=404, reason="local_missing", checked_url=url)
     headers = {"User-Agent": "levelavto-image-audit/1.0"}
     try:
         resp = requests.head(url, timeout=timeout_sec, allow_redirects=True, headers=headers)

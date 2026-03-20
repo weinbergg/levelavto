@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Iterable, Iterator, List, Optional
+from typing import Iterator, List, Optional
 import csv
 import json
 import logging
@@ -32,8 +32,9 @@ class MobileDeCsvRow:
     options: List[str]
     engine_type: Optional[str]
     displacement: Optional[Decimal]
+    displacement_orig: Optional[Decimal]
     horse_power: Optional[int]
-    power_kw: Optional[Decimal] = None
+    power_kw: Optional[Decimal]
     body_type: Optional[str]
     transmission: Optional[str]
     full_fuel_type: Optional[str]
@@ -54,6 +55,14 @@ class MobileDeCsvRow:
     price_rating_label: Optional[str]
     seller_country: Optional[str]
     created_at: Optional[datetime]
+    envkv_engine_type: Optional[str]
+    envkv_energy_consumption: Optional[str]
+    envkv_co2_emissions: Optional[str]
+    envkv_co2_class: Optional[str]
+    envkv_co2_class_value: Optional[str]
+    envkv_consumption_fuel: Optional[str]
+    features: List[str]
+    description: Optional[str]
     image_urls: List[str]
 
 
@@ -76,7 +85,6 @@ def _to_decimal(value: str | None) -> Optional[Decimal]:
     if not v:
         return None
     try:
-        # keep digits and dot/comma
         normalized = v.replace(",", ".")
         filtered = "".join(
             ch for ch in normalized if ch.isdigit() or ch == ".")
@@ -100,7 +108,6 @@ def _parse_created_at(value: str | None) -> Optional[datetime]:
     v = value.strip()
     if not v:
         return None
-    # try common formats
     for fmt in ("%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
             return datetime.strptime(v, fmt)
@@ -109,12 +116,7 @@ def _parse_created_at(value: str | None) -> Optional[datetime]:
     return None
 
 
-def _parse_image_urls(raw: str | None) -> List[str]:
-    if not raw:
-        return []
-
-
-def _parse_options(raw: str | None) -> List[str]:
+def _parse_json_list(raw: str | None, *, field_name: str) -> List[str]:
     if not raw:
         return []
     s = raw.strip()
@@ -124,15 +126,19 @@ def _parse_options(raw: str | None) -> List[str]:
     try:
         data = json.loads(s)
         if isinstance(data, list):
-            return [str(x).strip() for x in data if isinstance(x, (str, int, float))]
+            return [str(item).strip() for item in data if isinstance(item, (str, int, float)) and str(item).strip()]
+        return []
     except Exception as exc:
-        logger.warning("Failed to parse options JSON: %r (%s)", raw[:200], exc)
-    return []
+        logger.warning("Failed to parse %s JSON: %r (%s)", field_name, raw[:200], exc)
+        return []
+
+
+def _parse_image_urls(raw: str | None) -> List[str]:
+    if not raw:
+        return []
     s = raw.strip()
-    # strip surrounding quotes if any
     if len(s) >= 2 and s[0] == s[-1] and s[0] in ("'", '"'):
         s = s[1:-1]
-    # replace doubled quotes to make valid JSON
     s = s.replace('""', '"')
     try:
         data = json.loads(s)
@@ -143,14 +149,20 @@ def _parse_options(raw: str | None) -> List[str]:
                     url = item.get("url")
                     if isinstance(url, str) and url.strip():
                         urls.append(url.strip())
-                elif isinstance(item, str):
-                    if item.strip():
-                        urls.append(item.strip())
+                elif isinstance(item, str) and item.strip():
+                    urls.append(item.strip())
         return urls
     except Exception as exc:
-        logger.warning(
-            "Failed to parse image_urls JSON: %r (%s)", raw[:200], exc)
+        logger.warning("Failed to parse image_urls JSON: %r (%s)", raw[:200], exc)
         return []
+
+
+def _parse_options(raw: str | None) -> List[str]:
+    return _parse_json_list(raw, field_name="options")
+
+
+def _parse_features(raw: str | None) -> List[str]:
+    return _parse_json_list(raw, field_name="features")
 
 
 def iter_mobilede_csv_rows(file_path: str) -> Iterator[MobileDeCsvRow]:
@@ -158,10 +170,10 @@ def iter_mobilede_csv_rows(file_path: str) -> Iterator[MobileDeCsvRow]:
         reader = csv.reader(f, delimiter="|", quotechar='"',
                             escapechar=None, strict=False)
         header = next(reader, None)
-        # We'll match by name if header available; else assume fixed order
         name_to_idx = {}
         if header:
             name_to_idx = {name.strip(): i for i, name in enumerate(header)}
+
         for row in reader:
             def get(name: str, idx_fallback: int | None = None) -> Optional[str]:
                 if name_to_idx and name in name_to_idx and name_to_idx[name] < len(row):
@@ -169,6 +181,7 @@ def iter_mobilede_csv_rows(file_path: str) -> Iterator[MobileDeCsvRow]:
                 if idx_fallback is not None and idx_fallback < len(row):
                     return row[idx_fallback]
                 return None
+
             inner_id = _to_str(get("inner_id")) or ""
             if not inner_id:
                 continue
@@ -191,8 +204,9 @@ def iter_mobilede_csv_rows(file_path: str) -> Iterator[MobileDeCsvRow]:
                 options=_parse_options(get("options")),
                 engine_type=_to_str(get("engine_type")),
                 displacement=_to_decimal(get("displacement")),
+                displacement_orig=_to_decimal(get("displacement_orig")),
                 horse_power=_to_int(get("horse_power")),
-                power_kw=_to_decimal(get("power_kw")),
+                power_kw=_to_decimal(get("power_kw")) or _to_decimal(get("power_kwt")),
                 body_type=_to_str(get("body_type")),
                 transmission=_to_str(get("transmission")),
                 full_fuel_type=_to_str(get("full_fuel_type")),
@@ -213,5 +227,13 @@ def iter_mobilede_csv_rows(file_path: str) -> Iterator[MobileDeCsvRow]:
                 price_rating_label=_to_str(get("price_rating_label")),
                 seller_country=_to_str(get("seller_country")),
                 created_at=_parse_created_at(get("created_at")),
+                envkv_engine_type=_to_str(get("envkv.engineType")),
+                envkv_energy_consumption=_to_str(get("envkv.energyConsumption")),
+                envkv_co2_emissions=_to_str(get("envkv.co2Emissions")),
+                envkv_co2_class=_to_str(get("envkv.co2Class")),
+                envkv_co2_class_value=_to_str(get("envkv.co2Class_value")),
+                envkv_consumption_fuel=_to_str(get("envkv.consumptionDetails.fuel")),
+                features=_parse_features(get("features")),
+                description=_to_str(get("description")),
                 image_urls=_parse_image_urls(get("image_urls")),
             )

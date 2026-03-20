@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable, Iterator, List, Optional, Any, Dict
 from dataclasses import asdict
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 from .base import CarParsed
 from .config import SiteConfig
@@ -62,6 +62,20 @@ class MobileDeFeedParser:
             return "LPG"
         return full or raw
 
+    def _resolve_engine_cc(self, row: MobileDeCsvRow) -> Optional[int]:
+        raw_cc = row.displacement_orig
+        if raw_cc is not None:
+            try:
+                return int(Decimal(raw_cc).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            except Exception:
+                pass
+        if row.displacement is None:
+            return None
+        try:
+            return int((Decimal(row.displacement) * Decimal("1000")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        except Exception:
+            return None
+
     def _detect_drive(self, options: List[str]) -> Optional[str]:
         opts = " ".join(options).lower()
         if "four-wheel drive" in opts or "all wheel" in opts or "four-wheel" in opts:
@@ -76,7 +90,10 @@ class MobileDeFeedParser:
         for row in rows:
             images: List[str] = list(row.image_urls) if row.image_urls else []
             thumb = images[0] if images else None
-            drive = self._detect_drive(row.options or [])
+            option_values = list(row.options or [])
+            if row.features:
+                option_values.extend(row.features)
+            drive = self._detect_drive(option_values)
             payload = self._payload_from_row(row)
             # skip obviously broken rows
             if not row.mark and not row.model and not row.title:
@@ -98,13 +115,16 @@ class MobileDeFeedParser:
                     row.price_eur) if row.price_eur is not None else None,
                 currency="EUR",
                 listing_date=row.created_at,
-                engine_cc=int(row.displacement * 1000) if row.displacement else None,
+                engine_cc=self._resolve_engine_cc(row),
                 power_hp=float(row.horse_power) if row.horse_power else None,
-                power_kw=float(row.power_kw) if hasattr(row, "power_kw") and row.power_kw else (float(row.horse_power) /
-                                                                                              1.35962 if row.horse_power else None),
+                power_kw=float(row.power_kw) if row.power_kw is not None else (
+                    float(row.horse_power) / 1.35962 if row.horse_power else None
+                ),
                 body_type=self._normalize_body(row.body_type),
                 engine_type=self._normalize_engine(
-                    row.engine_type, row.full_fuel_type),
+                    row.envkv_engine_type or row.engine_type,
+                    row.envkv_consumption_fuel or row.full_fuel_type,
+                ),
                 transmission=self._normalize_transmission(row.transmission),
                 drive_type=drive,
                 color=row.manufacturer_color or row.color,
