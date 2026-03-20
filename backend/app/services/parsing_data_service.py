@@ -100,7 +100,17 @@ class ParsingDataService:
         ).scalars().all()
         existing_by_eid = {c.external_id: c for c in existing_rows}
 
-        for eid, payload in unique_items.items():
+        ordered_eids = sorted(
+            unique_items.keys(),
+            key=lambda eid: (
+                0 if eid in existing_by_eid else 1,
+                int(getattr(existing_by_eid.get(eid), "id", 0) or 0),
+                str(eid),
+            ),
+        )
+
+        for eid in ordered_eids:
+            payload = unique_items[eid]
             # Extract images out of payload; they are persisted separately
             images: List[str] = []
             raw_images = payload.pop("images", None)

@@ -1262,7 +1262,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             deduped_images: list[str] = []
             seen_images: set[str] = set()
             for url in detail_images:
-                key = str(url or "").strip()
+                key = _normalize_detail_image(url)
                 if not key or key in seen_images:
                     continue
                 seen_images.add(key)

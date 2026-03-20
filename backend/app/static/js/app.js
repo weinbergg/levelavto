@@ -2118,6 +2118,8 @@
   function initAdvancedSearch() {
     const form = qs('#advanced-search-form')
     if (!form) return
+    if (form.dataset.initialized === '1') return
+    form.dataset.initialized = '1'
     const rowsWrap = qs('#search-rows')
     const template = qs('#search-row-template')
     const addBtn = qs('#add-search-row')
@@ -2394,6 +2396,17 @@
       bindExistingRow(node, initial)
     }
 
+    const ensureRows = (initials = []) => {
+      if (!rowsWrap) return
+      const currentRows = qsa('[data-search-row]', rowsWrap)
+      if (currentRows.length) {
+        currentRows.forEach((row, idx) => bindExistingRow(row, initials[idx] || {}))
+        return
+      }
+      const safeInitials = initials.length ? initials : [{}]
+      safeInitials.forEach((initial) => addRow(initial))
+    }
+
     const buildLines = () => {
       const rows = qsa('[data-search-row]', rowsWrap)
       const lines = []
@@ -2529,8 +2542,8 @@
 
     form.addEventListener('reset', () => {
       setTimeout(() => {
-        if (rowsWrap) rowsWrap.innerHTML = ''
-        addRow({})
+        rowsWrap?.replaceChildren()
+        ensureRows([{}])
         bindRegionSelect(form)
         bindRegMonthState(form)
         bindOtherColorsToggle(form)
@@ -2545,21 +2558,17 @@
       scheduleCount()
     })
 
-    const linesFromUrl = new URLSearchParams(window.location.search).getAll('line')
-    const existingRows = qsa('[data-search-row]', rowsWrap)
-    if (linesFromUrl.length) {
-      if (existingRows.length) {
-        bindExistingRow(existingRows[0], parseLine(linesFromUrl[0]))
-        linesFromUrl.slice(1).forEach((line) => addRow(parseLine(line)))
-      } else {
-        linesFromUrl.forEach((line) => addRow(parseLine(line)))
-      }
-    } else {
-      if (existingRows.length) {
-        bindExistingRow(existingRows[0], {})
-      } else {
-        addRow({})
-      }
+    const initialLines = new URLSearchParams(window.location.search).getAll('line').map(parseLine)
+    ensureRows(initialLines)
+    requestAnimationFrame(() => ensureRows(initialLines))
+    window.addEventListener('pageshow', () => ensureRows(initialLines))
+    if (window.MutationObserver && rowsWrap) {
+      const observer = new MutationObserver(() => {
+        if (!rowsWrap.querySelector('[data-search-row]')) {
+          ensureRows(initialLines)
+        }
+      })
+      observer.observe(rowsWrap, { childList: true })
     }
     if (form.id !== 'advanced-search-form') {
       bindRegionSelect(form)
@@ -2623,6 +2632,8 @@
     const main = qs('.detail-hero__main')
     const img = qs('#primaryImage')
     if (!main || !img) return
+    if (main.dataset.bound === '1') return
+    main.dataset.bound = '1'
     window.__detailGalleryHandled = true
     let images = []
     try {
@@ -2647,7 +2658,11 @@
       const firstOk = images.findIndex((src) => isUsable(src))
       idx = firstOk >= 0 ? firstOk : 0
     }
-    const thumbs = qsa('.detail-hero__thumbs .thumb')
+    let thumbs = qsa('.detail-hero__thumbs .thumb')
+    if (thumbs.length > images.length) {
+      thumbs.slice(images.length).forEach((btn) => btn.remove())
+      thumbs = qsa('.detail-hero__thumbs .thumb')
+    }
     const thumbsWrap = qs('.detail-hero__thumbs')
     const prevBtn = qs('[data-detail-prev]')
     const nextBtn = qs('[data-detail-next]')

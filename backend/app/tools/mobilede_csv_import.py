@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from typing import List
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from datetime import datetime
 import os
 import itertools
@@ -67,6 +69,24 @@ def main() -> None:
         inserted_total = updated_total = seen_total = skipped_total = 0
         batch: List[dict] = []
         BATCH_SIZE = 500
+        MAX_BATCH_RETRIES = 5
+
+        def apply_batch(items: List[dict]) -> tuple[int, int, int]:
+            attempt = 0
+            while True:
+                try:
+                    return service.upsert_parsed_items(source, items)
+                except OperationalError as exc:
+                    db.rollback()
+                    attempt += 1
+                    message = str(exc).lower()
+                    if "deadlock detected" not in message or attempt > MAX_BATCH_RETRIES:
+                        raise
+                    delay = min(5.0, 0.5 * attempt)
+                    print(
+                        f"Deadlock on batch retry {attempt}/{MAX_BATCH_RETRIES}; sleeping {delay:.1f}s"
+                    )
+                    time.sleep(delay)
 
         row_iter = feed_parser.iter_parsed_from_csv(
             iter_mobilede_csv_rows(args.file))
@@ -76,13 +96,13 @@ def main() -> None:
         for parsed in row_iter:
             batch.append(parsed.as_dict())
             if len(batch) >= BATCH_SIZE:
-                ins, upd, seen = service.upsert_parsed_items(source, batch)
+                ins, upd, seen = apply_batch(batch)
                 inserted_total += ins
                 updated_total += upd
                 seen_total += seen
                 batch.clear()
         if batch:
-            ins, upd, seen = service.upsert_parsed_items(source, batch)
+            ins, upd, seen = apply_batch(batch)
             inserted_total += ins
             updated_total += upd
             seen_total += seen

@@ -52,7 +52,7 @@
         </div>
         {% if image_urls and image_urls|length > 1 %}
         <div class="detail-hero__thumbs">
-          {% for img_url in image_urls[:30] %}
+          {% for img_url in image_urls %}
           {% set im_raw = (img_url or '')|trim %}
           {% if not im_raw %}
             {% set thumb_src = '/static/img/no-photo.svg' %}
