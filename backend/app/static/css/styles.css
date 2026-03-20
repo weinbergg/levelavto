@@ -2837,6 +2837,21 @@ input[type="number"]::-webkit-outer-spin-button {
   cursor: not-allowed;
   filter: grayscale(0.6);
 }
+@media (max-width: 900px) {
+  .detail-hero__thumbs {
+    display: flex;
+    flex-wrap: nowrap;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-right: 0;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .detail-hero__thumbs .thumb {
+    flex: 0 0 86px;
+  }
+}
 .detail-info {
   display: grid;
   gap: 14px;

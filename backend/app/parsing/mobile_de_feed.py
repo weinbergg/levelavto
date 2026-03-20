@@ -76,6 +76,19 @@ class MobileDeFeedParser:
         except Exception:
             return None
 
+    def _resolve_price_eur(self, row: MobileDeCsvRow) -> Optional[float]:
+        if row.price_eur_nt is not None:
+            try:
+                return float(row.price_eur_nt)
+            except Exception:
+                pass
+        if row.price_eur is not None:
+            try:
+                return float(row.price_eur)
+            except Exception:
+                pass
+        return None
+
     def _resolve_power_kw(self, row: MobileDeCsvRow) -> Optional[float]:
         if row.power_kw is not None:
             try:
@@ -126,8 +139,7 @@ class MobileDeFeedParser:
                 registration_year=int(row.first_registration.split("/")[1]) if row.first_registration and "/" in row.first_registration else None,
                 registration_month=int(row.first_registration.split("/")[0]) if row.first_registration and "/" in row.first_registration else None,
                 mileage=row.km_age,
-                price=float(
-                    row.price_eur) if row.price_eur is not None else None,
+                price=self._resolve_price_eur(row),
                 currency="EUR",
                 listing_date=row.created_at,
                 engine_cc=self._resolve_engine_cc(row),

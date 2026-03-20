@@ -1258,6 +1258,16 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
                     detail_images.insert(0, resolved_thumb)
         except Exception:
             pass
+        if detail_images:
+            deduped_images: list[str] = []
+            seen_images: set[str] = set()
+            for url in detail_images:
+                key = str(url or "").strip()
+                if not key or key in seen_images:
+                    continue
+                seen_images.add(key)
+                deduped_images.append(key)
+            detail_images = deduped_images
     details = []
     options = []
     calc = None

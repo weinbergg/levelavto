@@ -36,10 +36,10 @@ def build_calc_debug(
 
     price_net_eur = None
     price_source = None
-    if pricing.get("net_eur"):
+    if pricing.get("net_eur") is not None:
         price_net_eur = float(pricing["net_eur"])
         price_source = "payload.net_eur"
-    elif pricing.get("gross_eur"):
+    elif pricing.get("gross_eur") is not None:
         price_net_eur = float(pricing["gross_eur"])
         price_source = "payload.gross_eur"
     elif car.price is not None and car.currency:

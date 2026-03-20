@@ -2377,6 +2377,12 @@
       })
     }
 
+    const bindExistingRow = (row, initial = {}) => {
+      if (!row || row.dataset.bound === '1') return
+      row.dataset.bound = '1'
+      bindRow(row, initial)
+    }
+
     const addRow = (initial = {}) => {
       if (!rowsWrap) return
       let node = null
@@ -2385,7 +2391,7 @@
       }
       if (!node) return
       rowsWrap.appendChild(node)
-      bindRow(node, initial)
+      bindExistingRow(node, initial)
     }
 
     const buildLines = () => {
@@ -2539,12 +2545,21 @@
       scheduleCount()
     })
 
-    if (rowsWrap) rowsWrap.innerHTML = ''
     const linesFromUrl = new URLSearchParams(window.location.search).getAll('line')
+    const existingRows = qsa('[data-search-row]', rowsWrap)
     if (linesFromUrl.length) {
-      linesFromUrl.forEach((line) => addRow(parseLine(line)))
+      if (existingRows.length) {
+        bindExistingRow(existingRows[0], parseLine(linesFromUrl[0]))
+        linesFromUrl.slice(1).forEach((line) => addRow(parseLine(line)))
+      } else {
+        linesFromUrl.forEach((line) => addRow(parseLine(line)))
+      }
     } else {
-      addRow({})
+      if (existingRows.length) {
+        bindExistingRow(existingRows[0], {})
+      } else {
+        addRow({})
+      }
     }
     if (form.id !== 'advanced-search-form') {
       bindRegionSelect(form)
@@ -2616,7 +2631,15 @@
       images = []
     }
     if (!Array.isArray(images) || images.length < 2) return
-    images = images.map((u) => normalizeThumbUrl(u, { thumb: true, width: DETAIL_PRIMARY_WIDTH }))
+    const deduped = []
+    const seen = new Set()
+    images.forEach((u) => {
+      const normalized = normalizeThumbUrl(u, { thumb: true, width: DETAIL_PRIMARY_WIDTH })
+      if (!normalized || seen.has(normalized)) return
+      seen.add(normalized)
+      deduped.push(normalized)
+    })
+    images = deduped
     if (images.length < 2) return
     const isUsable = (src) => Boolean(src && src !== '/static/img/no-photo.svg')
     let idx = Math.max(0, images.indexOf(img.getAttribute('src')))

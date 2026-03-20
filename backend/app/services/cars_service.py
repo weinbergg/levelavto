@@ -1448,10 +1448,16 @@ class CarsService:
         used_price = None
         used_currency = "EUR"
         vat_reclaim = False
-        if price_net and vat_pct and float(vat_pct) > 0:
+        if price_net is not None:
             used_price = float(price_net)
-            vat_reclaim = True
-        elif price_gross:
+            try:
+                vat_reclaim = bool(
+                    (vat_pct is not None and float(vat_pct) > 0)
+                    or (price_gross is not None and float(price_net) < float(price_gross))
+                )
+            except Exception:
+                vat_reclaim = True
+        elif price_gross is not None:
             used_price = float(price_gross)
         else:
             used_price = car.price
@@ -2143,7 +2149,16 @@ class CarsService:
         price_gross = payload.get("price_eur")
         price_net = payload.get("price_eur_nt")
         vat_pct = payload.get("vat")
-        vat_reclaimable = bool(price_net and vat_pct and float(vat_pct) > 0)
+        try:
+            vat_reclaimable = bool(
+                price_net is not None
+                and (
+                    (vat_pct is not None and float(vat_pct) > 0)
+                    or (price_gross is not None and float(price_net) < float(price_gross))
+                )
+            )
+        except Exception:
+            vat_reclaimable = bool(price_net is not None)
         return {
             "gross_eur": float(price_gross) if price_gross is not None else None,
             "net_eur": float(price_net) if price_net is not None else None,
