@@ -1742,6 +1742,29 @@ body.filters-open {
   gap: 6px;
   min-width: 0;
 }
+.advanced-lines .search-row,
+.advanced-lines .search-row .field,
+.advanced-lines .search-row select,
+.advanced-lines .search-row input {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+.advanced-lines .search-row select,
+.advanced-lines .search-row input {
+  position: static !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  clip: auto !important;
+  clip-path: none !important;
+  white-space: normal !important;
+}
+.advanced-lines .search-row select.model-select-native {
+  height: 46px !important;
+  overflow: visible !important;
+}
+.advanced-lines .model-accordion {
+  display: none !important;
+}
 .icon-btn {
   width: 46px;
   height: 46px;
