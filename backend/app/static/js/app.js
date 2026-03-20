@@ -1620,6 +1620,7 @@
     const models = Array.isArray(payload?.models) ? payload.models : []
     const groups = Array.isArray(payload?.model_groups) ? payload.model_groups : []
     const enableAccordion = window.ENABLE_MODEL_ACCORDION === true
+    const isAdvancedSearchSelect = select?.form?.id === 'advanced-search-form'
     select.innerHTML = ''
     const empty = document.createElement('option')
     empty.value = ''
@@ -1688,7 +1689,7 @@
     }
 
     const renderAccordion = () => {
-      if (!enableAccordion) {
+      if (!enableAccordion || isAdvancedSearchSelect) {
         removeAccordion()
         return
       }
@@ -2396,15 +2397,40 @@
       bindExistingRow(node, initial)
     }
 
+    const forceRebuildRows = (initials = []) => {
+      if (!rowsWrap) return
+      rowsWrap.replaceChildren()
+      const safeInitials = initials.length ? initials : [{}]
+      safeInitials.forEach((initial) => addRow(initial))
+    }
+
+    const rowsUsable = () => {
+      if (!rowsWrap) return false
+      const rows = qsa('[data-search-row]', rowsWrap)
+      if (!rows.length) return false
+      return rows.some((row) => {
+        const controls = qsa('select, input', row)
+        if (controls.length < 3) return false
+        if (row.offsetHeight > 24) return true
+        return controls.some((el) => {
+          const style = window.getComputedStyle(el)
+          return style.display !== 'none' && style.visibility !== 'hidden'
+        })
+      })
+    }
+
     const ensureRows = (initials = []) => {
       if (!rowsWrap) return
+      if (!rowsUsable()) {
+        forceRebuildRows(initials)
+        return
+      }
       const currentRows = qsa('[data-search-row]', rowsWrap)
       if (currentRows.length) {
         currentRows.forEach((row, idx) => bindExistingRow(row, initials[idx] || {}))
         return
       }
-      const safeInitials = initials.length ? initials : [{}]
-      safeInitials.forEach((initial) => addRow(initial))
+      forceRebuildRows(initials)
     }
 
     const buildLines = () => {
@@ -2559,16 +2585,20 @@
     })
 
     const initialLines = new URLSearchParams(window.location.search).getAll('line').map(parseLine)
-    ensureRows(initialLines)
-    requestAnimationFrame(() => ensureRows(initialLines))
-    window.addEventListener('pageshow', () => ensureRows(initialLines))
+    const repairRows = () => ensureRows(initialLines)
+    repairRows()
+    requestAnimationFrame(repairRows)
+    window.addEventListener('load', repairRows)
+    window.addEventListener('pageshow', repairRows)
+    window.setTimeout(repairRows, 250)
+    window.setTimeout(repairRows, 1000)
     if (window.MutationObserver && rowsWrap) {
       const observer = new MutationObserver(() => {
-        if (!rowsWrap.querySelector('[data-search-row]')) {
-          ensureRows(initialLines)
+        if (!rowsUsable()) {
+          repairRows()
         }
       })
-      observer.observe(rowsWrap, { childList: true })
+      observer.observe(rowsWrap, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] })
     }
     if (form.id !== 'advanced-search-form') {
       bindRegionSelect(form)
