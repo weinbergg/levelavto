@@ -76,6 +76,21 @@ class MobileDeFeedParser:
         except Exception:
             return None
 
+    def _resolve_power_kw(self, row: MobileDeCsvRow) -> Optional[float]:
+        if row.power_kw is not None:
+            try:
+                value = float(row.power_kw)
+                if 0 < value <= 2500:
+                    return value
+            except Exception:
+                pass
+        if row.horse_power:
+            try:
+                return float(row.horse_power) / 1.35962
+            except Exception:
+                return None
+        return None
+
     def _detect_drive(self, options: List[str]) -> Optional[str]:
         opts = " ".join(options).lower()
         if "four-wheel drive" in opts or "all wheel" in opts or "four-wheel" in opts:
@@ -117,9 +132,7 @@ class MobileDeFeedParser:
                 listing_date=row.created_at,
                 engine_cc=self._resolve_engine_cc(row),
                 power_hp=float(row.horse_power) if row.horse_power else None,
-                power_kw=float(row.power_kw) if row.power_kw is not None else (
-                    float(row.horse_power) / 1.35962 if row.horse_power else None
-                ),
+                power_kw=self._resolve_power_kw(row),
                 body_type=self._normalize_body(row.body_type),
                 engine_type=self._normalize_engine(
                     row.envkv_engine_type or row.engine_type,

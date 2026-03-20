@@ -10,6 +10,7 @@ import logging
 
 
 logger = logging.getLogger("mobilede_csv")
+_MAX_REASONABLE_POWER_KW = Decimal("2500")
 
 
 @dataclass
@@ -120,17 +121,38 @@ def _parse_json_list(raw: str | None, *, field_name: str) -> List[str]:
     if not raw:
         return []
     s = raw.strip()
+    if not s:
+        return []
     if len(s) >= 2 and s[0] == s[-1] and s[0] in ("'", '"'):
         s = s[1:-1]
     s = s.replace('""', '"')
+    if not s:
+        return []
     try:
         data = json.loads(s)
         if isinstance(data, list):
             return [str(item).strip() for item in data if isinstance(item, (str, int, float)) and str(item).strip()]
+        if isinstance(data, (str, int, float)):
+            item = str(data).strip()
+            return [item] if item else []
         return []
     except Exception as exc:
-        logger.warning("Failed to parse %s JSON: %r (%s)", field_name, raw[:200], exc)
-        return []
+        if s.startswith("[") or s.startswith("{"):
+            logger.warning("Failed to parse %s JSON: %r (%s)", field_name, raw[:200], exc)
+            return []
+        return [s]
+
+
+def _parse_power_kw(raw_primary: str | None, raw_fallback: str | None) -> Optional[Decimal]:
+    for raw in (raw_primary, raw_fallback):
+        value = _to_decimal(raw)
+        if value is None:
+            continue
+        if value <= 0 or value > _MAX_REASONABLE_POWER_KW:
+            logger.warning("Ignoring suspicious power_kw value: %r -> %s", raw[:80] if raw else raw, value)
+            continue
+        return value
+    return None
 
 
 def _parse_image_urls(raw: str | None) -> List[str]:
@@ -206,7 +228,7 @@ def iter_mobilede_csv_rows(file_path: str) -> Iterator[MobileDeCsvRow]:
                 displacement=_to_decimal(get("displacement")),
                 displacement_orig=_to_decimal(get("displacement_orig")),
                 horse_power=_to_int(get("horse_power")),
-                power_kw=_to_decimal(get("power_kw")) or _to_decimal(get("power_kwt")),
+                power_kw=_parse_power_kw(get("power_kw"), get("power_kwt")),
                 body_type=_to_str(get("body_type")),
                 transmission=_to_str(get("transmission")),
                 full_fuel_type=_to_str(get("full_fuel_type")),

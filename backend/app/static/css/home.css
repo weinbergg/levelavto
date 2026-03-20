@@ -55,15 +55,31 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
+.filter-grid--overlay.filter-grid--compact .field {
+  min-width: 0;
+}
 .filter-grid--overlay .field--dynamic {
   min-height: 100%;
 }
 .search-card--overlay .field-pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+.search-card--overlay .field-pair--home {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.search-card--overlay .field-pair--home select,
+.search-card--overlay .field-pair--home .field-pair__month,
+.search-card--overlay .field-pair--home .field-pair__month select {
+  min-width: 0;
+}
 .search-card--overlay .field-pair select {
   min-height: 46px;
   height: 46px;
+}
+@media (max-width: 1480px) {
+  .filter-grid--overlay.filter-grid--compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 @media (max-width: 1200px) {
   .filter-grid--overlay.filter-grid--compact {

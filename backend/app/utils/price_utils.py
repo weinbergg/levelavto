@@ -3,7 +3,7 @@ import os
 from typing import Optional
 
 PRICE_NOTE_WITHOUT_UTIL = "*Без учета утилизационного сбора РФ"
-PRICE_NOTE_EUROPE = "Цена в Европе (Если не хватает данных для расчета)"
+PRICE_NOTE_EUROPE = "Цена в Европе"
 
 
 def get_round_step_rub() -> int:

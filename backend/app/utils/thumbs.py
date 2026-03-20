@@ -9,7 +9,7 @@ import requests
 from .redis_cache import get_redis
 
 
-_RULE_CANDIDATES = ("mo-240.jpg", "mo-360.jpg", "mo-640.jpg")
+_RULE_CANDIDATES = ("mo-1024.jpg", "mo-640.jpg", "mo-360.jpg", "mo-240.jpg")
 _RULE_RE = re.compile(r"(rule=)mo-\d+(?:\.jpg)?", re.IGNORECASE)
 _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",

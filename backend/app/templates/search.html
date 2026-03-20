@@ -11,7 +11,30 @@
       {% set params = request.query_params %}
       <div class="advanced-lines">
         <div class="search-filters search-filters--lines">
-          <div class="search-rows" id="search-rows"></div>
+          <div class="search-rows" id="search-rows">
+            <div class="search-row" data-search-row>
+              <div class="field">
+                <label>Марка</label>
+                <select name="line_brand" data-line-brand>
+                  <option value="">Неважно</option>
+                  {% for b in brands|sort %}
+                  <option value="{{ b }}">{{ b }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="field">
+                <label>Модель</label>
+                <select name="line_model" data-line-model disabled>
+                  <option value="">Неважно</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Вариант</label>
+                <input type="text" name="line_variant" data-line-variant placeholder="Например GTI..." />
+              </div>
+              <button class="icon-btn icon-btn--danger" type="button" data-line-remove aria-label="Удалить строку">🗑</button>
+            </div>
+          </div>
           <template id="search-row-template">
             <div class="search-row" data-search-row>
               <div class="field">

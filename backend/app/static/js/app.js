@@ -2378,8 +2378,12 @@
     }
 
     const addRow = (initial = {}) => {
-      if (!template || !rowsWrap) return
-      const node = template.content.firstElementChild.cloneNode(true)
+      if (!rowsWrap) return
+      let node = null
+      if (template?.content) {
+        node = template.content.querySelector('[data-search-row]')?.cloneNode(true)
+      }
+      if (!node) return
       rowsWrap.appendChild(node)
       bindRow(node, initial)
     }
@@ -2535,6 +2539,7 @@
       scheduleCount()
     })
 
+    if (rowsWrap) rowsWrap.innerHTML = ''
     const linesFromUrl = new URLSearchParams(window.location.search).getAll('line')
     if (linesFromUrl.length) {
       linesFromUrl.forEach((line) => addRow(parseLine(line)))
@@ -2754,18 +2759,30 @@
   }
 
   function initAll() {
-    initNav()
-    loadFavoritesState()
-    initCatalog()
-    initHome()
-    initAdvancedSearch()
-    initDetailGallery()
-    initDetailActions()
-    applyLeadPrefill()
-    initLeadFromDetail()
-    initBackToTop()
-    initThumbFallbacks()
-    convertInlinePrices()
+    const safeInit = (label, fn) => {
+      try {
+        const result = fn()
+        if (result && typeof result.then === 'function') {
+          result.catch((e) => {
+            console.error(`[la:init:${label}]`, e)
+          })
+        }
+      } catch (e) {
+        console.error(`[la:init:${label}]`, e)
+      }
+    }
+    safeInit('nav', initNav)
+    safeInit('favorites', loadFavoritesState)
+    safeInit('catalog', initCatalog)
+    safeInit('home', initHome)
+    safeInit('advanced-search', initAdvancedSearch)
+    safeInit('detail-gallery', initDetailGallery)
+    safeInit('detail-actions', initDetailActions)
+    safeInit('lead-prefill', applyLeadPrefill)
+    safeInit('lead-from-detail', initLeadFromDetail)
+    safeInit('back-to-top', initBackToTop)
+    safeInit('thumb-fallbacks', initThumbFallbacks)
+    safeInit('inline-prices', convertInlinePrices)
   }
 
   if (document.readyState === 'loading') {
