@@ -1255,6 +1255,13 @@ html {
   font-size: 9px;
   font-weight: 700;
 }
+.social-link__icon-image {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.1);
+}
 .footer-messenger-buttons {
   display: flex;
   flex-wrap: wrap;
@@ -1929,6 +1936,12 @@ body.filters-open {
 .has-model-accordion .model-accordion.model-accordion--dropup {
   top: auto;
   bottom: calc(100% + 8px);
+}
+/* Home search: keep models dropdown above controls */
+#home-search .has-model-accordion .model-accordion {
+  top: auto;
+  bottom: calc(100% + 8px);
+  z-index: 180;
 }
 
 .model-accordion.is-hidden {

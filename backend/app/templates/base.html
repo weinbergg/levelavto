@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Автокаталог{% endblock %}</title>
     <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/css/styles.css?v=33" />
+    <link rel="stylesheet" href="/static/css/styles.css?v=34" />
     {% block head_extra %}{% endblock %}
   </head>
   <body data-auth="{{ 1 if user else 0 }}">
@@ -161,11 +161,11 @@
           </div>
           {% if address %}<div>{{ address }}</div>{% endif %}
           <div class="footer-social">
-            <a class="social-link" href="{{ tg }}" target="_blank" rel="noopener"><span class="social-link__icon">✈</span><span>Telegram</span></a>
-            {% if max_link %}<a class="social-link" href="{{ max_link }}" target="_blank" rel="noopener"><span class="social-link__icon">M</span><span>MAX</span></a>{% endif %}
-            <a class="social-link" href="{{ vk }}" target="_blank" rel="noopener"><span class="social-link__icon">VK</span><span>VK</span></a>
-            <a class="social-link" href="{{ avito }}" target="_blank" rel="noopener"><span class="social-link__icon">A</span><span>Avito</span></a>
-            <a class="social-link" href="{{ autoru }}" target="_blank" rel="noopener"><span class="social-link__icon">R</span><span>Auto.ru</span></a>
+            <a class="social-link" href="{{ tg }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/telegram.png" alt="Telegram" /><span>Telegram</span></a>
+            {% if max_link %}<a class="social-link" href="{{ max_link }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/max.png" alt="MAX" /><span>MAX</span></a>{% endif %}
+            <a class="social-link" href="{{ vk }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/vk.svg" alt="VK" /><span>VK</span></a>
+            <a class="social-link" href="{{ avito }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/avito.svg" alt="Avito" /><span>Avito</span></a>
+            <a class="social-link" href="{{ autoru }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/autoru.svg" alt="Auto.ru" /><span>Auto.ru</span></a>
             {% if wa %}<a class="social-link" href="{{ wa }}" target="_blank" rel="noopener"><span class="social-link__icon">WA</span><span>WhatsApp</span></a>{% endif %}
             {% if ig %}<a class="social-link" href="{{ ig }}" target="_blank" rel="noopener"><span class="social-link__icon">IG</span><span>Instagram</span></a>{% endif %}
           </div>

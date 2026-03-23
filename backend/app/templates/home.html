@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
-<link rel="stylesheet" href="/static/css/home.css?v=12" />
+<link rel="stylesheet" href="/static/css/home.css?v=13" />
 {% if hero_videos and hero_videos|length > 0 %}
 <link rel="preload" as="video" href="{{ hero_videos[0] }}" fetchpriority="high" />
 {% endif %}
@@ -607,11 +607,11 @@
       {% set social_avito = contact_avito or content.get('contact_avito') or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
       {% set social_autoru = contact_autoru or content.get('contact_autoru') or 'https://auto.ru/profile/28529976' %}
       <div class="social-grid">
-        <a class="social-card" href="{{ social_tg }}" target="_blank" rel="noopener"><span class="social-card__icon">✈</span><span>Telegram</span></a>
-        {% if social_max %}<a class="social-card" href="{{ social_max }}" target="_blank" rel="noopener"><span class="social-card__icon">M</span><span>MAX</span></a>{% endif %}
-        <a class="social-card" href="{{ social_avito }}" target="_blank" rel="noopener"><span class="social-card__icon">A</span><span>Avito</span></a>
-        <a class="social-card" href="{{ social_autoru }}" target="_blank" rel="noopener"><span class="social-card__icon">R</span><span>Auto.ru</span></a>
-        <a class="social-card" href="{{ social_vk }}" target="_blank" rel="noopener"><span class="social-card__icon">VK</span><span>VK</span></a>
+        <a class="social-card" href="{{ social_tg }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/telegram.png" alt="Telegram" /><span>Telegram</span></a>
+        {% if social_max %}<a class="social-card" href="{{ social_max }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/max.png" alt="MAX" /><span>MAX</span></a>{% endif %}
+        <a class="social-card" href="{{ social_avito }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/avito.svg" alt="Avito" /><span>Avito</span></a>
+        <a class="social-card" href="{{ social_autoru }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/autoru.svg" alt="Auto.ru" /><span>Auto.ru</span></a>
+        <a class="social-card" href="{{ social_vk }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/vk.svg" alt="VK" /><span>VK</span></a>
       </div>
     </div>
   </section>
