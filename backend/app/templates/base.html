@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Автокаталог{% endblock %}</title>
     <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/css/styles.css?v=32" />
+    <link rel="stylesheet" href="/static/css/styles.css?v=33" />
     {% block head_extra %}{% endblock %}
   </head>
   <body data-auth="{{ 1 if user else 0 }}">
@@ -147,11 +147,11 @@
         {% set phone = contact_phone or content.get('contact_phone') if content is defined else contact_phone %}
         {% set email = contact_email or content.get('contact_email') if content is defined else contact_email %}
         {% set address = contact_address or content.get('contact_address') if content is defined else contact_address %}
-        {% set tg = contact_tg or content.get('contact_tg') if content is defined else contact_tg %}
-        {% set max_link = contact_max or content.get('contact_max') if content is defined else contact_max %}
-        {% set vk = contact_vk or content.get('contact_vk') if content is defined else contact_vk %}
-        {% set avito = contact_avito or content.get('contact_avito') if content is defined else contact_avito %}
-        {% set autoru = contact_autoru or content.get('contact_autoru') if content is defined else contact_autoru %}
+        {% set tg = (contact_tg or content.get('contact_tg') if content is defined else contact_tg) or 'https://t.me/levelavto' %}
+        {% set max_link = (contact_max or content.get('contact_max') if content is defined else contact_max) %}
+        {% set vk = (contact_vk or content.get('contact_vk') if content is defined else contact_vk) or 'https://vk.ru/levelavto' %}
+        {% set avito = (contact_avito or content.get('contact_avito') if content is defined else contact_avito) or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
+        {% set autoru = (contact_autoru or content.get('contact_autoru') if content is defined else contact_autoru) or 'https://auto.ru/profile/28529976' %}
         {% set wa = contact_wa or content.get('contact_wa') if content is defined else contact_wa %}
         {% set ig = contact_ig or content.get('contact_ig') if content is defined else contact_ig %}
         <div class="footer-meta">
@@ -161,14 +161,13 @@
           </div>
           {% if address %}<div>{{ address }}</div>{% endif %}
           <div class="footer-social">
-            {% if tg %}<a href="{{ tg }}" target="_blank" rel="noopener">Telegram</a>{% endif %}
-            {% if max_link %}{% if tg %} · {% endif %}<a href="{{ max_link }}" target="_blank" rel="noopener">MAX</a>{% endif %}
-            {% if vk %}{% if tg or max_link %} · {% endif %}<a href="{{ vk }}" target="_blank" rel="noopener">VK</a>{% endif %}
-            {% if avito %}{% if tg or max_link or vk %} · {% endif %}<a href="{{ avito }}" target="_blank" rel="noopener">Avito</a>{% endif %}
-            {% if autoru %}{% if tg or max_link or vk or avito %} · {% endif %}<a href="{{ autoru }}" target="_blank" rel="noopener">Auto.ru</a>{% endif %}
-            {% if wa %}{% if tg %} · {% endif %}<a href="{{ wa }}" target="_blank" rel="noopener">WhatsApp</a>{% endif %}
-            {% if ig %}{% if tg or wa %} · {% endif %}<a href="{{ ig }}" target="_blank" rel="noopener">Instagram</a>{% endif %}
-            {% if not tg and not max_link and not vk and not avito and not autoru and not wa and not ig %}Telegram · MAX · VK · Avito · Auto.ru{% endif %}
+            <a class="social-link" href="{{ tg }}" target="_blank" rel="noopener"><span class="social-link__icon">✈</span><span>Telegram</span></a>
+            {% if max_link %}<a class="social-link" href="{{ max_link }}" target="_blank" rel="noopener"><span class="social-link__icon">M</span><span>MAX</span></a>{% endif %}
+            <a class="social-link" href="{{ vk }}" target="_blank" rel="noopener"><span class="social-link__icon">VK</span><span>VK</span></a>
+            <a class="social-link" href="{{ avito }}" target="_blank" rel="noopener"><span class="social-link__icon">A</span><span>Avito</span></a>
+            <a class="social-link" href="{{ autoru }}" target="_blank" rel="noopener"><span class="social-link__icon">R</span><span>Auto.ru</span></a>
+            {% if wa %}<a class="social-link" href="{{ wa }}" target="_blank" rel="noopener"><span class="social-link__icon">WA</span><span>WhatsApp</span></a>{% endif %}
+            {% if ig %}<a class="social-link" href="{{ ig }}" target="_blank" rel="noopener"><span class="social-link__icon">IG</span><span>Instagram</span></a>{% endif %}
           </div>
           <div class="footer-messenger-buttons">
             {% if tg %}<a class="btn btn-secondary btn-small" href="{{ tg }}" target="_blank" rel="noopener">Написать в TG</a>{% endif %}
@@ -180,7 +179,7 @@
     </footer>
     <button id="backToTop" class="back-to-top" type="button" aria-label="Наверх">↑</button>
     <script>window.ENABLE_MODEL_ACCORDION = true;</script>
-    <script src="/static/js/app.js?v=69"></script>
+    <script src="/static/js/app.js?v=70"></script>
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>

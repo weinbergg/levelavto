@@ -1669,6 +1669,7 @@
       const key = select.id || select.name || 'model'
       const container = host?.querySelector?.(`[data-model-accordion-for="${key}"]`)
       if (container) container.remove()
+      if (host) host.classList.remove('has-model-accordion')
       select.classList.remove('model-select-native')
       clearGeneratedModelLines()
     }
@@ -1708,9 +1709,11 @@
         container.dataset.modelAccordionFor = select.id || select.name || 'model'
         host.appendChild(container)
       }
+      host.classList.add('has-model-accordion')
       if (!groups.length) {
         container.innerHTML = ''
         container.classList.add('is-hidden')
+        host.classList.remove('has-model-accordion')
         select.classList.remove('model-select-native')
         return
       }

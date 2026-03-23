@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
-<link rel="stylesheet" href="/static/css/home.css?v=11" />
+<link rel="stylesheet" href="/static/css/home.css?v=12" />
 {% if hero_videos and hero_videos|length > 0 %}
 <link rel="preload" as="video" href="{{ hero_videos[0] }}" fetchpriority="high" />
 {% endif %}
@@ -500,24 +500,26 @@
                 placeholder="Расскажите, какой автомобиль нужен и когда готовы покупать"
               ></textarea>
             </div>
-            <div class="field span-12 consent-field">
-              <label class="checkbox">
-                <input type="checkbox" name="privacy" required />
-                <span>
-                  {{ home.lead.privacy_prefix }}
-                  <a href="/privacy" target="_blank" rel="noopener"
-                    >{{ home.lead.privacy_link_text }}</a
-                  >
-                </span>
-              </label>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">
-                {{ home.lead.submit_label }}
-              </button>
-              <span class="hero-note"
-                >{{ home.lead.note }}</span
-              >
+            <div class="lead-submit-row span-12">
+              <div class="field consent-field">
+                <label class="checkbox">
+                  <input type="checkbox" name="privacy" required />
+                  <span>
+                    {{ home.lead.privacy_prefix }}
+                    <a href="/privacy" target="_blank" rel="noopener"
+                      >{{ home.lead.privacy_link_text }}</a
+                    >
+                  </span>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                  {{ home.lead.submit_label }}
+                </button>
+                <span class="hero-note"
+                  >{{ home.lead.note }}</span
+                >
+              </div>
             </div>
           </div>
           {% if lead_status %}
@@ -582,7 +584,7 @@
           </div>
         </div>
         <iframe
-          src="https://yandex.ru/map-widget/v1/?ll=37.5209%2C55.7540&z=15&pt=37.5209,55.7540,pm2rdl"
+          src="https://yandex.ru/map-widget/v1/org/level_avto/84440785619"
           width="100%"
           height="380"
           frameborder="0"
@@ -600,14 +602,16 @@
         </div>
       </div>
       {% set social_tg = contact_tg or content.get('contact_tg') or 'https://t.me/levelavto' %}
+      {% set social_max = contact_max or content.get('contact_max') %}
       {% set social_vk = contact_vk or content.get('contact_vk') or 'https://vk.ru/levelavto' %}
       {% set social_avito = contact_avito or content.get('contact_avito') or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
       {% set social_autoru = contact_autoru or content.get('contact_autoru') or 'https://auto.ru/profile/28529976' %}
       <div class="social-grid">
-        <a class="social-card" href="{{ social_tg }}" target="_blank" rel="noopener">Telegram</a>
-        <a class="social-card" href="{{ social_avito }}" target="_blank" rel="noopener">Avito</a>
-        <a class="social-card" href="{{ social_autoru }}" target="_blank" rel="noopener">Auto.ru</a>
-        <a class="social-card" href="{{ social_vk }}" target="_blank" rel="noopener">VK</a>
+        <a class="social-card" href="{{ social_tg }}" target="_blank" rel="noopener"><span class="social-card__icon">✈</span><span>Telegram</span></a>
+        {% if social_max %}<a class="social-card" href="{{ social_max }}" target="_blank" rel="noopener"><span class="social-card__icon">M</span><span>MAX</span></a>{% endif %}
+        <a class="social-card" href="{{ social_avito }}" target="_blank" rel="noopener"><span class="social-card__icon">A</span><span>Avito</span></a>
+        <a class="social-card" href="{{ social_autoru }}" target="_blank" rel="noopener"><span class="social-card__icon">R</span><span>Auto.ru</span></a>
+        <a class="social-card" href="{{ social_vk }}" target="_blank" rel="noopener"><span class="social-card__icon">VK</span><span>VK</span></a>
       </div>
     </div>
   </section>
