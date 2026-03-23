@@ -30,8 +30,13 @@ CONTACT_KEYS = {
     "contact_email": "Email",
     "contact_address": "Адрес",
     "contact_tg": "Telegram",
+    "contact_max": "MAX",
+    "contact_vk": "VK",
+    "contact_avito": "Avito",
+    "contact_autoru": "Auto.ru",
     "contact_wa": "WhatsApp",
     "contact_ig": "Instagram",
+    "contact_map_link": "Ссылка на карту",
     "lead_email": "Email для заявок",
 }
 LEGACY_HOME_KEYS = ("hero_title", "hero_subtitle", "hero_note")
@@ -87,8 +92,13 @@ def update_contacts(
     contact_email: str = Form(""),
     contact_address: str = Form(""),
     contact_tg: str = Form(""),
+    contact_max: str = Form(""),
+    contact_vk: str = Form(""),
+    contact_avito: str = Form(""),
+    contact_autoru: str = Form(""),
     contact_wa: str = Form(""),
     contact_ig: str = Form(""),
+    contact_map_link: str = Form(""),
 ):
     admin_svc = AdminService(db)
     admin_svc.set_site_content(
@@ -98,8 +108,13 @@ def update_contacts(
             "contact_email": contact_email,
             "contact_address": contact_address,
             "contact_tg": contact_tg,
+            "contact_max": contact_max,
+            "contact_vk": contact_vk,
+            "contact_avito": contact_avito,
+            "contact_autoru": contact_autoru,
             "contact_wa": contact_wa,
             "contact_ig": contact_ig,
+            "contact_map_link": contact_map_link,
         }
     )
     return RedirectResponse(url="/admin", status_code=302)

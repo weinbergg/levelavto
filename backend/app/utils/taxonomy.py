@@ -240,11 +240,28 @@ _FREE_TEXT_EXACT = {
     "reverse camera": "камера заднего вида",
     "full leather": "кожа",
     "part leather": "частичная кожа",
+    "partial leather": "частичная кожа",
+    "leather": "кожа",
+    "leatherette": "экокожа",
+    "synthetic leather": "экокожа",
     "cloth": "ткань",
     "fabric": "ткань",
     "velour": "велюр",
+    "velours": "велюр",
     "alcantara": "алькантара",
+    "nappa": "наппа",
     "suede": "замша",
+    "vinyl": "винил",
+    "other": "другое",
+    "anthracite": "антрацит",
+    "charcoal": "графит",
+    "cognac": "коньячный",
+    "cream": "кремовый",
+    "ivory": "слоновая кость",
+    "taupe": "серо-бежевый",
+    "tan": "песочный",
+    "camel": "песочно-коричневый",
+    "burgundy": "бордовый",
     "no_rating": "нет оценки",
     "very_good_price": "отличная цена",
     "good_price": "хорошая цена",
@@ -323,6 +340,19 @@ _FREE_TEXT_REPLACEMENTS = (
     ("reverse camera", "камера заднего вида"),
     ("parking sensors", "парктроники"),
     ("multifunction steering wheel", "мульти-руль"),
+    ("partial leather", "частичная кожа"),
+    ("leatherette", "экокожа"),
+    ("synthetic leather", "экокожа"),
+    ("velours", "велюр"),
+    ("anthracite", "антрацит"),
+    ("charcoal", "графит"),
+    ("cognac", "коньячный"),
+    ("cream", "кремовый"),
+    ("ivory", "слоновая кость"),
+    ("taupe", "серо-бежевый"),
+    ("tan", "песочный"),
+    ("camel", "песочно-коричневый"),
+    ("burgundy", "бордовый"),
 )
 
 
@@ -358,12 +388,23 @@ def translate_payload_value(field: Optional[str], value: Optional[str]) -> Optio
     if low in _FREE_TEXT_EXACT:
         return _FREE_TEXT_EXACT[low]
 
-    # Translate comma-separated payload phrases like "cloth, beige".
-    if "," in raw:
-        parts = [part.strip() for part in raw.split(",") if part.strip()]
-        if len(parts) > 1:
-            translated_parts = [translate_payload_value(field, part) or part for part in parts]
-            return ", ".join(translated_parts)
+    if re.search(r"[,/;|]", raw):
+        tokens = re.split(r"(\s*[,/;|]\s*)", raw)
+        translated_tokens: List[str] = []
+        changed = False
+        for token in tokens:
+            if not token:
+                continue
+            if re.fullmatch(r"\s*[,/;|]\s*", token):
+                translated_tokens.append(token)
+                continue
+            stripped = token.strip()
+            translated = translate_payload_value(field, stripped) or stripped
+            if translated != stripped:
+                changed = True
+            translated_tokens.append(translated)
+        if changed:
+            return "".join(translated_tokens)
 
     mapped = (
         ru_fuel(raw)

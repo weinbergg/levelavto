@@ -148,25 +148,39 @@
         {% set email = contact_email or content.get('contact_email') if content is defined else contact_email %}
         {% set address = contact_address or content.get('contact_address') if content is defined else contact_address %}
         {% set tg = contact_tg or content.get('contact_tg') if content is defined else contact_tg %}
+        {% set max_link = contact_max or content.get('contact_max') if content is defined else contact_max %}
+        {% set vk = contact_vk or content.get('contact_vk') if content is defined else contact_vk %}
+        {% set avito = contact_avito or content.get('contact_avito') if content is defined else contact_avito %}
+        {% set autoru = contact_autoru or content.get('contact_autoru') if content is defined else contact_autoru %}
         {% set wa = contact_wa or content.get('contact_wa') if content is defined else contact_wa %}
         {% set ig = contact_ig or content.get('contact_ig') if content is defined else contact_ig %}
         <div class="footer-meta">
           <div>Тел.: <a href="tel:{{ (phone or '+7 (911) 070-75-00')|replace(' ','') }}">{{ phone or '+7 (911) 070-75-00' }}</a></div>
           <div>
-            Email: <a href="mailto:{{ email or 'info@levelavto.ru' }}">{{ email or 'info@levelavto.ru' }}</a>
+            Email: <a href="mailto:{{ email or 'Level.avto@mail.ru' }}">{{ email or 'Level.avto@mail.ru' }}</a>
           </div>
+          {% if address %}<div>{{ address }}</div>{% endif %}
           <div class="footer-social">
             {% if tg %}<a href="{{ tg }}" target="_blank" rel="noopener">Telegram</a>{% endif %}
+            {% if max_link %}{% if tg %} · {% endif %}<a href="{{ max_link }}" target="_blank" rel="noopener">MAX</a>{% endif %}
+            {% if vk %}{% if tg or max_link %} · {% endif %}<a href="{{ vk }}" target="_blank" rel="noopener">VK</a>{% endif %}
+            {% if avito %}{% if tg or max_link or vk %} · {% endif %}<a href="{{ avito }}" target="_blank" rel="noopener">Avito</a>{% endif %}
+            {% if autoru %}{% if tg or max_link or vk or avito %} · {% endif %}<a href="{{ autoru }}" target="_blank" rel="noopener">Auto.ru</a>{% endif %}
             {% if wa %}{% if tg %} · {% endif %}<a href="{{ wa }}" target="_blank" rel="noopener">WhatsApp</a>{% endif %}
             {% if ig %}{% if tg or wa %} · {% endif %}<a href="{{ ig }}" target="_blank" rel="noopener">Instagram</a>{% endif %}
-            {% if not tg and not wa and not ig %}Telegram · WhatsApp{% endif %}
+            {% if not tg and not max_link and not vk and not avito and not autoru and not wa and not ig %}Telegram · MAX · VK · Avito · Auto.ru{% endif %}
+          </div>
+          <div class="footer-messenger-buttons">
+            {% if tg %}<a class="btn btn-secondary btn-small" href="{{ tg }}" target="_blank" rel="noopener">Написать в TG</a>{% endif %}
+            {% if max_link %}<a class="btn btn-secondary btn-small" href="{{ max_link }}" target="_blank" rel="noopener">Написать в MAX</a>{% endif %}
           </div>
           <div>© {{ 2025 }} Level Avto</div>
         </div>
       </div>
     </footer>
     <button id="backToTop" class="back-to-top" type="button" aria-label="Наверх">↑</button>
-    <script src="/static/js/app.js?v=68"></script>
+    <script>window.ENABLE_MODEL_ACCORDION = true;</script>
+    <script src="/static/js/app.js?v=69"></script>
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>

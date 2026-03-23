@@ -31,7 +31,7 @@ content %}
       <h3>Контакты</h3>
       <form method="post" action="/admin/contacts" class="form-vertical">
         <label>Email для заявок
-          <input type="email" name="lead_email" value="{{ content.get('lead_email','info@levelavto.ru') }}" />
+          <input type="email" name="lead_email" value="{{ content.get('lead_email','Level.avto@mail.ru') }}" />
           <span class="small muted">Сюда будут уходить заявки с формы</span>
         </label>
         <div class="admin-grid-2">
@@ -39,19 +39,34 @@ content %}
             <input type="text" name="contact_phone" placeholder="+7 (911) 070-75-00" value="{{ content.get('contact_phone','+7 (911) 070-75-00') }}" />
           </label>
           <label>Email
-            <input type="email" name="contact_email" placeholder="info@levelavto.ru" value="{{ content.get('contact_email','info@levelavto.ru') }}" />
+            <input type="email" name="contact_email" placeholder="Level.avto@mail.ru" value="{{ content.get('contact_email','Level.avto@mail.ru') }}" />
           </label>
           <label>Адрес
-            <input type="text" name="contact_address" placeholder="Шелепихинская наб. 34к4, Москва" value="{{ content.get('contact_address','Шелепихинская набережная, 34к4 стр.8, Москва') }}" />
+            <input type="text" name="contact_address" placeholder="Шелепихинская наб., 34к4зд8, Москва" value="{{ content.get('contact_address','Шелепихинская наб., 34к4зд8, Москва') }}" />
           </label>
           <label>Telegram (ссылка)
             <input type="text" name="contact_tg" placeholder="https://t.me/levelavto" value="{{ content.get('contact_tg','') }}" />
+          </label>
+          <label>MAX (ссылка)
+            <input type="text" name="contact_max" placeholder="https://max.ru/..." value="{{ content.get('contact_max','') }}" />
+          </label>
+          <label>VK (ссылка)
+            <input type="text" name="contact_vk" placeholder="https://vk.ru/levelavto" value="{{ content.get('contact_vk','') }}" />
+          </label>
+          <label>Avito (ссылка)
+            <input type="text" name="contact_avito" placeholder="https://www.avito.ru/brands/i113720154?src=sharing" value="{{ content.get('contact_avito','') }}" />
+          </label>
+          <label>Auto.ru (ссылка)
+            <input type="text" name="contact_autoru" placeholder="https://auto.ru/profile/28529976" value="{{ content.get('contact_autoru','') }}" />
           </label>
           <label>WhatsApp (ссылка)
             <input type="text" name="contact_wa" placeholder="https://wa.me/79110707500" value="{{ content.get('contact_wa','') }}" />
           </label>
           <label>Instagram (ссылка)
             <input type="text" name="contact_ig" placeholder="https://instagram.com/..." value="{{ content.get('contact_ig','') }}" />
+          </label>
+          <label>Ссылка на карту
+            <input type="text" name="contact_map_link" placeholder="https://yandex.ru/navi/org/..." value="{{ content.get('contact_map_link','https://yandex.ru/navi/org/level_avto/84440785619?si=0zmrqk6ar44eg33t1xd7j74k7m') }}" />
           </label>
         </div>
         <button type="submit" class="btn btn-primary">Сохранить контакты</button>

@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
-<link rel="stylesheet" href="/static/css/home.css?v=10" />
+<link rel="stylesheet" href="/static/css/home.css?v=11" />
 {% if hero_videos and hero_videos|length > 0 %}
 <link rel="preload" as="video" href="{{ hero_videos[0] }}" fetchpriority="high" />
 {% endif %}
@@ -166,13 +166,13 @@
       <div class="hero-note">{{ home.hero.note }}</div>
     </div>
     <div class="hero-visual">
-      <div class="card" style="padding: 18px">
+      <div class="card hero-partners-card">
         <h3 style="margin-top: 0">{{ home.hero.why_title }}</h3>
-        <ul class="specs">
+        <div class="partner-grid">
           {% for item in home.hero.why_items %}
-          <li>{{ item }}</li>
+          <div class="partner-logo">{{ item }}</div>
           {% endfor %}
-        </ul>
+        </div>
       </div>
     </div>
   </div>
@@ -255,6 +255,15 @@
         </ul>
         <p>{{ about_cards[3].paragraph }}</p>
         <p><strong>{{ about_cards[3].emphasis }}</strong></p>
+      </div>
+    </div>
+    <div class="leader-card">
+      <div class="leader-card__image">
+        <img src="{{ home.about.leader.photo if home.about.leader and home.about.leader.photo else '/static/img/no-photo.svg' }}" alt="{{ home.about.leader.name if home.about.leader else 'Руководитель Level Avto' }}" loading="lazy" />
+      </div>
+      <div class="leader-card__content">
+        <h3>{{ home.about.leader.name if home.about.leader else 'Дмитрий Моторов' }}</h3>
+        <p class="muted">{{ home.about.leader.role if home.about.leader else 'Руководитель компании Level Avto' }}</p>
       </div>
     </div>
   </div>
@@ -360,31 +369,7 @@
   </div>
 </section>
 
-<section class="section" id="advantages">
-  <div class="la-container">
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">{{ home.advantages.title }}</h2>
-        <p class="section-sub">{{ home.advantages.subtitle }}</p>
-      </div>
-    </div>
-    <div class="category-grid">
-      <div class="card">
-        <strong>{{ home.advantages.cards[0].title }}</strong>
-        <p class="hero-note">{{ home.advantages.cards[0].text }}</p>
-      </div>
-      <div class="card">
-        <strong>{{ home.advantages.cards[1].title }}</strong>
-        <p class="hero-note">{{ home.advantages.cards[1].text }}</p>
-      </div>
-      <div class="card">
-        <strong>{{ home.advantages.cards[2].title }}</strong>
-        <p class="hero-note">{{ home.advantages.cards[2].text }}</p>
-      </div>
-    </div>
-  </div>
-
-  <section class="section" id="brands">
+<section class="section" id="brands">
     <div class="la-container">
       <div class="section-header">
         <div>
@@ -410,7 +395,7 @@
         {% endfor %}
       </div>
     </div>
-  </section>
+</section>
 
 
   <section class="section" id="how-it-works">
@@ -422,34 +407,15 @@
         </div>
       </div>
       <div class="how-steps">
+        {% for step in home.how_it_works.steps %}
         <div class="how-step">
-          <div class="how-step__badge">1</div>
+          <div class="how-step__badge">{{ loop.index }}</div>
           <div>
-            <strong>{{ home.how_it_works.steps[0].title }}</strong>
-            <p>{{ home.how_it_works.steps[0].text }}</p>
+            <strong>{{ step.title }}</strong>
+            <p>{{ step.text }}</p>
           </div>
         </div>
-        <div class="how-step">
-          <div class="how-step__badge">2</div>
-          <div>
-            <strong>{{ home.how_it_works.steps[1].title }}</strong>
-            <p>{{ home.how_it_works.steps[1].text }}</p>
-          </div>
-        </div>
-        <div class="how-step">
-          <div class="how-step__badge">3</div>
-          <div>
-            <strong>{{ home.how_it_works.steps[2].title }}</strong>
-            <p>{{ home.how_it_works.steps[2].text }}</p>
-          </div>
-        </div>
-        <div class="how-step">
-          <div class="how-step__badge">4</div>
-          <div>
-            <strong>{{ home.how_it_works.steps[3].title }}</strong>
-            <p>{{ home.how_it_works.steps[3].text }}</p>
-          </div>
-        </div>
+        {% endfor %}
       </div>
     </div>
   </section>
@@ -572,8 +538,9 @@
         <div>
           <h2 class="section-title">{{ home.contacts.title }}</h2>
           {% set phone = contact_phone or content.get('contact_phone','+7 (911) 070-75-00') %}
-          {% set email = contact_email or content.get('contact_email','info@levelavto.ru') %}
-          {% set address = contact_address or content.get('contact_address','Шелепихинская набережная, 34к4 стр.8, Москва') %}
+          {% set email = contact_email or content.get('contact_email','Level.avto@mail.ru') %}
+          {% set address = contact_address or content.get('contact_address','Шелепихинская наб., 34к4зд8, Москва') %}
+          {% set map_link = contact_map_link or content.get('contact_map_link','https://yandex.ru/navi/org/level_avto/84440785619?si=0zmrqk6ar44eg33t1xd7j74k7m') %}
           <p class="section-sub">{{ address }}. {{ home.contacts.subtitle_suffix }}</p>
         </div>
       </div>
@@ -585,18 +552,33 @@
             {% if contact_tg or content.get('contact_tg') %}
             <a href="{{ contact_tg or content.get('contact_tg') }}" target="_blank" rel="noopener">Telegram</a>
             {% endif %}
+            {% if contact_max or content.get('contact_max') %}
+            · <a href="{{ contact_max or content.get('contact_max') }}" target="_blank" rel="noopener">MAX</a>
+            {% endif %}
             {% if contact_wa or content.get('contact_wa') %}
             · <a href="{{ contact_wa or content.get('contact_wa') }}" target="_blank" rel="noopener">WhatsApp</a>
             {% endif %}
-            {% if contact_ig or content.get('contact_ig') %}
-            · <a href="{{ contact_ig or content.get('contact_ig') }}" target="_blank" rel="noopener">Instagram</a>
+            {% if contact_vk or content.get('contact_vk') %}
+            · <a href="{{ contact_vk or content.get('contact_vk') }}" target="_blank" rel="noopener">VK</a>
+            {% endif %}
+            {% if contact_avito or content.get('contact_avito') %}
+            · <a href="{{ contact_avito or content.get('contact_avito') }}" target="_blank" rel="noopener">Avito</a>
+            {% endif %}
+            {% if contact_autoru or content.get('contact_autoru') %}
+            · <a href="{{ contact_autoru or content.get('contact_autoru') }}" target="_blank" rel="noopener">Auto.ru</a>
             {% endif %}
           </p>
-          <p class="muted">{{ address }}</p>
+          <p class="muted"><a href="{{ map_link }}" target="_blank" rel="noopener">{{ address }}</a></p>
           <p class="muted">{{ home.contacts.hours_note }}</p>
           <div class="inline-actions" style="margin-top: 10px">
             <a class="btn btn-primary" href="tel:{{ phone|replace(' ','') }}">{{ home.contacts.call_button }}</a>
             <a class="btn btn-secondary" href="mailto:{{ email }}">{{ home.contacts.email_button }}</a>
+            {% if contact_tg or content.get('contact_tg') %}
+            <a class="btn btn-secondary" href="{{ contact_tg or content.get('contact_tg') }}" target="_blank" rel="noopener">Написать в TG</a>
+            {% endif %}
+            {% if contact_max or content.get('contact_max') %}
+            <a class="btn btn-secondary" href="{{ contact_max or content.get('contact_max') }}" target="_blank" rel="noopener">Написать в MAX</a>
+            {% endif %}
           </div>
         </div>
         <iframe
@@ -607,6 +589,25 @@
           style="border: 0; border-radius: 16px; overflow: hidden"
           allowfullscreen
         ></iframe>
+      </div>
+    </div>
+  </section>
+  <section class="section" id="social">
+    <div class="la-container">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">{{ home.social.title }}</h2>
+        </div>
+      </div>
+      {% set social_tg = contact_tg or content.get('contact_tg') or 'https://t.me/levelavto' %}
+      {% set social_vk = contact_vk or content.get('contact_vk') or 'https://vk.ru/levelavto' %}
+      {% set social_avito = contact_avito or content.get('contact_avito') or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
+      {% set social_autoru = contact_autoru or content.get('contact_autoru') or 'https://auto.ru/profile/28529976' %}
+      <div class="social-grid">
+        <a class="social-card" href="{{ social_tg }}" target="_blank" rel="noopener">Telegram</a>
+        <a class="social-card" href="{{ social_avito }}" target="_blank" rel="noopener">Avito</a>
+        <a class="social-card" href="{{ social_autoru }}" target="_blank" rel="noopener">Auto.ru</a>
+        <a class="social-card" href="{{ social_vk }}" target="_blank" rel="noopener">VK</a>
       </div>
     </div>
   </section>

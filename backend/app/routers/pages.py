@@ -48,6 +48,7 @@ from ..utils.country_map import country_label_ru, resolve_display_country, norma
 from ..utils.color_groups import split_color_facets
 from ..utils.thumbs import local_media_exists, normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.home_content import build_home_content
+from ..utils.telegram import send_telegram_message
 
 
 router = APIRouter()
@@ -593,6 +594,11 @@ def _home_context(
             "contact_tg",
             "contact_wa",
             "contact_ig",
+            "contact_vk",
+            "contact_avito",
+            "contact_autoru",
+            "contact_max",
+            "contact_map_link",
         ])
     home_content = build_home_content(content)
     _stage("content_ms", t0)
@@ -666,6 +672,40 @@ def _home_context(
                 if len(collage_display) >= 60:
                     break
             rng.shuffle(pool)
+    else:
+        # Fallback: build collage from catalog thumbnails if local media collage is unavailable.
+        rows = (
+            db.execute(
+                select(Car.thumbnail_url)
+                .where(Car.is_available.is_(True), Car.thumbnail_url.is_not(None), Car.thumbnail_url != "")
+                .order_by(Car.updated_at.desc())
+                .limit(180)
+            )
+            .scalars()
+            .all()
+        )
+        for raw in rows:
+            thumb = resolve_thumbnail_url(raw, None)
+            if not thumb:
+                continue
+            if "img.classistatic.de" in thumb:
+                src = f"/thumb?u={quote(thumb)}&w=360&fmt=webp&rev=2"
+                fallback = thumb
+            else:
+                src = thumb
+                fallback = "/static/img/no-photo.svg"
+            collage_images.append(
+                {
+                    "src": src,
+                    "srcset": "",
+                    "width": 320,
+                    "height": 240,
+                    "fallback": fallback,
+                }
+            )
+            if len(collage_images) >= 60:
+                break
+        collage_display = collage_images
     _stage("collage_ms", t0)
 
     # brand logos: map brands that have logo files in static/img/brand-logos
@@ -814,8 +854,8 @@ def submit_lead(
     else:
         # send email if configured
         content_service = ContentService(db)
-        lead_email = content_service.content_map().get(
-            "lead_email") or "info@levelavto.ru"
+        content_map = content_service.content_map()
+        lead_email = content_map.get("lead_email") or "Level.avto@mail.ru"
         body = (
             f"Заявка с сайта\n"
             f"Имя: {name}\n"
@@ -831,7 +871,7 @@ def submit_lead(
             port = int(os.environ.get("EMAIL_PORT", "587"))
             user = os.environ.get("EMAIL_HOST_USER")
             pwd = os.environ.get("EMAIL_HOST_PASSWORD")
-            mail_from = os.environ.get("EMAIL_FROM", "info@levelavto.ru")
+            mail_from = os.environ.get("EMAIL_FROM", "Level.avto@mail.ru")
             if host and user and pwd:
                 msg = MIMEText(body, "plain", "utf-8")
                 msg["Subject"] = "Заявка с сайта Level Avto"
@@ -844,6 +884,23 @@ def submit_lead(
                 sent = True
         except Exception as e:
             print("[LEAD][email_failed]", e)
+        tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        tg_chat = (
+            os.environ.get("TELEGRAM_ADMIN_CHAT_ID")
+            or os.environ.get("TELEGRAM_CHAT_ID")
+            or (os.environ.get("TELEGRAM_ALLOWED_IDS", "").split(",")[0].strip() if os.environ.get("TELEGRAM_ALLOWED_IDS") else "")
+        )
+        if tg_token and tg_chat:
+            tg_text = (
+                "Новая заявка с сайта Level Avto\n"
+                f"Имя: {name}\n"
+                f"Телефон: {phone}\n"
+                f"Email: {email or '—'}\n"
+                f"Предпочтения: {preferred or '—'}\n"
+                f"Бюджет: {price_range or '—'}\n"
+                f"Комментарий: {comment or '—'}"
+            )
+            send_telegram_message(tg_token, tg_chat, tg_text)
         # always log to stdout
         print("[LEAD]", {"name": name, "phone": phone, "email": email, "preferred": preferred,
               "price_range": price_range, "comment": comment, "sent": sent})
@@ -1023,6 +1080,11 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "contact_tg",
             "contact_wa",
             "contact_ig",
+            "contact_vk",
+            "contact_avito",
+            "contact_autoru",
+            "contact_max",
+            "contact_map_link",
         ])
     timing["content_ms"] = (time.perf_counter() - t0) * 1000
     timing["total_ms"] = (time.perf_counter() - t_start) * 1000
@@ -1077,6 +1139,11 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "contact_tg": contact_content.get("contact_tg"),
             "contact_wa": contact_content.get("contact_wa"),
             "contact_ig": contact_content.get("contact_ig"),
+            "contact_vk": contact_content.get("contact_vk"),
+            "contact_avito": contact_content.get("contact_avito"),
+            "contact_autoru": contact_content.get("contact_autoru"),
+            "contact_max": contact_content.get("contact_max"),
+            "contact_map_link": contact_content.get("contact_map_link"),
         },
     )
     request.state.perf["render_ms"] = (time.perf_counter() - t_render) * 1000
@@ -1109,6 +1176,11 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "contact_tg",
             "contact_wa",
             "contact_ig",
+            "contact_vk",
+            "contact_avito",
+            "contact_autoru",
+            "contact_max",
+            "contact_map_link",
         ])
     total_cars = _get_cars_count(service, params, timing_enabled)
     request.state.perf = {
@@ -1177,6 +1249,11 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "contact_tg": contact_content.get("contact_tg"),
             "contact_wa": contact_content.get("contact_wa"),
             "contact_ig": contact_content.get("contact_ig"),
+            "contact_vk": contact_content.get("contact_vk"),
+            "contact_avito": contact_content.get("contact_avito"),
+            "contact_autoru": contact_content.get("contact_autoru"),
+            "contact_max": contact_content.get("contact_max"),
+            "contact_map_link": contact_content.get("contact_map_link"),
         },
     )
     request.state.perf["render_ms"] = (time.perf_counter() - t_render) * 1000

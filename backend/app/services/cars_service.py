@@ -549,6 +549,409 @@ class CarsService:
                 return cached
             return {}
 
+    def _build_list_conditions(
+        self,
+        *,
+        region: Optional[str] = None,
+        country: Optional[str] = None,
+        kr_type: Optional[str] = None,
+        brand: Optional[str] = None,
+        lines: Optional[List[str]] = None,
+        source_key: Optional[str | List[str]] = None,
+        q: Optional[str] = None,
+        model: Optional[str] = None,
+        generation: Optional[str] = None,
+        color: Optional[str] = None,
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        year_min: Optional[int] = None,
+        year_max: Optional[int] = None,
+        mileage_min: Optional[int] = None,
+        mileage_max: Optional[int] = None,
+        reg_year_min: Optional[int] = None,
+        reg_month_min: Optional[int] = None,
+        reg_year_max: Optional[int] = None,
+        reg_month_max: Optional[int] = None,
+        body_type: Optional[str] = None,
+        engine_type: Optional[str] = None,
+        transmission: Optional[str] = None,
+        drive_type: Optional[str] = None,
+        num_seats: Optional[str] = None,
+        doors_count: Optional[str] = None,
+        emission_class: Optional[str] = None,
+        efficiency_class: Optional[str] = None,
+        climatisation: Optional[str] = None,
+        airbags: Optional[str] = None,
+        interior_design: Optional[str] = None,
+        interior_color: Optional[str] = None,
+        interior_material: Optional[str] = None,
+        vat_reclaimable: Optional[str] = None,
+        air_suspension: Optional[bool] = None,
+        price_rating_label: Optional[str] = None,
+        owners_count: Optional[str] = None,
+        power_hp_min: Optional[float] = None,
+        power_hp_max: Optional[float] = None,
+        engine_cc_min: Optional[int] = None,
+        engine_cc_max: Optional[int] = None,
+        condition: Optional[str] = None,
+        hide_no_local_photo: bool = False,
+        exclude_fields: Optional[set[str]] = None,
+    ) -> Tuple[List[Any], Dict[str, Any]]:
+        exclude = exclude_fields or set()
+        conditions = [self._available_expr()]
+
+        if region and not country and region.upper() == "KR":
+            country = "KR"
+
+        if lines and "line" not in exclude:
+            line_conditions = []
+            brand_field = func.lower(func.trim(Car.brand))
+            model_field = func.lower(func.trim(Car.model))
+            variant_field = func.lower(func.trim(Car.variant))
+            for line in lines:
+                parts = [p.strip() for p in (line or "").split("|")]
+                while len(parts) < 3:
+                    parts.append("")
+                b, m, v = parts[0], parts[1], parts[2]
+                group = []
+                if b:
+                    norm_b = normalize_brand(b).strip().strip(".,;")
+                    variants = brand_variants(norm_b) if norm_b else []
+                    if variants:
+                        group.append(
+                            or_(*[brand_field.like(func.lower(f"%{item}%")) for item in variants])
+                        )
+                    else:
+                        group.append(brand_field.like(func.lower(f"%{b}%")))
+                if m:
+                    group.append(model_field.like(func.lower(f"%{m}%")))
+                if v:
+                    group.append(variant_field.like(func.lower(f"%{v}%")))
+                if group:
+                    line_conditions.append(and_(*group))
+            if line_conditions:
+                conditions.append(or_(*line_conditions))
+
+        if country:
+            c = normalize_country_code(country)
+            if c == "EU":
+                country = None
+                if not region:
+                    region = "EU"
+            elif c == "KR":
+                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                kr_conds = [Car.country.like("KR%")]
+                if kr_sources:
+                    kr_conds.append(Car.source_id.in_(kr_sources))
+                conditions.append(or_(*kr_conds))
+            elif c:
+                conditions.append(Car.country == c)
+
+        if region:
+            r = region.upper()
+            if r == "KR":
+                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                conds = [Car.country.like("KR%")]
+                if kr_sources:
+                    conds.append(Car.source_id.in_(kr_sources))
+                conditions.append(or_(*conds))
+            elif r == "EU":
+                eu_sources = self._source_ids_for_europe()
+                if eu_sources:
+                    conditions.append(Car.source_id.in_(eu_sources))
+                else:
+                    conditions.append(Car.country.in_(self.EU_COUNTRIES))
+
+        if kr_type and "kr_type" not in exclude:
+            kt_raw = str(kr_type).upper()
+            kt = None
+            if kt_raw in ("KR_INTERNAL", "DOMESTIC"):
+                kt = "domestic"
+            elif kt_raw in ("KR_IMPORT", "IMPORT"):
+                kt = "import"
+            if kt:
+                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                conds = [func.lower(Car.kr_market_type) == kt, Car.country.like("KR%")]
+                if kr_sources:
+                    conds.append(Car.source_id.in_(kr_sources))
+                conditions.append(and_(or_(*conds)))
+
+        if brand and "brand" not in exclude:
+            b = normalize_brand(brand).strip().strip(".,;")
+            if b:
+                variants = brand_variants(b)
+                variants_lc = [v.lower() for v in variants if v]
+                if variants_lc:
+                    conditions.append(func.lower(func.trim(Car.brand)).in_(variants_lc))
+
+        if q and "q" not in exclude:
+            q_tokens = [t for t in re.split(r"[\s,]+", q.strip().lower()) if t]
+            if len(q_tokens) == 1 and not engine_type and "engine_type" not in exclude:
+                token = q_tokens[0]
+                quick_fuel_map = {
+                    "дизель": "diesel",
+                    "дизельный": "diesel",
+                    "дизельные": "diesel",
+                    "дизельное": "diesel",
+                    "diesel": "diesel",
+                    "бензин": "petrol",
+                    "бенз": "petrol",
+                    "petrol": "petrol",
+                    "gasoline": "petrol",
+                    "hybrid": "hybrid",
+                    "гибрид": "hybrid",
+                    "электро": "electric",
+                    "электр": "electric",
+                    "electric": "electric",
+                    "ev": "electric",
+                }
+                mapped = quick_fuel_map.get(token)
+                if mapped:
+                    engine_type = mapped
+                    q = None
+                elif token.startswith("дизел"):
+                    engine_type = "diesel"
+                    q = None
+
+        if q and "q" not in exclude:
+            tokens = [t for t in re.split(r"[\s,]+", q.strip().lower()) if t]
+            payload_text = func.lower(cast(Car.source_payload, String))
+            token_groups = []
+            fuel_map = {
+                "дизель": ["diesel"],
+                "дизельный": ["diesel"],
+                "дизельные": ["diesel"],
+                "дизельное": ["diesel"],
+                "diesel": ["diesel"],
+                "бензин": ["petrol", "gasoline", "benzin"],
+                "бенз": ["petrol", "gasoline", "benzin"],
+                "hybrid": ["hybrid"],
+                "гибрид": ["hybrid"],
+                "электро": ["electric", "ev"],
+                "электр": ["electric", "ev"],
+                "electric": ["electric", "ev"],
+            }
+            drive_tokens = {"4x4", "4х4", "4wd", "awd", "full", "полный", "полныйпривод"}
+            for token in tokens:
+                conds = []
+                if token in fuel_map or token.startswith("дизел"):
+                    mapped = fuel_map.get(token, fuel_map["дизель"])
+                    for item in mapped:
+                        conds.append(func.lower(Car.engine_type).like(f"%{item}%"))
+                        conds.append(payload_text.like(f"%{item}%"))
+                elif token in drive_tokens:
+                    conds.append(func.lower(Car.drive_type).like("%awd%"))
+                    conds.append(func.lower(Car.drive_type).like("%4wd%"))
+                    conds.append(payload_text.like("%four-wheel%"))
+                    conds.append(payload_text.like("%all wheel%"))
+                    conds.append(payload_text.like("%4x4%"))
+                elif token.startswith("панор") or token.startswith("panor"):
+                    conds.append(payload_text.like("%panor%"))
+                else:
+                    like = f"%{token}%"
+                    conds.extend(
+                        [
+                            func.lower(Car.brand).like(like),
+                            func.lower(Car.model).like(like),
+                            func.lower(Car.variant).like(like),
+                            func.lower(Car.generation).like(like),
+                            func.lower(Car.body_type).like(like),
+                            func.lower(Car.engine_type).like(like),
+                            func.lower(Car.transmission).like(like),
+                            func.lower(Car.drive_type).like(like),
+                            func.lower(Car.color).like(like),
+                            payload_text.like(like),
+                        ]
+                    )
+                if conds:
+                    token_groups.append(or_(*conds))
+            if token_groups:
+                conditions.append(and_(*token_groups))
+
+        if model and "model" not in exclude:
+            model_value = model.strip()
+            if model_value:
+                conditions.append(Car.model == model_value)
+
+        payload_json = cast(Car.source_payload, JSONB)
+        payload_text = func.lower(cast(Car.source_payload, String))
+
+        if num_seats and "num_seats" not in exclude:
+            conditions.append(func.jsonb_extract_path_text(payload_json, "num_seats") == str(num_seats))
+        if doors_count and "doors_count" not in exclude:
+            conditions.append(func.jsonb_extract_path_text(payload_json, "doors_count") == str(doors_count))
+        if emission_class and "emission_class" not in exclude:
+            conditions.append(func.jsonb_extract_path_text(payload_json, "emission_class") == emission_class)
+        if efficiency_class and "efficiency_class" not in exclude:
+            conditions.append(func.jsonb_extract_path_text(payload_json, "efficiency_class") == efficiency_class)
+        if climatisation and "climatisation" not in exclude:
+            conditions.append(func.jsonb_extract_path_text(payload_json, "climatisation") == climatisation)
+        if airbags and "airbags" not in exclude:
+            conditions.append(func.jsonb_extract_path_text(payload_json, "airbags") == airbags)
+        if interior_design and "interior_design" not in exclude:
+            conditions.append(func.jsonb_extract_path_text(payload_json, "interior_design") == interior_design)
+        if interior_color and "interior_color" not in exclude:
+            conditions.append(
+                func.lower(func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), "")).like(
+                    f"%{interior_color.lower()}%"
+                )
+            )
+        if interior_material and "interior_material" not in exclude:
+            conditions.append(
+                func.lower(func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), "")).like(
+                    f"%{interior_material.lower()}%"
+                )
+            )
+        if vat_reclaimable and "vat_reclaimable" not in exclude:
+            vat_raw = str(vat_reclaimable).strip().lower()
+            vat_nt = func.jsonb_extract_path_text(payload_json, "price_eur_nt")
+            vat_pct = func.jsonb_extract_path_text(payload_json, "vat")
+            if vat_raw in {"1", "true", "yes", "y", "refund", "with", "возмещается"}:
+                conditions.append(
+                    or_(
+                        vat_nt.is_not(None),
+                        vat_pct.is_not(None),
+                    )
+                )
+            elif vat_raw in {"0", "false", "no", "n", "without", "не возмещается"}:
+                conditions.append(
+                    and_(
+                        vat_nt.is_(None),
+                        vat_pct.is_(None),
+                    )
+                )
+        if air_suspension and "air_suspension" not in exclude:
+            conditions.append(
+                or_(
+                    payload_text.like("%air suspension%"),
+                    payload_text.like("%air_suspension%"),
+                    payload_text.like("%pneum%"),
+                    payload_text.like("%пневмо%"),
+                )
+            )
+        if price_rating_label and "price_rating_label" not in exclude:
+            conditions.append(func.jsonb_extract_path_text(payload_json, "price_rating_label") == price_rating_label)
+        if owners_count and "owners_count" not in exclude:
+            conditions.append(func.jsonb_extract_path_text(payload_json, "owners_count") == str(owners_count))
+
+        if generation and "generation" not in exclude:
+            conditions.append(func.lower(Car.generation).like(func.lower(f"%{generation.strip()}%")))
+
+        if color and "color" not in exclude:
+            group_key = normalize_color_group_key(color)
+            if group_key:
+                conditions.append(Car.color_group == group_key)
+            else:
+                aliases = color_aliases(color)
+                if aliases:
+                    conditions.append(or_(*[func.lower(Car.color).like(f"%{alias}%") for alias in aliases]))
+                else:
+                    conditions.append(func.lower(Car.color) == color.lower())
+
+        if source_key and "source" not in exclude:
+            keys: List[str] = []
+            if isinstance(source_key, str):
+                keys = [k.strip() for k in source_key.split(",") if k.strip()]
+            else:
+                keys = [k.strip() for k in source_key if k and k.strip()]
+            if keys:
+                src_ids = self.db.execute(select(Source.id).where(Source.key.in_(keys))).scalars().all()
+                if src_ids:
+                    conditions.append(Car.source_id.in_(src_ids))
+
+        if (price_min is not None or price_max is not None) and "price" not in exclude:
+            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+            conditions.append(price_expr.is_not(None))
+            if price_min is not None:
+                conditions.append(price_expr >= price_min)
+            if price_max is not None:
+                conditions.append(price_expr <= price_max)
+
+        if year_min is not None and "year_min" not in exclude:
+            conditions.append(Car.year >= year_min)
+        if year_max is not None and "year_max" not in exclude:
+            conditions.append(Car.year <= year_max)
+        if mileage_min is not None and "mileage_min" not in exclude:
+            conditions.append(Car.mileage >= mileage_min)
+        if mileage_max is not None and "mileage_max" not in exclude:
+            conditions.append(Car.mileage <= mileage_max)
+
+        if reg_year_min is not None and "reg_year_min" not in exclude:
+            if reg_month_min is not None and "reg_month_min" not in exclude:
+                conditions.append(
+                    or_(
+                        Car.registration_year > reg_year_min,
+                        and_(
+                            Car.registration_year == reg_year_min,
+                            Car.registration_month.is_not(None),
+                            Car.registration_month >= reg_month_min,
+                        ),
+                    )
+                )
+            else:
+                conditions.append(Car.registration_year >= reg_year_min)
+
+        if reg_year_max is not None and "reg_year_max" not in exclude:
+            if reg_month_max is not None and "reg_month_max" not in exclude:
+                conditions.append(
+                    or_(
+                        Car.registration_year < reg_year_max,
+                        and_(
+                            Car.registration_year == reg_year_max,
+                            Car.registration_month.is_not(None),
+                            Car.registration_month <= reg_month_max,
+                        ),
+                    )
+                )
+            else:
+                conditions.append(Car.registration_year <= reg_year_max)
+
+        if body_type and "body_type" not in exclude:
+            conditions.append(func.lower(Car.body_type) == body_type.lower())
+        if engine_type and "engine_type" not in exclude:
+            aliases = fuel_aliases(engine_type)
+            if aliases:
+                conditions.append(or_(*[func.lower(Car.engine_type).like(f"%{alias}%") for alias in aliases]))
+            else:
+                conditions.append(func.lower(Car.engine_type) == engine_type.lower())
+        if transmission and "transmission" not in exclude:
+            conditions.append(func.lower(Car.transmission) == transmission.lower())
+        if drive_type and "drive_type" not in exclude:
+            conditions.append(func.lower(Car.drive_type) == drive_type.lower())
+        if power_hp_min is not None and "power_hp_min" not in exclude:
+            conditions.append(Car.power_hp >= power_hp_min)
+        if power_hp_max is not None and "power_hp_max" not in exclude:
+            conditions.append(Car.power_hp <= power_hp_max)
+        if engine_cc_min is not None and "engine_cc_min" not in exclude:
+            conditions.append(Car.engine_cc >= engine_cc_min)
+        if engine_cc_max is not None and "engine_cc_max" not in exclude:
+            conditions.append(Car.engine_cc <= engine_cc_max)
+        if condition and "condition" not in exclude:
+            cond = condition.strip().lower()
+            if cond == "new":
+                conditions.append(Car.mileage.is_not(None))
+                conditions.append(Car.mileage <= 100)
+            elif cond == "used":
+                conditions.append(Car.mileage.is_not(None))
+                conditions.append(Car.mileage > 100)
+
+        strict_local_photo_mode = bool(hide_no_local_photo and (region or "").upper() == "EU")
+        if strict_local_photo_mode:
+            conditions.append(
+                and_(
+                    Car.thumbnail_local_path.is_not(None),
+                    Car.thumbnail_local_path != "",
+                )
+            )
+
+        return conditions, {
+            "region": region,
+            "country": country,
+            "engine_type": engine_type,
+            "q": q,
+            "strict_local_photo_mode": strict_local_photo_mode,
+        }
+
     def list_cars(
         self,
         *,
@@ -583,6 +986,9 @@ class CarsService:
         climatisation: Optional[str] = None,
         airbags: Optional[str] = None,
         interior_design: Optional[str] = None,
+        interior_color: Optional[str] = None,
+        interior_material: Optional[str] = None,
+        vat_reclaimable: Optional[str] = None,
         air_suspension: Optional[bool] = None,
         price_rating_label: Optional[str] = None,
         owners_count: Optional[str] = None,
@@ -599,345 +1005,56 @@ class CarsService:
         use_fast_count: bool = True,
         hide_no_local_photo: bool = False,
     ) -> Tuple[List[Car] | List[dict], int]:
-        conditions = [self._available_expr()]
-        if region and not country:
-            if region.upper() == "KR":
-                country = "KR"
-        if lines:
-            line_conditions = []
-            brand_field = func.lower(func.trim(Car.brand))
-            model_field = func.lower(func.trim(Car.model))
-            variant_field = func.lower(func.trim(Car.variant))
-            for line in lines:
-                parts = [p.strip() for p in (line or "").split("|")]
-                while len(parts) < 3:
-                    parts.append("")
-                b, m, v = parts[0], parts[1], parts[2]
-                group = []
-                if b:
-                    norm_b = normalize_brand(b).strip().strip(".,;")
-                    variants = brand_variants(norm_b) if norm_b else []
-                    if variants:
-                        group.append(or_(*[
-                            brand_field.like(func.lower(f"%{v}%")) for v in variants
-                        ]))
-                    else:
-                        group.append(brand_field.like(func.lower(f"%{b}%")))
-                if m:
-                    group.append(model_field.like(func.lower(f"%{m}%")))
-                if v:
-                    group.append(variant_field.like(func.lower(f"%{v}%")))
-                if group:
-                    line_conditions.append(and_(*group))
-            if line_conditions:
-                conditions.append(or_(*line_conditions))
-        if country:
-            c = normalize_country_code(country)
-            if c == "EU":
-                country = None
-                if not region:
-                    region = "EU"
-            elif c == "KR":
-                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-                kr_conds = [Car.country.like("KR%")]
-                if kr_sources:
-                    kr_conds.append(Car.source_id.in_(kr_sources))
-                conditions.append(or_(*kr_conds))
-            elif c:
-                conditions.append(Car.country == c)
-        if region:
-            r = region.upper()
-            if r == "KR":
-                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-                conds = [Car.country.like("KR%")]
-                if kr_sources:
-                    conds.append(Car.source_id.in_(kr_sources))
-                conditions.append(or_(*conds))
-            elif r == "EU":
-                eu_sources = self._source_ids_for_europe()
-                if eu_sources:
-                    conditions.append(Car.source_id.in_(eu_sources))
-                else:
-                    conditions.append(Car.country.in_(self.EU_COUNTRIES))
-        if kr_type:
-            kt_raw = str(kr_type).upper()
-            kt = None
-            if kt_raw in ("KR_INTERNAL", "DOMESTIC"):
-                kt = "domestic"
-            elif kt_raw in ("KR_IMPORT", "IMPORT"):
-                kt = "import"
-            if kt:
-                # allow KR by country or by source hints
-                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-                conds = [func.lower(Car.kr_market_type) == kt]
-                conds.append(Car.country.like("KR%"))
-                if kr_sources:
-                    conds.append(Car.source_id.in_(kr_sources))
-                conditions.append(and_(or_(*conds)))
-        if brand:
-            b = normalize_brand(brand).strip().strip(".,;")
-            if b:
-                variants = brand_variants(b)
-                variants_lc = [v.lower() for v in variants if v]
-                if variants_lc:
-                    conditions.append(func.lower(func.trim(Car.brand)).in_(variants_lc))
-        if q:
-            # Fast path: map single-token fuel queries to structured engine_type filter.
-            # This avoids expensive broad payload scans for common searches like "diesel".
-            q_tokens = [t for t in re.split(r"[\s,]+", q.strip().lower()) if t]
-            if len(q_tokens) == 1 and not engine_type:
-                token = q_tokens[0]
-                quick_fuel_map = {
-                    "дизель": "diesel",
-                    "дизельный": "diesel",
-                    "дизельные": "diesel",
-                    "дизельное": "diesel",
-                    "diesel": "diesel",
-                    "бензин": "petrol",
-                    "бенз": "petrol",
-                    "petrol": "petrol",
-                    "gasoline": "petrol",
-                    "hybrid": "hybrid",
-                    "гибрид": "hybrid",
-                    "электро": "electric",
-                    "электр": "electric",
-                    "electric": "electric",
-                    "ev": "electric",
-                }
-                mapped = quick_fuel_map.get(token)
-                if mapped:
-                    engine_type = mapped
-                    q = None
-                elif token.startswith("дизел"):
-                    engine_type = "diesel"
-                    q = None
-        if q:
-            tokens = [t for t in re.split(r"[\\s,]+", q.strip().lower()) if t]
-            payload_text = func.lower(cast(Car.source_payload, String))
-            token_groups = []
-            fuel_map = {
-                "дизель": ["diesel"],
-                "дизельный": ["diesel"],
-                "дизельные": ["diesel"],
-                "дизельное": ["diesel"],
-                "diesel": ["diesel"],
-                "бензин": ["petrol", "gasoline", "benzin"],
-                "бенз": ["petrol", "gasoline", "benzin"],
-                "hybrid": ["hybrid"],
-                "гибрид": ["hybrid"],
-                "электро": ["electric", "ev"],
-                "электр": ["electric", "ev"],
-                "electric": ["electric", "ev"],
-            }
-            drive_tokens = {"4x4", "4х4", "4wd", "awd", "full", "полный", "полныйпривод"}
-            for token in tokens:
-                conds = []
-                if token in fuel_map or token.startswith("дизел"):
-                    mapped = fuel_map.get(token, fuel_map["дизель"])
-                    for f in mapped:
-                        conds.append(func.lower(Car.engine_type).like(f"%{f}%"))
-                        conds.append(payload_text.like(f"%{f}%"))
-                elif token in drive_tokens:
-                    conds.append(func.lower(Car.drive_type).like("%awd%"))
-                    conds.append(func.lower(Car.drive_type).like("%4wd%"))
-                    conds.append(payload_text.like("%four-wheel%"))
-                    conds.append(payload_text.like("%all wheel%"))
-                    conds.append(payload_text.like("%4x4%"))
-                elif token.startswith("панор") or token.startswith("panor"):
-                    conds.append(payload_text.like("%panor%"))
-                else:
-                    like = f"%{token}%"
-                    conds.extend(
-                        [
-                            func.lower(Car.brand).like(like),
-                            func.lower(Car.model).like(like),
-                            func.lower(Car.variant).like(like),
-                            func.lower(Car.generation).like(like),
-                            func.lower(Car.body_type).like(like),
-                            func.lower(Car.engine_type).like(like),
-                            func.lower(Car.transmission).like(like),
-                            func.lower(Car.drive_type).like(like),
-                            func.lower(Car.color).like(like),
-                            payload_text.like(like),
-                        ]
-                    )
-                if conds:
-                    token_groups.append(or_(*conds))
-            if token_groups:
-                conditions.append(and_(*token_groups))
-        if model:
-            model_value = model.strip()
-            if model_value:
-                if not brand:
-                    conditions.append(Car.model == model_value)
-                else:
-                    conditions.append(Car.model == model_value)
-        if num_seats:
-            conditions.append(
-                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "num_seats")
-                == str(num_seats)
-            )
-        if doors_count:
-            conditions.append(
-                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "doors_count")
-                == str(doors_count)
-            )
-        if emission_class:
-            conditions.append(
-                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "emission_class")
-                == emission_class
-            )
-        if efficiency_class:
-            conditions.append(
-                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "efficiency_class")
-                == efficiency_class
-            )
-        if climatisation:
-            conditions.append(
-                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "climatisation")
-                == climatisation
-            )
-        if airbags:
-            conditions.append(
-                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "airbags")
-                == airbags
-            )
-        if interior_design:
-            conditions.append(
-                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "interior_design")
-                == interior_design
-            )
-        if air_suspension:
-            payload_text = func.lower(cast(Car.source_payload, String))
-            conditions.append(
-                or_(
-                    payload_text.like("%air suspension%"),
-                    payload_text.like("%air_suspension%"),
-                    payload_text.like("%pneum%"),
-                    payload_text.like("%пневмо%"),
-                )
-            )
-        if price_rating_label:
-            conditions.append(
-                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "price_rating_label")
-                == price_rating_label
-            )
-        if owners_count:
-            conditions.append(
-                func.jsonb_extract_path_text(cast(Car.source_payload, JSONB), "owners_count")
-                == str(owners_count)
-            )
-        if generation:
-            conditions.append(func.lower(Car.generation).like(
-                func.lower(f"%{generation.strip()}%")))
-        if color:
-            group_key = normalize_color_group_key(color)
-            if group_key:
-                conditions.append(Car.color_group == group_key)
-            else:
-                aliases = color_aliases(color)
-                if aliases:
-                    conditions.append(or_(
-                        *[func.lower(Car.color).like(f"%{a}%") for a in aliases]
-                    ))
-                else:
-                    conditions.append(func.lower(Car.color) == color.lower())
-        if source_key:
-            keys: List[str] = []
-            if isinstance(source_key, str):
-                keys = [k.strip() for k in source_key.split(",") if k.strip()]
-            else:
-                keys = [k.strip() for k in source_key if k and k.strip()]
-            if keys:
-                src_ids = self.db.execute(select(Source.id).where(
-                    Source.key.in_(keys))).scalars().all()
-                if src_ids:
-                    conditions.append(Car.source_id.in_(src_ids))
-        if price_min is not None or price_max is not None:
-            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
-            conditions.append(price_expr.is_not(None))
-            if price_min is not None:
-                conditions.append(price_expr >= price_min)
-            if price_max is not None:
-                conditions.append(price_expr <= price_max)
-        if year_min is not None:
-            conditions.append(Car.year >= year_min)
-        if year_max is not None:
-            conditions.append(Car.year <= year_max)
-        if mileage_min is not None:
-            conditions.append(Car.mileage >= mileage_min)
-        if mileage_max is not None:
-            conditions.append(Car.mileage <= mileage_max)
-        if reg_year_min is not None:
-            if reg_month_min is not None:
-                conditions.append(
-                    or_(
-                        Car.registration_year > reg_year_min,
-                        and_(
-                            Car.registration_year == reg_year_min,
-                            Car.registration_month.is_not(None),
-                            Car.registration_month >= reg_month_min,
-                        ),
-                    )
-                )
-            else:
-                conditions.append(Car.registration_year >= reg_year_min)
-        if reg_year_max is not None:
-            if reg_month_max is not None:
-                conditions.append(
-                    or_(
-                        Car.registration_year < reg_year_max,
-                        and_(
-                            Car.registration_year == reg_year_max,
-                            Car.registration_month.is_not(None),
-                            Car.registration_month <= reg_month_max,
-                        ),
-                    )
-                )
-            else:
-                conditions.append(Car.registration_year <= reg_year_max)
-        if body_type:
-            conditions.append(func.lower(Car.body_type) == body_type.lower())
-        if engine_type:
-            aliases = fuel_aliases(engine_type)
-            if aliases:
-                conditions.append(or_(
-                    *[func.lower(Car.engine_type).like(f"%{a}%") for a in aliases]
-                ))
-            else:
-                conditions.append(func.lower(Car.engine_type) == engine_type.lower())
-        if transmission:
-            conditions.append(func.lower(Car.transmission)
-                              == transmission.lower())
-        if drive_type:
-            conditions.append(func.lower(Car.drive_type) == drive_type.lower())
-        if power_hp_min is not None:
-            conditions.append(Car.power_hp >= power_hp_min)
-        if power_hp_max is not None:
-            conditions.append(Car.power_hp <= power_hp_max)
-        if engine_cc_min is not None:
-            conditions.append(Car.engine_cc >= engine_cc_min)
-        if engine_cc_max is not None:
-            conditions.append(Car.engine_cc <= engine_cc_max)
-        if condition:
-            cond = condition.strip().lower()
-            if cond == "new":
-                conditions.append(Car.mileage.is_not(None))
-                conditions.append(Car.mileage <= 100)
-            elif cond == "used":
-                conditions.append(Car.mileage.is_not(None))
-                conditions.append(Car.mileage > 100)
-
-        strict_local_photo_mode = bool(hide_no_local_photo and (region or "").upper() == "EU")
-
-        # Optional strict catalog mode: hide cars without mirrored local photos.
-        if strict_local_photo_mode:
-            conditions.append(
-                and_(
-                    Car.thumbnail_local_path.is_not(None),
-                    Car.thumbnail_local_path != "",
-                )
-            )
+        conditions, resolved = self._build_list_conditions(
+            region=region,
+            country=country,
+            kr_type=kr_type,
+            brand=brand,
+            lines=lines,
+            source_key=source_key,
+            q=q,
+            model=model,
+            generation=generation,
+            color=color,
+            price_min=price_min,
+            price_max=price_max,
+            year_min=year_min,
+            year_max=year_max,
+            mileage_min=mileage_min,
+            mileage_max=mileage_max,
+            reg_year_min=reg_year_min,
+            reg_month_min=reg_month_min,
+            reg_year_max=reg_year_max,
+            reg_month_max=reg_month_max,
+            body_type=body_type,
+            engine_type=engine_type,
+            transmission=transmission,
+            drive_type=drive_type,
+            num_seats=num_seats,
+            doors_count=doors_count,
+            emission_class=emission_class,
+            efficiency_class=efficiency_class,
+            climatisation=climatisation,
+            airbags=airbags,
+            interior_design=interior_design,
+            interior_color=interior_color,
+            interior_material=interior_material,
+            vat_reclaimable=vat_reclaimable,
+            air_suspension=air_suspension,
+            price_rating_label=price_rating_label,
+            owners_count=owners_count,
+            power_hp_min=power_hp_min,
+            power_hp_max=power_hp_max,
+            engine_cc_min=engine_cc_min,
+            engine_cc_max=engine_cc_max,
+            condition=condition,
+            hide_no_local_photo=hide_no_local_photo,
+        )
+        region = resolved.get("region")
+        country = resolved.get("country")
+        engine_type = resolved.get("engine_type")
+        q = resolved.get("q")
+        strict_local_photo_mode = bool(resolved.get("strict_local_photo_mode"))
 
         where_expr = and_(*conditions) if conditions else None
 
@@ -971,6 +1088,9 @@ class CarsService:
             climatisation,
             airbags,
             interior_design,
+            interior_color,
+            interior_material,
+            vat_reclaimable,
             air_suspension,
             price_rating_label,
             owners_count,
@@ -1007,6 +1127,9 @@ class CarsService:
                 "climatisation": climatisation,
                 "airbags": airbags,
                 "interior_design": interior_design,
+                "interior_color": interior_color,
+                "interior_material": interior_material,
+                "vat_reclaimable": vat_reclaimable,
                 "air_suspension": air_suspension,
                 "price_rating_label": price_rating_label,
                 "owners_count": owners_count,
@@ -1754,6 +1877,97 @@ class CarsService:
             if all(len(buckets[k]) >= limit for k in keys):
                 break
         return {k: sorted(list(v)) for k, v in buckets.items()}
+
+    def payload_values_bulk_filtered(
+        self,
+        keys: List[str],
+        *,
+        limit: int = 120,
+        max_scan: int = 50000,
+        **filters: Any,
+    ) -> Dict[str, List[str]]:
+        if not keys:
+            return {}
+        conditions, _ = self._build_list_conditions(**filters)
+        stmt = (
+            select(Car.source_payload)
+            .where(and_(*conditions), Car.source_payload.is_not(None))
+            .execution_options(stream_results=True)
+        )
+        buckets: Dict[str, set[str]] = {k: set() for k in keys}
+        scanned = 0
+        for payload in self.db.execute(stmt).scalars().yield_per(1000):
+            scanned += 1
+            if not payload:
+                if scanned >= max_scan:
+                    break
+                continue
+            for key in keys:
+                if key not in payload:
+                    continue
+                items = payload.get(key)
+                values = items if isinstance(items, list) else [items]
+                bucket = buckets[key]
+                if len(bucket) >= limit:
+                    continue
+                for item in values:
+                    if item is None:
+                        continue
+                    text = str(item).strip()
+                    if not text:
+                        continue
+                    bucket.add(text)
+                    if len(bucket) >= limit:
+                        break
+            if scanned >= max_scan:
+                break
+            if all(len(buckets[key]) >= limit for key in keys):
+                break
+        return {key: sorted(list(values)) for key, values in buckets.items()}
+
+    def facet_counts_filtered(
+        self,
+        *,
+        field: str,
+        limit: int = 120,
+        **filters: Any,
+    ) -> List[Dict[str, Any]]:
+        col_map = {
+            "country": func.upper(Car.country),
+            "body_type": Car.body_type,
+            "engine_type": Car.engine_type,
+            "transmission": Car.transmission,
+            "drive_type": Car.drive_type,
+            "generation": Car.generation,
+            "color": Car.color,
+        }
+        col = col_map.get(field)
+        if col is None:
+            return []
+        conditions, _ = self._build_list_conditions(**filters)
+        stmt = (
+            select(col.label("value"), func.count().label("count"))
+            .select_from(Car)
+            .where(and_(*conditions), col.is_not(None), cast(col, String) != "")
+            .group_by(col)
+            .order_by(func.count().desc(), col.asc())
+            .limit(limit)
+        )
+        rows = self.db.execute(stmt).all()
+        out: List[Dict[str, Any]] = []
+        seen_country: set[str] = set()
+        for value, count in rows:
+            if value is None or value == "":
+                continue
+            if field == "country":
+                code = normalize_country_code(value)
+                if not code or code in seen_country:
+                    continue
+                seen_country.add(code)
+                out.append({"value": code, "count": int(count)})
+                continue
+            out.append({"value": value, "count": int(count)})
+        return out
 
     def source_ids_for_region(self, region: str) -> List[int]:
         if not region:

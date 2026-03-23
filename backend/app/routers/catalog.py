@@ -197,6 +197,14 @@ def _sort_by_label(items: list[dict]) -> list[dict]:
     return sorted(items, key=lambda x: (x.get("label") or x.get("value") or "").strip().casefold())
 
 
+def _sort_numeric_strings(values: List[str]) -> List[str]:
+    def to_num(v: str) -> int:
+        digits = "".join(ch for ch in str(v) if ch.isdigit())
+        return int(digits) if digits else 0
+
+    return sorted(values, key=lambda v: (to_num(v), str(v)))
+
+
 def _region_label(code: str | None) -> str:
     if not code:
         return ""
@@ -297,6 +305,9 @@ def list_cars(
     climatisation: Optional[str] = Query(default=None),
     airbags: Optional[str] = Query(default=None),
     interior_design: Optional[str] = Query(default=None),
+    interior_color: Optional[str] = Query(default=None),
+    interior_material: Optional[str] = Query(default=None),
+    vat_reclaimable: Optional[str] = Query(default=None),
     air_suspension: Optional[bool] = Query(default=None),
     price_rating_label: Optional[str] = Query(default=None),
     owners_count: Optional[str] = Query(default=None),
@@ -441,6 +452,9 @@ def list_cars(
             "climatisation": climatisation,
             "airbags": airbags,
             "interior_design": interior_design,
+            "interior_color": interior_color,
+            "interior_material": interior_material,
+            "vat_reclaimable": vat_reclaimable,
             "air_suspension": air_suspension,
             "price_rating_label": price_rating_label,
             "owners_count": owners_count,
@@ -509,6 +523,9 @@ def list_cars(
         climatisation=climatisation,
         airbags=airbags,
         interior_design=interior_design,
+        interior_color=interior_color,
+        interior_material=interior_material,
+        vat_reclaimable=vat_reclaimable,
         air_suspension=air_suspension,
         price_rating_label=price_rating_label,
         owners_count=owners_count,
@@ -931,6 +948,9 @@ def advanced_count(request: Request, db: Session = Depends(get_db)):
         "climatisation": qp.get("climatisation"),
         "airbags": qp.get("airbags"),
         "interior_design": qp.get("interior_design"),
+        "interior_color": qp.get("interior_color"),
+        "interior_material": qp.get("interior_material"),
+        "vat_reclaimable": qp.get("vat_reclaimable"),
         "air_suspension": _to_bool(qp.get("air_suspension")),
         "price_rating_label": qp.get("price_rating_label"),
         "owners_count": qp.get("owners_count"),
@@ -984,6 +1004,9 @@ def advanced_count(request: Request, db: Session = Depends(get_db)):
             climatisation=qp.get("climatisation"),
             airbags=qp.get("airbags"),
             interior_design=qp.get("interior_design"),
+            interior_color=qp.get("interior_color"),
+            interior_material=qp.get("interior_material"),
+            vat_reclaimable=qp.get("vat_reclaimable"),
             air_suspension=_to_bool(qp.get("air_suspension")),
             price_rating_label=qp.get("price_rating_label"),
             owners_count=qp.get("owners_count"),
@@ -1389,16 +1412,70 @@ def filter_ctx_model(
 @router.get("/filter_payload")
 def filter_payload(
     request: Request,
-    region: Optional[str] = Query(default=None),
-    country: Optional[str] = Query(default=None),
-    brand: Optional[str] = Query(default=None),
-    model: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
     timing_enabled = os.environ.get("CAR_API_TIMING", "0") == "1"
-    params = normalize_filter_params(
-        {"region": region, "country": country, "brand": brand, "model": model}
+    qp = request.query_params
+    region = qp.get("region")
+    country = qp.get("country")
+    eu_country = qp.get("eu_country")
+    kr_type = qp.get("kr_type")
+    brand = qp.get("brand")
+    model = qp.get("model")
+    canon = _canonicalize_params(
+        region=region,
+        country=country,
+        eu_country=eu_country,
+        kr_type=kr_type,
+        brand=brand,
+        model=model,
+    )
+    lines = qp.getlist("line") if hasattr(qp, "getlist") else []
+    source = qp.getlist("source") if hasattr(qp, "getlist") else []
+    source_value: Optional[str | List[str]] = source if source else qp.get("source")
+    params = normalize_count_params(
+        {
+            "region": canon.get("region"),
+            "country": canon.get("country"),
+            "brand": canon.get("brand"),
+            "model": canon.get("model"),
+            "generation": qp.get("generation"),
+            "color": qp.get("color"),
+            "body_type": qp.get("body_type"),
+            "engine_type": qp.get("engine_type"),
+            "transmission": qp.get("transmission"),
+            "drive_type": qp.get("drive_type"),
+            "price_min": _to_float(qp.get("price_min")),
+            "price_max": _to_float(qp.get("price_max")),
+            "power_hp_min": _to_float(qp.get("power_hp_min")),
+            "power_hp_max": _to_float(qp.get("power_hp_max")),
+            "engine_cc_min": _to_int(qp.get("engine_cc_min")),
+            "engine_cc_max": _to_int(qp.get("engine_cc_max")),
+            "year_min": _to_int(qp.get("year_min")),
+            "year_max": _to_int(qp.get("year_max")),
+            "mileage_min": _to_int(qp.get("mileage_min")),
+            "mileage_max": _to_int(qp.get("mileage_max")),
+            "kr_type": canon.get("kr_type"),
+            "reg_year_min": _to_int(qp.get("reg_year_min")),
+            "reg_month_min": _to_int(qp.get("reg_month_min")),
+            "reg_year_max": _to_int(qp.get("reg_year_max")),
+            "reg_month_max": _to_int(qp.get("reg_month_max")),
+            "condition": qp.get("condition"),
+            "q": qp.get("q"),
+            "line": "|".join(lines or []),
+            "source": ",".join(source) if source else qp.get("source"),
+            "num_seats": qp.get("num_seats"),
+            "doors_count": qp.get("doors_count"),
+            "emission_class": qp.get("emission_class"),
+            "efficiency_class": qp.get("efficiency_class"),
+            "climatisation": qp.get("climatisation"),
+            "airbags": qp.get("airbags"),
+            "interior_design": qp.get("interior_design"),
+            "air_suspension": _to_bool(qp.get("air_suspension")),
+            "price_rating_label": qp.get("price_rating_label"),
+            "owners_count": qp.get("owners_count"),
+        }
     )
     cache_key = build_filter_payload_key(params)
     cached = redis_get_json(cache_key)
@@ -1418,21 +1495,136 @@ def filter_payload(
         "interior_design",
         "price_rating_label",
     ]
-    eu_payload = service.payload_values_bulk(payload_keys, source_ids=service.source_ids_for_region("EU"))
-    kr_payload = service.payload_values_bulk(payload_keys, source_ids=service.source_ids_for_region("KR"))
+    common_filters = {
+        "region": canon.get("region"),
+        "country": canon.get("country"),
+        "kr_type": canon.get("kr_type"),
+        "brand": canon.get("brand"),
+        "model": canon.get("model"),
+        "generation": qp.get("generation"),
+        "color": qp.get("color"),
+        "body_type": qp.get("body_type"),
+        "engine_type": qp.get("engine_type"),
+        "transmission": qp.get("transmission"),
+        "drive_type": qp.get("drive_type"),
+        "price_min": _to_float(qp.get("price_min")),
+        "price_max": _to_float(qp.get("price_max")),
+        "power_hp_min": _to_float(qp.get("power_hp_min")),
+        "power_hp_max": _to_float(qp.get("power_hp_max")),
+        "engine_cc_min": _to_int(qp.get("engine_cc_min")),
+        "engine_cc_max": _to_int(qp.get("engine_cc_max")),
+        "year_min": _to_int(qp.get("year_min")),
+        "year_max": _to_int(qp.get("year_max")),
+        "mileage_min": _to_int(qp.get("mileage_min")),
+        "mileage_max": _to_int(qp.get("mileage_max")),
+        "reg_year_min": _to_int(qp.get("reg_year_min")),
+        "reg_month_min": _to_int(qp.get("reg_month_min")),
+        "reg_year_max": _to_int(qp.get("reg_year_max")),
+        "reg_month_max": _to_int(qp.get("reg_month_max")),
+        "condition": qp.get("condition"),
+        "q": qp.get("q"),
+        "lines": lines or None,
+        "source_key": source_value,
+        "num_seats": qp.get("num_seats"),
+        "doors_count": qp.get("doors_count"),
+        "emission_class": qp.get("emission_class"),
+        "efficiency_class": qp.get("efficiency_class"),
+        "climatisation": qp.get("climatisation"),
+        "airbags": qp.get("airbags"),
+        "interior_design": qp.get("interior_design"),
+        "air_suspension": _to_bool(qp.get("air_suspension")),
+        "price_rating_label": qp.get("price_rating_label"),
+        "owners_count": qp.get("owners_count"),
+    }
+    eu_filters = {**common_filters, "region": "EU", "country": canon.get("country") if canon.get("country") not in (None, "KR") else None, "kr_type": None}
+    kr_filters = {**common_filters, "region": "KR", "country": "KR", "kr_type": canon.get("kr_type")}
+
+    eu_payload = service.payload_values_bulk_filtered(payload_keys, **eu_filters)
+    kr_payload = service.payload_values_bulk_filtered(payload_keys, **kr_filters)
+    countries = _sort_by_label(
+        [
+            {
+                "value": row["value"],
+                "label": country_label_ru(row["value"]) or row["value"],
+                "count": row.get("count", 0),
+            }
+            for row in service.facet_counts_filtered(field="country", **{**common_filters, "country": None, "region": "EU", "kr_type": None})
+            if row.get("value")
+        ]
+    )
+    body_types = _sort_by_label(
+        [
+            {
+                "value": row["value"],
+                "label": ru_body(row["value"]) or display_body(row["value"]) or row["value"],
+                "count": row.get("count", 0),
+            }
+            for row in service.facet_counts_filtered(field="body_type", **common_filters)
+            if row.get("value")
+        ]
+    )
+    generations = _sort_by_label(
+        [
+            {"value": row["value"], "label": row["value"], "count": row.get("count", 0)}
+            for row in service.facet_counts_filtered(field="generation", **common_filters)
+            if row.get("value")
+        ]
+    )
+    engine_types = _sort_by_label(
+        [
+            {
+                "value": row["value"],
+                "label": translate_payload_value("engine_type", row["value"]) or row["value"],
+                "count": row.get("count", 0),
+            }
+            for row in service.facet_counts_filtered(field="engine_type", **common_filters)
+            if row.get("value")
+        ]
+    )
+    transmissions = _sort_by_label(
+        [
+            {
+                "value": row["value"],
+                "label": translate_payload_value("transmission", row["value"]) or row["value"],
+                "count": row.get("count", 0),
+            }
+            for row in service.facet_counts_filtered(field="transmission", **common_filters)
+            if row.get("value")
+        ]
+    )
+    drive_types = _sort_by_label(
+        [
+            {
+                "value": row["value"],
+                "label": translate_payload_value("drive_type", row["value"]) or row["value"],
+                "count": row.get("count", 0),
+            }
+            for row in service.facet_counts_filtered(field="drive_type", **common_filters)
+            if row.get("value")
+        ]
+    )
+    colors_basic, colors_other = _split_colors(service.facet_counts_filtered(field="color", **common_filters))
     data = {
-        "seats_options_eu": build_labeled_options(eu_payload.get("num_seats", []), "num_seats"),
-        "doors_options_eu": build_labeled_options(eu_payload.get("doors_count", []), "doors_count"),
-        "owners_options_eu": build_labeled_options(eu_payload.get("owners_count", []), "owners_count"),
+        "countries": countries,
+        "body_types": body_types,
+        "generations": generations,
+        "engine_types": engine_types,
+        "transmissions": transmissions,
+        "drive_types": drive_types,
+        "colors_basic": colors_basic,
+        "colors_other": colors_other,
+        "seats_options_eu": build_labeled_options(_sort_numeric_strings(eu_payload.get("num_seats", [])), "num_seats"),
+        "doors_options_eu": build_labeled_options(_sort_numeric_strings(eu_payload.get("doors_count", [])), "doors_count"),
+        "owners_options_eu": build_labeled_options(_sort_numeric_strings(eu_payload.get("owners_count", [])), "owners_count"),
         "emission_classes_eu": build_labeled_options(eu_payload.get("emission_class", []), "emission_class"),
         "efficiency_classes_eu": build_labeled_options(eu_payload.get("efficiency_class", []), "efficiency_class"),
         "climatisation_options_eu": build_labeled_options(eu_payload.get("climatisation", []), "climatisation"),
         "airbags_options_eu": build_labeled_options(eu_payload.get("airbags", []), "airbags"),
         "interior_design_options_eu": build_labeled_options(eu_payload.get("interior_design", []), "interior_design"),
         "price_rating_labels_eu": build_labeled_options(eu_payload.get("price_rating_label", []), "price_rating_label"),
-        "seats_options_kr": build_labeled_options(kr_payload.get("num_seats", []), "num_seats"),
-        "doors_options_kr": build_labeled_options(kr_payload.get("doors_count", []), "doors_count"),
-        "owners_options_kr": build_labeled_options(kr_payload.get("owners_count", []), "owners_count"),
+        "seats_options_kr": build_labeled_options(_sort_numeric_strings(kr_payload.get("num_seats", [])), "num_seats"),
+        "doors_options_kr": build_labeled_options(_sort_numeric_strings(kr_payload.get("doors_count", [])), "doors_count"),
+        "owners_options_kr": build_labeled_options(_sort_numeric_strings(kr_payload.get("owners_count", [])), "owners_count"),
         "emission_classes_kr": build_labeled_options(kr_payload.get("emission_class", []), "emission_class"),
         "efficiency_classes_kr": build_labeled_options(kr_payload.get("efficiency_class", []), "efficiency_class"),
         "climatisation_options_kr": build_labeled_options(kr_payload.get("climatisation", []), "climatisation"),

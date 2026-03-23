@@ -331,6 +331,12 @@
                 {% endfor %}
               </select>
             </label>
+            <label>Цвет салона
+              <input type="text" name="interior_color" value="{{ params.get('interior_color','') }}" placeholder="Например: black, beige, nero" />
+            </label>
+            <label>Материал салона
+              <input type="text" name="interior_material" value="{{ params.get('interior_material','') }}" placeholder="Например: leather, alcantara, fabric" />
+            </label>
           </div>
         </div>
       </section>
@@ -461,6 +467,13 @@
               </select>
             </label>
             {% endif %}
+            <label>НДС
+              <select name="vat_reclaimable">
+                <option value="">Не важно</option>
+                <option value="1" {% if params.get('vat_reclaimable') == '1' %}selected{% endif %}>Возмещается</option>
+                <option value="0" {% if params.get('vat_reclaimable') == '0' %}selected{% endif %}>Не возмещается</option>
+              </select>
+            </label>
           </div>
         </div>
       </section>

@@ -615,13 +615,16 @@
       climatisation: 'Климат',
       airbags: 'Подушки',
       interior_design: 'Интерьер',
+      interior_color: 'Цвет салона',
+      interior_material: 'Материал салона',
+      vat_reclaimable: 'НДС',
       price_rating_label: 'Оценка цены',
       color: 'Цвет',
       q: 'Поиск',
       region: null,
       kr_type: null,
-      interior_color: null,
-      interior_material: null,
+      interior_color: 'Цвет салона',
+      interior_material: 'Материал салона',
       air_suspension: 'Пневмоподвеска',
       reg_year_min: null,
       reg_month_min: null,
@@ -671,6 +674,9 @@
       }
       if (['engine_type', 'transmission', 'drive_type', 'body_type', 'condition'].includes(key)) {
         displayValue = selectLabel(key, value)
+      }
+      if (key === 'vat_reclaimable') {
+        displayValue = value === '1' ? 'Возмещается' : value === '0' ? 'Не возмещается' : value
       }
       if (key === 'power_hp_min' || key === 'power_hp_max') {
         const n = Number(value)
@@ -2192,8 +2198,61 @@
       price_rating_label: 'price_rating_labels',
     }
 
+    const rebuildColorChipGroup = (wrap, items) => {
+      if (!wrap) return
+      wrap.replaceChildren()
+      ;(items || []).forEach((item) => {
+        if (!item || !item.value) return
+        const chip = document.createElement('button')
+        chip.type = 'button'
+        chip.className = 'color-chip'
+        chip.dataset.color = item.value
+        chip.dataset.label = item.label || item.value
+        chip.title = item.label || item.value
+        chip.setAttribute('aria-label', item.label || item.value)
+        if (item.hex) chip.style.setProperty('--chip-color', item.hex)
+        wrap.appendChild(chip)
+      })
+    }
+
+    const applyBasicOptions = (data) => {
+      if (!data) return
+      setSelectOptions(regionEuSelect, Array.isArray(data.countries) ? data.countries : [], { emptyLabel: 'Все страны' })
+      setSelectOptions(qs('select[name="body_type"]', form), Array.isArray(data.body_types) ? data.body_types : [], { emptyLabel: 'Любой' })
+      setSelectOptions(qs('select[name="generation"]', form), Array.isArray(data.generations) ? data.generations : [], { emptyLabel: 'Любое' })
+      setSelectOptions(qs('select[name="engine_type"]', form), Array.isArray(data.engine_types) ? data.engine_types : [], { emptyLabel: 'Любое' })
+      setSelectOptions(qs('select[name="transmission"]', form), Array.isArray(data.transmissions) ? data.transmissions : [], { emptyLabel: 'Любая' })
+      setSelectOptions(qs('select[name="drive_type"]', form), Array.isArray(data.drive_types) ? data.drive_types : [], { emptyLabel: 'Любой' })
+      const colorInput = qs('input[name="color"]', form)
+      const basicWrap = qs('.color-swatches--basic[data-color-chips]', form)
+      const extraWrap = qs('#colors-extra-search[data-color-chips]', form)
+      const toggle = qs('[data-colors-toggle][data-target="colors-extra-search"]', form)
+      const basic = Array.isArray(data.colors_basic) ? data.colors_basic : []
+      const extra = Array.isArray(data.colors_other) ? data.colors_other : []
+      if (basicWrap) rebuildColorChipGroup(basicWrap, basic)
+      if (extraWrap) rebuildColorChipGroup(extraWrap, extra)
+      if (toggle) {
+        toggle.classList.toggle('is-hidden', extra.length === 0)
+        if (!extra.length) toggle.setAttribute('aria-expanded', 'false')
+      }
+      if (colorInput) {
+        const allowed = new Set([...basic, ...extra].map((item) => item.value))
+        if (colorInput.value && allowed.size && !allowed.has(colorInput.value)) {
+          colorInput.value = ''
+        }
+      }
+      bindColorChips(form, () => {
+        scheduleCount()
+        scheduleOptionsRefresh()
+      })
+      bindOtherColorsToggle(form)
+      syncColorChips(form)
+      syncAdvancedGenerationVisibility()
+    }
+
     const applyPayloadOptions = (data) => {
       if (!data) return
+      applyBasicOptions(data)
       qsa('[data-region-options]', form).forEach((select) => {
         const name = select.getAttribute('name') || ''
         const base = payloadMap[name]
@@ -2224,15 +2283,14 @@
     }
 
     const loadPayloadOptions = async () => {
-      const params = new URLSearchParams()
-      const region = regionSelect?.value || ''
-      const country = regionEuSelect?.value || ''
-      if (region) params.set('region', region)
-      if (country) params.set('country', country)
+      const params = buildParams(false)
+      const reqId = String((Number(form.dataset.payloadReqId || '0') || 0) + 1)
+      form.dataset.payloadReqId = reqId
       try {
         const res = await fetch(`/api/filter_payload?${params.toString()}`)
         if (!res.ok) return
         const data = await res.json()
+        if (form.dataset.payloadReqId !== reqId) return
         applyPayloadOptions(data)
       } catch (e) {
         console.warn('filter payload', e)
@@ -2250,6 +2308,7 @@
         return true
       }
       qsa('[data-has-eu]', form).forEach((el) => {
+        if (el.classList && el.classList.contains('advanced-section')) return
         el.classList.toggle('is-hidden', !showFor(el))
       })
       qsa('[data-region-options]', form).forEach((select) => {
@@ -2362,9 +2421,14 @@
       brandSelect?.addEventListener('change', () => {
         fillModels(normalizeBrand(brandSelect.value), modelSelect, '')
         scheduleCount()
+        scheduleOptionsRefresh()
       })
-      modelSelect?.addEventListener('change', scheduleCount)
+      modelSelect?.addEventListener('change', () => {
+        scheduleCount()
+        scheduleOptionsRefresh()
+      })
       variantInput?.addEventListener('input', scheduleCount)
+      variantInput?.addEventListener('change', scheduleOptionsRefresh)
       removeBtn?.addEventListener('click', () => {
         const rows = qsa('[data-search-row]', rowsWrap)
         if (rows.length <= 1) {
@@ -2373,10 +2437,12 @@
           if (variantInput) variantInput.value = ''
           fillModels('', modelSelect, '')
           scheduleCount()
+          scheduleOptionsRefresh()
           return
         }
         row.remove()
         scheduleCount()
+        scheduleOptionsRefresh()
       })
     }
 
@@ -2484,6 +2550,7 @@
     }
 
     let debounce
+    let optionsDebounce
     const scheduleCount = () => {
       if (!countEl) return
       clearTimeout(debounce)
@@ -2498,6 +2565,13 @@
           console.warn('advanced count', e)
         }
       }, 300)
+    }
+
+    const scheduleOptionsRefresh = () => {
+      clearTimeout(optionsDebounce)
+      optionsDebounce = setTimeout(() => {
+        loadPayloadOptions()
+      }, 250)
     }
 
     const renderSuggestions = async () => {
@@ -2576,12 +2650,14 @@
         syncColorChips(form)
         updateRegionFilters()
         scheduleCount()
+        scheduleOptionsRefresh()
       }, 0)
     })
 
     addBtn?.addEventListener('click', () => {
       addRow({})
       scheduleCount()
+      scheduleOptionsRefresh()
     })
 
     const initialLines = new URLSearchParams(window.location.search).getAll('line').map(parseLine)
@@ -2608,16 +2684,22 @@
     loadPayloadOptions()
     syncAdvancedGenerationVisibility()
     bindRegMonthState(form)
-    bindColorChips(form, scheduleCount)
+    bindColorChips(form, () => {
+      scheduleCount()
+      scheduleOptionsRefresh()
+    })
     bindOtherColorsToggle(form)
     const ctrls = qsa('input, select', form)
     ctrls.forEach((el) => {
-      el.addEventListener('change', scheduleCount)
+      el.addEventListener('change', () => {
+        scheduleCount()
+        scheduleOptionsRefresh()
+      })
       el.addEventListener('input', scheduleCount)
     })
     regionSelect?.addEventListener('change', () => {
       updateRegionSub()
-      loadPayloadOptions()
+      scheduleOptionsRefresh()
       updateRegionFilters()
       syncAdvancedGenerationVisibility()
       scheduleCount()

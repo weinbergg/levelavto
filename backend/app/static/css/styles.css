@@ -1223,6 +1223,12 @@ html {
   display: grid;
   gap: 6px;
 }
+.footer-messenger-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
 
 /* Catalog */
 .catalog {
