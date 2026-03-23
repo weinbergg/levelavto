@@ -1709,6 +1709,8 @@
         container.dataset.modelAccordionFor = select.id || select.name || 'model'
         host.appendChild(container)
       }
+      const isHomeModel = select.id === 'home-model'
+      container.classList.toggle('model-accordion--dropup', isHomeModel)
       host.classList.add('has-model-accordion')
       if (!groups.length) {
         container.innerHTML = ''
@@ -1739,6 +1741,15 @@
       rootBody.className = 'model-accordion__body'
       root.appendChild(rootBody)
       container.appendChild(root)
+      if (!container.dataset.outsideBound) {
+        document.addEventListener('click', (event) => {
+          if (!container.contains(event.target)) {
+            const opened = container.querySelector('.model-accordion__root[open]')
+            if (opened) opened.open = false
+          }
+        })
+        container.dataset.outsideBound = '1'
+      }
 
       const clearBtn = document.createElement('button')
       clearBtn.type = 'button'
@@ -1789,6 +1800,7 @@
               if (value) selectedModels.add(value)
             })
             applySelection()
+            root.open = false
           })
           modelsWrap.appendChild(allBtn)
         }
@@ -1918,6 +1930,7 @@
       if (!brand) {
         modelSelect.disabled = true
         modelSelect.innerHTML = '<option value="">Все</option>'
+        fillModelSelectWithGroups(modelSelect, { models: [], model_groups: [] }, 'Все')
         return
       }
       modelSelect.disabled = true

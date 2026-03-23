@@ -1910,9 +1910,9 @@ body.filters-open {
 
 .model-accordion {
   margin-top: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-1);
   border-radius: 12px;
-  background: rgba(10, 16, 28, 0.96);
+  background: var(--bg-card);
   padding: 8px;
 }
 .has-model-accordion {
@@ -1926,6 +1926,10 @@ body.filters-open {
   z-index: 120;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
 }
+.has-model-accordion .model-accordion.model-accordion--dropup {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
 
 .model-accordion.is-hidden {
   display: none;
@@ -1936,6 +1940,7 @@ body.filters-open {
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
+  color: var(--text-2);
 }
 
 .model-accordion__root > summary {
@@ -1956,7 +1961,7 @@ body.filters-open {
 }
 
 .model-accordion__group {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-1);
   padding: 6px 0;
 }
 
@@ -1982,8 +1987,8 @@ body.filters-open {
 }
 
 .model-accordion__model {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-1);
+  background: var(--bg-interactive);
   color: inherit;
   border-radius: 999px;
   padding: 5px 10px;
