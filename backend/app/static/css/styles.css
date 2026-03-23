@@ -1262,6 +1262,17 @@ html {
   object-fit: cover;
   background: rgba(255, 255, 255, 0.1);
 }
+.social-link__icon-image--wide {
+  width: 58px;
+  height: 16px;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+}
+.social-link--icon-only {
+  padding-left: 8px;
+  padding-right: 8px;
+}
 .footer-messenger-buttons {
   display: flex;
   flex-wrap: wrap;
@@ -1932,16 +1943,6 @@ body.filters-open {
   top: calc(100% + 8px);
   z-index: 120;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
-}
-.has-model-accordion .model-accordion.model-accordion--dropup {
-  top: auto;
-  bottom: calc(100% + 8px);
-}
-/* Home search: keep models dropdown above controls */
-#home-search .has-model-accordion .model-accordion {
-  top: auto;
-  bottom: calc(100% + 8px);
-  z-index: 180;
 }
 
 .model-accordion.is-hidden {

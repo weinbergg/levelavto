@@ -1709,8 +1709,6 @@
         container.dataset.modelAccordionFor = select.id || select.name || 'model'
         host.appendChild(container)
       }
-      const isHomeModel = select.id === 'home-model'
-      container.classList.toggle('model-accordion--dropup', isHomeModel)
       host.classList.add('has-model-accordion')
       if (!groups.length) {
         container.innerHTML = ''
@@ -1800,7 +1798,6 @@
               if (value) selectedModels.add(value)
             })
             applySelection()
-            root.open = false
           })
           modelsWrap.appendChild(allBtn)
         }
@@ -1819,7 +1816,6 @@
               selectedModels.add(value)
             }
             applySelection()
-            root.open = false
           })
           modelsWrap.appendChild(btn)
         })

@@ -692,6 +692,17 @@
   object-fit: cover;
   background: rgba(255, 255, 255, 0.12);
 }
+.social-card__icon-image--wide {
+  width: 72px;
+  height: 20px;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+}
+.social-card--icon-only {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
 
 .lead-section {
   padding: 40px 0 60px;

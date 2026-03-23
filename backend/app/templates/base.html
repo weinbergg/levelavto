@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Автокаталог{% endblock %}</title>
     <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/css/styles.css?v=34" />
+    <link rel="stylesheet" href="/static/css/styles.css?v=35" />
     {% block head_extra %}{% endblock %}
   </head>
   <body data-auth="{{ 1 if user else 0 }}">
@@ -148,7 +148,7 @@
         {% set email = contact_email or content.get('contact_email') if content is defined else contact_email %}
         {% set address = contact_address or content.get('contact_address') if content is defined else contact_address %}
         {% set tg = (contact_tg or content.get('contact_tg') if content is defined else contact_tg) or 'https://t.me/levelavto' %}
-        {% set max_link = (contact_max or content.get('contact_max') if content is defined else contact_max) %}
+        {% set max_link = (contact_max or content.get('contact_max') if content is defined else contact_max) or 'https://max.ru/' %}
         {% set vk = (contact_vk or content.get('contact_vk') if content is defined else contact_vk) or 'https://vk.ru/levelavto' %}
         {% set avito = (contact_avito or content.get('contact_avito') if content is defined else contact_avito) or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
         {% set autoru = (contact_autoru or content.get('contact_autoru') if content is defined else contact_autoru) or 'https://auto.ru/profile/28529976' %}
@@ -162,16 +162,15 @@
           {% if address %}<div>{{ address }}</div>{% endif %}
           <div class="footer-social">
             <a class="social-link" href="{{ tg }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/telegram.png" alt="Telegram" /><span>Telegram</span></a>
-            {% if max_link %}<a class="social-link" href="{{ max_link }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/max.png" alt="MAX" /><span>MAX</span></a>{% endif %}
+            <a class="social-link" href="{{ max_link }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/max.png" alt="MAX" /><span>MAX</span></a>
             <a class="social-link" href="{{ vk }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/vk.svg" alt="VK" /><span>VK</span></a>
-            <a class="social-link" href="{{ avito }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/avito.svg" alt="Avito" /><span>Avito</span></a>
-            <a class="social-link" href="{{ autoru }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/autoru.svg" alt="Auto.ru" /><span>Auto.ru</span></a>
+            <a class="social-link social-link--icon-only" href="{{ avito }}" target="_blank" rel="noopener" aria-label="Avito"><img class="social-link__icon-image social-link__icon-image--wide" src="/static/img/social/avito.svg" alt="Avito" /></a>
+            <a class="social-link social-link--icon-only" href="{{ autoru }}" target="_blank" rel="noopener" aria-label="Auto.ru"><img class="social-link__icon-image social-link__icon-image--wide" src="/static/img/social/autoru.svg" alt="Auto.ru" /></a>
             {% if wa %}<a class="social-link" href="{{ wa }}" target="_blank" rel="noopener"><span class="social-link__icon">WA</span><span>WhatsApp</span></a>{% endif %}
             {% if ig %}<a class="social-link" href="{{ ig }}" target="_blank" rel="noopener"><span class="social-link__icon">IG</span><span>Instagram</span></a>{% endif %}
           </div>
           <div class="footer-messenger-buttons">
-            {% if tg %}<a class="btn btn-secondary btn-small" href="{{ tg }}" target="_blank" rel="noopener">Написать в TG</a>{% endif %}
-            {% if max_link %}<a class="btn btn-secondary btn-small" href="{{ max_link }}" target="_blank" rel="noopener">Написать в MAX</a>{% endif %}
+            <a class="btn btn-secondary btn-small" href="{{ max_link }}" target="_blank" rel="noopener">Написать в MAX</a>
           </div>
           <div>© {{ 2025 }} Level Avto</div>
         </div>
@@ -179,7 +178,7 @@
     </footer>
     <button id="backToTop" class="back-to-top" type="button" aria-label="Наверх">↑</button>
     <script>window.ENABLE_MODEL_ACCORDION = true;</script>
-    <script src="/static/js/app.js?v=71"></script>
+    <script src="/static/js/app.js?v=72"></script>
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>
