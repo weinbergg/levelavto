@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
-<link rel="stylesheet" href="/static/css/home.css?v=14" />
+<link rel="stylesheet" href="/static/css/home.css?v=15" />
 {% if hero_videos and hero_videos|length > 0 %}
 <link rel="preload" as="video" href="{{ hero_videos[0] }}" fetchpriority="high" />
 {% endif %}
@@ -609,8 +609,8 @@
       <div class="social-grid">
         <a class="social-card" href="{{ social_tg }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/telegram.png" alt="Telegram" /><span>Telegram</span></a>
         <a class="social-card" href="{{ social_max }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/max.png" alt="MAX" /><span>MAX</span></a>
-        <a class="social-card social-card--icon-only" href="{{ social_avito }}" target="_blank" rel="noopener" aria-label="Avito"><img class="social-card__icon-image social-card__icon-image--wide" src="/static/img/social/avito.svg" alt="Avito" /></a>
-        <a class="social-card social-card--icon-only" href="{{ social_autoru }}" target="_blank" rel="noopener" aria-label="Auto.ru"><img class="social-card__icon-image social-card__icon-image--wide" src="/static/img/social/autoru.svg" alt="Auto.ru" /></a>
+        <a class="social-card social-card--icon-only" href="{{ social_avito }}" target="_blank" rel="noopener" aria-label="Avito"><img class="social-card__icon-image social-card__icon-image--wide social-card__icon-image--mono-text" src="/static/img/social/avito.svg" alt="Avito" /></a>
+        <a class="social-card social-card--icon-only" href="{{ social_autoru }}" target="_blank" rel="noopener" aria-label="Auto.ru"><img class="social-card__icon-image social-card__icon-image--wide social-card__icon-image--mono-text" src="/static/img/social/autoru.svg" alt="Auto.ru" /></a>
         <a class="social-card" href="{{ social_vk }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/vk.svg" alt="VK" /><span>VK</span></a>
       </div>
     </div>

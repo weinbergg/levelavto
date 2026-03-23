@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Автокаталог{% endblock %}</title>
     <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/css/styles.css?v=35" />
+    <link rel="stylesheet" href="/static/css/styles.css?v=36" />
     {% block head_extra %}{% endblock %}
   </head>
   <body data-auth="{{ 1 if user else 0 }}">
@@ -161,16 +161,13 @@
           </div>
           {% if address %}<div>{{ address }}</div>{% endif %}
           <div class="footer-social">
-            <a class="social-link" href="{{ tg }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/telegram.png" alt="Telegram" /><span>Telegram</span></a>
-            <a class="social-link" href="{{ max_link }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/max.png" alt="MAX" /><span>MAX</span></a>
-            <a class="social-link" href="{{ vk }}" target="_blank" rel="noopener"><img class="social-link__icon-image" src="/static/img/social/vk.svg" alt="VK" /><span>VK</span></a>
-            <a class="social-link social-link--icon-only" href="{{ avito }}" target="_blank" rel="noopener" aria-label="Avito"><img class="social-link__icon-image social-link__icon-image--wide" src="/static/img/social/avito.svg" alt="Avito" /></a>
-            <a class="social-link social-link--icon-only" href="{{ autoru }}" target="_blank" rel="noopener" aria-label="Auto.ru"><img class="social-link__icon-image social-link__icon-image--wide" src="/static/img/social/autoru.svg" alt="Auto.ru" /></a>
-            {% if wa %}<a class="social-link" href="{{ wa }}" target="_blank" rel="noopener"><span class="social-link__icon">WA</span><span>WhatsApp</span></a>{% endif %}
-            {% if ig %}<a class="social-link" href="{{ ig }}" target="_blank" rel="noopener"><span class="social-link__icon">IG</span><span>Instagram</span></a>{% endif %}
-          </div>
-          <div class="footer-messenger-buttons">
-            <a class="btn btn-secondary btn-small" href="{{ max_link }}" target="_blank" rel="noopener">Написать в MAX</a>
+            <a class="social-link social-link--icon-only" href="{{ tg }}" target="_blank" rel="noopener" aria-label="Telegram"><img class="social-link__icon-image" src="/static/img/social/telegram.png" alt="Telegram" /></a>
+            <a class="social-link social-link--icon-only" href="{{ max_link }}" target="_blank" rel="noopener" aria-label="MAX"><img class="social-link__icon-image" src="/static/img/social/max.png" alt="MAX" /></a>
+            <a class="social-link social-link--icon-only" href="{{ vk }}" target="_blank" rel="noopener" aria-label="VK"><img class="social-link__icon-image" src="/static/img/social/vk.svg" alt="VK" /></a>
+            <a class="social-link social-link--icon-only" href="{{ avito }}" target="_blank" rel="noopener" aria-label="Avito"><img class="social-link__icon-image social-link__icon-image--wide social-link__icon-image--mono-text" src="/static/img/social/avito.svg" alt="Avito" /></a>
+            <a class="social-link social-link--icon-only" href="{{ autoru }}" target="_blank" rel="noopener" aria-label="Auto.ru"><img class="social-link__icon-image social-link__icon-image--wide social-link__icon-image--mono-text" src="/static/img/social/autoru.svg" alt="Auto.ru" /></a>
+            {% if wa %}<a class="social-link social-link--icon-only" href="{{ wa }}" target="_blank" rel="noopener" aria-label="WhatsApp"><span class="social-link__icon">WA</span></a>{% endif %}
+            {% if ig %}<a class="social-link social-link--icon-only" href="{{ ig }}" target="_blank" rel="noopener" aria-label="Instagram"><span class="social-link__icon">IG</span></a>{% endif %}
           </div>
           <div>© {{ 2025 }} Level Avto</div>
         </div>
@@ -178,7 +175,7 @@
     </footer>
     <button id="backToTop" class="back-to-top" type="button" aria-label="Наверх">↑</button>
     <script>window.ENABLE_MODEL_ACCORDION = true;</script>
-    <script src="/static/js/app.js?v=72"></script>
+    <script src="/static/js/app.js?v=73"></script>
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>

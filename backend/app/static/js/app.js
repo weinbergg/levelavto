@@ -1722,14 +1722,6 @@
       container.classList.remove('is-hidden')
       container.innerHTML = ''
 
-      const selected = document.createElement('div')
-      selected.className = 'model-accordion__selected'
-      selected.innerHTML = `
-        <span class="muted">Выбрано:</span>
-        <strong data-model-selected>${emptyLabel}</strong>
-      `
-      container.appendChild(selected)
-
       const root = document.createElement('details')
       root.className = 'model-accordion__root'
       const rootSummary = document.createElement('summary')
@@ -1751,7 +1743,7 @@
 
       const clearBtn = document.createElement('button')
       clearBtn.type = 'button'
-      clearBtn.className = 'btn btn-ghost btn-small'
+      clearBtn.className = 'model-accordion__clear'
       clearBtn.textContent = emptyLabel
       clearBtn.addEventListener('click', () => {
         selectedModels.clear()

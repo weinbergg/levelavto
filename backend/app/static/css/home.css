@@ -674,6 +674,9 @@
   padding: 14px;
   font-weight: 600;
 }
+.social-card span {
+  color: #fff;
+}
 .social-card__icon {
   width: 20px;
   height: 20px;
@@ -698,6 +701,9 @@
   border-radius: 0;
   object-fit: contain;
   background: transparent;
+}
+.social-card__icon-image--mono-text {
+  filter: brightness(0) invert(1);
 }
 .social-card--icon-only {
   padding-top: 12px;
