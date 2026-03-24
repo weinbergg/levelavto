@@ -14,6 +14,8 @@ def test_js_has_model_accordion_rendering():
     assert "model-accordion__item" in script
     assert "data-model-value" in script
     assert "model_groups" in script
+    assert "const toggleModelSelection = (value) =>" in script
+    assert "itemBtn.addEventListener('click', () => toggleModelSelection(value))" in script
 
 
 def test_css_has_model_accordion_styles():

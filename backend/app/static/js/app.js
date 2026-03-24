@@ -1662,6 +1662,22 @@
         select.form.appendChild(hidden)
       })
     }
+    const getGeneratedModelValues = () => {
+      if (!isCatalogModelSelect || !select?.form) return []
+      const brandField = select.form.elements['brand']
+      const brand = normalizeBrand(brandField?.value || '')
+      return qsa('input[name="line"][data-generated-model-line="1"]', select.form)
+        .map((el) => String(el.value || ''))
+        .map((line) => {
+          const parts = line.split('|')
+          return {
+            brand: normalizeBrand(parts[0] || ''),
+            model: String(parts[1] || '').trim(),
+          }
+        })
+        .filter((item) => item.model && (!brand || !item.brand || item.brand === brand))
+        .map((item) => item.model)
+    }
 
     const removeAccordion = () => {
       const host = select.closest('.field, label, .search-row')
@@ -1744,7 +1760,8 @@
       clearBtn.type = 'button'
       clearBtn.className = 'model-accordion__clear'
       clearBtn.textContent = emptyLabel
-      const selectedModels = new Set()
+      const selectedModels = new Set(getGeneratedModelValues())
+      if (!selectedModels.size && select.value) selectedModels.add(select.value)
       const applySelection = () => {
         const values = Array.from(selectedModels)
         if (values.length === 1) {
@@ -1756,14 +1773,7 @@
         setAccordionState(container, select.value || '', values)
         select.dispatchEvent(new Event('change', { bubbles: true }))
       }
-      const selectOneModel = (value) => {
-        if (!value) return
-        selectedModels.clear()
-        selectedModels.add(value)
-        applySelection()
-        root.open = false
-      }
-      const toggleSeriesModel = (value) => {
+      const toggleModelSelection = (value) => {
         if (!value) return
         if (selectedModels.has(value)) {
           selectedModels.delete(value)
@@ -1794,7 +1804,7 @@
           itemBtn.className = 'model-accordion__item'
           itemBtn.dataset.modelValue = value
           itemBtn.textContent = `${group?.label || row?.label || value}${count ? ` (${count})` : ''}`
-          itemBtn.addEventListener('click', () => selectOneModel(value))
+          itemBtn.addEventListener('click', () => toggleModelSelection(value))
           rootBody.appendChild(itemBtn)
           return
         }
@@ -1813,9 +1823,16 @@
           allBtn.className = 'model-accordion__model model-accordion__model--all'
           allBtn.textContent = 'Все в серии'
           allBtn.addEventListener('click', () => {
-            groupModels.forEach((row) => {
-              const value = row?.value || row?.model || ''
-              if (value) selectedModels.add(value)
+            const groupValues = groupModels
+              .map((row) => row?.value || row?.model || '')
+              .filter(Boolean)
+            const shouldClearGroup = groupValues.every((value) => selectedModels.has(value))
+            groupValues.forEach((value) => {
+              if (shouldClearGroup) {
+                selectedModels.delete(value)
+              } else {
+                selectedModels.add(value)
+              }
             })
             applySelection()
           })
@@ -1829,29 +1846,32 @@
           btn.className = 'model-accordion__model'
           btn.dataset.modelValue = value
           btn.textContent = row?.label || value
-          btn.addEventListener('click', () => toggleSeriesModel(value))
+          btn.addEventListener('click', () => toggleModelSelection(value))
           modelsWrap.appendChild(btn)
         })
         details.appendChild(modelsWrap)
         rootBody.appendChild(details)
       })
 
-      if (select.value) selectedModels.add(select.value)
       setAccordionState(container, select.value || '', Array.from(selectedModels))
-      if (!select.dataset.modelAccordionBound) {
-        select.addEventListener('change', () => {
-          if (select.value) {
-            selectedModels.clear()
-            selectedModels.add(select.value)
-            syncGeneratedModelLines([select.value])
-          } else if (selectedModels.size <= 1) {
-            selectedModels.clear()
-            syncGeneratedModelLines([])
-          }
-          setAccordionState(container, select.value || '', Array.from(selectedModels))
-        })
-        select.dataset.modelAccordionBound = '1'
+      if (select.__modelAccordionChangeHandler) {
+        select.removeEventListener('change', select.__modelAccordionChangeHandler)
       }
+      const handleModelAccordionChange = () => {
+        selectedModels.clear()
+        const lineValues = getGeneratedModelValues()
+        if (lineValues.length) {
+          lineValues.forEach((value) => selectedModels.add(value))
+        } else if (select.value) {
+          selectedModels.add(select.value)
+          syncGeneratedModelLines([select.value])
+        } else {
+          syncGeneratedModelLines([])
+        }
+        setAccordionState(container, select.value || '', Array.from(selectedModels))
+      }
+      select.addEventListener('change', handleModelAccordionChange)
+      select.__modelAccordionChangeHandler = handleModelAccordionChange
     }
 
     if (groups.length) {
