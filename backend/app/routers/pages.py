@@ -608,7 +608,6 @@ def _home_context(
     # медиа лежат рядом с корнем проекта: /code/фото-видео
     media_root = Path(__file__).resolve().parents[3] / "фото-видео"
     video_dir = media_root / "видео"
-    car_photos_dir = media_root / "машины"
 
     t0 = time.perf_counter()
     hero_videos = []
@@ -623,41 +622,68 @@ def _home_context(
 
     t0 = time.perf_counter()
     collage_images = []
-    thumb_dir = media_root / "машины_thumbs"
-    if car_photos_dir.exists():
-        thumb_prefix = thumb_dir.name
-        orig_prefix = car_photos_dir.name
+    image_exts = {".jpg", ".jpeg", ".webp", ".png"}
 
-        def build_url(prefix: str, name: str) -> str:
-            safe_name = name.replace("\u00a0", " ")
-            return f"/media/{prefix}/{quote(safe_name)}"
+    def build_media_url(path_obj: Path) -> str:
+        rel = path_obj.relative_to(media_root).as_posix().replace("\u00a0", " ")
+        return f"/media/{quote(rel, safe='/')}"
 
-        files = list(car_photos_dir.iterdir())
+    def collect_gallery_files(root_dir: Path) -> list[Path]:
+        if not root_dir.exists():
+            return []
+        preferred_dirs = ["машины", "фото", "фото-машины", "gallery", "photos"]
+        files: list[Path] = []
+        for name in preferred_dirs:
+            candidate = root_dir / name
+            if not candidate.exists() or not candidate.is_dir():
+                continue
+            files.extend(
+                p
+                for p in candidate.rglob("*")
+                if p.is_file()
+                and p.suffix.lower() in image_exts
+                and not any(part.startswith(".") for part in p.parts)
+            )
+            if files:
+                break
+        if files:
+            return files
+        return [
+            p
+            for p in root_dir.rglob("*")
+            if p.is_file()
+            and p.suffix.lower() in image_exts
+            and not any(part.startswith(".") for part in p.parts)
+            and "видео" not in p.parts
+            and not any(part.endswith("_thumbs") for part in p.parts)
+        ]
+
+    gallery_files = collect_gallery_files(media_root)
+    if gallery_files:
         rng_files = random.Random(42)
-        rng_files.shuffle(files)
-        for p in files:
-            if p.name.startswith("."):
-                continue
-            if p.suffix.lower() not in {".jpg", ".jpeg", ".webp", ".png"}:
-                continue
+        rng_files.shuffle(gallery_files)
+        for p in gallery_files:
             base = p.stem
-            t320 = thumb_dir / f"{base}__w320.webp"
-            t640 = thumb_dir / f"{base}__w640.webp"
+            parent = p.parent
+            thumbs_parent = parent.parent / f"{parent.name}_thumbs"
+            t320 = thumbs_parent / f"{base}__w320.webp"
+            t640 = thumbs_parent / f"{base}__w640.webp"
             has_thumb = t320.exists()
-            src = build_url(thumb_prefix if has_thumb else orig_prefix,
-                            t320.name if has_thumb else p.name)
+            src = build_media_url(t320 if has_thumb else p)
             srcset_parts = []
             if has_thumb:
-                srcset_parts.append(f"{build_url(thumb_prefix, t320.name)} 320w")
+                srcset_parts.append(f"{build_media_url(t320)} 320w")
                 if t640.exists():
-                    srcset_parts.append(f"{build_url(thumb_prefix, t640.name)} 640w")
-            collage_images.append({
-                "src": src,
-                "srcset": ", ".join(srcset_parts),
-                "width": 320,
-                "height": 240,
-                "fallback": build_url(orig_prefix, p.name),
-            })
+                    srcset_parts.append(f"{build_media_url(t640)} 640w")
+            collage_images.append(
+                {
+                    "src": src,
+                    "srcset": ", ".join(srcset_parts),
+                    "width": 320,
+                    "height": 240,
+                    "fallback": build_media_url(p),
+                }
+            )
 
     collage_display = []
     if collage_images:

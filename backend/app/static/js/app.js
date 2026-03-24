@@ -1626,7 +1626,6 @@
     const models = Array.isArray(payload?.models) ? payload.models : []
     const groups = Array.isArray(payload?.model_groups) ? payload.model_groups : []
     const enableAccordion = window.ENABLE_MODEL_ACCORDION === true
-    const isAdvancedSearchSelect = select?.form?.id === 'advanced-search-form'
     select.innerHTML = ''
     const empty = document.createElement('option')
     empty.value = ''
@@ -1696,7 +1695,7 @@
     }
 
     const renderAccordion = () => {
-      if (!enableAccordion || isAdvancedSearchSelect) {
+      if (!enableAccordion) {
         removeAccordion()
         return
       }
@@ -2664,7 +2663,15 @@
       scheduleOptionsRefresh()
     })
 
-    const initialLines = new URLSearchParams(window.location.search).getAll('line').map(parseLine)
+    const initialParams = new URLSearchParams(window.location.search)
+    const initialLines = initialParams.getAll('line').map(parseLine)
+    if (!initialLines.length) {
+      const brand = normalizeBrand(initialParams.get('brand') || '')
+      const model = (initialParams.get('model') || '').trim()
+      if (brand || model) {
+        initialLines.push({ brand, model, variant: '' })
+      }
+    }
     const repairRows = () => ensureRows(initialLines)
     repairRows()
     requestAnimationFrame(repairRows)

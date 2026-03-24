@@ -45,7 +45,7 @@ DEFAULT_HOME_CONTENT: Dict[str, Any] = {
     "about": {
         "eyebrow": "О нас",
         "title": "Почему нужно обратиться именно в Level Avto?",
-        "subtitle": "С 2019г. занимаюсь импортом автомобилей по всему миру.",
+        "subtitle": "С 2019г. импортируем автомобили по всему миру",
         "cards": [
             {
                 "title": "Почему выбирают нас",
@@ -246,6 +246,9 @@ def build_home_content(content_map: Dict[str, str]) -> Dict[str, Any]:
     cases_title_norm = (base.get("cases", {}).get("title") or "").strip().lower()
     if cases_title_norm.startswith("за 8 лет привезли"):
         base["cases"]["title"] = DEFAULT_HOME_CONTENT["cases"]["title"]
+    about_subtitle_norm = (base.get("about", {}).get("subtitle") or "").strip().lower()
+    if about_subtitle_norm == "с 2019г. занимаюсь импортом автомобилей по всему миру.":
+        base["about"]["subtitle"] = DEFAULT_HOME_CONTENT["about"]["subtitle"]
     return base
 
 

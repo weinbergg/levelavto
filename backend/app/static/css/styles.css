@@ -1822,7 +1822,7 @@ body.filters-open {
   overflow: visible !important;
 }
 .advanced-lines .model-accordion {
-  display: none !important;
+  display: block;
 }
 .advanced-search #advanced-base,
 .advanced-search #advanced-tech,

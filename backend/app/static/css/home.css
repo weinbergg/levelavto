@@ -734,11 +734,36 @@
 }
 .lead-submit-row .form-actions {
   margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 .lead-submit-row .checkbox {
   min-height: 52px;
   display: inline-flex;
   align-items: center;
+}
+.lead-messenger-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.lead-messenger-link {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border-1);
+  background: var(--bg-interactive);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+.lead-messenger-link__icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 .contact-map {
   display: grid;

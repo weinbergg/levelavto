@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
-<link rel="stylesheet" href="/static/css/home.css?v=15" />
+<link rel="stylesheet" href="/static/css/home.css?v=16" />
 {% if hero_videos and hero_videos|length > 0 %}
 <link rel="preload" as="video" href="{{ hero_videos[0] }}" fetchpriority="high" />
 {% endif %}
@@ -516,6 +516,18 @@
                 <button type="submit" class="btn btn-primary">
                   {{ home.lead.submit_label }}
                 </button>
+                <div class="lead-messenger-links">
+                  {% if contact_tg or content.get('contact_tg') %}
+                  <a class="lead-messenger-link" href="{{ contact_tg or content.get('contact_tg') }}" target="_blank" rel="noopener" aria-label="Telegram">
+                    <img class="lead-messenger-link__icon" src="/static/img/social/telegram.png" alt="Telegram" />
+                  </a>
+                  {% endif %}
+                  {% if contact_max or content.get('contact_max') %}
+                  <a class="lead-messenger-link" href="{{ contact_max or content.get('contact_max') }}" target="_blank" rel="noopener" aria-label="MAX">
+                    <img class="lead-messenger-link__icon" src="/static/img/social/max.png" alt="MAX" />
+                  </a>
+                  {% endif %}
+                </div>
                 <span class="hero-note"
                   >{{ home.lead.note }}</span
                 >
@@ -602,13 +614,11 @@
         </div>
       </div>
       {% set social_tg = contact_tg or content.get('contact_tg') or 'https://t.me/levelavto' %}
-      {% set social_max = contact_max or content.get('contact_max') or 'https://max.ru/' %}
       {% set social_vk = contact_vk or content.get('contact_vk') or 'https://vk.ru/levelavto' %}
       {% set social_avito = contact_avito or content.get('contact_avito') or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
       {% set social_autoru = contact_autoru or content.get('contact_autoru') or 'https://auto.ru/profile/28529976' %}
       <div class="social-grid">
         <a class="social-card" href="{{ social_tg }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/telegram.png" alt="Telegram" /><span>Telegram</span></a>
-        <a class="social-card" href="{{ social_max }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/max.png" alt="MAX" /><span>MAX</span></a>
         <a class="social-card social-card--icon-only" href="{{ social_avito }}" target="_blank" rel="noopener" aria-label="Avito"><img class="social-card__icon-image social-card__icon-image--wide social-card__icon-image--mono-text" src="/static/img/social/avito.svg" alt="Avito" /></a>
         <a class="social-card social-card--icon-only" href="{{ social_autoru }}" target="_blank" rel="noopener" aria-label="Auto.ru"><img class="social-card__icon-image social-card__icon-image--wide social-card__icon-image--mono-text" src="/static/img/social/autoru.svg" alt="Auto.ru" /></a>
         <a class="social-card" href="{{ social_vk }}" target="_blank" rel="noopener"><img class="social-card__icon-image" src="/static/img/social/vk.svg" alt="VK" /><span>VK</span></a>
