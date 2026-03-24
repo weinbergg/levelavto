@@ -1744,16 +1744,6 @@
       clearBtn.type = 'button'
       clearBtn.className = 'model-accordion__clear'
       clearBtn.textContent = emptyLabel
-      clearBtn.addEventListener('click', () => {
-        selectedModels.clear()
-        select.value = ''
-        syncGeneratedModelLines([])
-        select.dispatchEvent(new Event('change', { bubbles: true }))
-        setAccordionState(container, '', [])
-        root.open = false
-      })
-      rootBody.appendChild(clearBtn)
-
       const selectedModels = new Set()
       const applySelection = () => {
         const values = Array.from(selectedModels)
@@ -1766,18 +1756,57 @@
         setAccordionState(container, select.value || '', values)
         select.dispatchEvent(new Event('change', { bubbles: true }))
       }
+      const selectOneModel = (value) => {
+        if (!value) return
+        selectedModels.clear()
+        selectedModels.add(value)
+        applySelection()
+        root.open = false
+      }
+      const toggleSeriesModel = (value) => {
+        if (!value) return
+        if (selectedModels.has(value)) {
+          selectedModels.delete(value)
+        } else {
+          selectedModels.add(value)
+        }
+        applySelection()
+      }
+      clearBtn.addEventListener('click', () => {
+        selectedModels.clear()
+        select.value = ''
+        syncGeneratedModelLines([])
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+        setAccordionState(container, '', [])
+        root.open = false
+      })
+      rootBody.appendChild(clearBtn)
 
       groups.forEach((group) => {
+        const groupModels = Array.isArray(group?.models) ? group.models : []
+        const count = Number(group?.count || 0)
+        if (groupModels.length === 1) {
+          const row = groupModels[0]
+          const value = row?.value || row?.model || ''
+          if (!value) return
+          const itemBtn = document.createElement('button')
+          itemBtn.type = 'button'
+          itemBtn.className = 'model-accordion__item'
+          itemBtn.dataset.modelValue = value
+          itemBtn.textContent = `${group?.label || row?.label || value}${count ? ` (${count})` : ''}`
+          itemBtn.addEventListener('click', () => selectOneModel(value))
+          rootBody.appendChild(itemBtn)
+          return
+        }
+
         const details = document.createElement('details')
         details.className = 'model-accordion__group'
         const summary = document.createElement('summary')
-        const count = Number(group?.count || 0)
         summary.textContent = `${group?.label || 'Прочее'}${count ? ` (${count})` : ''}`
         details.appendChild(summary)
 
         const modelsWrap = document.createElement('div')
         modelsWrap.className = 'model-accordion__models'
-        const groupModels = Array.isArray(group?.models) ? group.models : []
         if (groupModels.length) {
           const allBtn = document.createElement('button')
           allBtn.type = 'button'
@@ -1800,14 +1829,7 @@
           btn.className = 'model-accordion__model'
           btn.dataset.modelValue = value
           btn.textContent = row?.label || value
-          btn.addEventListener('click', () => {
-            if (selectedModels.has(value)) {
-              selectedModels.delete(value)
-            } else {
-              selectedModels.add(value)
-            }
-            applySelection()
-          })
+          btn.addEventListener('click', () => toggleSeriesModel(value))
           modelsWrap.appendChild(btn)
         })
         details.appendChild(modelsWrap)

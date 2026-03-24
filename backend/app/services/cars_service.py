@@ -2095,25 +2095,55 @@ class CarsService:
         raw = str(model or "").strip()
         if not raw:
             return "other"
-        token = re.split(r"[\s\-/]+", raw, maxsplit=1)[0].strip()
+        token = re.split(r"\s+", raw, maxsplit=1)[0].strip(" ,.;")
         if not token:
             return "other"
         brand_norm = normalize_brand(brand).strip().upper()
         token_up = token.upper()
         if brand_norm == "BMW":
-            lead_num = re.match(r"^(\d+)", token_up)
+            lead_num = re.match(r"^([1-8])\d{2}", token_up)
             if lead_num:
                 return f"{lead_num.group(1)}-series"
-            lead_alpha = re.match(r"^([A-Z]+)", token_up)
-            if lead_alpha:
-                return f"{lead_alpha.group(1)}-series"
-        lead_alpha = re.match(r"^([A-Z]+)", token_up)
-        if lead_alpha:
-            return lead_alpha.group(1)
-        lead_num = re.match(r"^(\d+)", token_up)
-        if lead_num:
-            return lead_num.group(1)
-        return "other"
+            if token_up.startswith("IX") or token_up.startswith("I"):
+                return "I-series"
+            if token_up.startswith("XM") or token_up.startswith("X"):
+                return "X-series"
+            if token_up.startswith("Z"):
+                return "Z-series"
+            if token_up.startswith("M"):
+                return "M-series"
+        if brand_norm == "PORSCHE":
+            lead_num = re.match(r"^(\d{3,4})", token_up)
+            p911_codes = {"911", "930", "964", "991", "992", "993", "996", "997"}
+            if token_up.startswith("911") or (lead_num and lead_num.group(1) in p911_codes):
+                return "911-series"
+        if brand_norm == "MERCEDES-BENZ" and raw.upper().startswith("AMG GT"):
+            return "AMG GT"
+        return token
+    
+    def _natural_text_key(self, value: Any) -> tuple:
+        text = str(value or "").strip().casefold()
+        parts = re.split(r"(\d+)", text)
+        key: list[tuple[int, Any]] = []
+        for part in parts:
+            if not part:
+                continue
+            if part.isdigit():
+                key.append((0, int(part)))
+            else:
+                key.append((1, part))
+        return tuple(key)
+
+    def _model_family_label(self, brand: str, key: str) -> str:
+        norm_brand = normalize_brand(brand).strip().upper() if brand else ""
+        if key == "other":
+            return "Прочее"
+        if norm_brand == "BMW" and key.endswith("-series"):
+            prefix = key.replace("-series", "")
+            return f"{prefix.upper()} серия"
+        if norm_brand == "PORSCHE" and key == "911-series":
+            return "Series 911"
+        return key
 
     def build_model_groups(
         self, *, brand: Optional[str], models: List[Dict[str, Any]]
@@ -2127,11 +2157,7 @@ class CarsService:
             key = self._model_family_key(norm_brand, value)
             bucket = grouped.get(key)
             if bucket is None:
-                label = key
-                if norm_brand.upper() == "BMW" and key.endswith("-series"):
-                    label = key.replace("-series", " серия").upper().replace(" СЕРИЯ", " серия")
-                elif key == "other":
-                    label = "Прочее"
+                label = self._model_family_label(norm_brand, key)
                 bucket = {"key": key, "label": label, "count": 0, "models": []}
                 grouped[key] = bucket
             bucket["models"].append(item)
@@ -2141,9 +2167,23 @@ class CarsService:
         for group in out:
             group["models"] = sorted(
                 group["models"],
-                key=lambda x: (x.get("label") or x.get("value") or "").strip().casefold(),
+                key=lambda x: self._natural_text_key(x.get("label") or x.get("value") or ""),
             )
-        out.sort(key=lambda x: (-int(x.get("count") or 0), str(x.get("label") or "")))
+        def group_sort_key(item: Dict[str, Any]) -> tuple:
+            label = str(item.get("label") or "")
+            key = str(item.get("key") or "")
+            models_count = len(item.get("models") or [])
+            if key == "other" or label.casefold() == "прочее":
+                bucket = 3
+            elif models_count > 1:
+                bucket = 1
+            elif label[:1].isdigit():
+                bucket = 2
+            else:
+                bucket = 0
+            return (bucket, self._natural_text_key(label))
+
+        out.sort(key=group_sort_key)
         return out
 
     def drive_types(self) -> List[Dict[str, Any]]:

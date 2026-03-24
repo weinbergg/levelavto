@@ -7,17 +7,21 @@ def test_model_grouping_bmw_series():
         {"value": "X5", "label": "X5", "count": 10},
         {"value": "X6", "label": "X6", "count": 8},
         {"value": "320d", "label": "320d", "count": 7},
+        {"value": "330e", "label": "330e", "count": 6},
         {"value": "M5", "label": "M5", "count": 5},
         {"value": "iX", "label": "iX", "count": 4},
     ]
     groups = service.build_model_groups(brand="BMW", models=models)
     labels = {g["label"] for g in groups}
     assert "X серия" in labels
+    assert "3 серия" in labels
     x_group = next(g for g in groups if g["label"] == "X серия")
     assert {m["value"] for m in x_group["models"]} == {"X5", "X6"}
+    three_group = next(g for g in groups if g["label"] == "3 серия")
+    assert {m["value"] for m in three_group["models"]} == {"320d", "330e"}
 
 
-def test_model_grouping_generic_prefix():
+def test_model_grouping_generic_uses_exact_family_token():
     service = CarsService(db=None)  # type: ignore[arg-type]
     models = [
         {"value": "A6", "label": "A6", "count": 12},
@@ -26,5 +30,23 @@ def test_model_grouping_generic_prefix():
     ]
     groups = service.build_model_groups(brand="Audi", models=models)
     labels = [g["label"] for g in groups]
-    assert "A" in labels
-    assert "Q" in labels
+    assert "A4" in labels
+    assert "A6" in labels
+    assert "Q5" in labels
+
+
+def test_model_grouping_porsche_911_series():
+    service = CarsService(db=None)  # type: ignore[arg-type]
+    models = [
+        {"value": "911", "label": "911", "count": 12},
+        {"value": "930", "label": "930", "count": 3},
+        {"value": "964", "label": "964", "count": 2},
+        {"value": "991", "label": "991", "count": 5},
+        {"value": "992", "label": "992", "count": 4},
+        {"value": "Cayenne", "label": "Cayenne", "count": 7},
+    ]
+    groups = service.build_model_groups(brand="Porsche", models=models)
+    labels = {g["label"] for g in groups}
+    assert "Series 911" in labels
+    family = next(g for g in groups if g["label"] == "Series 911")
+    assert {m["value"] for m in family["models"]} == {"911", "930", "964", "991", "992"}

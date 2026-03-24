@@ -1,3 +1,4 @@
+import inspect
 import os
 import time
 from typing import Dict, Any, List, Tuple
@@ -19,22 +20,49 @@ from backend.app.utils.redis_cache import (
 )
 
 
+def _param_default(param: inspect.Parameter) -> Any:
+    default = param.default
+    if default is inspect._empty:
+        return None
+    query_default = getattr(default, "default", inspect._empty)
+    if query_default is not inspect._empty:
+        return query_default
+    return default
+
+
+def _call_route_with_defaults(fn, /, **overrides):
+    kwargs: Dict[str, Any] = {}
+    for name, param in inspect.signature(fn).parameters.items():
+        if name in overrides:
+            kwargs[name] = overrides[name]
+            continue
+        kwargs[name] = _param_default(param)
+    return fn(**kwargs)
+
+
 def _prewarm_base(db, params: Dict[str, Any]) -> Tuple[str, float]:
     started = time.perf_counter()
     normalized = normalize_filter_params(params)
-    payload = filter_ctx_base(None, normalized.get("region"), normalized.get("country"), db=db)
+    _call_route_with_defaults(
+        filter_ctx_base,
+        request=None,
+        region=normalized.get("region"),
+        country=normalized.get("country"),
+        db=db,
+    )
     return f"filter_ctx_base:{normalized}", (time.perf_counter() - started) * 1000
 
 
 def _prewarm_brand(db, params: Dict[str, Any]) -> Tuple[str, float]:
     started = time.perf_counter()
     normalized = normalize_filter_params(params)
-    payload = filter_ctx_brand(
-        None,
-        normalized.get("region"),
-        normalized.get("country"),
-        normalized.get("kr_type"),
-        normalized.get("brand"),
+    _call_route_with_defaults(
+        filter_ctx_brand,
+        request=None,
+        region=normalized.get("region"),
+        country=normalized.get("country"),
+        kr_type=normalized.get("kr_type"),
+        brand=normalized.get("brand"),
         db=db,
     )
     return f"filter_ctx_brand:{normalized}", (time.perf_counter() - started) * 1000
@@ -43,12 +71,13 @@ def _prewarm_brand(db, params: Dict[str, Any]) -> Tuple[str, float]:
 def _prewarm_model(db, params: Dict[str, Any]) -> Tuple[str, float]:
     started = time.perf_counter()
     normalized = normalize_filter_params(params)
-    payload = filter_ctx_model(
-        None,
-        normalized.get("region"),
-        normalized.get("country"),
-        normalized.get("brand"),
-        normalized.get("model"),
+    _call_route_with_defaults(
+        filter_ctx_model,
+        request=None,
+        region=normalized.get("region"),
+        country=normalized.get("country"),
+        brand=normalized.get("brand"),
+        model=normalized.get("model"),
         db=db,
     )
     return f"filter_ctx_model:{normalized}", (time.perf_counter() - started) * 1000
@@ -192,49 +221,13 @@ def main() -> None:
             print(f"[prewarm] cars_count key={cache_key} value={count}")
 
         def _prewarm_list(params: Dict[str, Any]) -> None:
-            list_cars(
-                None,
+            _call_route_with_defaults(
+                list_cars,
+                request=None,
                 db=db,
                 region=params.get("region"),
                 country=params.get("country"),
-                eu_country=None,
                 brand=params.get("brand"),
-                line=None,
-                source=None,
-                q=None,
-                model=None,
-                generation=None,
-                color=None,
-                body_type=None,
-                engine_type=None,
-                transmission=None,
-                drive_type=None,
-                num_seats=None,
-                doors_count=None,
-                emission_class=None,
-                efficiency_class=None,
-                climatisation=None,
-                airbags=None,
-                interior_design=None,
-                air_suspension=None,
-                price_rating_label=None,
-                owners_count=None,
-                price_min=None,
-                price_max=None,
-                power_hp_min=None,
-                power_hp_max=None,
-                engine_cc_min=None,
-                engine_cc_max=None,
-                year_min=None,
-                year_max=None,
-                mileage_min=None,
-                mileage_max=None,
-                kr_type=None,
-                reg_year_min=None,
-                reg_month_min=None,
-                reg_year_max=None,
-                reg_month_max=None,
-                condition=None,
                 sort=params.get("sort"),
                 page=1,
                 page_size=int(params.get("page_size") or 12),
@@ -246,49 +239,13 @@ def main() -> None:
                 if _should_stop(started, max_sec):
                     print("[prewarm] stop by PREWARM_MAX_SEC (brand lists)")
                     break
-                list_cars(
-                    None,
+                _call_route_with_defaults(
+                    list_cars,
+                    request=None,
                     db=db,
                     region=params.get("region"),
                     country=params.get("country"),
-                    eu_country=None,
                     brand=params.get("brand"),
-                    line=None,
-                    source=None,
-                    q=None,
-                    model=None,
-                    generation=None,
-                    color=None,
-                    body_type=None,
-                    engine_type=None,
-                    transmission=None,
-                    drive_type=None,
-                    num_seats=None,
-                    doors_count=None,
-                    emission_class=None,
-                    efficiency_class=None,
-                    climatisation=None,
-                    airbags=None,
-                    interior_design=None,
-                    air_suspension=None,
-                    price_rating_label=None,
-                    owners_count=None,
-                    price_min=None,
-                    price_max=None,
-                    power_hp_min=None,
-                    power_hp_max=None,
-                    engine_cc_min=None,
-                    engine_cc_max=None,
-                    year_min=None,
-                    year_max=None,
-                    mileage_min=None,
-                    mileage_max=None,
-                    kr_type=None,
-                    reg_year_min=None,
-                    reg_month_min=None,
-                    reg_year_max=None,
-                    reg_month_max=None,
-                    condition=None,
                     sort=list_sort,
                     page=1,
                     page_size=list_page_size,

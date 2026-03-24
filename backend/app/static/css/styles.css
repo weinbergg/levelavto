@@ -2013,6 +2013,24 @@ body.filters-open {
   display: none;
 }
 
+.model-accordion__item {
+  display: block;
+  width: 100%;
+  padding: 10px 2px;
+  border: 0;
+  border-top: 1px solid var(--border-1);
+  background: transparent;
+  color: var(--text-1);
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.model-accordion__item.is-active {
+  color: #fff;
+}
+
 .model-accordion__models {
   display: flex;
   flex-wrap: wrap;
