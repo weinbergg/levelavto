@@ -37,6 +37,9 @@ def test_normalize_count_keeps_extended_catalog_fields():
         "source": "mobile_de",
         "reg_month_min": "2",
         "reg_month_max": "11",
+        "interior_color": "black",
+        "interior_material": "leather",
+        "vat_reclaimable": "1",
     }
     out = normalize_count_params(params)
     assert out["region"] == "EU"
@@ -47,3 +50,6 @@ def test_normalize_count_keeps_extended_catalog_fields():
     assert out["source"] == "mobile_de"
     assert out["reg_month_min"] == "2"
     assert out["reg_month_max"] == "11"
+    assert out["interior_color"] == "black"
+    assert out["interior_material"] == "leather"
+    assert out["vat_reclaimable"] == "1"

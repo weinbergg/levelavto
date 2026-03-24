@@ -12,7 +12,7 @@ import random
 import math
 from email.mime.text import MIMEText
 from ..db import get_db
-from ..services.cars_service import CarsService
+from ..services.cars_service import CarsService, normalize_brand
 from ..utils.recommended_config import load_config
 from ..services.content_service import ContentService
 from sqlalchemy.orm import Session
@@ -123,6 +123,9 @@ def _get_cars_count(service: CarsService, params: Dict[str, Any], timing_enabled
             "climatisation",
             "airbags",
             "interior_design",
+            "interior_color",
+            "interior_material",
+            "vat_reclaimable",
             "air_suspension",
             "price_rating_label",
             "owners_count",
@@ -170,6 +173,9 @@ def _get_cars_count(service: CarsService, params: Dict[str, Any], timing_enabled
             climatisation=count_params.get("climatisation"),
             airbags=count_params.get("airbags"),
             interior_design=count_params.get("interior_design"),
+            interior_color=count_params.get("interior_color"),
+            interior_material=count_params.get("interior_material"),
+            vat_reclaimable=count_params.get("vat_reclaimable"),
             air_suspension=_to_bool(count_params.get("air_suspension")),
             price_rating_label=count_params.get("price_rating_label"),
             owners_count=count_params.get("owners_count"),
@@ -987,6 +993,11 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         params["country"] = params.get("eu_country")
     if "eu_country" in params:
         params.pop("eu_country", None)
+    canon_region = str(params.get("region") or "").strip().upper() or None
+    canon_country = str(params.get("country") or "").strip().upper() or None
+    canon_kr_type = str(params.get("kr_type") or "").strip().upper() or None
+    canon_brand = normalize_brand(params.get("brand")).strip() if params.get("brand") else None
+    canon_model = str(params.get("model") or "").strip() or None
     def _int_val(key: str) -> Optional[int]:
         raw = params.get(key)
         if raw is None or raw == "":
@@ -1003,34 +1014,68 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             return float(raw)
         except (TypeError, ValueError):
             return None
+    def _bool_val(key: str) -> Optional[bool]:
+        raw = params.get(key)
+        if raw is None or raw == "":
+            return None
+        if isinstance(raw, bool):
+            return raw
+        value = str(raw).strip().lower()
+        if value in {"1", "true", "yes", "on"}:
+            return True
+        if value in {"0", "false", "no", "off"}:
+            return False
+        return None
     initial_items: List[dict] = []
     initial_total: Optional[int] = None
     try:
+        source_list = qp.getlist("source") if hasattr(qp, "getlist") else []
+        source_value: Optional[str | List[str]] = source_list if source_list else params.get("source")
         items, initial_total = service.list_cars(
-            region=params.get("region"),
-            country=params.get("country"),
-            kr_type=params.get("kr_type"),
-            brand=params.get("brand"),
-            model=params.get("model"),
+            region=canon_region,
+            country=canon_country,
+            kr_type=canon_kr_type,
+            brand=canon_brand,
+            lines=qp.getlist("line") if hasattr(qp, "getlist") else None,
+            source_key=source_value,
+            q=params.get("q"),
+            model=canon_model,
             generation=params.get("generation"),
             color=params.get("color"),
+            body_type=params.get("body_type"),
+            engine_type=params.get("engine_type"),
+            transmission=params.get("transmission"),
+            drive_type=params.get("drive_type"),
             price_min=_float_val("price_min"),
             price_max=_float_val("price_max"),
+            power_hp_min=_float_val("power_hp_min"),
+            power_hp_max=_float_val("power_hp_max"),
+            engine_cc_min=_int_val("engine_cc_min"),
+            engine_cc_max=_int_val("engine_cc_max"),
+            year_min=_int_val("year_min"),
+            year_max=_int_val("year_max"),
             mileage_min=_int_val("mileage_min"),
             mileage_max=_int_val("mileage_max"),
             reg_year_min=_int_val("reg_year_min"),
             reg_month_min=_int_val("reg_month_min"),
             reg_year_max=_int_val("reg_year_max"),
             reg_month_max=_int_val("reg_month_max"),
-            body_type=params.get("body_type"),
-            engine_type=params.get("engine_type"),
-            transmission=params.get("transmission"),
-            drive_type=params.get("drive_type"),
+            num_seats=params.get("num_seats"),
+            doors_count=params.get("doors_count"),
+            emission_class=params.get("emission_class"),
+            efficiency_class=params.get("efficiency_class"),
+            climatisation=params.get("climatisation"),
+            airbags=params.get("airbags"),
+            interior_design=params.get("interior_design"),
+            interior_color=params.get("interior_color"),
+            interior_material=params.get("interior_material"),
+            vat_reclaimable=params.get("vat_reclaimable"),
+            air_suspension=_bool_val("air_suspension"),
+            price_rating_label=params.get("price_rating_label"),
+            owners_count=params.get("owners_count"),
             condition=params.get("condition"),
-            lines=qp.getlist("line") if hasattr(qp, "getlist") else None,
-            q=params.get("q"),
             sort=params.get("sort") or "price_asc",
-            page=1,
+            page=_int_val("page") or 1,
             page_size=12,
             light=True,
         )
@@ -1128,8 +1173,8 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         logger.info("CATALOG_TIMING %s", request.state.html_parts)
     print(
         "CATALOG_SSR "
-        f"items={len(initial_items)} region={params.get('region')} country={params.get('country')} "
-        f"brand={params.get('brand')} model={params.get('model')} sort={params.get('sort') or 'price_asc'}",
+        f"items={len(initial_items)} region={canon_region} country={canon_country} "
+        f"brand={canon_brand} model={canon_model} sort={params.get('sort') or 'price_asc'}",
         flush=True,
     )
 
