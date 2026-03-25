@@ -51,6 +51,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
     assert "if (!params.get('brand') && uniqueBrands.length === 1)" in script
     assert "data-line-state-hidden=\"1\"" in script or "data-line-state-hidden='1'" in script
     assert "appendStateInput('brand', uniqueBrands[0])" in script
+    assert "window.location.assign(buildCatalogUrl(params))" in script
+    assert "if (el.matches?.('[data-line-model], [data-line-variant]')) return false" in script
 
 
 def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():

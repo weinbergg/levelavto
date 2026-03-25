@@ -2586,6 +2586,12 @@
       if (!hasItems) advancedGenerationSelect.value = ''
     }
 
+    const shouldRefreshOptionsForControl = (el) => {
+      if (!el) return false
+      if (el.matches?.('[data-line-model], [data-line-variant]')) return false
+      return true
+    }
+
     const prepareSubmit = () => {
       // rebuild "line" params from rows so backend receives canonical format
       qsa('input[name="line"]', form).forEach((el) => el.remove())
@@ -2727,10 +2733,9 @@
       })
       modelSelect?.addEventListener('change', () => {
         scheduleCount()
-        scheduleOptionsRefresh()
       })
       variantInput?.addEventListener('input', scheduleCount)
-      variantInput?.addEventListener('change', scheduleOptionsRefresh)
+      variantInput?.addEventListener('change', scheduleCount)
       removeBtn?.addEventListener('click', () => {
         const rows = qsa('[data-search-row]', rowsWrap)
         if (rows.length <= 1) {
@@ -2951,12 +2956,16 @@
 
     if (form.id !== 'advanced-search-form') return
 
-    form.addEventListener('submit', () => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault()
+      clearTimeout(debounce)
+      clearTimeout(optionsDebounce)
       prepareSubmit()
+      const params = buildParams(false)
       if (DEBUG_FILTERS) {
-        const qs = new URLSearchParams(new FormData(form)).toString()
-        console.info('filters:advanced submit', qs)
+        console.info('filters:advanced submit', params.toString())
       }
+      window.location.assign(buildCatalogUrl(params))
     })
 
     form.addEventListener('reset', () => {
@@ -3020,7 +3029,9 @@
     ctrls.forEach((el) => {
       el.addEventListener('change', () => {
         scheduleCount()
-        scheduleOptionsRefresh()
+        if (shouldRefreshOptionsForControl(el)) {
+          scheduleOptionsRefresh()
+        }
       })
       el.addEventListener('input', scheduleCount)
     })
