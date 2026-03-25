@@ -38,3 +38,10 @@ def test_filter_payload_includes_dynamic_brand_options():
     router = _read("app/routers/catalog.py")
     assert 'field="brand"' in router
     assert '"brands": brands' in router
+
+
+def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_lines():
+    script = _read("app/static/js/app.js")
+    assert "initials.slice(currentRows.length).forEach((initial) => addRow(initial))" in script
+    assert "const selectedModels = getAccordionSelectedModels(modelSelect)" in script
+    assert "const models = selectedModels.length ? selectedModels : [modelSelect?.value || '']" in script

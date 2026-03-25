@@ -2005,7 +2005,7 @@ body.filters-open {
 .model-accordion__group > summary {
   cursor: pointer;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 15px;
   list-style: none;
 }
 
@@ -2031,7 +2031,7 @@ body.filters-open {
   color: var(--text-1);
   text-align: left;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 15px;
   cursor: pointer;
 }
 
@@ -2050,8 +2050,8 @@ body.filters-open {
   background: var(--bg-interactive);
   color: var(--text-1);
   border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 15px;
   cursor: pointer;
 }
 
@@ -2060,8 +2060,8 @@ body.filters-open {
   background: var(--bg-interactive);
   color: inherit;
   border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 15px;
   cursor: pointer;
 }
 

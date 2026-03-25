@@ -15,6 +15,8 @@ def test_js_has_model_accordion_rendering():
     assert "data-model-value" in script
     assert "data-model-group-values" in script
     assert "model_groups" in script
+    assert "setAccordionSelectedModels" in script
+    assert "getAccordionSelectedModels" in script
     assert "__modelAccordionSync" in script
     assert "selected.getAll('line')" in script
     assert "const toggleModelSelection = (value) =>" in script

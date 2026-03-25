@@ -376,6 +376,22 @@
       }
       selected.append(key, next)
     })
+    const lineItems = params
+      .getAll('line')
+      .map((line) => parseLineValue(line))
+      .filter((item) => item.brand || item.model)
+    if (!selected.get('brand')) {
+      const lineBrands = Array.from(new Set(lineItems.map((item) => item.brand).filter(Boolean)))
+      if (lineBrands.length === 1) {
+        selected.set('brand', lineBrands[0])
+      }
+    }
+    if (!selected.get('model')) {
+      const lineModels = Array.from(new Set(lineItems.map((item) => item.model).filter(Boolean)))
+      if (lineModels.length === 1) {
+        selected.set('model', lineModels[0])
+      }
+    }
     return selected
   }
 
@@ -415,6 +431,31 @@
       .map((el) => parseLineValue(el.value))
       .filter((item) => item.model && (!normalizedBrand || !item.brand || item.brand === normalizedBrand))
       .map((item) => item.model)
+  }
+
+  function setAccordionSelectedModels(select, values = []) {
+    if (!select) return
+    const normalized = Array.from(new Set((values || []).map((value) => String(value || '').trim()).filter(Boolean)))
+    select.__accordionSelectedModels = normalized
+    select.dataset.selectedModels = JSON.stringify(normalized)
+  }
+
+  function getAccordionSelectedModels(select) {
+    if (!select) return []
+    if (Array.isArray(select.__accordionSelectedModels)) {
+      return select.__accordionSelectedModels.map((value) => String(value || '').trim()).filter(Boolean)
+    }
+    try {
+      const parsed = JSON.parse(select.dataset.selectedModels || '[]')
+      if (Array.isArray(parsed)) {
+        const normalized = parsed.map((value) => String(value || '').trim()).filter(Boolean)
+        select.__accordionSelectedModels = normalized
+        return normalized
+      }
+    } catch {
+      return []
+    }
+    return []
   }
 
   function syncFormFromSelected(form, selected) {
@@ -1346,6 +1387,7 @@
       const form = qs('#filters')
       form?.reset()
       clearCatalogModelLineInputs(form)
+      if (modelSelect) setAccordionSelectedModels(modelSelect, [])
       syncColorChips(form)
       syncRegMonthState(form)
       bindOtherColorsToggle(form)
@@ -1411,7 +1453,10 @@
       logChange('kr_type', qs('#kr-type'))
       const handleCatalogLocationChange = async () => {
         clearCatalogModelLineInputs(filtersForm)
-        if (modelSelect) modelSelect.value = ''
+        if (modelSelect) {
+          modelSelect.value = ''
+          setAccordionSelectedModels(modelSelect, [])
+        }
         await loadCatalogFilterBase()
         if (brandSelect?.value) {
           await updateCatalogModels()
@@ -1470,6 +1515,7 @@
       modelSelect.innerHTML = ''
       if (!normBrand) {
         clearCatalogModelLineInputs(catalogForm)
+        setAccordionSelectedModels(modelSelect, [])
         fillModelSelectWithGroups(modelSelect, { models: [], model_groups: [] }, 'Все')
         modelSelect.disabled = true
         if (generationSelect) {
@@ -1488,8 +1534,12 @@
       const selectedLines = getCatalogSelectedModels(catalogForm, normBrand)
       if (selectedLines.length === 1) {
         setSelectValueInsensitive(modelSelect, selectedLines[0])
+        setAccordionSelectedModels(modelSelect, [selectedLines[0]])
       } else if (!selectedLines.length && initialModelRestorePending && initialModelParam) {
         setSelectValueInsensitive(modelSelect, initialModelParam)
+        setAccordionSelectedModels(modelSelect, [initialModelParam])
+      } else {
+        setAccordionSelectedModels(modelSelect, selectedLines)
       }
       initialModelRestorePending = false
       modelSelect.disabled = false
@@ -1505,7 +1555,10 @@
     }
     brandSelect?.addEventListener('change', () => {
       clearCatalogModelLineInputs(filtersForm)
-      if (modelSelect) modelSelect.value = ''
+      if (modelSelect) {
+        modelSelect.value = ''
+        setAccordionSelectedModels(modelSelect, [])
+      }
       updateCatalogModels()
     })
     modelSelect?.addEventListener('change', async () => {
@@ -1851,10 +1904,13 @@
       clearBtn.type = 'button'
       clearBtn.className = 'model-accordion__clear'
       clearBtn.textContent = emptyLabel
-      const selectedModels = new Set(getGeneratedModelValues())
+      const initialSelectedValues = isCatalogModelSelect ? getGeneratedModelValues() : getAccordionSelectedModels(select)
+      const selectedModels = new Set(initialSelectedValues)
       if (!selectedModels.size && select.value) selectedModels.add(select.value)
+      setAccordionSelectedModels(select, Array.from(selectedModels))
       const applySelection = () => {
         const values = Array.from(selectedModels)
+        setAccordionSelectedModels(select, values)
         if (values.length === 1) {
           select.value = values[0]
         } else {
@@ -1875,6 +1931,7 @@
       }
       clearBtn.addEventListener('click', () => {
         selectedModels.clear()
+        setAccordionSelectedModels(select, [])
         select.value = ''
         syncGeneratedModelLines([])
         select.dispatchEvent(new Event('change', { bubbles: true }))
@@ -1952,14 +2009,18 @@
       const handleModelAccordionChange = () => {
         selectedModels.clear()
         const lineValues = getGeneratedModelValues()
+        const storedValues = !isCatalogModelSelect ? getAccordionSelectedModels(select) : []
         if (lineValues.length) {
           lineValues.forEach((value) => selectedModels.add(value))
+        } else if (storedValues.length > 1) {
+          storedValues.forEach((value) => selectedModels.add(value))
         } else if (select.value) {
           selectedModels.add(select.value)
           syncGeneratedModelLines([select.value])
         } else {
           syncGeneratedModelLines([])
         }
+        setAccordionSelectedModels(select, Array.from(selectedModels))
         setAccordionState(container, select.value || '', Array.from(selectedModels))
       }
       select.addEventListener('change', handleModelAccordionChange)
@@ -2525,6 +2586,7 @@
         fillModelSelectWithGroups(modelSelect, { models: [], model_groups: [] }, 'Неважно')
         modelSelect.disabled = true
         modelSelect.value = ''
+        setAccordionSelectedModels(modelSelect, [])
         modelSelect.__modelAccordionSync?.()
         return
       }
@@ -2536,9 +2598,14 @@
       const payload = await fetchModels({ brand, region, country, krType })
       fillModelSelectWithGroups(modelSelect, payload, 'Неважно')
       if (selected) {
-        setSelectValueInsensitive(modelSelect, selected)
+        if (setSelectValueInsensitive(modelSelect, selected)) {
+          setAccordionSelectedModels(modelSelect, [selected])
+        } else {
+          setAccordionSelectedModels(modelSelect, [])
+        }
       } else {
         modelSelect.value = ''
+        setAccordionSelectedModels(modelSelect, [])
       }
       modelSelect.disabled = false
       modelSelect.__modelAccordionSync?.()
@@ -2663,6 +2730,9 @@
       const currentRows = qsa('[data-search-row]', rowsWrap)
       if (currentRows.length) {
         currentRows.forEach((row, idx) => bindExistingRow(row, initials[idx] || {}))
+        if (currentRows.length < initials.length) {
+          initials.slice(currentRows.length).forEach((initial) => addRow(initial))
+        }
         return
       }
       forceRebuildRows(initials)
@@ -2673,10 +2743,20 @@
       const lines = []
       rows.forEach((row) => {
         const brand = normalizeBrand(qs('[data-line-brand]', row)?.value || '')
-        const model = qs('[data-line-model]', row)?.value || ''
+        const modelSelect = qs('[data-line-model]', row)
+        const selectedModels = getAccordionSelectedModels(modelSelect)
         const variant = qs('[data-line-variant]', row)?.value || ''
-        if (!brand && !model && !variant) return
-        lines.push([brand, model, variant].map((v) => v.trim()).join('|'))
+        const models = selectedModels.length ? selectedModels : [modelSelect?.value || '']
+        const normalizedModels = Array.from(new Set(models.map((value) => String(value || '').trim())))
+        if (!normalizedModels.some(Boolean)) {
+          if (!brand && !variant) return
+          lines.push([brand, '', variant].map((v) => v.trim()).join('|'))
+          return
+        }
+        normalizedModels.forEach((model) => {
+          if (!brand && !model && !variant) return
+          lines.push([brand, model, variant].map((v) => v.trim()).join('|'))
+        })
       })
       return lines
     }
