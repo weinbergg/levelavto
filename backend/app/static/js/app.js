@@ -2198,6 +2198,13 @@
     let initialAnimation = true
     let pendingController = null
 
+    const getHomeSelectedModels = () => {
+      const selected = getAccordionSelectedModels(modelSelect)
+      if (selected.length) return selected
+      const fallback = String(modelSelect?.value || '').trim()
+      return fallback ? [fallback] : []
+    }
+
     if (resetBtn) {
       resetBtn.addEventListener('click', (e) => {
         e.preventDefault()
@@ -2206,20 +2213,27 @@
         if (modelSelect) {
           modelSelect.innerHTML = '<option value="">Все</option>'
           modelSelect.disabled = true
+          setAccordionSelectedModels(modelSelect, [])
+          modelSelect.__modelAccordionSync?.()
         }
         initialAnimation = true
         updateCount()
       })
     }
 
-    async function updateHomeModels() {
+    async function updateHomeModels(selectedOverride = null) {
       if (!brandSelect || !modelSelect) return
       const brand = normalizeBrand(brandSelect.value)
+      const selectedValues = Array.isArray(selectedOverride)
+        ? Array.from(new Set(selectedOverride.map((value) => String(value || '').trim()).filter(Boolean)))
+        : getHomeSelectedModels()
       modelSelect.innerHTML = ''
       if (!brand) {
         modelSelect.disabled = true
         modelSelect.innerHTML = '<option value="">Все</option>'
         fillModelSelectWithGroups(modelSelect, { models: [], model_groups: [] }, 'Все')
+        setAccordionSelectedModels(modelSelect, [])
+        modelSelect.__modelAccordionSync?.()
         return
       }
       modelSelect.disabled = true
@@ -2229,18 +2243,39 @@
       const krType = regionSlotSelect?.name === 'kr_type' ? (regionSlotSelect?.value || '') : ''
       const payload = await fetchModels({ brand, region, country, krType })
       fillModelSelectWithGroups(modelSelect, payload, 'Все')
+      const availableValues = new Set(
+        Array.from(modelSelect.options || [])
+          .map((opt) => String(opt.value || '').trim())
+          .filter(Boolean),
+      )
+      const preservedValues = selectedValues.filter((value) => availableValues.has(value))
+      if (preservedValues.length > 1) {
+        modelSelect.value = ''
+        setAccordionSelectedModels(modelSelect, preservedValues)
+      } else if (preservedValues.length === 1) {
+        if (setSelectValueInsensitive(modelSelect, preservedValues[0])) {
+          setAccordionSelectedModels(modelSelect, preservedValues)
+        } else {
+          modelSelect.value = ''
+          setAccordionSelectedModels(modelSelect, [])
+        }
+      } else {
+        modelSelect.value = ''
+        setAccordionSelectedModels(modelSelect, [])
+      }
       modelSelect.disabled = false
+      modelSelect.__modelAccordionSync?.()
     }
 
     brandSelect?.addEventListener('change', () => {
-      updateHomeModels().then(() => updateCount())
+      updateHomeModels([]).then(() => updateCount())
     })
 
     function buildHomeParams(withPaging = false) {
       const data = new FormData(form)
       const params = new URLSearchParams()
       const numericKeys = ['price_max', 'mileage_max', 'reg_year_min', 'reg_month_min', 'reg_year_max', 'reg_month_max']
-      const skipKeys = ['region_extra']
+      const skipKeys = ['region_extra', 'model']
       let regionVal = ''
       for (const [k, v] of data.entries()) {
         if (k === 'region') regionVal = v
@@ -2261,6 +2296,23 @@
           continue
         }
         params.append(k, v)
+      }
+      const brand = normalizeBrand(brandSelect?.value || '')
+      const selectedModels = getHomeSelectedModels()
+      if (brand) {
+        params.set('brand', brand)
+      }
+      if (brand && selectedModels.length) {
+        selectedModels.forEach((modelValue) => {
+          params.append('line', `${brand}|${String(modelValue || '').trim()}|`)
+        })
+        if (selectedModels.length === 1) {
+          params.set('model', selectedModels[0])
+        } else {
+          params.delete('model')
+        }
+      } else {
+        params.delete('line')
       }
       if (regionVal === 'KR') {
         params.set('country', 'KR')
@@ -2404,10 +2456,20 @@
     })
     regionSelect?.addEventListener('change', () => {
       updateRegionSlot()
-      updateCount()
+      updateHomeModels().then(() => updateCount())
     })
-    regionSlotSelect?.addEventListener('change', updateCount)
-    // Do not intercept home form submit; use plain GET /catalog with form fields.
+    regionSlotSelect?.addEventListener('change', () => {
+      updateHomeModels().then(() => updateCount())
+    })
+    form.addEventListener('submit', (event) => {
+      event.preventDefault()
+      const params = buildHomeParams(false)
+      if (DEBUG_FILTERS) {
+        console.info('home: submit', params.toString())
+        sessionStorage.setItem('homeSubmitParams', params.toString())
+      }
+      window.location.assign(buildCatalogUrl(params))
+    })
     window.addEventListener('pageshow', () => {
       initialAnimation = true
       updateCount()

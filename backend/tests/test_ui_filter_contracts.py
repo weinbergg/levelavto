@@ -72,8 +72,18 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=78' in template
+    assert '/static/js/app.js?v=79' in template
     assert '/static/css/styles.css?v=38' in template
+
+
+def test_home_search_uses_line_params_and_js_submit():
+    script = _read("app/static/js/app.js")
+    assert "const getHomeSelectedModels = () =>" in script
+    assert "const skipKeys = ['region_extra', 'model']" in script
+    assert "params.append('line', `${brand}|${String(modelValue || '').trim()}|`)" in script
+    assert "window.location.assign(buildCatalogUrl(params))" in script
+    assert "sessionStorage.setItem('homeSubmitParams', params.toString())" in script
+    assert "updateHomeModels().then(() => updateCount())" in script
 
 
 def test_model_group_summary_has_visible_selected_states():
