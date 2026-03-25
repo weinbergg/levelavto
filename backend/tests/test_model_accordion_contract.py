@@ -20,7 +20,10 @@ def test_js_has_model_accordion_rendering():
     assert "__modelAccordionSync" in script
     assert "selected.getAll('line')" in script
     assert "const toggleModelSelection = (value) =>" in script
-    assert "itemBtn.addEventListener('click', () => toggleModelSelection(value))" in script
+    assert "itemBtn.addEventListener('click', (event) =>" in script
+    assert "toggleModelSelection(value)" in script
+    assert "root.open = true" in script
+    assert "dataset.skipTriggerOnce = '1'" in script
 
 
 def test_css_has_model_accordion_styles():
@@ -28,3 +31,4 @@ def test_css_has_model_accordion_styles():
     assert ".model-accordion" in css
     assert ".model-accordion__item" in css
     assert ".model-accordion__model.is-active" in css
+    assert "font-size: 15px;" in css

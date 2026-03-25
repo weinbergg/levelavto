@@ -1958,7 +1958,7 @@ body.filters-open {
   background: rgba(255, 255, 255, 0.06);
   cursor: pointer;
   font-weight: 500;
-  font-size: 12px;
+  font-size: 15px;
   color: var(--text-1);
   list-style: none;
 }

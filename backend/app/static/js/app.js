@@ -406,7 +406,7 @@
 
   function clearCatalogModelLineInputs(form) {
     if (!form || form.id !== 'filters') return
-    qsa('input[name="line"][data-catalog-line="1"]', form).forEach((el) => el.remove())
+    qsa('input[name="line"]', form).forEach((el) => el.remove())
   }
 
   function setCatalogModelLineInputs(form, lines = []) {
@@ -914,6 +914,7 @@
     qs('#emptyReset')?.addEventListener('click', () => {
       const form = qs('#filters')
       form?.reset()
+      clearCatalogModelLineInputs(form)
       syncColorChips(form)
       syncRegMonthState(form)
       bindOtherColorsToggle(form)
@@ -921,6 +922,7 @@
       if (modelSelect) {
         modelSelect.innerHTML = '<option value=\"\">Все</option>'
         modelSelect.disabled = true
+        setAccordionSelectedModels(modelSelect, [])
       }
       loadCars(1)
     })
@@ -1425,7 +1427,12 @@
         const qs = params.toString()
         advancedLink.href = qs ? `/search?${qs}` : '/search'
       }
-      const trigger = () => {
+      const trigger = (event) => {
+        const sourceEl = event?.currentTarget
+        if (sourceEl?.dataset?.skipTriggerOnce === '1') {
+          sourceEl.dataset.skipTriggerOnce = ''
+          return
+        }
         clearTimeout(debounce)
         debounce = setTimeout(() => {
           const params = collectParams(1)
@@ -1546,6 +1553,7 @@
       modelSelect.__modelAccordionSync?.()
       if (generationSelect) {
         if (modelSelect.value) {
+          modelSelect.dataset.skipTriggerOnce = '1'
           modelSelect.dispatchEvent(new Event('change', { bubbles: true }))
         } else {
           setSelectOptions(generationSelect, [], { emptyLabel: 'Любое' })
@@ -1918,6 +1926,7 @@
         }
         syncGeneratedModelLines(values)
         setAccordionState(container, select.value || '', values)
+        root.open = true
         select.dispatchEvent(new Event('change', { bubbles: true }))
       }
       const toggleModelSelection = (value) => {
@@ -1929,7 +1938,12 @@
         }
         applySelection()
       }
-      clearBtn.addEventListener('click', () => {
+      clearBtn.addEventListener('mousedown', (event) => {
+        event.preventDefault()
+      })
+      clearBtn.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
         selectedModels.clear()
         setAccordionSelectedModels(select, [])
         select.value = ''
@@ -1952,7 +1966,14 @@
           itemBtn.className = 'model-accordion__item'
           itemBtn.dataset.modelValue = value
           itemBtn.textContent = `${group?.label || row?.label || value}${count ? ` (${count})` : ''}`
-          itemBtn.addEventListener('click', () => toggleModelSelection(value))
+          itemBtn.addEventListener('mousedown', (event) => {
+            event.preventDefault()
+          })
+          itemBtn.addEventListener('click', (event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            toggleModelSelection(value)
+          })
           rootBody.appendChild(itemBtn)
           return
         }
@@ -1974,7 +1995,12 @@
             .map((row) => row?.value || row?.model || '')
             .filter(Boolean)
           allBtn.dataset.modelGroupValues = JSON.stringify(groupValues)
-          allBtn.addEventListener('click', () => {
+          allBtn.addEventListener('mousedown', (event) => {
+            event.preventDefault()
+          })
+          allBtn.addEventListener('click', (event) => {
+            event.preventDefault()
+            event.stopPropagation()
             const shouldClearGroup = groupValues.every((value) => selectedModels.has(value))
             groupValues.forEach((value) => {
               if (shouldClearGroup) {
@@ -1995,7 +2021,14 @@
           btn.className = 'model-accordion__model'
           btn.dataset.modelValue = value
           btn.textContent = row?.label || value
-          btn.addEventListener('click', () => toggleModelSelection(value))
+          btn.addEventListener('mousedown', (event) => {
+            event.preventDefault()
+          })
+          btn.addEventListener('click', (event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            toggleModelSelection(value)
+          })
           modelsWrap.appendChild(btn)
         })
         details.appendChild(modelsWrap)

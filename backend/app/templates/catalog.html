@@ -251,7 +251,7 @@
           <button class="btn btn-ghost" id="resetFilters" type="button">Сбросить</button>
         </div>
         {% for line in params.getlist('line') %}
-        <input type="hidden" name="line" value="{{ line }}">
+        <input type="hidden" name="line" value="{{ line }}" data-catalog-line="1">
         {% endfor %}
         {% set adv_keys = ['num_seats','doors_count','emission_class','efficiency_class','climatisation','airbags','interior_design','interior_color','interior_material','vat_reclaimable','price_rating_label','owners_count'] %}
         {% for key in adv_keys %}

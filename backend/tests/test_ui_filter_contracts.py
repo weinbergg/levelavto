@@ -45,3 +45,17 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
     assert "initials.slice(currentRows.length).forEach((initial) => addRow(initial))" in script
     assert "const selectedModels = getAccordionSelectedModels(modelSelect)" in script
     assert "const models = selectedModels.length ? selectedModels : [modelSelect?.value || '']" in script
+
+
+def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():
+    template = _read("app/templates/catalog.html")
+    assert 'data-catalog-line="1"' in template
+
+
+def test_taxonomy_contains_extra_body_and_interior_translations():
+    taxonomy = _read("app/resources/taxonomy_ru.csv")
+    utils = _read("app/utils/taxonomy.py")
+    assert "body_type,sportscar,Спорткар" in taxonomy
+    assert "body_type,othercar,Прочее" in taxonomy
+    assert '"leder": "кожа"' in utils
+    assert '"kunstleder": "экокожа"' in utils
