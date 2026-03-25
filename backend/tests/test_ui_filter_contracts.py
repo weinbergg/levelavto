@@ -45,6 +45,12 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
     assert "initials.slice(currentRows.length).forEach((initial) => addRow(initial))" in script
     assert "const selectedModels = getAccordionSelectedModels(modelSelect)" in script
     assert "const models = selectedModels.length ? selectedModels : [modelSelect?.value || '']" in script
+    assert "const currentSelectedModels = getAccordionSelectedModels(modelSelect)" in script
+    assert "currentSelectedModels.length ? currentSelectedModels : currentModel" in script
+    assert "const uniqueBrands = Array.from(new Set(parsedLines.map((item) => item.brand).filter(Boolean)))" in script
+    assert "if (!params.get('brand') && uniqueBrands.length === 1)" in script
+    assert "data-line-state-hidden=\"1\"" in script or "data-line-state-hidden='1'" in script
+    assert "appendStateInput('brand', uniqueBrands[0])" in script
 
 
 def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():
@@ -59,3 +65,10 @@ def test_taxonomy_contains_extra_body_and_interior_translations():
     assert "body_type,othercar,Прочее" in taxonomy
     assert '"leder": "кожа"' in utils
     assert '"kunstleder": "экокожа"' in utils
+
+
+def test_pages_home_uses_recommended_and_media_cache_helpers():
+    router = _read("app/routers/pages.py")
+    assert "_get_home_recommended(service, db, reco_cfg, limit=12)" in router
+    assert "home_media_ctx:v2" in router
+    assert "home_recommended:" in router

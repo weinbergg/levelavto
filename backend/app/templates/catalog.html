@@ -56,22 +56,26 @@
                 <option value="used" {% if params.get('condition') == 'used' %}selected{% endif %}>С пробегом</option>
               </select>
             </label>
-            <label>Марка
-              <select name="brand" id="brand">
-                <option value="">Все</option>
-                {% for b in brands|sort %}
-                <option value="{{ b }}" {% if params.get('brand') == b %}selected{% endif %}>{{ b }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>Модель
-              <select name="model" id="model-select" {% if not params.get('brand') %}disabled{% endif %}>
-                <option value="">Все</option>
-                {% if params.get('model') %}
-                <option value="{{ params.get('model') }}" selected>{{ params.get('model') }}</option>
-                {% endif %}
-              </select>
-            </label>
+            <div class="field">
+              <label>Марка
+                <select name="brand" id="brand">
+                  <option value="">Все</option>
+                  {% for b in brands|sort %}
+                  <option value="{{ b }}" {% if params.get('brand') == b %}selected{% endif %}>{{ b }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
+            <div class="field">
+              <label>Модель
+                <select name="model" id="model-select" {% if not params.get('brand') %}disabled{% endif %}>
+                  <option value="">Все</option>
+                  {% if params.get('model') %}
+                  <option value="{{ params.get('model') }}" selected>{{ params.get('model') }}</option>
+                  {% endif %}
+                </select>
+              </label>
+            </div>
             <div class="filters-row">
               <label>Цена от, ₽
                 <input type="number" name="price_min" inputmode="numeric" min="0" step="1000" value="{{ params.get('price_min','') }}" placeholder="от">

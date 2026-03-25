@@ -16,7 +16,7 @@ from ..services.cars_service import CarsService, normalize_brand
 from ..utils.recommended_config import load_config
 from ..services.content_service import ContentService
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, func, exists
+from sqlalchemy import select, and_, func, exists, case
 from cachetools import TTLCache
 from ..utils.redis_cache import (
     redis_get_json,
@@ -58,6 +58,74 @@ _FILTER_CTX_CACHE: TTLCache = TTLCache(maxsize=64, ttl=600)
 _TOTAL_CARS_CACHE: TTLCache = TTLCache(maxsize=32, ttl=300)
 _HOME_FILTER_CTX_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
 _HOME_MEDIA_CACHE: TTLCache = TTLCache(maxsize=2, ttl=3600)
+_HOME_RECOMMENDED_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
+
+
+def _home_dataset_version() -> str:
+    try:
+        return build_filter_ctx_base_key({}).rsplit(":v", 1)[-1]
+    except Exception:
+        return "0"
+
+
+def _home_media_redis_key() -> str:
+    return "home_media_ctx:v2"
+
+
+def _home_recommended_redis_key(cfg: Dict[str, Any], limit: int) -> str:
+    return (
+        "home_recommended:"
+        f"{cfg.get('max_age_years')}:{cfg.get('price_min')}:{cfg.get('price_max')}:"
+        f"{cfg.get('mileage_max')}:{limit}:v{_home_dataset_version()}"
+    )
+
+
+def _load_cars_by_ids(db: Session, ids: List[int]) -> List[Car]:
+    if not ids:
+        return []
+    ordering = case({car_id: idx for idx, car_id in enumerate(ids)}, value=Car.id)
+    return list(
+        db.execute(
+            select(Car)
+            .where(Car.id.in_(ids))
+            .order_by(ordering)
+        ).scalars().all()
+    )
+
+
+def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any], limit: int = 12) -> List[Car]:
+    cache_key = (
+        cfg.get("max_age_years"),
+        cfg.get("price_min"),
+        cfg.get("price_max"),
+        cfg.get("mileage_max"),
+        limit,
+        _home_dataset_version(),
+    )
+    cached_ids = _HOME_RECOMMENDED_CACHE.get(cache_key)
+    if cached_ids:
+        cached_items = _load_cars_by_ids(db, [int(car_id) for car_id in cached_ids if car_id])
+        if cached_items:
+            return cached_items
+    redis_key = _home_recommended_redis_key(cfg, limit)
+    cached_ids = redis_get_json(redis_key)
+    if isinstance(cached_ids, list) and cached_ids:
+        cached_items = _load_cars_by_ids(db, [int(car_id) for car_id in cached_ids if car_id])
+        if cached_items:
+            _HOME_RECOMMENDED_CACHE[cache_key] = cached_ids
+            return cached_items
+    items = service.recommended_auto(
+        max_age_years=cfg.get("max_age_years"),
+        price_min=cfg.get("price_min"),
+        price_max=cfg.get("price_max"),
+        mileage_max=cfg.get("mileage_max"),
+        limit=limit,
+    )
+    ids = [int(car.id) for car in items if getattr(car, "id", None)]
+    if ids:
+        _HOME_RECOMMENDED_CACHE[cache_key] = ids
+        redis_set_json(redis_key, ids, ttl_sec=1800)
+    return items
 
 
 def _get_cars_count(service: CarsService, params: Dict[str, Any], timing_enabled: bool) -> int:
@@ -623,6 +691,11 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
     cached = _HOME_MEDIA_CACHE.get(cache_key)
     if cached:
         return cached
+    redis_key = _home_media_redis_key()
+    cached = redis_get_json(redis_key)
+    if cached:
+        _HOME_MEDIA_CACHE[cache_key] = cached
+        return cached
 
     media_root = Path(__file__).resolve().parents[3] / "фото-видео"
     video_dir = media_root / "видео"
@@ -751,6 +824,7 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
         "collage_images": collage_display or collage_images,
     }
     _HOME_MEDIA_CACHE[cache_key] = payload
+    redis_set_json(redis_key, payload, ttl_sec=3600)
     return payload
 
 
@@ -778,13 +852,7 @@ def _home_context(
     body_type_stats = home_filter_ctx.get("body_type_stats") or []
     reco_cfg = load_config()
     t0 = time.perf_counter()
-    recommended = service.recommended_auto(
-        max_age_years=reco_cfg.get("max_age_years"),
-        price_min=reco_cfg.get("price_min"),
-        price_max=reco_cfg.get("price_max"),
-        mileage_max=reco_cfg.get("mileage_max"),
-        limit=12,
-    )
+    recommended = _get_home_recommended(service, db, reco_cfg, limit=12)
     _stage("recommended_ms", t0)
     for car in recommended:
         code, label = resolve_display_country(car)

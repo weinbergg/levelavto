@@ -2589,6 +2589,7 @@
     const prepareSubmit = () => {
       // rebuild "line" params from rows so backend receives canonical format
       qsa('input[name="line"]', form).forEach((el) => el.remove())
+      qsa('[data-line-state-hidden="1"]', form).forEach((el) => el.remove())
       const lines = buildLines()
       lines.forEach((line) => {
         const input = document.createElement('input')
@@ -2597,6 +2598,20 @@
         input.value = line
         form.appendChild(input)
       })
+      const parsedLines = lines.map((line) => parseLineValue(line))
+      const uniqueBrands = Array.from(new Set(parsedLines.map((item) => item.brand).filter(Boolean)))
+      const uniqueModels = Array.from(new Set(parsedLines.map((item) => item.model).filter(Boolean)))
+      const appendStateInput = (name, value) => {
+        if (!value) return
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = name
+        input.value = value
+        input.dataset.lineStateHidden = '1'
+        form.appendChild(input)
+      }
+      if (uniqueBrands.length === 1) appendStateInput('brand', uniqueBrands[0])
+      if (uniqueModels.length === 1) appendStateInput('model', uniqueModels[0])
       // ensure KR submits country=KR even if EU country select is disabled
       const regionVal = String(regionSelect?.value || '').toUpperCase()
       let hiddenCountry = qs('input[type="hidden"][name="country"]', form)
@@ -2615,6 +2630,9 @@
 
     const fillModels = async (brand, modelSelect, selected) => {
       if (!modelSelect) return
+      const selectedValues = Array.isArray(selected)
+        ? Array.from(new Set(selected.map((value) => String(value || '').trim()).filter(Boolean)))
+        : (selected ? [String(selected).trim()] : [])
       if (!brand) {
         fillModelSelectWithGroups(modelSelect, { models: [], model_groups: [] }, 'Неважно')
         modelSelect.disabled = true
@@ -2630,10 +2648,20 @@
       const krType = regionKrSelect?.value || ''
       const payload = await fetchModels({ brand, region, country, krType })
       fillModelSelectWithGroups(modelSelect, payload, 'Неважно')
-      if (selected) {
-        if (setSelectValueInsensitive(modelSelect, selected)) {
-          setAccordionSelectedModels(modelSelect, [selected])
+      const availableValues = new Set(
+        Array.from(modelSelect.options || [])
+          .map((opt) => String(opt.value || '').trim())
+          .filter(Boolean),
+      )
+      const preservedValues = selectedValues.filter((value) => availableValues.has(value))
+      if (preservedValues.length > 1) {
+        modelSelect.value = ''
+        setAccordionSelectedModels(modelSelect, preservedValues)
+      } else if (preservedValues.length === 1) {
+        if (setSelectValueInsensitive(modelSelect, preservedValues[0])) {
+          setAccordionSelectedModels(modelSelect, preservedValues)
         } else {
+          modelSelect.value = ''
           setAccordionSelectedModels(modelSelect, [])
         }
       } else {
@@ -2660,6 +2688,7 @@
         const modelSelect = qs('[data-line-model]', row)
         if (!brandSelect || !modelSelect) continue
         const currentBrand = normalizeBrand(brandSelect.value || '')
+        const currentSelectedModels = getAccordionSelectedModels(modelSelect)
         const currentModel = modelSelect.value || ''
         setLineBrandOptions(brandSelect, brandOptions)
         if (currentBrand && !setSelectValueInsensitive(brandSelect, currentBrand)) {
@@ -2667,7 +2696,11 @@
           await fillModels('', modelSelect, '')
           continue
         }
-        await fillModels(normalizeBrand(brandSelect.value || ''), modelSelect, currentModel)
+        await fillModels(
+          normalizeBrand(brandSelect.value || ''),
+          modelSelect,
+          currentSelectedModels.length ? currentSelectedModels : currentModel,
+        )
       }
     }
 
@@ -2819,10 +2852,14 @@
       }
       const lines = buildLines()
       lines.forEach((line) => params.append('line', line))
-      if (!params.get('brand') && lines.length === 1) {
-        const first = parseLineValue(lines[0])
-        if (first.brand) params.set('brand', first.brand)
-        if (first.model) params.set('model', first.model)
+      const parsedLines = lines.map((line) => parseLineValue(line))
+      const uniqueBrands = Array.from(new Set(parsedLines.map((item) => item.brand).filter(Boolean)))
+      const uniqueModels = Array.from(new Set(parsedLines.map((item) => item.model).filter(Boolean)))
+      if (!params.get('brand') && uniqueBrands.length === 1) {
+        params.set('brand', uniqueBrands[0])
+      }
+      if (!params.get('model') && uniqueModels.length === 1) {
+        params.set('model', uniqueModels[0])
       }
       if (withPaging) {
         params.set('page', '1')
