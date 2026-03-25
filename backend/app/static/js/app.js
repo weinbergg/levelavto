@@ -404,6 +404,27 @@
     }
   }
 
+  function groupLineSelections(lines = []) {
+    const grouped = new Map()
+    ;(lines || []).forEach((entry) => {
+      const item = typeof entry === 'string' ? parseLineValue(entry) : entry
+      const brand = normalizeBrand(item?.brand || '')
+      const model = String(item?.model || '').trim()
+      const variant = String(item?.variant || '').trim()
+      const key = `${brand}__${variant}`
+      if (!grouped.has(key)) {
+        grouped.set(key, { brand, variant, models: [] })
+      }
+      if (model) {
+        const bucket = grouped.get(key)
+        if (!bucket.models.includes(model)) {
+          bucket.models.push(model)
+        }
+      }
+    })
+    return Array.from(grouped.values())
+  }
+
   function clearCatalogModelLineInputs(form) {
     if (!form || form.id !== 'filters') return
     qsa('input[name="line"]', form).forEach((el) => el.remove())
@@ -433,11 +454,21 @@
       .map((item) => item.model)
   }
 
+  function getEffectiveCatalogSelectedModels(form) {
+    if (!form || form.id !== 'filters') return []
+    const modelSelect = form.elements['model'] || qs('#model-select', form)
+    const stored = getAccordionSelectedModels(modelSelect)
+    if (stored.length) return stored
+    const fromLines = getCatalogSelectedModels(form)
+    if (fromLines.length) return fromLines
+    const fallback = String(modelSelect?.value || '').trim()
+    return fallback ? [fallback] : []
+  }
+
   function syncCatalogLinesFromState(form) {
     if (!form || form.id !== 'filters') return []
     const brand = normalizeBrand(form.elements['brand']?.value || '')
-    const modelSelect = form.elements['model'] || qs('#model-select', form)
-    const selectedModels = getAccordionSelectedModels(modelSelect)
+    const selectedModels = getEffectiveCatalogSelectedModels(form)
     if (!brand || selectedModels.length <= 1) {
       clearCatalogModelLineInputs(form)
       return []
@@ -2758,7 +2789,7 @@
         brandSelect.value = normalizeBrand(initial.brand || '')
       }
       if (variantInput) variantInput.value = initial.variant || ''
-      fillModels(normalizeBrand(initial.brand || ''), modelSelect, initial.model || '')
+      fillModels(normalizeBrand(initial.brand || ''), modelSelect, initial.models || initial.model || '')
       brandSelect?.addEventListener('change', () => {
         fillModels(normalizeBrand(brandSelect.value), modelSelect, '')
         scheduleCount()
@@ -3022,12 +3053,12 @@
     })
 
     const initialParams = new URLSearchParams(window.location.search)
-    const initialLines = initialParams.getAll('line').map(parseLineValue)
+    const initialLines = groupLineSelections(initialParams.getAll('line'))
     if (!initialLines.length) {
       const brand = normalizeBrand(initialParams.get('brand') || '')
       const model = (initialParams.get('model') || '').trim()
       if (brand || model) {
-        initialLines.push({ brand, model, variant: '' })
+        initialLines.push({ brand, models: model ? [model] : [], variant: '' })
       }
     }
     const repairRows = () => ensureRows(initialLines)

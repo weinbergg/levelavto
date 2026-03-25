@@ -40,6 +40,13 @@ def test_filter_payload_includes_dynamic_brand_options():
     assert '"brands": brands' in router
 
 
+def test_cars_count_supports_line_filters():
+    router = _read("app/routers/catalog.py")
+    assert 'line: Optional[List[str]] = Query(' in router
+    assert '"line": "|".join(line or [])' in router
+    assert "lines=line," in router
+
+
 def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_lines():
     script = _read("app/static/js/app.js")
     assert "initials.slice(currentRows.length).forEach((initial) => addRow(initial))" in script
@@ -55,11 +62,21 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
     assert "if (el.matches?.('[data-line-model], [data-line-variant]')) return false" in script
     assert "function syncCatalogLinesFromState(form)" in script
     assert "const restoredModels = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)" in script
+    assert "function groupLineSelections(lines = [])" in script
+    assert "const initialLines = groupLineSelections(initialParams.getAll('line'))" in script
+    assert "fillModels(normalizeBrand(initial.brand || ''), modelSelect, initial.models || initial.model || '')" in script
 
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=75' in template
+    assert '/static/js/app.js?v=76' in template
+
+
+def test_model_group_summary_has_visible_selected_states():
+    css = _read("app/static/css/styles.css")
+    assert ".model-accordion__group.is-active > summary" in css
+    assert "background: rgba(255, 98, 79, 0.18);" in css
+    assert ".model-accordion__group.is-partial > summary" in css
 
 
 def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():
