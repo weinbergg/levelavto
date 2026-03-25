@@ -2748,6 +2748,18 @@
       normalizeBrandOptions(select)
     }
 
+    const getRowInitialSelectedModels = (row) => {
+      if (!row) return []
+      try {
+        const parsed = JSON.parse(row.dataset.initialSelectedModels || '[]')
+        return Array.isArray(parsed)
+          ? parsed.map((value) => String(value || '').trim()).filter(Boolean)
+          : []
+      } catch {
+        return []
+      }
+    }
+
     const refreshSearchRowsOptions = async (brandOptions = [], reqId = '') => {
       if (!rowsWrap) return
       form.dataset.lineBrandOptions = JSON.stringify(Array.isArray(brandOptions) ? brandOptions : [])
@@ -2759,6 +2771,7 @@
         if (!brandSelect || !modelSelect) continue
         const currentBrand = normalizeBrand(brandSelect.value || '')
         const currentSelectedModels = getAccordionSelectedModels(modelSelect)
+        const initialSelectedModels = getRowInitialSelectedModels(row)
         const currentModel = modelSelect.value || ''
         setLineBrandOptions(brandSelect, brandOptions)
         if (currentBrand && !setSelectValueInsensitive(brandSelect, currentBrand)) {
@@ -2769,7 +2782,9 @@
         await fillModels(
           normalizeBrand(brandSelect.value || ''),
           modelSelect,
-          currentSelectedModels.length ? currentSelectedModels : currentModel,
+          currentSelectedModels.length
+            ? currentSelectedModels
+            : (initialSelectedModels.length ? initialSelectedModels : currentModel),
         )
       }
     }
@@ -2789,13 +2804,20 @@
         brandSelect.value = normalizeBrand(initial.brand || '')
       }
       if (variantInput) variantInput.value = initial.variant || ''
+      row.dataset.initialSelectedModels = JSON.stringify(
+        Array.isArray(initial.models)
+          ? initial.models
+          : (initial.model ? [initial.model] : []),
+      )
       fillModels(normalizeBrand(initial.brand || ''), modelSelect, initial.models || initial.model || '')
       brandSelect?.addEventListener('change', () => {
         fillModels(normalizeBrand(brandSelect.value), modelSelect, '')
+        row.dataset.initialSelectedModels = '[]'
         scheduleCount()
         scheduleOptionsRefresh()
       })
       modelSelect?.addEventListener('change', () => {
+        row.dataset.initialSelectedModels = '[]'
         scheduleCount()
       })
       variantInput?.addEventListener('input', scheduleCount)
