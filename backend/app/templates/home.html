@@ -1,9 +1,6 @@
 {% extends "base.html" %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
 <link rel="stylesheet" href="/static/css/home.css?v=16" />
-{% if hero_videos and hero_videos|length > 0 %}
-<link rel="preload" as="video" href="{{ hero_videos[0] }}" fetchpriority="high" />
-{% endif %}
 {% endblock %} {% block content %}
 <section class="hero hero-with-video" id="hero">
   {% if hero_videos %}
@@ -15,8 +12,8 @@
       muted
       loop
       autoplay
-      preload="auto"
-      src="{{ hero_videos[0] }}"
+      preload="none"
+      data-src="{{ hero_videos[0] }}"
       poster="{{ collage_images[0].src if collage_images else '' }}"
     ></video>
     <div class="hero-video__overlay"></div>
@@ -635,21 +632,53 @@
         videoEl.setAttribute("playsinline", "");
         videoEl.controls = false;
         videoEl.removeAttribute("controls");
+        const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+        const connection =
+          navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        const avoidAutoload =
+          Boolean(prefersReducedMotion)
+          || Boolean(connection?.saveData)
+          || ["slow-2g", "2g"].includes(String(connection?.effectiveType || "").toLowerCase());
+        const loadVideo = () => {
+          if (videoEl.dataset.loaded === "1") return;
+          const src = videoEl.dataset.src;
+          if (!src) return;
+          videoEl.dataset.loaded = "1";
+          videoEl.src = src;
+          videoEl.load();
+        };
         const tryPlay = () => {
           if (document.hidden) return;
+          loadVideo();
           const p = videoEl.play();
           if (p && typeof p.catch === "function") {
             p.catch(() => {});
           }
         };
-        videoEl.addEventListener("canplay", tryPlay, { once: true });
-        requestAnimationFrame(tryPlay);
-        setTimeout(tryPlay, 400);
-        document.addEventListener("visibilitychange", () => {
-          if (!document.hidden) {
-            tryPlay();
+        if (!avoidAutoload) {
+          videoEl.addEventListener("canplay", tryPlay, { once: true });
+          if ("IntersectionObserver" in window) {
+            const observer = new IntersectionObserver((entries) => {
+              if (entries.some((entry) => entry.isIntersecting)) {
+                loadVideo();
+                observer.disconnect();
+              }
+            }, { rootMargin: "200px 0px" });
+            observer.observe(videoEl);
+          } else {
+            setTimeout(loadVideo, 600);
           }
-        });
+          if ("requestIdleCallback" in window) {
+            requestIdleCallback(loadVideo, { timeout: 1500 });
+          } else {
+            setTimeout(loadVideo, 900);
+          }
+          document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) {
+              tryPlay();
+            }
+          });
+        }
       }
 
       const form = document.getElementById("mini-calc-form");

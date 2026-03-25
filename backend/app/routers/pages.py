@@ -22,6 +22,7 @@ from ..utils.redis_cache import (
     redis_get_json,
     redis_set_json,
     build_filter_ctx_key,
+    build_filter_ctx_base_key,
     normalize_filter_params,
     build_cars_count_key,
     normalize_count_params,
@@ -55,6 +56,8 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 _FILTER_CTX_CACHE: TTLCache = TTLCache(maxsize=64, ttl=600)
 _TOTAL_CARS_CACHE: TTLCache = TTLCache(maxsize=32, ttl=300)
+_HOME_FILTER_CTX_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
+_HOME_MEDIA_CACHE: TTLCache = TTLCache(maxsize=2, ttl=3600)
 
 
 def _get_cars_count(service: CarsService, params: Dict[str, Any], timing_enabled: bool) -> int:
@@ -522,6 +525,235 @@ def _build_filter_context(
     return ctx
 
 
+def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
+    cache_key = "home_filter_ctx:all"
+    cached = _HOME_FILTER_CTX_CACHE.get(cache_key)
+    if cached:
+        return cached
+
+    base_ctx = redis_get_json(build_filter_ctx_base_key({}))
+    if base_ctx:
+        regions = [str(item.get("value") or "").strip() for item in base_ctx.get("regions") or [] if item.get("value")]
+        countries = [str(item.get("value") or "").strip() for item in base_ctx.get("countries") or [] if item.get("value")]
+        country_labels = base_ctx.get("country_labels") or {
+            **{code: country_label_ru(code) or code for code in countries},
+            "EU": "Европа",
+            "KR": "Корея",
+        }
+        brand_stats = [
+            {"brand": normalize_brand(item.get("value")), "count": int(item.get("count") or 0)}
+            for item in base_ctx.get("brands") or []
+            if item.get("value")
+        ]
+        body_type_stats = [
+            {"body_type": item.get("value"), "count": int(item.get("count") or 0)}
+            for item in base_ctx.get("body_types") or []
+            if item.get("value")
+        ]
+        payload = {
+            "regions": regions,
+            "countries": countries,
+            "country_labels": country_labels,
+            "kr_types": base_ctx.get("kr_types") or [],
+            "reg_years": [int(v) for v in base_ctx.get("reg_years") or [] if v not in (None, "")],
+            "reg_months": base_ctx.get("reg_months") or [{"value": i + 1, "label": MONTHS_RU[i]} for i in range(12)],
+            "brands": [item["brand"] for item in brand_stats if item.get("brand")],
+            "brand_stats": brand_stats,
+            "body_type_stats": body_type_stats,
+        }
+        _HOME_FILTER_CTX_CACHE[cache_key] = payload
+        return payload
+
+    regions = [
+        str(row.get("value") or "").strip()
+        for row in service.facet_counts(field="region", filters={})
+        if row.get("value")
+    ]
+    countries = []
+    seen_countries = set()
+    for row in service.facet_counts(field="country", filters={}):
+        raw_val = row.get("value")
+        if not raw_val:
+            continue
+        code = normalize_country_code(raw_val)
+        if not code or code in seen_countries:
+            continue
+        seen_countries.add(code)
+        countries.append(code)
+    brand_stats = [
+        {"brand": normalize_brand(row["value"]), "count": int(row["count"])}
+        for row in service.facet_counts(field="brand", filters={})
+        if row.get("value")
+    ]
+    body_type_stats = [
+        {"body_type": row["value"], "count": int(row["count"])}
+        for row in service.facet_counts(field="body_type", filters={})
+        if row.get("value")
+    ]
+    payload = {
+        "regions": regions,
+        "countries": countries,
+        "country_labels": {
+            **{code: country_label_ru(code) or code for code in countries},
+            "EU": "Европа",
+            "KR": "Корея",
+        },
+        "kr_types": [
+            {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
+            {"value": "KR_IMPORT", "label": "Корея (импорт)"},
+        ] if "KR" in regions else [],
+        "reg_years": sorted(
+            [int(row["value"]) for row in service.facet_counts(field="reg_year", filters={}) if row.get("value")],
+            reverse=True,
+        ),
+        "reg_months": [{"value": i + 1, "label": MONTHS_RU[i]} for i in range(12)],
+        "brands": sorted(
+            [item["brand"] for item in brand_stats if item.get("brand")],
+            key=lambda value: value.casefold(),
+        ),
+        "brand_stats": brand_stats,
+        "body_type_stats": body_type_stats,
+    }
+    _HOME_FILTER_CTX_CACHE[cache_key] = payload
+    return payload
+
+
+def _build_home_media_context(db: Session) -> Dict[str, Any]:
+    cache_key = "home_media:default"
+    cached = _HOME_MEDIA_CACHE.get(cache_key)
+    if cached:
+        return cached
+
+    media_root = Path(__file__).resolve().parents[3] / "фото-видео"
+    video_dir = media_root / "видео"
+    hero_videos: List[str] = []
+    if video_dir.exists():
+        prefix = video_dir.name
+        for path_obj in sorted(video_dir.iterdir()):
+            if path_obj.suffix.lower() in {".mp4", ".mov", ".webm"}:
+                hero_videos.append(f"/media/{prefix}/{path_obj.name}")
+    if len(hero_videos) > 1:
+        hero_videos = [hero_videos[1]]
+
+    image_exts = {".jpg", ".jpeg", ".webp", ".png"}
+
+    def build_media_url(path_obj: Path) -> str:
+        rel = path_obj.relative_to(media_root).as_posix().replace("\u00a0", " ")
+        return f"/media/{quote(rel, safe='/')}"
+
+    def collect_gallery_files(root_dir: Path) -> list[Path]:
+        if not root_dir.exists():
+            return []
+        preferred_dirs = ["машины", "фото", "фото-машины", "gallery", "photos"]
+        files: list[Path] = []
+        for name in preferred_dirs:
+            candidate = root_dir / name
+            if not candidate.exists() or not candidate.is_dir():
+                continue
+            files.extend(
+                p
+                for p in candidate.rglob("*")
+                if p.is_file()
+                and p.suffix.lower() in image_exts
+                and not any(part.startswith(".") for part in p.parts)
+            )
+            if files:
+                break
+        if files:
+            return files
+        return [
+            p
+            for p in root_dir.rglob("*")
+            if p.is_file()
+            and p.suffix.lower() in image_exts
+            and not any(part.startswith(".") for part in p.parts)
+            and "видео" not in p.parts
+            and not any(part.endswith("_thumbs") for part in p.parts)
+        ]
+
+    collage_images: List[Dict[str, Any]] = []
+    gallery_files = collect_gallery_files(media_root)
+    if gallery_files:
+        rng_files = random.Random(42)
+        rng_files.shuffle(gallery_files)
+        for path_obj in gallery_files:
+            base = path_obj.stem
+            parent = path_obj.parent
+            thumbs_parent = parent.parent / f"{parent.name}_thumbs"
+            t320 = thumbs_parent / f"{base}__w320.webp"
+            t640 = thumbs_parent / f"{base}__w640.webp"
+            has_thumb = t320.exists()
+            src = build_media_url(t320 if has_thumb else path_obj)
+            srcset_parts = []
+            if has_thumb:
+                srcset_parts.append(f"{build_media_url(t320)} 320w")
+                if t640.exists():
+                    srcset_parts.append(f"{build_media_url(t640)} 640w")
+            collage_images.append(
+                {
+                    "src": src,
+                    "srcset": ", ".join(srcset_parts),
+                    "width": 320,
+                    "height": 240,
+                    "fallback": build_media_url(path_obj),
+                }
+            )
+
+    collage_display: List[Dict[str, Any]] = []
+    if collage_images:
+        rng = random.Random(21)
+        pool = collage_images.copy()
+        rng.shuffle(pool)
+        while len(collage_display) < 60:
+            for item in pool:
+                if collage_display and collage_display[-1]["src"] == item["src"]:
+                    continue
+                collage_display.append(item)
+                if len(collage_display) >= 60:
+                    break
+            rng.shuffle(pool)
+    else:
+        rows = (
+            db.execute(
+                select(Car.thumbnail_url)
+                .where(Car.is_available.is_(True), Car.thumbnail_url.is_not(None), Car.thumbnail_url != "")
+                .order_by(Car.updated_at.desc())
+                .limit(180)
+            )
+            .scalars()
+            .all()
+        )
+        for raw in rows:
+            thumb = resolve_thumbnail_url(raw, None)
+            if not thumb:
+                continue
+            if "img.classistatic.de" in thumb:
+                src = f"/thumb?u={quote(thumb)}&w=360&fmt=webp&rev=2"
+                fallback = thumb
+            else:
+                src = thumb
+                fallback = "/static/img/no-photo.svg"
+            collage_images.append(
+                {
+                    "src": src,
+                    "srcset": "",
+                    "width": 320,
+                    "height": 240,
+                    "fallback": fallback,
+                }
+            )
+            if len(collage_images) >= 60:
+                break
+        collage_display = collage_images
+
+    payload = {
+        "hero_videos": hero_videos,
+        "collage_images": collage_display or collage_images,
+    }
+    _HOME_MEDIA_CACHE[cache_key] = payload
+    return payload
+
+
 def _home_context(
     request: Request,
     service: CarsService,
@@ -530,6 +762,7 @@ def _home_context(
     timing: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
     timing_enabled = os.environ.get("HTML_TIMING", "0") == "1"
+
     def _stage(name: str, started_at: float):
         if timing is None:
             return
@@ -537,12 +770,12 @@ def _home_context(
         timing[name] = ms
         if timing_enabled:
             print(f"HOME_STAGE name={name} ms={ms:.2f}", flush=True)
+
     t0 = time.perf_counter()
-    brand_stats = service.brand_stats()
-    _stage("brand_stats_ms", t0)
-    t0 = time.perf_counter()
-    body_type_stats = service.body_type_stats()
-    _stage("body_type_stats_ms", t0)
+    home_filter_ctx = _build_home_filter_context(service)
+    _stage("home_filter_ctx_ms", t0)
+    brand_stats = home_filter_ctx.get("brand_stats") or []
+    body_type_stats = home_filter_ctx.get("body_type_stats") or []
     reco_cfg = load_config()
     t0 = time.perf_counter()
     recommended = service.recommended_auto(
@@ -611,134 +844,11 @@ def _home_context(
     t0 = time.perf_counter()
     fx_rates = service.get_fx_rates(allow_fetch=False) or {}
     _stage("fx_rates_ms", t0)
-    # медиа лежат рядом с корнем проекта: /code/фото-видео
-    media_root = Path(__file__).resolve().parents[3] / "фото-видео"
-    video_dir = media_root / "видео"
-
     t0 = time.perf_counter()
-    hero_videos = []
-    if video_dir.exists():
-        prefix = video_dir.name
-        for p in sorted(video_dir.iterdir()):
-            if p.suffix.lower() in {".mp4", ".mov", ".webm"}:
-                hero_videos.append(f"/media/{prefix}/{p.name}")
-    if len(hero_videos) > 1:
-        hero_videos = [hero_videos[1]]
-    _stage("hero_videos_ms", t0)
-
-    t0 = time.perf_counter()
-    collage_images = []
-    image_exts = {".jpg", ".jpeg", ".webp", ".png"}
-
-    def build_media_url(path_obj: Path) -> str:
-        rel = path_obj.relative_to(media_root).as_posix().replace("\u00a0", " ")
-        return f"/media/{quote(rel, safe='/')}"
-
-    def collect_gallery_files(root_dir: Path) -> list[Path]:
-        if not root_dir.exists():
-            return []
-        preferred_dirs = ["машины", "фото", "фото-машины", "gallery", "photos"]
-        files: list[Path] = []
-        for name in preferred_dirs:
-            candidate = root_dir / name
-            if not candidate.exists() or not candidate.is_dir():
-                continue
-            files.extend(
-                p
-                for p in candidate.rglob("*")
-                if p.is_file()
-                and p.suffix.lower() in image_exts
-                and not any(part.startswith(".") for part in p.parts)
-            )
-            if files:
-                break
-        if files:
-            return files
-        return [
-            p
-            for p in root_dir.rglob("*")
-            if p.is_file()
-            and p.suffix.lower() in image_exts
-            and not any(part.startswith(".") for part in p.parts)
-            and "видео" not in p.parts
-            and not any(part.endswith("_thumbs") for part in p.parts)
-        ]
-
-    gallery_files = collect_gallery_files(media_root)
-    if gallery_files:
-        rng_files = random.Random(42)
-        rng_files.shuffle(gallery_files)
-        for p in gallery_files:
-            base = p.stem
-            parent = p.parent
-            thumbs_parent = parent.parent / f"{parent.name}_thumbs"
-            t320 = thumbs_parent / f"{base}__w320.webp"
-            t640 = thumbs_parent / f"{base}__w640.webp"
-            has_thumb = t320.exists()
-            src = build_media_url(t320 if has_thumb else p)
-            srcset_parts = []
-            if has_thumb:
-                srcset_parts.append(f"{build_media_url(t320)} 320w")
-                if t640.exists():
-                    srcset_parts.append(f"{build_media_url(t640)} 640w")
-            collage_images.append(
-                {
-                    "src": src,
-                    "srcset": ", ".join(srcset_parts),
-                    "width": 320,
-                    "height": 240,
-                    "fallback": build_media_url(p),
-                }
-            )
-
-    collage_display = []
-    if collage_images:
-        rng = random.Random(21)
-        pool = collage_images.copy()
-        rng.shuffle(pool)
-        while len(collage_display) < 60:
-            for img in pool:
-                if collage_display and collage_display[-1]["src"] == img["src"]:
-                    continue
-                collage_display.append(img)
-                if len(collage_display) >= 60:
-                    break
-            rng.shuffle(pool)
-    else:
-        # Fallback: build collage from catalog thumbnails if local media collage is unavailable.
-        rows = (
-            db.execute(
-                select(Car.thumbnail_url)
-                .where(Car.is_available.is_(True), Car.thumbnail_url.is_not(None), Car.thumbnail_url != "")
-                .order_by(Car.updated_at.desc())
-                .limit(180)
-            )
-            .scalars()
-            .all()
-        )
-        for raw in rows:
-            thumb = resolve_thumbnail_url(raw, None)
-            if not thumb:
-                continue
-            if "img.classistatic.de" in thumb:
-                src = f"/thumb?u={quote(thumb)}&w=360&fmt=webp&rev=2"
-                fallback = thumb
-            else:
-                src = thumb
-                fallback = "/static/img/no-photo.svg"
-            collage_images.append(
-                {
-                    "src": src,
-                    "srcset": "",
-                    "width": 320,
-                    "height": 240,
-                    "fallback": fallback,
-                }
-            )
-            if len(collage_images) >= 60:
-                break
-        collage_display = collage_images
-    _stage("collage_ms", t0)
+    media_ctx = _build_home_media_context(db)
+    _stage("media_ms", t0)
+    hero_videos = media_ctx.get("hero_videos") or []
+    collage_images = media_ctx.get("collage_images") or []
 
     # brand logos: map brands that have logo files in static/img/brand-logos
     static_root = Path(__file__).resolve().parent.parent / \
@@ -781,11 +891,8 @@ def _home_context(
             )
             seen.add(b["brand"])
 
-    t0 = time.perf_counter()
-    filter_ctx = _build_filter_context(service, db, include_payload=False, params={})
-    _stage("filter_ctx_ms", t0)
-    country_labels = filter_ctx.get("country_labels") or {}
-    countries_list = filter_ctx.get("countries") or []
+    country_labels = home_filter_ctx.get("country_labels") or {}
+    countries_list = home_filter_ctx.get("countries") or []
     countries_with_labels = [
         {"value": c, "label": country_labels.get(c, c)}
         for c in countries_list
@@ -798,21 +905,14 @@ def _home_context(
         "request": request,
         "user": getattr(request.state, "user", None),
         "total_cars": total_cars,
-        "brands": filter_ctx["brands"],
-        "regions": filter_ctx["regions"],
+        "brands": home_filter_ctx["brands"],
+        "regions": home_filter_ctx["regions"],
         "countries": countries_list,
         "countries_labeled": countries_with_labels,
         "country_labels": country_labels,
-        "kr_types": filter_ctx["kr_types"],
-        "reg_years": filter_ctx["reg_years"],
-        "reg_months": filter_ctx["reg_months"],
-        "price_options": filter_ctx["price_options"],
-        "mileage_options": filter_ctx["mileage_options"],
-        "generations": filter_ctx["generations"],
-        "colors_basic": filter_ctx["colors_basic"],
-        "colors_other": filter_ctx["colors_other"],
-        "engine_types": filter_ctx["engine_types"],
-        "transmissions": filter_ctx["transmissions"],
+        "kr_types": home_filter_ctx["kr_types"],
+        "reg_years": home_filter_ctx["reg_years"],
+        "reg_months": home_filter_ctx["reg_months"],
         "brand_stats": brand_stats,
         "brand_logos": brand_logos,
         "body_type_stats": body_type_stats,
@@ -821,7 +921,7 @@ def _home_context(
         "home": home_content,
         "fx_rates": fx_rates,
         "hero_videos": hero_videos,
-        "collage_images": collage_display or collage_images,
+        "collage_images": collage_images,
     }
     if extra:
         context.update(extra)
@@ -838,9 +938,7 @@ def index(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
     timing["total_ms"] = (time.perf_counter() - t_start) * 1000
     request.state.perf = {
         "db_ms": float(
-            timing.get("brand_stats_ms", 0)
-            + timing.get("body_type_stats_ms", 0)
-            + timing.get("filter_ctx_ms", 0)
+            timing.get("home_filter_ctx_ms", 0)
             + timing.get("total_cars_ms", 0)
             + timing.get("recommended_ms", 0)
         ),
