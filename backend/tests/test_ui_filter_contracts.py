@@ -53,6 +53,13 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
     assert "appendStateInput('brand', uniqueBrands[0])" in script
     assert "window.location.assign(buildCatalogUrl(params))" in script
     assert "if (el.matches?.('[data-line-model], [data-line-variant]')) return false" in script
+    assert "function syncCatalogLinesFromState(form)" in script
+    assert "const restoredModels = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)" in script
+
+
+def test_base_template_bumps_app_bundle_version():
+    template = _read("app/templates/base.html")
+    assert '/static/js/app.js?v=75' in template
 
 
 def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():

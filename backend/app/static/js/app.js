@@ -433,6 +433,20 @@
       .map((item) => item.model)
   }
 
+  function syncCatalogLinesFromState(form) {
+    if (!form || form.id !== 'filters') return []
+    const brand = normalizeBrand(form.elements['brand']?.value || '')
+    const modelSelect = form.elements['model'] || qs('#model-select', form)
+    const selectedModels = getAccordionSelectedModels(modelSelect)
+    if (!brand || selectedModels.length <= 1) {
+      clearCatalogModelLineInputs(form)
+      return []
+    }
+    const lines = selectedModels.map((model) => `${brand}|${String(model || '').trim()}|`).filter(Boolean)
+    setCatalogModelLineInputs(form, lines)
+    return lines
+  }
+
   function setAccordionSelectedModels(select, values = []) {
     if (!select) return
     const normalized = Array.from(new Set((values || []).map((value) => String(value || '').trim()).filter(Boolean)))
@@ -833,6 +847,9 @@
 
   function collectParams(page) {
     const form = qs('#filters')
+    if (form?.id === 'filters') {
+      syncCatalogLinesFromState(form)
+    }
     const data = new FormData(form)
     const params = new URLSearchParams()
     const numericKeys = [
@@ -1298,6 +1315,16 @@
     const advancedLink = qs('#catalog-advanced-link')
     normalizeBrandOptions(brandSelect)
     let initialReapplyDone = false
+    const initialLineModels = selectedFilters
+      .getAll('line')
+      .map((line) => parseLineValue(line))
+      .filter((item) => item.brand || item.model)
+    const getInitialLineModelsForBrand = (brand) => {
+      const normalizedBrand = normalizeBrand(brand || '')
+      return initialLineModels
+        .filter((item) => item.model && (!normalizedBrand || !item.brand || item.brand === normalizedBrand))
+        .map((item) => item.model)
+    }
     const reapplySelected = () => {
       if (!filtersForm) return
       selectedFilters.forEach((value, key) => {
@@ -1539,14 +1566,20 @@
       const payload = await fetchModels({ brand: normBrand, region, country, krType })
       fillModelSelectWithGroups(modelSelect, payload, 'Все')
       const selectedLines = getCatalogSelectedModels(catalogForm, normBrand)
-      if (selectedLines.length === 1) {
-        setSelectValueInsensitive(modelSelect, selectedLines[0])
-        setAccordionSelectedModels(modelSelect, [selectedLines[0]])
-      } else if (!selectedLines.length && initialModelRestorePending && initialModelParam) {
+      const restoredModels = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)
+      if (restoredModels.length > 1) {
+        modelSelect.value = ''
+        setAccordionSelectedModels(modelSelect, restoredModels)
+        syncCatalogLinesFromState(catalogForm)
+      } else if (restoredModels.length === 1) {
+        setSelectValueInsensitive(modelSelect, restoredModels[0])
+        setAccordionSelectedModels(modelSelect, [restoredModels[0]])
+        clearCatalogModelLineInputs(catalogForm)
+      } else if (initialModelRestorePending && initialModelParam) {
         setSelectValueInsensitive(modelSelect, initialModelParam)
         setAccordionSelectedModels(modelSelect, [initialModelParam])
       } else {
-        setAccordionSelectedModels(modelSelect, selectedLines)
+        setAccordionSelectedModels(modelSelect, [])
       }
       initialModelRestorePending = false
       modelSelect.disabled = false
