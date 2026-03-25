@@ -1553,6 +1553,20 @@ def filter_payload(
 
     eu_payload = service.payload_values_bulk_filtered(payload_keys, **eu_filters)
     kr_payload = service.payload_values_bulk_filtered(payload_keys, **kr_filters)
+    brands = _sort_by_label(
+        [
+            {
+                "value": row["value"],
+                "label": row["value"],
+                "count": row.get("count", 0),
+            }
+            for row in service.facet_counts_filtered(
+                field="brand",
+                **{**common_filters, "brand": None, "model": None, "generation": None, "lines": None},
+            )
+            if row.get("value")
+        ]
+    )
     countries = _sort_by_label(
         [
             {
@@ -1617,6 +1631,7 @@ def filter_payload(
     )
     colors_basic, colors_other = _split_colors(service.facet_counts_filtered(field="color", **common_filters))
     data = {
+        "brands": brands,
         "countries": countries,
         "body_types": body_types,
         "generations": generations,

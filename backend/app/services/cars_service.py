@@ -1945,6 +1945,7 @@ class CarsService:
         **filters: Any,
     ) -> List[Dict[str, Any]]:
         col_map = {
+            "brand": Car.brand,
             "country": func.upper(Car.country),
             "body_type": Car.body_type,
             "engine_type": Car.engine_type,
@@ -1968,8 +1969,15 @@ class CarsService:
         rows = self.db.execute(stmt).all()
         out: List[Dict[str, Any]] = []
         seen_country: set[str] = set()
+        merged_brands: Dict[str, int] = {}
         for value, count in rows:
             if value is None or value == "":
+                continue
+            if field == "brand":
+                norm = normalize_brand(value)
+                if not norm:
+                    continue
+                merged_brands[norm] = merged_brands.get(norm, 0) + int(count)
                 continue
             if field == "country":
                 code = normalize_country_code(value)
@@ -1979,6 +1987,11 @@ class CarsService:
                 out.append({"value": code, "count": int(count)})
                 continue
             out.append({"value": value, "count": int(count)})
+        if field == "brand":
+            return sorted(
+                [{"value": value, "count": count} for value, count in merged_brands.items()],
+                key=lambda item: (-item["count"], str(item["value"]).lower()),
+            )
         return out
 
     def source_ids_for_region(self, region: str) -> List[int]:

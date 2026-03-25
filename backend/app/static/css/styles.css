@@ -2009,6 +2009,14 @@ body.filters-open {
   list-style: none;
 }
 
+.model-accordion__group.is-active > summary {
+  color: #fff;
+}
+
+.model-accordion__group.is-partial > summary {
+  color: rgba(255, 98, 79, 0.92);
+}
+
 .model-accordion__group > summary::-webkit-details-marker {
   display: none;
 }
@@ -2061,6 +2069,12 @@ body.filters-open {
   background: rgba(255, 98, 79, 0.2);
   border-color: rgba(255, 98, 79, 0.8);
 }
+
+.model-accordion__model.is-partial {
+  background: rgba(255, 98, 79, 0.12);
+  border-color: rgba(255, 98, 79, 0.42);
+}
+
 .model-accordion__model--all {
   font-weight: 700;
   border-style: dashed;

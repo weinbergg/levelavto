@@ -379,8 +379,47 @@
     return selected
   }
 
+  function parseLineValue(line) {
+    const parts = String(line || '').split('|')
+    return {
+      brand: normalizeBrand(parts[0] || ''),
+      model: String(parts[1] || '').trim(),
+      variant: String(parts[2] || '').trim(),
+    }
+  }
+
+  function clearCatalogModelLineInputs(form) {
+    if (!form || form.id !== 'filters') return
+    qsa('input[name="line"][data-catalog-line="1"]', form).forEach((el) => el.remove())
+  }
+
+  function setCatalogModelLineInputs(form, lines = []) {
+    if (!form || form.id !== 'filters') return
+    clearCatalogModelLineInputs(form)
+    ;(lines || []).forEach((line) => {
+      const value = String(line || '').trim()
+      if (!value) return
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = 'line'
+      input.value = value
+      input.dataset.catalogLine = '1'
+      form.appendChild(input)
+    })
+  }
+
+  function getCatalogSelectedModels(form, brand = '') {
+    if (!form || form.id !== 'filters') return []
+    const normalizedBrand = normalizeBrand(brand || form.elements['brand']?.value || '')
+    return qsa('input[name="line"][data-catalog-line="1"]', form)
+      .map((el) => parseLineValue(el.value))
+      .filter((item) => item.model && (!normalizedBrand || !item.brand || item.brand === normalizedBrand))
+      .map((item) => item.model)
+  }
+
   function syncFormFromSelected(form, selected) {
     if (!form || !selected) return
+    setCatalogModelLineInputs(form, selected.getAll('line'))
     selected.forEach((value, key) => {
       if (key === 'line') return
       const field = form.elements[key]
@@ -1207,6 +1246,7 @@
     const urlParams = new URLSearchParams(window.location.search)
     const initialPage = Number(urlParams.get('page') || 1)
     const initialModelParam = urlParams.get('model') || ''
+    let initialModelRestorePending = Boolean(initialModelParam)
     const initialSort = urlParams.get('sort') || 'price_asc'
     const modelSelect = qs('#model-select')
     const brandSelect = qs('#brand')
@@ -1254,6 +1294,7 @@
         if (!res.ok) return
         const data = await res.json()
         setSelectOptions(qs('#brand'), data.brands || [], { emptyLabel: 'Все', labelKey: 'label', valueKey: 'value' })
+        normalizeBrandOptions(qs('#brand'))
         setSelectOptions(qs('#body_type'), data.body_types || [], { emptyLabel: 'Любой' })
         setSelectOptions(qs('[name="engine_type"]'), data.engine_types || [], { emptyLabel: 'Любое' })
         setSelectOptions(qs('[name="transmission"]'), data.transmissions || [], { emptyLabel: 'Любая' })
@@ -1304,12 +1345,13 @@
       e.preventDefault()
       const form = qs('#filters')
       form?.reset()
+      clearCatalogModelLineInputs(form)
       syncColorChips(form)
       syncRegMonthState(form)
       bindOtherColorsToggle(form)
       bindRegionSelect(form)
       if (modelSelect) {
-        modelSelect.innerHTML = '<option value="">Все</option>'
+        fillModelSelectWithGroups(modelSelect, { models: [], model_groups: [] }, 'Все')
         modelSelect.disabled = true
       }
       sessionStorage.setItem('catalogScroll', String(0))
@@ -1367,8 +1409,27 @@
       logChange('region', qs('#region'))
       logChange('country', qs('#country'))
       logChange('kr_type', qs('#kr-type'))
-      qs('#region')?.addEventListener('change', loadCatalogFilterBase)
-      qs('#country')?.addEventListener('change', loadCatalogFilterBase)
+      const handleCatalogLocationChange = async () => {
+        clearCatalogModelLineInputs(filtersForm)
+        if (modelSelect) modelSelect.value = ''
+        await loadCatalogFilterBase()
+        if (brandSelect?.value) {
+          await updateCatalogModels()
+          return
+        }
+        if (modelSelect) {
+          fillModelSelectWithGroups(modelSelect, { models: [], model_groups: [] }, 'Все')
+          modelSelect.disabled = true
+          modelSelect.__modelAccordionSync?.()
+        }
+        if (generationSelect) {
+          setSelectOptions(generationSelect, [], { emptyLabel: 'Любое' })
+          syncGenerationVisibility()
+        }
+      }
+      qs('#region')?.addEventListener('change', handleCatalogLocationChange)
+      qs('#country')?.addEventListener('change', handleCatalogLocationChange)
+      qs('#kr-type')?.addEventListener('change', handleCatalogLocationChange)
       const sortSelect = qs('#sortHidden', filtersForm)
       if (sortSelect && initialSort) sortSelect.value = initialSort
       const sortTopbar = qs('#sort-select')
@@ -1405,10 +1466,16 @@
       if (!brandSelect || !modelSelect) return
       const brand = brandSelect.value
       const normBrand = normalizeBrand(brand)
+      const catalogForm = modelSelect.form
       modelSelect.innerHTML = ''
       if (!normBrand) {
+        clearCatalogModelLineInputs(catalogForm)
+        fillModelSelectWithGroups(modelSelect, { models: [], model_groups: [] }, 'Все')
         modelSelect.disabled = true
-        modelSelect.innerHTML = '<option value="">Все</option>'
+        if (generationSelect) {
+          setSelectOptions(generationSelect, [], { emptyLabel: 'Любое' })
+          syncGenerationVisibility()
+        }
         return
       }
       modelSelect.disabled = true
@@ -1418,13 +1485,28 @@
       const krType = qs('[name="kr_type"]')?.value || ''
       const payload = await fetchModels({ brand: normBrand, region, country, krType })
       fillModelSelectWithGroups(modelSelect, payload, 'Все')
-      if (initialModelParam) {
+      const selectedLines = getCatalogSelectedModels(catalogForm, normBrand)
+      if (selectedLines.length === 1) {
+        setSelectValueInsensitive(modelSelect, selectedLines[0])
+      } else if (!selectedLines.length && initialModelRestorePending && initialModelParam) {
         setSelectValueInsensitive(modelSelect, initialModelParam)
       }
+      initialModelRestorePending = false
       modelSelect.disabled = false
+      modelSelect.__modelAccordionSync?.()
+      if (generationSelect) {
+        if (modelSelect.value) {
+          modelSelect.dispatchEvent(new Event('change', { bubbles: true }))
+        } else {
+          setSelectOptions(generationSelect, [], { emptyLabel: 'Любое' })
+          syncGenerationVisibility()
+        }
+      }
     }
     brandSelect?.addEventListener('change', () => {
-      updateCatalogModels().then(() => loadCars(1))
+      clearCatalogModelLineInputs(filtersForm)
+      if (modelSelect) modelSelect.value = ''
+      updateCatalogModels()
     })
     modelSelect?.addEventListener('change', async () => {
       if (!generationSelect) return
@@ -1454,7 +1536,6 @@
       }
       if (brandSelect && brandSelect.value) {
         await updateCatalogModels()
-        if (initialModelParam) setSelectValueInsensitive(modelSelect, initialModelParam)
       }
       syncGenerationVisibility()
       loadCars(initialPage)
@@ -1642,41 +1723,22 @@
     }
 
     const isCatalogModelSelect = select?.form?.id === 'filters' && (select?.name === 'model' || select?.id === 'model-select')
-    const clearGeneratedModelLines = () => {
-      if (!isCatalogModelSelect || !select?.form) return
-      qsa('input[name="line"][data-generated-model-line="1"]', select.form).forEach((el) => el.remove())
-    }
     const syncGeneratedModelLines = (selectedModels) => {
       if (!isCatalogModelSelect || !select?.form) return
-      clearGeneratedModelLines()
+      clearCatalogModelLineInputs(select.form)
       const brandField = select.form.elements['brand']
       const brand = normalizeBrand(brandField?.value || '')
       const values = Array.isArray(selectedModels) ? selectedModels.filter(Boolean) : []
       if (!brand || values.length <= 1) return
-      values.forEach((modelValue) => {
-        const hidden = document.createElement('input')
-        hidden.type = 'hidden'
-        hidden.name = 'line'
-        hidden.value = `${brand}|${modelValue}|`
-        hidden.dataset.generatedModelLine = '1'
-        select.form.appendChild(hidden)
-      })
+      setCatalogModelLineInputs(
+        select.form,
+        values.map((modelValue) => `${brand}|${modelValue}|`),
+      )
     }
     const getGeneratedModelValues = () => {
       if (!isCatalogModelSelect || !select?.form) return []
       const brandField = select.form.elements['brand']
-      const brand = normalizeBrand(brandField?.value || '')
-      return qsa('input[name="line"][data-generated-model-line="1"]', select.form)
-        .map((el) => String(el.value || ''))
-        .map((line) => {
-          const parts = line.split('|')
-          return {
-            brand: normalizeBrand(parts[0] || ''),
-            model: String(parts[1] || '').trim(),
-          }
-        })
-        .filter((item) => item.model && (!brand || !item.brand || item.brand === brand))
-        .map((item) => item.model)
+      return getCatalogSelectedModels(select.form, brandField?.value || '')
     }
 
     const removeAccordion = () => {
@@ -1684,9 +1746,14 @@
       const key = select.id || select.name || 'model'
       const container = host?.querySelector?.(`[data-model-accordion-for="${key}"]`)
       if (container) container.remove()
+      if (select.__modelAccordionChangeHandler) {
+        select.removeEventListener('change', select.__modelAccordionChangeHandler)
+        select.__modelAccordionChangeHandler = null
+      }
+      select.__modelAccordionSync = null
       if (host) host.classList.remove('has-model-accordion')
       select.classList.remove('model-select-native')
-      clearGeneratedModelLines()
+      clearCatalogModelLineInputs(select.form)
     }
 
     const setAccordionState = (container, selectedValue, selectedValues = []) => {
@@ -1708,6 +1775,25 @@
           selectedEl.textContent = selectedOpt?.textContent || emptyLabel
         }
       }
+      qsa('[data-model-group-values]', container).forEach((btn) => {
+        let groupValues = []
+        try {
+          groupValues = JSON.parse(btn.dataset.modelGroupValues || '[]')
+        } catch {
+          groupValues = []
+        }
+        const matchedCount = groupValues.filter((value) => selectedSet.has(String(value || ''))).length
+        const isActive = Boolean(groupValues.length) && matchedCount === groupValues.length
+        const isPartial = matchedCount > 0 && matchedCount < groupValues.length
+        btn.classList.toggle('is-active', isActive)
+        btn.classList.toggle('is-partial', isPartial)
+        const groupEl = btn.closest('.model-accordion__group')
+        if (groupEl) {
+          groupEl.classList.toggle('is-active', isActive)
+          groupEl.classList.toggle('is-partial', isPartial)
+          if (matchedCount > 0) groupEl.open = true
+        }
+      })
     }
 
     const renderAccordion = () => {
@@ -1726,6 +1812,11 @@
       }
       host.classList.add('has-model-accordion')
       if (!groups.length) {
+        if (select.__modelAccordionChangeHandler) {
+          select.removeEventListener('change', select.__modelAccordionChangeHandler)
+          select.__modelAccordionChangeHandler = null
+        }
+        select.__modelAccordionSync = null
         container.innerHTML = ''
         container.classList.add('is-hidden')
         host.classList.remove('has-model-accordion')
@@ -1822,10 +1913,11 @@
           allBtn.type = 'button'
           allBtn.className = 'model-accordion__model model-accordion__model--all'
           allBtn.textContent = 'Все в серии'
+          const groupValues = groupModels
+            .map((row) => row?.value || row?.model || '')
+            .filter(Boolean)
+          allBtn.dataset.modelGroupValues = JSON.stringify(groupValues)
           allBtn.addEventListener('click', () => {
-            const groupValues = groupModels
-              .map((row) => row?.value || row?.model || '')
-              .filter(Boolean)
             const shouldClearGroup = groupValues.every((value) => selectedModels.has(value))
             groupValues.forEach((value) => {
               if (shouldClearGroup) {
@@ -1872,6 +1964,7 @@
       }
       select.addEventListener('change', handleModelAccordionChange)
       select.__modelAccordionChangeHandler = handleModelAccordionChange
+      select.__modelAccordionSync = handleModelAccordionChange
     }
 
     if (groups.length) {
@@ -2295,9 +2388,10 @@
       syncAdvancedGenerationVisibility()
     }
 
-    const applyPayloadOptions = (data) => {
+    const applyPayloadOptions = async (data, reqId = '') => {
       if (!data) return
       applyBasicOptions(data)
+      await refreshSearchRowsOptions(Array.isArray(data.brands) ? data.brands : [], reqId)
       qsa('[data-region-options]', form).forEach((select) => {
         const name = select.getAttribute('name') || ''
         const base = payloadMap[name]
@@ -2336,7 +2430,7 @@
         if (!res.ok) return
         const data = await res.json()
         if (form.dataset.payloadReqId !== reqId) return
-        applyPayloadOptions(data)
+        await applyPayloadOptions(data, reqId)
       } catch (e) {
         console.warn('filter payload', e)
       }
@@ -2398,15 +2492,6 @@
       if (!hasItems) advancedGenerationSelect.value = ''
     }
 
-    const parseLine = (line) => {
-      const parts = String(line || '').split('|')
-      return {
-        brand: normalizeBrand(parts[0] || ''),
-        model: (parts[1] || '').trim(),
-        variant: (parts[2] || '').trim(),
-      }
-    }
-
     const prepareSubmit = () => {
       // rebuild "line" params from rows so backend receives canonical format
       qsa('input[name="line"]', form).forEach((el) => el.remove())
@@ -2437,8 +2522,10 @@
     const fillModels = async (brand, modelSelect, selected) => {
       if (!modelSelect) return
       if (!brand) {
+        fillModelSelectWithGroups(modelSelect, { models: [], model_groups: [] }, 'Неважно')
         modelSelect.disabled = true
-        modelSelect.innerHTML = '<option value="">Неважно</option>'
+        modelSelect.value = ''
+        modelSelect.__modelAccordionSync?.()
         return
       }
       modelSelect.disabled = true
@@ -2448,8 +2535,40 @@
       const krType = regionKrSelect?.value || ''
       const payload = await fetchModels({ brand, region, country, krType })
       fillModelSelectWithGroups(modelSelect, payload, 'Неважно')
-      if (selected) modelSelect.value = selected
+      if (selected) {
+        setSelectValueInsensitive(modelSelect, selected)
+      } else {
+        modelSelect.value = ''
+      }
       modelSelect.disabled = false
+      modelSelect.__modelAccordionSync?.()
+    }
+
+    const setLineBrandOptions = (select, items) => {
+      if (!select) return
+      setSelectOptions(select, items, { emptyLabel: 'Неважно', labelKey: 'label', valueKey: 'value' })
+      normalizeBrandOptions(select)
+    }
+
+    const refreshSearchRowsOptions = async (brandOptions = [], reqId = '') => {
+      if (!rowsWrap) return
+      form.dataset.lineBrandOptions = JSON.stringify(Array.isArray(brandOptions) ? brandOptions : [])
+      const rows = qsa('[data-search-row]', rowsWrap)
+      for (const row of rows) {
+        if (reqId && form.dataset.payloadReqId !== reqId) return
+        const brandSelect = qs('[data-line-brand]', row)
+        const modelSelect = qs('[data-line-model]', row)
+        if (!brandSelect || !modelSelect) continue
+        const currentBrand = normalizeBrand(brandSelect.value || '')
+        const currentModel = modelSelect.value || ''
+        setLineBrandOptions(brandSelect, brandOptions)
+        if (currentBrand && !setSelectValueInsensitive(brandSelect, currentBrand)) {
+          brandSelect.value = ''
+          await fillModels('', modelSelect, '')
+          continue
+        }
+        await fillModels(normalizeBrand(brandSelect.value || ''), modelSelect, currentModel)
+      }
     }
 
     const bindRow = (row, initial = {}) => {
@@ -2458,7 +2577,12 @@
       const variantInput = qs('[data-line-variant]', row)
       const removeBtn = qs('[data-line-remove]', row)
       if (brandSelect) {
-        normalizeBrandOptions(brandSelect)
+        const dynamicBrandOptions = parseOptions(form.dataset.lineBrandOptions || '[]')
+        if (dynamicBrandOptions.length) {
+          setLineBrandOptions(brandSelect, dynamicBrandOptions)
+        } else {
+          normalizeBrandOptions(brandSelect)
+        }
         brandSelect.value = normalizeBrand(initial.brand || '')
       }
       if (variantInput) variantInput.value = initial.variant || ''
@@ -2583,7 +2707,7 @@
       const lines = buildLines()
       lines.forEach((line) => params.append('line', line))
       if (!params.get('brand') && lines.length === 1) {
-        const first = parseLine(lines[0])
+        const first = parseLineValue(lines[0])
         if (first.brand) params.set('brand', first.brand)
         if (first.model) params.set('model', first.model)
       }
@@ -2623,7 +2747,7 @@
       if (!suggestionsEl) return
       suggestionsEl.innerHTML = ''
       const lines = buildLines()
-      const first = lines.length ? parseLine(lines[0]) : { brand: '', model: '' }
+      const first = lines.length ? parseLineValue(lines[0]) : { brand: '', model: '' }
       const params = new URLSearchParams()
       const country = qs('input[name="country"]', form)?.value
       if (country) params.set('country', country)
@@ -2706,7 +2830,7 @@
     })
 
     const initialParams = new URLSearchParams(window.location.search)
-    const initialLines = initialParams.getAll('line').map(parseLine)
+    const initialLines = initialParams.getAll('line').map(parseLineValue)
     if (!initialLines.length) {
       const brand = normalizeBrand(initialParams.get('brand') || '')
       const model = (initialParams.get('model') || '').trim()

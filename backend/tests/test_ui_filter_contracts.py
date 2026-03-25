@@ -32,3 +32,9 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "setRegionSelectOptions" in script
     assert "item.value ?? item.id" in script
     assert "select.disabled = normalizedItems.length === 0" in script or "select.disabled = deduped.length === 0" in script
+
+
+def test_filter_payload_includes_dynamic_brand_options():
+    router = _read("app/routers/catalog.py")
+    assert 'field="brand"' in router
+    assert '"brands": brands' in router
