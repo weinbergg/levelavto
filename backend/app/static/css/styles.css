@@ -1818,8 +1818,10 @@ body.filters-open {
   white-space: normal !important;
 }
 .advanced-lines .search-row select.model-select-native {
-  height: 46px !important;
-  overflow: visible !important;
+  display: none !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
 }
 .advanced-lines .model-accordion {
   display: block;
@@ -2045,6 +2047,9 @@ body.filters-open {
 
 .model-accordion__item.is-active {
   color: #fff;
+  background: rgba(255, 98, 79, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 98, 79, 0.45);
+  border-radius: 10px;
 }
 
 .model-accordion__models {

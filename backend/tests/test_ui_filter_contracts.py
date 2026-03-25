@@ -50,11 +50,7 @@ def test_cars_count_supports_line_filters():
 def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_lines():
     script = _read("app/static/js/app.js")
     assert "initials.slice(currentRows.length).forEach((initial) => addRow(initial))" in script
-    assert "const selectedModels = getAccordionSelectedModels(modelSelect)" in script
     assert "const models = selectedModels.length ? selectedModels : [modelSelect?.value || '']" in script
-    assert "const currentSelectedModels = getAccordionSelectedModels(modelSelect)" in script
-    assert "currentSelectedModels.length" in script
-    assert "initialSelectedModels.length ? initialSelectedModels : currentModel" in script
     assert "const uniqueBrands = Array.from(new Set(parsedLines.map((item) => item.brand).filter(Boolean)))" in script
     assert "if (!params.get('brand') && uniqueBrands.length === 1)" in script
     assert "data-line-state-hidden=\"1\"" in script or "data-line-state-hidden='1'" in script
@@ -67,13 +63,17 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
     assert "const initialLines = groupLineSelections(initialParams.getAll('line'))" in script
     assert "fillModels(normalizeBrand(initial.brand || ''), modelSelect, initial.models || initial.model || '')" in script
     assert "const getRowInitialSelectedModels = (row) =>" in script
+    assert "const getRowEffectiveSelectedModels = (row, modelSelect) =>" in script
     assert "row.dataset.initialSelectedModels = JSON.stringify(" in script
-    assert "initialSelectedModels.length ? initialSelectedModels : currentModel" in script
+    assert "const currentSelectedModels = getRowEffectiveSelectedModels(row, modelSelect)" in script
+    assert "const selectedModels = getRowEffectiveSelectedModels(row, modelSelect)" in script
+    assert "scheduleCount()" in script
 
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=77' in template
+    assert '/static/js/app.js?v=78' in template
+    assert '/static/css/styles.css?v=38' in template
 
 
 def test_model_group_summary_has_visible_selected_states():
@@ -81,8 +81,9 @@ def test_model_group_summary_has_visible_selected_states():
     assert ".model-accordion__group.is-active > summary" in css
     assert "background: rgba(255, 98, 79, 0.18);" in css
     assert ".model-accordion__group.is-partial > summary" in css
-
-
+    assert ".advanced-lines .search-row select.model-select-native" in css
+    assert "display: none !important;" in css
+    assert ".model-accordion__item.is-active" in css
 def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():
     template = _read("app/templates/catalog.html")
     assert 'data-catalog-line="1"' in template

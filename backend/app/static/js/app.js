@@ -1878,6 +1878,9 @@
       select.__modelAccordionSync = null
       if (host) host.classList.remove('has-model-accordion')
       select.classList.remove('model-select-native')
+      select.hidden = false
+      select.removeAttribute('aria-hidden')
+      select.style.removeProperty('display')
       clearCatalogModelLineInputs(select.form)
     }
 
@@ -1946,10 +1949,16 @@
         container.classList.add('is-hidden')
         host.classList.remove('has-model-accordion')
         select.classList.remove('model-select-native')
+        select.hidden = false
+        select.removeAttribute('aria-hidden')
+        select.style.removeProperty('display')
         return
       }
 
       select.classList.add('model-select-native')
+      select.hidden = true
+      select.setAttribute('aria-hidden', 'true')
+      select.style.setProperty('display', 'none', 'important')
       container.classList.remove('is-hidden')
       container.innerHTML = ''
 
@@ -2760,6 +2769,14 @@
       }
     }
 
+    const getRowEffectiveSelectedModels = (row, modelSelect) => {
+      const selectedModels = getAccordionSelectedModels(modelSelect)
+      if (selectedModels.length) return selectedModels
+      const fallbackValue = String(modelSelect?.value || '').trim()
+      if (fallbackValue) return [fallbackValue]
+      return getRowInitialSelectedModels(row)
+    }
+
     const refreshSearchRowsOptions = async (brandOptions = [], reqId = '') => {
       if (!rowsWrap) return
       form.dataset.lineBrandOptions = JSON.stringify(Array.isArray(brandOptions) ? brandOptions : [])
@@ -2770,8 +2787,7 @@
         const modelSelect = qs('[data-line-model]', row)
         if (!brandSelect || !modelSelect) continue
         const currentBrand = normalizeBrand(brandSelect.value || '')
-        const currentSelectedModels = getAccordionSelectedModels(modelSelect)
-        const initialSelectedModels = getRowInitialSelectedModels(row)
+        const currentSelectedModels = getRowEffectiveSelectedModels(row, modelSelect)
         const currentModel = modelSelect.value || ''
         setLineBrandOptions(brandSelect, brandOptions)
         if (currentBrand && !setSelectValueInsensitive(brandSelect, currentBrand)) {
@@ -2782,9 +2798,7 @@
         await fillModels(
           normalizeBrand(brandSelect.value || ''),
           modelSelect,
-          currentSelectedModels.length
-            ? currentSelectedModels
-            : (initialSelectedModels.length ? initialSelectedModels : currentModel),
+          currentSelectedModels.length ? currentSelectedModels : currentModel,
         )
       }
     }
@@ -2804,12 +2818,17 @@
         brandSelect.value = normalizeBrand(initial.brand || '')
       }
       if (variantInput) variantInput.value = initial.variant || ''
-      row.dataset.initialSelectedModels = JSON.stringify(
-        Array.isArray(initial.models)
-          ? initial.models
-          : (initial.model ? [initial.model] : []),
-      )
-      fillModels(normalizeBrand(initial.brand || ''), modelSelect, initial.models || initial.model || '')
+      const initialModels = Array.isArray(initial.models)
+        ? initial.models
+        : (initial.model ? [initial.model] : [])
+      row.dataset.initialSelectedModels = JSON.stringify(initialModels)
+      Promise.resolve(
+        fillModels(normalizeBrand(initial.brand || ''), modelSelect, initial.models || initial.model || '')
+      ).then(() => {
+        if (initialModels.length) {
+          scheduleCount()
+        }
+      })
       brandSelect?.addEventListener('change', () => {
         fillModels(normalizeBrand(brandSelect.value), modelSelect, '')
         row.dataset.initialSelectedModels = '[]'
@@ -2901,7 +2920,7 @@
       rows.forEach((row) => {
         const brand = normalizeBrand(qs('[data-line-brand]', row)?.value || '')
         const modelSelect = qs('[data-line-model]', row)
-        const selectedModels = getAccordionSelectedModels(modelSelect)
+        const selectedModels = getRowEffectiveSelectedModels(row, modelSelect)
         const variant = qs('[data-line-variant]', row)?.value || ''
         const models = selectedModels.length ? selectedModels : [modelSelect?.value || '']
         const normalizedModels = Array.from(new Set(models.map((value) => String(value || '').trim())))
