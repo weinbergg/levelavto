@@ -69,7 +69,7 @@ def _home_dataset_version() -> str:
 
 
 def _home_media_redis_key() -> str:
-    return "home_media_ctx:v2"
+    return "home_media_ctx:v3"
 
 
 def _home_recommended_redis_key(cfg: Dict[str, Any], limit: int) -> str:
@@ -697,6 +697,8 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
         _HOME_MEDIA_CACHE[cache_key] = cached
         return cached
 
+    app_root = Path(__file__).resolve().parents[1]
+    static_collage_dir = app_root / "static" / "home-collage"
     media_root = Path(__file__).resolve().parents[3] / "фото-видео"
     video_dir = media_root / "видео"
     hero_videos: List[str] = []
@@ -709,6 +711,10 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
         hero_videos = [hero_videos[1]]
 
     image_exts = {".jpg", ".jpeg", ".webp", ".png"}
+
+    def build_static_url(path_obj: Path) -> str:
+        rel = path_obj.relative_to(app_root / "static").as_posix().replace("\u00a0", " ")
+        return f"/static/{quote(rel, safe='/')}"
 
     def build_media_url(path_obj: Path) -> str:
         rel = path_obj.relative_to(media_root).as_posix().replace("\u00a0", " ")
@@ -745,32 +751,58 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
         ]
 
     collage_images: List[Dict[str, Any]] = []
-    gallery_files = collect_gallery_files(media_root)
-    if gallery_files:
+    static_gallery_files = (
+        sorted(
+            p
+            for p in static_collage_dir.rglob("*")
+            if p.is_file()
+            and p.suffix.lower() in image_exts
+            and not any(part.startswith(".") for part in p.parts)
+        )
+        if static_collage_dir.exists()
+        else []
+    )
+    if static_gallery_files:
         rng_files = random.Random(42)
-        rng_files.shuffle(gallery_files)
-        for path_obj in gallery_files:
-            base = path_obj.stem
-            parent = path_obj.parent
-            thumbs_parent = parent.parent / f"{parent.name}_thumbs"
-            t320 = thumbs_parent / f"{base}__w320.webp"
-            t640 = thumbs_parent / f"{base}__w640.webp"
-            has_thumb = t320.exists()
-            src = build_media_url(t320 if has_thumb else path_obj)
-            srcset_parts = []
-            if has_thumb:
-                srcset_parts.append(f"{build_media_url(t320)} 320w")
-                if t640.exists():
-                    srcset_parts.append(f"{build_media_url(t640)} 640w")
+        rng_files.shuffle(static_gallery_files)
+        for path_obj in static_gallery_files:
+            src = build_static_url(path_obj)
             collage_images.append(
                 {
                     "src": src,
-                    "srcset": ", ".join(srcset_parts),
+                    "srcset": "",
                     "width": 320,
                     "height": 240,
-                    "fallback": build_media_url(path_obj),
+                    "fallback": src,
                 }
             )
+    else:
+        gallery_files = collect_gallery_files(media_root)
+        if gallery_files:
+            rng_files = random.Random(42)
+            rng_files.shuffle(gallery_files)
+            for path_obj in gallery_files:
+                base = path_obj.stem
+                parent = path_obj.parent
+                thumbs_parent = parent.parent / f"{parent.name}_thumbs"
+                t320 = thumbs_parent / f"{base}__w320.webp"
+                t640 = thumbs_parent / f"{base}__w640.webp"
+                has_thumb = t320.exists()
+                src = build_media_url(t320 if has_thumb else path_obj)
+                srcset_parts = []
+                if has_thumb:
+                    srcset_parts.append(f"{build_media_url(t320)} 320w")
+                    if t640.exists():
+                        srcset_parts.append(f"{build_media_url(t640)} 640w")
+                collage_images.append(
+                    {
+                        "src": src,
+                        "srcset": ", ".join(srcset_parts),
+                        "width": 320,
+                        "height": 240,
+                        "fallback": build_media_url(path_obj),
+                    }
+                )
 
     collage_display: List[Dict[str, Any]] = []
     if collage_images:

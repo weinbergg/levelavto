@@ -111,5 +111,6 @@ def test_taxonomy_contains_extra_body_and_interior_translations():
 def test_pages_home_uses_recommended_and_media_cache_helpers():
     router = _read("app/routers/pages.py")
     assert "_get_home_recommended(service, db, reco_cfg, limit=12)" in router
-    assert "home_media_ctx:v2" in router
+    assert "home_media_ctx:v3" in router
+    assert 'static" / "home-collage"' in router
     assert "home_recommended:" in router
