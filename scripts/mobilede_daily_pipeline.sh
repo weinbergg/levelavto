@@ -19,6 +19,12 @@ for env_name in KEEP_CSV MOBILEDE_HOST MOBILEDE_LOGIN MOBILEDE_PASSWORD MOBILEDE
 done
 docker compose run --rm "${RUN_ENV_ARGS[@]}" web python -m backend.app.tools.mobilede_daily "${DAILY_ARGS[@]}"
 
+echo "[mobilede_pipeline] step=backfill_missing_registration"
+docker compose exec -T web python -m backend.app.scripts.backfill_missing_registration \
+  --region EU \
+  --batch "${MISSING_REG_BACKFILL_BATCH:-2000}" \
+  --chunk "${MISSING_REG_BACKFILL_CHUNK:-50000}"
+
 echo "[mobilede_pipeline] step=car_counts_refresh"
 docker compose exec -T web python -m backend.app.tools.car_counts_refresh --report
 
@@ -60,10 +66,10 @@ docker compose exec -T web python -m backend.app.scripts.recalc_missing_prices \
   --only-missing-total \
   --report-json /app/artifacts/recalc_missing_prices_daily.json
 
-echo "[mobilede_pipeline] step=recalc_missing_registration"
+echo "[mobilede_pipeline] step=recalc_defaulted_registration"
 docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
   --region EU \
-  --only-missing-registration \
+  --only-defaulted-registration \
   --since-minutes "${MISSING_REG_CALC_SINCE_MINUTES:-2880}" \
   --batch "${MISSING_REG_CALC_BATCH:-2000}"
 

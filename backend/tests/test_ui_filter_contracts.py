@@ -151,10 +151,25 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
     model = _read("app/models/car.py")
     cron = Path(__file__).resolve().parents[2] / "deploy" / "cron.mobilede"
     backfill = _read("app/tools/mobilede_payload_backfill.py")
-    assert 'CALC_MISSING_REG_YEAR", "2025"' in service
-    assert 'CALC_MISSING_REG_MONTH", "1"' in service
+    reg_defaults = _read("app/utils/registration_defaults.py")
+    parsing_service = _read("app/services/parsing_data_service.py")
+    recalc_script = _read("app/scripts/recalc_calc_cache.py")
+    reg_backfill_script = _read("app/scripts/backfill_missing_registration.py")
+    pipeline = Path(__file__).resolve().parents[2] / "scripts" / "mobilede_daily_pipeline.sh"
+    assert "get_missing_registration_default" in service
     assert "car.display_description" in detail_template
     assert "description=row.description" in parser
     assert 'description: Mapped[str | None] = mapped_column(Text, nullable=True)' in model
     assert "mobilede_daily_pipeline.sh" in cron.read_text(encoding="utf-8")
     assert 'car.description = item["payload"].get("description")' in backfill
+    assert 'or os.getenv("CALC_MISSING_REG_YEAR")' in reg_defaults
+    assert 'or os.getenv("CALC_MISSING_REG_MONTH")' in reg_defaults
+    assert 'or "2025"' in reg_defaults
+    assert 'or "1"' in reg_defaults
+    assert 'source_payload["registration_defaulted"] = True' in reg_defaults
+    assert "apply_missing_registration_fallback(payload)" in parsing_service
+    assert "--only-defaulted-registration" in recalc_script
+    assert 'jsonb_extract_path_text(payload_json, "registration_defaulted")' in recalc_script
+    assert "[backfill_missing_registration]" in reg_backfill_script
+    assert "step=backfill_missing_registration" in pipeline.read_text(encoding="utf-8")
+    assert "step=recalc_defaulted_registration" in pipeline.read_text(encoding="utf-8")

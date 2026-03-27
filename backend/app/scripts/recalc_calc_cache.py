@@ -7,7 +7,8 @@ from backend.app.db import SessionLocal
 from backend.app.models import Car
 from backend.app.services.cars_service import CarsService
 from backend.app.utils.telegram import send_telegram_message
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, cast
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 def main() -> None:
@@ -20,6 +21,11 @@ def main() -> None:
         "--only-missing-registration",
         action="store_true",
         help="recalculate only cars with missing registration_year or registration_month",
+    )
+    ap.add_argument(
+        "--only-defaulted-registration",
+        action="store_true",
+        help="recalculate only cars with auto-defaulted registration date",
     )
     ap.add_argument("--since-minutes", type=int, default=None)
     ap.add_argument("--chunk", type=int, default=50000, help="ids per window (avoid huge offsets)")
@@ -92,6 +98,14 @@ def main() -> None:
             base = base.filter(
                 or_(Car.registration_year.is_(None), Car.registration_month.is_(None))
             )
+        if args.only_defaulted_registration:
+            payload_json = cast(Car.source_payload, JSONB)
+            base = base.filter(
+                func.coalesce(
+                    func.jsonb_extract_path_text(payload_json, "registration_defaulted"),
+                    "false",
+                ) == "true"
+            )
         if args.since_minutes:
             since_ts = datetime.utcnow() - timedelta(minutes=args.since_minutes)
             base = base.filter(Car.updated_at >= since_ts)
@@ -117,7 +131,9 @@ def main() -> None:
                     for car in cars:
                         processed += 1
                         try:
-                            force_recalc = bool(args.only_missing_registration)
+                            force_recalc = bool(
+                                args.only_missing_registration or args.only_defaulted_registration
+                            )
                             res = svc.ensure_calc_cache(car, force=force_recalc)
                             if res is None:
                                 skipped += 1

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
@@ -9,6 +8,7 @@ from ..models.car import Car
 from ..services.cars_service import CarsService
 from ..services.calculator_config_service import CalculatorConfigService
 from ..services.calculator_runtime import EstimateRequest, calculate, is_bev
+from ..utils.registration_defaults import get_missing_registration_default
 
 
 def build_calc_debug(
@@ -65,6 +65,8 @@ def build_calc_debug(
     if car.engine_type and "electric" in car.engine_type.lower() and car.engine_cc and car.engine_cc > 0:
         notes.append("fuel_conflict: engine_type electric but engine_cc>0, treating as ICE/PHEV")
 
+    fallback_reg_year, fallback_reg_month = get_missing_registration_default()
+
     req = EstimateRequest(
         scenario=scenario,
         price_net_eur=price_net_eur or 0,
@@ -73,8 +75,8 @@ def build_calc_debug(
         power_hp=float(car.power_hp) if car.power_hp is not None else None,
         power_kw=float(car.power_kw) if car.power_kw is not None else None,
         is_electric=is_electric,
-        reg_year=car.registration_year or int(os.getenv("CALC_MISSING_REG_YEAR", "2025") or 2025),
-        reg_month=car.registration_month or int(os.getenv("CALC_MISSING_REG_MONTH", "1") or 1),
+        reg_year=car.registration_year or fallback_reg_year,
+        reg_month=car.registration_month or fallback_reg_month,
     )
     result = calculate(cfg.payload, req)
 

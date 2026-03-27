@@ -20,6 +20,7 @@ from ..utils.localization import display_color
 from ..utils.color_groups import normalize_color_group_key
 from ..utils.country_map import normalize_country_code
 from ..utils.redis_cache import build_cars_count_key, redis_get_json, redis_set_json
+from ..utils.registration_defaults import get_missing_registration_default
 from ..utils.taxonomy import (
     normalize_color,
     normalize_fuel,
@@ -1602,8 +1603,7 @@ class CarsService:
             self.logger.info("calc_skip_no_price car=%s src=%s", car.id, getattr(car.source, "key", None))
             return _fallback_total("no_price")
         reg_fallback_missing = False
-        fallback_reg_year = int(os.getenv("CALC_MISSING_REG_YEAR", "2025") or 2025)
-        fallback_reg_month = int(os.getenv("CALC_MISSING_REG_MONTH", "1") or 1)
+        fallback_reg_year, fallback_reg_month = get_missing_registration_default()
         # Business rule: if registration date is missing, treat the car as registered from the fallback period.
         if car.registration_year and car.registration_month:
             reg_year = int(car.registration_year)

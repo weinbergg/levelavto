@@ -9,6 +9,7 @@ from ..models import Car, Source, CarImage, ProgressKV
 from ..services.cars_service import CarsService
 from ..utils.pricing import to_rub
 from ..utils.color_groups import normalize_color_group
+from ..utils.registration_defaults import apply_missing_registration_fallback
 
 
 def compute_car_hash(payload: Dict[str, Any]) -> str:
@@ -85,6 +86,7 @@ class ParsingDataService:
                 if ts is None:
                     ts = now
                 payload["listing_date"] = ts
+            apply_missing_registration_fallback(payload)
             rub = to_rub(payload.get("price"), payload.get("currency"), rates)
             if rub is not None:
                 payload["price_rub_cached"] = round(rub, 2)
