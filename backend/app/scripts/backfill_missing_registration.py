@@ -4,7 +4,8 @@ import argparse
 import time
 from datetime import datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, cast, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 
 from backend.app.db import SessionLocal
 from backend.app.models import Car, Source
@@ -24,8 +25,37 @@ def main() -> None:
     fallback_year, fallback_month = get_missing_registration_default()
 
     with SessionLocal() as db:
+        payload_json = cast(Car.source_payload, JSONB)
+        defaulted_expr = (
+            func.coalesce(
+                func.jsonb_extract_path_text(payload_json, "registration_defaulted"),
+                "false",
+            )
+            == "true"
+        )
+        default_year_expr = func.coalesce(
+            func.jsonb_extract_path_text(payload_json, "registration_default_year"),
+            "",
+        )
+        default_month_expr = func.coalesce(
+            func.jsonb_extract_path_text(payload_json, "registration_default_month"),
+            "",
+        )
+        missing_registration_expr = or_(
+            Car.registration_year.is_(None),
+            Car.registration_month.is_(None),
+        )
+        stale_default_expr = and_(
+            defaulted_expr,
+            or_(
+                Car.registration_year != fallback_year,
+                Car.registration_month != fallback_month,
+                default_year_expr != str(fallback_year),
+                default_month_expr != str(fallback_month),
+            ),
+        )
         base = db.query(Car.id).filter(
-            or_(Car.registration_year.is_(None), Car.registration_month.is_(None))
+            or_(missing_registration_expr, stale_default_expr)
         )
         region = (args.region or "").strip().upper()
         if region == "EU":
@@ -76,19 +106,35 @@ def main() -> None:
                     batch_ids = ids[i : i + args.batch]
                     cars = db.query(Car).filter(Car.id.in_(batch_ids)).all()
                     for car in cars:
+                        payload = dict(car.source_payload or {})
+                        is_defaulted = payload.get("registration_defaulted") is True
+                        needs_rewrite = is_defaulted and (
+                            int(car.registration_year or 0) != fallback_year
+                            or int(car.registration_month or 0) != fallback_month
+                            or int(payload.get("registration_default_year") or 0) != fallback_year
+                            or int(payload.get("registration_default_month") or 0) != fallback_month
+                        )
+                        needs_fill = (
+                            car.registration_year is None
+                            or car.registration_month is None
+                        )
                         changed = False
-                        if car.registration_year is None:
+                        if car.registration_year is None or needs_rewrite:
                             car.registration_year = fallback_year
                             changed = True
-                        if car.registration_month is None:
+                        if car.registration_month is None or needs_rewrite:
                             car.registration_month = fallback_month
                             changed = True
-                        if changed:
-                            payload = dict(car.source_payload or {})
+                        if changed or needs_fill or needs_rewrite:
                             payload["registration_defaulted"] = True
-                            payload["registration_default_year"] = int(car.registration_year or fallback_year)
-                            payload["registration_default_month"] = int(car.registration_month or fallback_month)
+                            payload["registration_default_year"] = int(
+                                car.registration_year or fallback_year
+                            )
+                            payload["registration_default_month"] = int(
+                                car.registration_month or fallback_month
+                            )
                             car.source_payload = payload
+                        if changed:
                             car.updated_at = datetime.utcnow()
                             updated += 1
                         processed += 1

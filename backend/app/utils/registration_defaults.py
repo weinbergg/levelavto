@@ -8,7 +8,7 @@ def get_missing_registration_default() -> Tuple[int, int]:
     raw_year = (
         os.getenv("REGISTRATION_DEFAULT_YEAR")
         or os.getenv("CALC_MISSING_REG_YEAR")
-        or "2025"
+        or "2026"
     )
     raw_month = (
         os.getenv("REGISTRATION_DEFAULT_MONTH")
@@ -18,7 +18,7 @@ def get_missing_registration_default() -> Tuple[int, int]:
     try:
         year = int(raw_year)
     except Exception:
-        year = 2025
+        year = 2026
     try:
         month = int(raw_month)
     except Exception:

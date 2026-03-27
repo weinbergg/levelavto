@@ -164,12 +164,14 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
     assert 'car.description = item["payload"].get("description")' in backfill
     assert 'or os.getenv("CALC_MISSING_REG_YEAR")' in reg_defaults
     assert 'or os.getenv("CALC_MISSING_REG_MONTH")' in reg_defaults
-    assert 'or "2025"' in reg_defaults
+    assert 'or "2026"' in reg_defaults
     assert 'or "1"' in reg_defaults
     assert 'source_payload["registration_defaulted"] = True' in reg_defaults
     assert "apply_missing_registration_fallback(payload)" in parsing_service
     assert "--only-defaulted-registration" in recalc_script
     assert 'jsonb_extract_path_text(payload_json, "registration_defaulted")' in recalc_script
     assert "[backfill_missing_registration]" in reg_backfill_script
+    assert 'default_year_expr != str(fallback_year)' in reg_backfill_script
+    assert 'default_month_expr != str(fallback_month)' in reg_backfill_script
     assert "step=backfill_missing_registration" in pipeline.read_text(encoding="utf-8")
     assert "step=recalc_defaulted_registration" in pipeline.read_text(encoding="utf-8")
