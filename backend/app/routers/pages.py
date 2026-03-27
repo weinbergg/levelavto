@@ -39,6 +39,7 @@ from ..utils.taxonomy import (
     ru_drivetrain,
     translate_payload_value,
     build_labeled_options,
+    build_interior_options,
     normalize_fuel,
     normalize_color as _normalize_color,
     color_hex,
@@ -69,7 +70,7 @@ def _home_dataset_version() -> str:
 
 
 def _home_media_redis_key() -> str:
-    return "home_media_ctx:v3"
+    return "home_media_ctx:v4"
 
 
 def _home_recommended_redis_key(cfg: Dict[str, Any], limit: int) -> str:
@@ -444,6 +445,8 @@ def _build_filter_context(
         climatisation_options = []
         airbags_options = []
         interior_design_options = []
+        interior_color_options = []
+        interior_material_options = []
         price_rating_labels = []
         seats_options_eu = build_labeled_options(_sort_numeric_strings(eu_payload.get("num_seats", [])), "num_seats")
         doors_options_eu = build_labeled_options(_sort_numeric_strings(eu_payload.get("doors_count", [])), "doors_count")
@@ -453,6 +456,8 @@ def _build_filter_context(
         climatisation_options_eu = build_labeled_options(eu_payload.get("climatisation", []), "climatisation")
         airbags_options_eu = build_labeled_options(eu_payload.get("airbags", []), "airbags")
         interior_design_options_eu = build_labeled_options(eu_payload.get("interior_design", []), "interior_design")
+        interior_color_options_eu = build_interior_options(eu_payload.get("interior_design", []), "color")
+        interior_material_options_eu = build_interior_options(eu_payload.get("interior_design", []), "material")
         price_rating_labels_eu = build_labeled_options(eu_payload.get("price_rating_label", []), "price_rating_label")
         seats_options_kr = build_labeled_options(_sort_numeric_strings(kr_payload.get("num_seats", [])), "num_seats")
         doors_options_kr = build_labeled_options(_sort_numeric_strings(kr_payload.get("doors_count", [])), "doors_count")
@@ -462,6 +467,8 @@ def _build_filter_context(
         climatisation_options_kr = build_labeled_options(kr_payload.get("climatisation", []), "climatisation")
         airbags_options_kr = build_labeled_options(kr_payload.get("airbags", []), "airbags")
         interior_design_options_kr = build_labeled_options(kr_payload.get("interior_design", []), "interior_design")
+        interior_color_options_kr = build_interior_options(kr_payload.get("interior_design", []), "color")
+        interior_material_options_kr = build_interior_options(kr_payload.get("interior_design", []), "material")
         price_rating_labels_kr = build_labeled_options(kr_payload.get("price_rating_label", []), "price_rating_label")
     else:
         seats_options = []
@@ -472,6 +479,8 @@ def _build_filter_context(
         climatisation_options = []
         airbags_options = []
         interior_design_options = []
+        interior_color_options = []
+        interior_material_options = []
         price_rating_labels = []
         seats_options_eu = []
         doors_options_eu = []
@@ -481,6 +490,8 @@ def _build_filter_context(
         climatisation_options_eu = []
         airbags_options_eu = []
         interior_design_options_eu = []
+        interior_color_options_eu = []
+        interior_material_options_eu = []
         price_rating_labels_eu = []
         seats_options_kr = []
         doors_options_kr = []
@@ -490,6 +501,8 @@ def _build_filter_context(
         climatisation_options_kr = []
         airbags_options_kr = []
         interior_design_options_kr = []
+        interior_color_options_kr = []
+        interior_material_options_kr = []
         price_rating_labels_kr = []
     kr_types = []
     t0 = time.perf_counter()
@@ -567,6 +580,8 @@ def _build_filter_context(
         "climatisation_options": climatisation_options,
         "airbags_options": airbags_options,
         "interior_design_options": interior_design_options,
+        "interior_color_options": interior_color_options,
+        "interior_material_options": interior_material_options,
         "price_rating_labels": price_rating_labels,
         "seats_options_eu": seats_options_eu,
         "doors_options_eu": doors_options_eu,
@@ -576,6 +591,8 @@ def _build_filter_context(
         "climatisation_options_eu": climatisation_options_eu,
         "airbags_options_eu": airbags_options_eu,
         "interior_design_options_eu": interior_design_options_eu,
+        "interior_color_options_eu": interior_color_options_eu,
+        "interior_material_options_eu": interior_material_options_eu,
         "price_rating_labels_eu": price_rating_labels_eu,
         "seats_options_kr": seats_options_kr,
         "doors_options_kr": doors_options_kr,
@@ -585,6 +602,8 @@ def _build_filter_context(
         "climatisation_options_kr": climatisation_options_kr,
         "airbags_options_kr": airbags_options_kr,
         "interior_design_options_kr": interior_design_options_kr,
+        "interior_color_options_kr": interior_color_options_kr,
+        "interior_material_options_kr": interior_material_options_kr,
         "price_rating_labels_kr": price_rating_labels_kr,
         "has_air_suspension": has_air_suspension,
     }
@@ -614,7 +633,11 @@ def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
             if item.get("value")
         ]
         body_type_stats = [
-            {"body_type": item.get("value"), "count": int(item.get("count") or 0)}
+            {
+                "body_type": item.get("value"),
+                "label": item.get("label") or ru_body(item.get("value")) or display_body(item.get("value")) or item.get("value"),
+                "count": int(item.get("count") or 0),
+            }
             for item in base_ctx.get("body_types") or []
             if item.get("value")
         ]
@@ -654,7 +677,11 @@ def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
         if row.get("value")
     ]
     body_type_stats = [
-        {"body_type": row["value"], "count": int(row["count"])}
+        {
+            "body_type": row["value"],
+            "label": ru_body(row["value"]) or display_body(row["value"]) or row["value"],
+            "count": int(row["count"]),
+        }
         for row in service.facet_counts(field="body_type", filters={})
         if row.get("value")
     ]
@@ -809,12 +836,12 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
         rng = random.Random(21)
         pool = collage_images.copy()
         rng.shuffle(pool)
-        while len(collage_display) < 60:
+        while len(collage_display) < 75:
             for item in pool:
                 if collage_display and collage_display[-1]["src"] == item["src"]:
                     continue
                 collage_display.append(item)
-                if len(collage_display) >= 60:
+                if len(collage_display) >= 75:
                     break
             rng.shuffle(pool)
     else:
@@ -1398,6 +1425,8 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "engine_types": [],
             "transmissions": [],
             "drive_types": [],
+            "interior_color_options": [],
+            "interior_material_options": [],
             "has_air_suspension": service.has_air_suspension(),
             "initial_items": initial_items,
             "fx_rates": fx_rates,
@@ -1491,6 +1520,8 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "climatisation_options": filter_ctx["climatisation_options"],
             "airbags_options": filter_ctx["airbags_options"],
             "interior_design_options": filter_ctx["interior_design_options"],
+            "interior_color_options": filter_ctx.get("interior_color_options") or [],
+            "interior_material_options": filter_ctx.get("interior_material_options") or [],
             "price_rating_labels": filter_ctx["price_rating_labels"],
             "seats_options_eu": filter_ctx["seats_options_eu"],
             "doors_options_eu": filter_ctx["doors_options_eu"],
@@ -1500,6 +1531,8 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "climatisation_options_eu": filter_ctx["climatisation_options_eu"],
             "airbags_options_eu": filter_ctx["airbags_options_eu"],
             "interior_design_options_eu": filter_ctx["interior_design_options_eu"],
+            "interior_color_options_eu": filter_ctx.get("interior_color_options_eu") or [],
+            "interior_material_options_eu": filter_ctx.get("interior_material_options_eu") or [],
             "price_rating_labels_eu": filter_ctx["price_rating_labels_eu"],
             "seats_options_kr": filter_ctx["seats_options_kr"],
             "doors_options_kr": filter_ctx["doors_options_kr"],
@@ -1509,6 +1542,8 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "climatisation_options_kr": filter_ctx["climatisation_options_kr"],
             "airbags_options_kr": filter_ctx["airbags_options_kr"],
             "interior_design_options_kr": filter_ctx["interior_design_options_kr"],
+            "interior_color_options_kr": filter_ctx.get("interior_color_options_kr") or [],
+            "interior_material_options_kr": filter_ctx.get("interior_material_options_kr") or [],
             "price_rating_labels_kr": filter_ctx["price_rating_labels_kr"],
             "has_air_suspension": filter_ctx["has_air_suspension"],
             "content": contact_content,
@@ -1645,6 +1680,8 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         )
         payload = car.source_payload or {}
         pricing = service.price_info(car)
+        raw_description = (getattr(car, "description", None) or payload.get("description") or "").strip()
+        car.display_description = raw_description if raw_description else None
 
         def push(label: str, value: Any, *, as_color: bool = False) -> None:
             if value is None:

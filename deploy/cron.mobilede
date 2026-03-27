@@ -1,1 +1,1 @@
-15 9 * * * cd /opt/levelavto && /bin/bash scripts/fetch_mobilede_csv.sh >> /var/log/mobilede_fetch.log 2>&1
+15 9 * * * cd /opt/levelavto && /bin/bash scripts/mobilede_daily_pipeline.sh >> /var/log/mobilede_daily.log 2>&1

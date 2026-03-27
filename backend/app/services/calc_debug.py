@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
@@ -72,8 +73,8 @@ def build_calc_debug(
         power_hp=float(car.power_hp) if car.power_hp is not None else None,
         power_kw=float(car.power_kw) if car.power_kw is not None else None,
         is_electric=is_electric,
-        reg_year=car.registration_year,
-        reg_month=car.registration_month,
+        reg_year=car.registration_year or int(os.getenv("CALC_MISSING_REG_YEAR", "2025") or 2025),
+        reg_month=car.registration_month or int(os.getenv("CALC_MISSING_REG_MONTH", "1") or 1),
     )
     result = calculate(cfg.payload, req)
 
@@ -105,6 +106,8 @@ def build_calc_debug(
             "eur_rate": eur_rate_used,
             "usd_rate": usd_rate_used,
             "price_net_eur": price_net_eur,
+            "effective_reg_year": req.reg_year,
+            "effective_reg_month": req.reg_month,
         },
         "car": {
             "id": car.id,
@@ -118,6 +121,7 @@ def build_calc_debug(
             "power_kw": float(car.power_kw) if car.power_kw is not None else None,
             "registration_year": car.registration_year,
             "registration_month": car.registration_month,
+            "registration_fallback_applied": bool(not car.registration_year or not car.registration_month),
             "engine_type": car.engine_type,
             "country": car.country,
             "source_url": car.source_url,

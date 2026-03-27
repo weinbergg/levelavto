@@ -16,6 +16,7 @@ from ..utils.taxonomy import (
     ru_drivetrain,
     color_hex,
     build_labeled_options,
+    build_interior_options,
     translate_payload_value,
 )
 from ..utils.localization import display_body, display_color
@@ -1212,14 +1213,17 @@ def filter_ctx_base(
     t0 = time.perf_counter()
     cached = redis_get_json(cache_key)
     if cached:
-        print("FILTER_CTX_BASE_CACHE hit=1 source=redis", flush=True)
-        if os.getenv("FILTER_CTX_DEBUG") == "1":
-            total_ms = (time.perf_counter() - t0) * 1000
-            print(
-                f"FILTER_CTX_BASE ms={total_ms:.2f} regions={len(cached.get('regions', []))} countries={len(cached.get('countries', []))} brands={len(cached.get('brands', []))}",
-                flush=True,
-            )
-        return cached
+        if "interior_color_options" not in cached or "interior_material_options" not in cached:
+            cached = None
+        else:
+            print("FILTER_CTX_BASE_CACHE hit=1 source=redis", flush=True)
+            if os.getenv("FILTER_CTX_DEBUG") == "1":
+                total_ms = (time.perf_counter() - t0) * 1000
+                print(
+                    f"FILTER_CTX_BASE ms={total_ms:.2f} regions={len(cached.get('regions', []))} countries={len(cached.get('countries', []))} brands={len(cached.get('brands', []))}",
+                    flush=True,
+                )
+            return cached
     print("FILTER_CTX_BASE_CACHE hit=0 source=fallback", flush=True)
     base_filters = {"region": params.get("region"), "country": params.get("country")}
     regions_raw = [r["value"] for r in service.facet_counts(field="region", filters={}) if r.get("value")]
@@ -1299,6 +1303,7 @@ def filter_ctx_base(
         ]
     )
     colors_basic, colors_other = _split_colors(service.facet_counts(field="color", filters=base_filters))
+    interior_payload = service.payload_values_bulk_filtered(["interior_design"], **base_filters)
     payload = {
         "regions": regions,
         "countries": countries,
@@ -1311,6 +1316,8 @@ def filter_ctx_base(
         "drive_types": drive_types,
         "colors_basic": colors_basic,
         "colors_other": colors_other,
+        "interior_color_options": build_interior_options(interior_payload.get("interior_design", []), "color"),
+        "interior_material_options": build_interior_options(interior_payload.get("interior_design", []), "material"),
         "reg_years": reg_years,
         "reg_months": [{"value": i + 1, "label": m} for i, m in enumerate(["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"])],
     }
@@ -1522,6 +1529,8 @@ def filter_payload(
             "climatisation": qp.get("climatisation"),
             "airbags": qp.get("airbags"),
             "interior_design": qp.get("interior_design"),
+            "interior_color": qp.get("interior_color"),
+            "interior_material": qp.get("interior_material"),
             "air_suspension": _to_bool(qp.get("air_suspension")),
             "price_rating_label": qp.get("price_rating_label"),
             "owners_count": qp.get("owners_count"),
@@ -1530,9 +1539,10 @@ def filter_payload(
     cache_key = build_filter_payload_key(params)
     cached = redis_get_json(cache_key)
     if cached:
-        if timing_enabled:
-            print("FILTER_PAYLOAD_CACHE hit=1 source=redis payload_total_ms=0.0", flush=True)
-        return cached
+        if "interior_color_options_eu" in cached and "interior_material_options_eu" in cached:
+            if timing_enabled:
+                print("FILTER_PAYLOAD_CACHE hit=1 source=redis payload_total_ms=0.0", flush=True)
+            return cached
     start = time.perf_counter()
     payload_keys = [
         "num_seats",
@@ -1582,6 +1592,8 @@ def filter_payload(
         "climatisation": qp.get("climatisation"),
         "airbags": qp.get("airbags"),
         "interior_design": qp.get("interior_design"),
+        "interior_color": qp.get("interior_color"),
+        "interior_material": qp.get("interior_material"),
         "air_suspension": _to_bool(qp.get("air_suspension")),
         "price_rating_label": qp.get("price_rating_label"),
         "owners_count": qp.get("owners_count"),
@@ -1686,6 +1698,8 @@ def filter_payload(
         "climatisation_options_eu": build_labeled_options(eu_payload.get("climatisation", []), "climatisation"),
         "airbags_options_eu": build_labeled_options(eu_payload.get("airbags", []), "airbags"),
         "interior_design_options_eu": build_labeled_options(eu_payload.get("interior_design", []), "interior_design"),
+        "interior_color_options_eu": build_interior_options(eu_payload.get("interior_design", []), "color"),
+        "interior_material_options_eu": build_interior_options(eu_payload.get("interior_design", []), "material"),
         "price_rating_labels_eu": build_labeled_options(eu_payload.get("price_rating_label", []), "price_rating_label"),
         "seats_options_kr": build_labeled_options(_sort_numeric_strings(kr_payload.get("num_seats", [])), "num_seats"),
         "doors_options_kr": build_labeled_options(_sort_numeric_strings(kr_payload.get("doors_count", [])), "doors_count"),
@@ -1695,6 +1709,8 @@ def filter_payload(
         "climatisation_options_kr": build_labeled_options(kr_payload.get("climatisation", []), "climatisation"),
         "airbags_options_kr": build_labeled_options(kr_payload.get("airbags", []), "airbags"),
         "interior_design_options_kr": build_labeled_options(kr_payload.get("interior_design", []), "interior_design"),
+        "interior_color_options_kr": build_interior_options(kr_payload.get("interior_design", []), "color"),
+        "interior_material_options_kr": build_interior_options(kr_payload.get("interior_design", []), "material"),
         "price_rating_labels_kr": build_labeled_options(kr_payload.get("price_rating_label", []), "price_rating_label"),
     }
     redis_set_json(cache_key, data, ttl_sec=3600)

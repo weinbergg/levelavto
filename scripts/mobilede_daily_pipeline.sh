@@ -8,10 +8,16 @@ echo "[mobilede_pipeline] start $(date -Iseconds)"
 
 echo "[mobilede_pipeline] step=mobilede_daily"
 DAILY_ARGS=()
+RUN_ENV_ARGS=()
 if [ "${MOBILEDE_ALLOW_DEACTIVATE:-0}" = "1" ]; then
   DAILY_ARGS+=(--allow-deactivate)
 fi
-docker compose run --rm web python -m backend.app.tools.mobilede_daily "${DAILY_ARGS[@]}"
+for env_name in KEEP_CSV MOBILEDE_HOST MOBILEDE_LOGIN MOBILEDE_PASSWORD MOBILEDE_USER MOBILEDE_PASS MOBILEDE_TMP_DIR MOBILEDE_MIN_FREE_GB RUN_EU_CALC_AFTER_DAILY EU_CALC_SINCE_MIN; do
+  if [ -n "${!env_name:-}" ]; then
+    RUN_ENV_ARGS+=(-e "${env_name}=${!env_name}")
+  fi
+done
+docker compose run --rm "${RUN_ENV_ARGS[@]}" web python -m backend.app.tools.mobilede_daily "${DAILY_ARGS[@]}"
 
 echo "[mobilede_pipeline] step=car_counts_refresh"
 docker compose exec -T web python -m backend.app.tools.car_counts_refresh --report
@@ -53,6 +59,13 @@ docker compose exec -T web python -m backend.app.scripts.recalc_missing_prices \
   --limit "${MISSING_PRICE_LIMIT:-50000}" \
   --only-missing-total \
   --report-json /app/artifacts/recalc_missing_prices_daily.json
+
+echo "[mobilede_pipeline] step=recalc_missing_registration"
+docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
+  --region EU \
+  --only-missing-registration \
+  --since-minutes "${MISSING_REG_CALC_SINCE_MINUTES:-2880}" \
+  --batch "${MISSING_REG_CALC_BATCH:-2000}"
 
 if [ "${MOBILEDE_PRUNE_UNUSED_MEDIA:-1}" = "1" ]; then
   echo "[mobilede_pipeline] step=prune_unused_local_media"

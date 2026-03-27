@@ -265,7 +265,7 @@
         <div class="search-filters">
           <div class="filters-primary-grid advanced-grid">
             {% if (colors_basic and colors_basic|length > 0) or (colors_other and colors_other|length > 0) %}
-            <label class="field--full">Цвет кузова
+            <div class="field field--full"><span class="field-label">Цвет кузова</span>
               {% if colors_basic and colors_basic|length > 0 %}
               <div class="color-swatches color-swatches--basic" data-color-chips>
                 {% for c in colors_basic %}
@@ -306,14 +306,14 @@
               </div>
               {% endif %}
               <input type="hidden" name="color" value="{{ params.get('color','') }}">
-            </label>
+            </div>
             {% endif %}
           </div>
         </div>
       </section>
 
-      {% set interior_has_eu = interior_design_options_eu and interior_design_options_eu|length > 0 %}
-      {% set interior_has_kr = interior_design_options_kr and interior_design_options_kr|length > 0 %}
+      {% set interior_has_eu = (interior_design_options_eu and interior_design_options_eu|length > 0) or (interior_color_options_eu and interior_color_options_eu|length > 0) or (interior_material_options_eu and interior_material_options_eu|length > 0) %}
+      {% set interior_has_kr = (interior_design_options_kr and interior_design_options_kr|length > 0) or (interior_color_options_kr and interior_color_options_kr|length > 0) or (interior_material_options_kr and interior_material_options_kr|length > 0) %}
       <section class="advanced-section" id="advanced-interior" data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">
         <h2 class="advanced-section__title">Интерьер</h2>
         <div class="search-filters">
@@ -331,11 +331,31 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Цвет салона
-              <input type="text" name="interior_color" value="{{ params.get('interior_color','') }}" placeholder="Например: black, beige, nero" />
+            <label data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">Цвет салона
+              <select
+                name="interior_color"
+                data-region-options
+                data-options-eu='{{ interior_color_options_eu | tojson }}'
+                data-options-kr='{{ interior_color_options_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for opt in interior_color_options_eu %}
+                <option value="{{ opt.value }}" {% if params.get('interior_color') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                {% endfor %}
+              </select>
             </label>
-            <label>Материал салона
-              <input type="text" name="interior_material" value="{{ params.get('interior_material','') }}" placeholder="Например: leather, alcantara, fabric" />
+            <label data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">Материал салона
+              <select
+                name="interior_material"
+                data-region-options
+                data-options-eu='{{ interior_material_options_eu | tojson }}'
+                data-options-kr='{{ interior_material_options_kr | tojson }}'
+              >
+                <option value="">Не важно</option>
+                {% for opt in interior_material_options_eu %}
+                <option value="{{ opt.value }}" {% if params.get('interior_material') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                {% endfor %}
+              </select>
             </label>
           </div>
         </div>

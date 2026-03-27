@@ -24,6 +24,8 @@ def test_search_template_keeps_core_selects_clickable():
     assert '<select name="transmission">' in template
     assert '<select name="drive_type">' in template
     assert '<select name="engine_type">' in template
+    assert 'name="interior_color"' in template
+    assert 'name="interior_material"' in template
 
 
 def test_js_updates_generation_visibility_and_select_disabled_state():
@@ -38,6 +40,8 @@ def test_filter_payload_includes_dynamic_brand_options():
     router = _read("app/routers/catalog.py")
     assert 'field="brand"' in router
     assert '"brands": brands' in router
+    assert '"interior_color_options_eu": build_interior_options' in router
+    assert '"interior_material_options_eu": build_interior_options' in router
 
 
 def test_cars_count_supports_line_filters():
@@ -72,8 +76,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=79' in template
-    assert '/static/css/styles.css?v=38' in template
+    assert '/static/js/app.js?v=80' in template
+    assert '/static/css/styles.css?v=40' in template
 
 
 def test_home_search_uses_line_params_and_js_submit():
@@ -104,13 +108,53 @@ def test_taxonomy_contains_extra_body_and_interior_translations():
     utils = _read("app/utils/taxonomy.py")
     assert "body_type,sportscar,Спорткар" in taxonomy
     assert "body_type,othercar,Прочее" in taxonomy
+    assert "color,pink,Розовый" in taxonomy
     assert '"leder": "кожа"' in utils
     assert '"kunstleder": "экокожа"' in utils
+    assert "_INTERIOR_COLOR_LABELS" in utils
+    assert "_INTERIOR_MATERIAL_LABELS" in utils
 
 
 def test_pages_home_uses_recommended_and_media_cache_helpers():
     router = _read("app/routers/pages.py")
     assert "_get_home_recommended(service, db, reco_cfg, limit=12)" in router
-    assert "home_media_ctx:v3" in router
+    assert "home_media_ctx:v4" in router
     assert 'static" / "home-collage"' in router
     assert "home_recommended:" in router
+
+
+def test_home_collage_and_home_content_copy_are_updated():
+    template = _read("app/templates/home.html")
+    home_content = _read("app/utils/home_content.py")
+    assert "collage_images[:75]" in template
+    assert "Показываем только марки, которые есть в каталоге" in home_content
+
+
+def test_catalog_and_search_color_filters_use_non_label_wrapper():
+    search_template = _read("app/templates/search.html")
+    catalog_template = _read("app/templates/catalog.html")
+    assert '<div class="field field--full"><span class="field-label">Цвет кузова</span>' in search_template
+    assert '<div class="field field--full"><span class="field-label">Цвет кузова</span>' in catalog_template
+
+
+def test_registration_year_filters_fallback_to_car_year_when_missing():
+    service = _read("app/services/cars_service.py")
+    assert "reg_year_expr = func.coalesce(Car.registration_year, Car.year)" in service
+    assert "reg_month_floor_expr = func.coalesce(Car.registration_month, 12)" in service
+    assert "reg_month_ceil_expr = func.coalesce(Car.registration_month, 1)" in service
+
+
+def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_description():
+    service = _read("app/services/cars_service.py")
+    detail_template = _read("app/templates/car_detail.html")
+    parser = _read("app/parsing/mobile_de_feed.py")
+    model = _read("app/models/car.py")
+    cron = Path(__file__).resolve().parents[2] / "deploy" / "cron.mobilede"
+    backfill = _read("app/tools/mobilede_payload_backfill.py")
+    assert 'CALC_MISSING_REG_YEAR", "2025"' in service
+    assert 'CALC_MISSING_REG_MONTH", "1"' in service
+    assert "car.display_description" in detail_template
+    assert "description=row.description" in parser
+    assert 'description: Mapped[str | None] = mapped_column(Text, nullable=True)' in model
+    assert "mobilede_daily_pipeline.sh" in cron.read_text(encoding="utf-8")
+    assert 'car.description = item["payload"].get("description")' in backfill

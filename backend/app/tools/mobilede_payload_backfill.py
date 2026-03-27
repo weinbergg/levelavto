@@ -64,9 +64,10 @@ def main() -> None:
                 car = car_by_id.get(item["external_id"])
                 if not car:
                     continue
-                if not args.all and car.source_payload:
+                if not args.all and car.source_payload and getattr(car, "description", None):
                     continue
                 car.source_payload = item["payload"]
+                car.description = item["payload"].get("description")
                 updated += 1
             db.commit()
             batch = []

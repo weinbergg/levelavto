@@ -45,7 +45,7 @@ DEFAULT_HOME_CONTENT: Dict[str, Any] = {
     "about": {
         "eyebrow": "О нас",
         "title": "Почему нужно обратиться именно в Level Avto?",
-        "subtitle": "С 2019г. импортируем автомобили по всему миру",
+        "subtitle": "С 2019г. импортируем автомобили",
         "cards": [
             {
                 "title": "Почему выбирают нас",
@@ -123,7 +123,7 @@ DEFAULT_HOME_CONTENT: Dict[str, Any] = {
     },
     "brands": {
         "title": "Популярные марки",
-        "subtitle": "Показываем только бренды, которые есть в каталоге",
+        "subtitle": "Показываем только марки, которые есть в каталоге",
         "empty_note": "Добавьте логотипы в static/img/brand-logos, чтобы они появились.",
     },
     "how_it_works": {

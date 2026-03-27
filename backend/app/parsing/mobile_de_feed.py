@@ -153,6 +153,7 @@ class MobileDeFeedParser:
                 transmission=self._normalize_transmission(row.transmission),
                 drive_type=drive,
                 color=row.manufacturer_color or row.color,
+                description=row.description,
                 vin=None,
                 source_url=row.url,
                 thumbnail_url=thumb,

@@ -30,6 +30,8 @@ from ..utils.taxonomy import (
     fuel_aliases,
     color_hex,
     is_color_base,
+    interior_color_aliases,
+    interior_material_aliases,
 )
 from ..utils.breakdown_labels import label_for
 from .calculator_config_service import CalculatorConfigService
@@ -796,18 +798,15 @@ class CarsService:
             conditions.append(func.jsonb_extract_path_text(payload_json, "airbags") == airbags)
         if interior_design and "interior_design" not in exclude:
             conditions.append(func.jsonb_extract_path_text(payload_json, "interior_design") == interior_design)
+        interior_design_expr = func.lower(func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), ""))
         if interior_color and "interior_color" not in exclude:
-            conditions.append(
-                func.lower(func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), "")).like(
-                    f"%{interior_color.lower()}%"
-                )
-            )
+            aliases = interior_color_aliases(interior_color)
+            if aliases:
+                conditions.append(or_(*[interior_design_expr.like(f"%{alias.lower()}%") for alias in aliases]))
         if interior_material and "interior_material" not in exclude:
-            conditions.append(
-                func.lower(func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), "")).like(
-                    f"%{interior_material.lower()}%"
-                )
-            )
+            aliases = interior_material_aliases(interior_material)
+            if aliases:
+                conditions.append(or_(*[interior_design_expr.like(f"%{alias.lower()}%") for alias in aliases]))
         if vat_reclaimable and "vat_reclaimable" not in exclude:
             vat_raw = str(vat_reclaimable).strip().lower()
             vat_nt = func.jsonb_extract_path_text(payload_json, "price_eur_nt")
@@ -882,35 +881,37 @@ class CarsService:
         if mileage_max is not None and "mileage_max" not in exclude:
             conditions.append(Car.mileage <= mileage_max)
 
+        reg_year_expr = func.coalesce(Car.registration_year, Car.year)
+        reg_month_floor_expr = func.coalesce(Car.registration_month, 12)
+        reg_month_ceil_expr = func.coalesce(Car.registration_month, 1)
+
         if reg_year_min is not None and "reg_year_min" not in exclude:
             if reg_month_min is not None and "reg_month_min" not in exclude:
                 conditions.append(
                     or_(
-                        Car.registration_year > reg_year_min,
+                        reg_year_expr > reg_year_min,
                         and_(
-                            Car.registration_year == reg_year_min,
-                            Car.registration_month.is_not(None),
-                            Car.registration_month >= reg_month_min,
+                            reg_year_expr == reg_year_min,
+                            reg_month_floor_expr >= reg_month_min,
                         ),
                     )
                 )
             else:
-                conditions.append(Car.registration_year >= reg_year_min)
+                conditions.append(reg_year_expr >= reg_year_min)
 
         if reg_year_max is not None and "reg_year_max" not in exclude:
             if reg_month_max is not None and "reg_month_max" not in exclude:
                 conditions.append(
                     or_(
-                        Car.registration_year < reg_year_max,
+                        reg_year_expr < reg_year_max,
                         and_(
-                            Car.registration_year == reg_year_max,
-                            Car.registration_month.is_not(None),
-                            Car.registration_month <= reg_month_max,
+                            reg_year_expr == reg_year_max,
+                            reg_month_ceil_expr <= reg_month_max,
                         ),
                     )
                 )
             else:
-                conditions.append(Car.registration_year <= reg_year_max)
+                conditions.append(reg_year_expr <= reg_year_max)
 
         if body_type and "body_type" not in exclude:
             conditions.append(func.lower(Car.body_type) == body_type.lower())
@@ -1600,16 +1601,17 @@ class CarsService:
         if not used_price:
             self.logger.info("calc_skip_no_price car=%s src=%s", car.id, getattr(car.source, "key", None))
             return _fallback_total("no_price")
-        now_dt = datetime.utcnow()
-        reg_fallback_current = False
-        # Business rule: if registration date is missing, treat car as newly registered (current month/year).
+        reg_fallback_missing = False
+        fallback_reg_year = int(os.getenv("CALC_MISSING_REG_YEAR", "2025") or 2025)
+        fallback_reg_month = int(os.getenv("CALC_MISSING_REG_MONTH", "1") or 1)
+        # Business rule: if registration date is missing, treat the car as registered from the fallback period.
         if car.registration_year and car.registration_month:
             reg_year = int(car.registration_year)
             reg_month = int(car.registration_month)
         else:
-            reg_year = int(now_dt.year)
-            reg_month = int(now_dt.month)
-            reg_fallback_current = True
+            reg_year = fallback_reg_year
+            reg_month = fallback_reg_month
+            reg_fallback_missing = True
         # кеш
         cfg_svc = CalculatorConfigService(self.db)
         cfg = None
@@ -1683,7 +1685,7 @@ class CarsService:
         scenario = None
         if is_electric:
             scenario = "electric"
-        elif reg_fallback_current:
+        elif reg_fallback_missing:
             scenario = "under_3"
         req = EstimateRequest(
             scenario=scenario,

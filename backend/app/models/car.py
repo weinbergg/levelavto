@@ -51,6 +51,7 @@ class Car(Base):
     drive_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
     color: Mapped[str | None] = mapped_column(String(80), nullable=True)
     color_group: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     vin: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)

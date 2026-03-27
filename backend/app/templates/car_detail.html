@@ -187,6 +187,12 @@
           </div>
         </div>
         {% endif %}
+        {% if car.display_description %}
+        <div class="detail-description card">
+          <h3>Описание</h3>
+          <div class="detail-description__text">{{ car.display_description }}</div>
+        </div>
+        {% endif %}
         <div class="detail-actions">
           <div class="detail-actions__lead">
             <button class="btn cta-lead" id="detail-lead-btn" type="button" onclick="return window.toggleLeadForm(event);">

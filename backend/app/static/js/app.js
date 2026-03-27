@@ -1400,6 +1400,8 @@
         setSelectOptions(qs('[name="engine_type"]'), data.engine_types || [], { emptyLabel: 'Любое' })
         setSelectOptions(qs('[name="transmission"]'), data.transmissions || [], { emptyLabel: 'Любая' })
         setSelectOptions(qs('[name="drive_type"]'), data.drive_types || [], { emptyLabel: 'Любой' })
+        setSelectOptions(qs('select[name="interior_color"]'), data.interior_color_options || [], { emptyLabel: 'Не важно', labelKey: 'label', valueKey: 'value' })
+        setSelectOptions(qs('select[name="interior_material"]'), data.interior_material_options || [], { emptyLabel: 'Не важно', labelKey: 'label', valueKey: 'value' })
         setSelectOptions(qs('#reg-year-min'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         setSelectOptions(qs('#reg-year-max'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         const countrySelect = qs('#country')
@@ -2562,6 +2564,8 @@
       climatisation: 'climatisation_options',
       airbags: 'airbags_options',
       interior_design: 'interior_design_options',
+      interior_color: 'interior_color_options',
+      interior_material: 'interior_material_options',
       price_rating_label: 'price_rating_labels',
     }
 

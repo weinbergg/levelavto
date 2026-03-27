@@ -204,6 +204,198 @@ def is_color_base(val: Optional[str]) -> bool:
     return val.strip().lower() in COLOR_BASES
 
 
+_INTERIOR_COLOR_LABELS: Dict[str, str] = {
+    "anthracite": "Антрацит",
+    "charcoal": "Графит",
+    "cognac": "Коньячный",
+    "camel": "Песочно-коричневый",
+    "taupe": "Серо-бежевый",
+    "tan": "Песочный",
+    "ivory": "Слоновая кость",
+    "cream": "Кремовый",
+    "burgundy": "Бордовый",
+    "black": "Чёрный",
+    "white": "Белый",
+    "gray": "Серый",
+    "silver": "Серебристый",
+    "blue": "Синий",
+    "red": "Красный",
+    "green": "Зелёный",
+    "yellow": "Жёлтый",
+    "orange": "Оранжевый",
+    "beige": "Бежевый",
+    "brown": "Коричневый",
+    "purple": "Фиолетовый",
+    "pink": "Розовый",
+}
+
+_INTERIOR_COLOR_KEYWORDS: Dict[str, Tuple[str, ...]] = {
+    "anthracite": ("anthracite", "anthrazit", "антрацит"),
+    "charcoal": ("charcoal", "graphite", "graphit", "графит"),
+    "cognac": ("cognac", "коньяк", "коньячный"),
+    "camel": ("camel", "camelbraun", "camel brown", "песочно-коричнев", "кемел"),
+    "taupe": ("taupe", "серо-беж", "грейдж"),
+    "tan": ("tan", "песочный"),
+    "ivory": ("ivory", "elfenbein", "слоновая кость"),
+    "cream": ("cream", "кремов"),
+    "burgundy": ("burgundy", "bordeaux", "бордов"),
+    "black": ("black", "schwarz", "nero", "noir", "черн"),
+    "white": ("white", "weiss", "weiß", "blanc", "bianco", "бел"),
+    "gray": ("gray", "grey", "grau", "сер", "графитов"),
+    "silver": ("silver", "silber", "серебр"),
+    "blue": ("blue", "blau", "azure", "azur", "син", "голуб"),
+    "red": ("red", "rot", "rosso", "rouge", "красн"),
+    "green": ("green", "grün", "gruen", "verde", "зел"),
+    "yellow": ("yellow", "gelb", "желт"),
+    "orange": ("orange", "оранж"),
+    "beige": ("beige", "sand", "champagne", "беж", "песочн", "шамп"),
+    "brown": ("brown", "braun", "marron", "коричн", "шокол", "кофе"),
+    "purple": ("purple", "violet", "lila", "фиолет", "пурпур"),
+    "pink": ("pink", "rose", "rosa", "роз"),
+}
+
+_INTERIOR_MATERIAL_LABELS: Dict[str, str] = {
+    "leather": "Кожа",
+    "partial_leather": "Частичная кожа",
+    "eco_leather": "Экокожа",
+    "alcantara": "Алькантара",
+    "fabric": "Ткань",
+    "velour": "Велюр",
+    "suede": "Замша",
+    "microfiber": "Микрофибра",
+    "vinyl": "Винил",
+    "other": "Другое",
+}
+
+_INTERIOR_MATERIAL_KEYWORDS: Dict[str, Tuple[str, ...]] = {
+    "partial_leather": ("partial leather", "part leather", "teilleder", "частичная кожа"),
+    "eco_leather": ("leatherette", "synthetic leather", "kunstleder", "экокожа", "искусственная кожа"),
+    "alcantara": ("alcantara", "алькантара"),
+    "microfiber": ("mikrofaser", "mikrofibre", "microfibre", "microfiber", "микрофибра"),
+    "velour": ("velour", "velours", "велюр"),
+    "suede": ("suede", "замша"),
+    "vinyl": ("vinyl", "винил"),
+    "fabric": ("cloth", "fabric", "stoff", "textile", "tissu", "ткан"),
+    "leather": ("full leather", "vollleder", "leder", "leather", "nappa", "napa", "кожа"),
+    "other": ("other", "not specified", "другое", "не указано"),
+}
+
+_INTERIOR_COLOR_ORDER = tuple(_INTERIOR_COLOR_LABELS.keys())
+_INTERIOR_MATERIAL_ORDER = tuple(_INTERIOR_MATERIAL_LABELS.keys())
+
+
+def _normalize_interior_text(raw: Optional[str]) -> str:
+    text = (raw or "").strip().lower()
+    if not text:
+        return ""
+    text = text.replace("ß", "ss")
+    text = re.sub(r"[_\-/.,;|()+]+", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _match_keywords(text: str, variants: Dict[str, Tuple[str, ...]], order: Tuple[str, ...]) -> Optional[str]:
+    if not text:
+        return None
+    for key in order:
+        keywords = variants.get(key) or ()
+        if any(keyword in text for keyword in keywords):
+            return key
+    return None
+
+
+def interior_color_key(value: Optional[str]) -> Optional[str]:
+    raw = _normalize_interior_text(value)
+    if not raw:
+        return None
+    if raw in _INTERIOR_COLOR_LABELS:
+        return raw
+    translated = translate_payload_value("color", raw)
+    if translated:
+        translated_key = _normalize_interior_text(translated)
+        for key, label in _INTERIOR_COLOR_LABELS.items():
+            if translated_key == _normalize_interior_text(label):
+                return key
+    matched = _match_keywords(raw, _INTERIOR_COLOR_KEYWORDS, _INTERIOR_COLOR_ORDER)
+    if matched:
+        return matched
+    normalized = normalize_color(raw)
+    if normalized in _INTERIOR_COLOR_LABELS:
+        return normalized
+    return None
+
+
+def interior_material_key(value: Optional[str]) -> Optional[str]:
+    raw = _normalize_interior_text(value)
+    if not raw:
+        return None
+    if raw in _INTERIOR_MATERIAL_LABELS:
+        return raw
+    return _match_keywords(raw, _INTERIOR_MATERIAL_KEYWORDS, _INTERIOR_MATERIAL_ORDER)
+
+
+def interior_color_label(value: Optional[str]) -> Optional[str]:
+    key = interior_color_key(value)
+    if not key:
+        return None
+    return _INTERIOR_COLOR_LABELS.get(key)
+
+
+def interior_material_label(value: Optional[str]) -> Optional[str]:
+    key = interior_material_key(value)
+    if not key:
+        return None
+    return _INTERIOR_MATERIAL_LABELS.get(key)
+
+
+def interior_color_aliases(value: Optional[str]) -> List[str]:
+    key = interior_color_key(value)
+    if not key:
+        raw = _normalize_interior_text(value)
+        return [raw] if raw else []
+    aliases = set(_INTERIOR_COLOR_KEYWORDS.get(key) or ())
+    aliases.add(key)
+    label = _INTERIOR_COLOR_LABELS.get(key)
+    if label:
+        aliases.add(label.lower())
+    return sorted(alias for alias in aliases if alias)
+
+
+def interior_material_aliases(value: Optional[str]) -> List[str]:
+    key = interior_material_key(value)
+    if not key:
+        raw = _normalize_interior_text(value)
+        return [raw] if raw else []
+    aliases = set(_INTERIOR_MATERIAL_KEYWORDS.get(key) or ())
+    aliases.add(key)
+    label = _INTERIOR_MATERIAL_LABELS.get(key)
+    if label:
+        aliases.add(label.lower())
+    return sorted(alias for alias in aliases if alias)
+
+
+def build_interior_options(values: List[Any], kind: str) -> List[Dict[str, str]]:
+    items: List[Dict[str, str]] = []
+    seen: Set[str] = set()
+    if kind == "color":
+        key_fn = interior_color_key
+        label_fn = interior_color_label
+        order = _INTERIOR_COLOR_ORDER
+    else:
+        key_fn = interior_material_key
+        label_fn = interior_material_label
+        order = _INTERIOR_MATERIAL_ORDER
+    for value in values or []:
+        key = key_fn(value)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        items.append({"value": key, "label": label_fn(key) or key})
+    order_index = {key: idx for idx, key in enumerate(order)}
+    items.sort(key=lambda item: (order_index.get(item["value"], 999), item["label"].casefold()))
+    return items
+
+
 def normalize_fuel(val: Optional[str]) -> Optional[str]:
     return _normalize_alias("fuel", val)
 

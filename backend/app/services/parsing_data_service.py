@@ -28,6 +28,7 @@ def compute_car_hash(payload: Dict[str, Any]) -> str:
         str(payload.get("power_kw") or ""),
         str(payload.get("registration_year") or ""),
         str(payload.get("registration_month") or ""),
+        payload.get("description") or "",
     ]
     text = "|".join(parts)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:64]
@@ -134,6 +135,9 @@ class ParsingDataService:
                 else:
                     if payload.get("source_payload") is not None and existing.source_payload != payload["source_payload"]:
                         existing.source_payload = payload["source_payload"]
+                        updated += 1
+                    if getattr(existing, "description", None) != payload.get("description"):
+                        existing.description = payload.get("description")
                         updated += 1
                     if existing.price_rub_cached is None and payload.get("price_rub_cached") is not None:
                         existing.price_rub_cached = payload["price_rub_cached"]

@@ -50,6 +50,7 @@ class CarParsed:
     transmission: Optional[str] = None
     drive_type: Optional[str] = None
     color: Optional[str] = None
+    description: Optional[str] = None
     vin: Optional[str] = None
     source_url: Optional[str] = None
     thumbnail_url: Optional[str] = None
