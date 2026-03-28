@@ -76,8 +76,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=80' in template
-    assert '/static/css/styles.css?v=40' in template
+    assert '/static/js/app.js?v=81' in template
+    assert '/static/css/styles.css?v=41' in template
 
 
 def test_home_search_uses_line_params_and_js_submit():
@@ -128,6 +128,24 @@ def test_home_collage_and_home_content_copy_are_updated():
     home_content = _read("app/utils/home_content.py")
     assert "collage_images[:75]" in template
     assert "Показываем только марки, которые есть в каталоге" in home_content
+
+
+def test_card_and_detail_templates_render_variant_subtitles():
+    home_template = _read("app/templates/home.html")
+    catalog_template = _read("app/templates/catalog.html")
+    detail_template = _read("app/templates/car_detail.html")
+    script = _read("app/static/js/app.js")
+    schema = _read("app/schemas/car.py")
+    api_router = _read("app/routers/catalog.py")
+    css = _read("app/static/css/styles.css")
+    assert "car-card__subtitle" in home_template
+    assert "car-card__subtitle" in catalog_template
+    assert "detail-subtitle" in detail_template
+    assert "const variantLine = car.variant" in script
+    assert "variant: Optional[str] = None" in schema
+    assert '"variant": c.get("variant")' in api_router
+    assert ".car-card__subtitle" in css
+    assert ".detail-subtitle" in css
 
 
 def test_catalog_and_search_color_filters_use_non_label_wrapper():

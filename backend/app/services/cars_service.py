@@ -1541,6 +1541,9 @@ class CarsService:
             if car.calc_updated_at is not None and car.updated_at is not None:
                 if car.calc_updated_at < car.updated_at:
                     return True
+            if car.calc_updated_at is not None and car.spec_inferred_at is not None:
+                if car.calc_updated_at < car.spec_inferred_at:
+                    return True
             breakdown = car.calc_breakdown_json or []
             if customs_version and _extract_version(breakdown, "__customs_version") != customs_version:
                 return True
@@ -1669,17 +1672,20 @@ class CarsService:
                 price_net_eur = float(used_price) * (float(usd_rate) / float(eur_rate))
         if price_net_eur is None:
             return _fallback_total("no_price_net_eur")
+        effective_engine_cc = car.engine_cc if car.engine_cc is not None else car.inferred_engine_cc
+        effective_power_hp = car.power_hp if car.power_hp is not None else car.inferred_power_hp
+        effective_power_kw = car.power_kw if car.power_kw is not None else car.inferred_power_kw
         engine_type = (car.engine_type or "").lower()
         is_electric = is_bev(
-            car.engine_cc,
-            float(car.power_kw) if car.power_kw is not None else None,
-            float(car.power_hp) if car.power_hp is not None else None,
+            effective_engine_cc,
+            float(effective_power_kw) if effective_power_kw is not None else None,
+            float(effective_power_hp) if effective_power_hp is not None else None,
             car.engine_type,
         )
-        if is_electric and not (car.power_hp or car.power_kw):
+        if is_electric and not (effective_power_hp or effective_power_kw):
             self.logger.info("calc_skip_no_power car=%s src=%s", car.id, getattr(car.source, "key", None))
             return _fallback_total("no_power")
-        if not is_electric and not car.engine_cc:
+        if not is_electric and not effective_engine_cc:
             self.logger.info("calc_skip_no_cc car=%s src=%s", car.id, getattr(car.source, "key", None))
             return _fallback_total("no_engine_cc")
         scenario = None
@@ -1691,9 +1697,9 @@ class CarsService:
             scenario=scenario,
             price_net_eur=price_net_eur,
             eur_rate=eur_rate,
-            engine_cc=car.engine_cc,
-            power_hp=float(car.power_hp) if car.power_hp is not None else None,
-            power_kw=float(car.power_kw) if car.power_kw is not None else None,
+            engine_cc=effective_engine_cc,
+            power_hp=float(effective_power_hp) if effective_power_hp is not None else None,
+            power_kw=float(effective_power_kw) if effective_power_kw is not None else None,
             is_electric=is_electric,
             reg_year=reg_year,
             reg_month=reg_month,

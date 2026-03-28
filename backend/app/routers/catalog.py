@@ -647,6 +647,7 @@ def list_cars(
                 "id": c.get("id"),
                 "brand": c.get("brand"),
                 "model": c.get("model"),
+                "variant": c.get("variant"),
                 "year": c.get("year"),
                 "registration_year": c.get("registration_year"),
                 "registration_month": c.get("registration_month"),

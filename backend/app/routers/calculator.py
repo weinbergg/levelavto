@@ -63,19 +63,24 @@ def calc_endpoint(payload: CalcRequest, db: Session = Depends(get_db)):
                     if not eur_rate:
                         raise HTTPException(status_code=400, detail="RUB price provided but no EUR rate")
                     data["price_net_eur"] = float(car.price) / eur_rate
-            if data.get("engine_cc") is None and car.engine_type != "electric":
-                data["engine_cc"] = car.engine_type and None or None
-            if data.get("power_hp") is None and car.engine_type == "electric":
-                data["power_hp"] = None
+            effective_engine_cc = car.engine_cc if car.engine_cc is not None else car.inferred_engine_cc
+            effective_power_hp = car.power_hp if car.power_hp is not None else car.inferred_power_hp
+            effective_power_kw = car.power_kw if car.power_kw is not None else car.inferred_power_kw
+            if data.get("engine_cc") is None:
+                data["engine_cc"] = effective_engine_cc
+            if data.get("power_hp") is None:
+                data["power_hp"] = float(effective_power_hp) if effective_power_hp is not None else None
+            if data.get("power_kw") is None:
+                data["power_kw"] = float(effective_power_kw) if effective_power_kw is not None else None
             # registration fields
             if data.get("first_registration_year") is None and hasattr(car, "registration_year"):
                 data["first_registration_year"] = getattr(car, "registration_year", None)
             if data.get("first_registration_month") is None and hasattr(car, "registration_month"):
                 data["first_registration_month"] = getattr(car, "registration_month", None)
             is_electric = is_bev(
-                car.engine_cc,
-                float(car.power_kw) if car.power_kw is not None else None,
-                float(car.power_hp) if car.power_hp is not None else None,
+                effective_engine_cc,
+                float(effective_power_kw) if effective_power_kw is not None else None,
+                float(effective_power_hp) if effective_power_hp is not None else None,
                 car.engine_type,
             )
         data["is_electric"] = is_electric

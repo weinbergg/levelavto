@@ -10,6 +10,7 @@ class CarBase(BaseModel):
     country: str
     brand: Optional[str] = None
     model: Optional[str] = None
+    variant: Optional[str] = None
     generation: Optional[str] = None
     year: Optional[int] = None
     mileage: Optional[int] = None

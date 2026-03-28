@@ -9,6 +9,7 @@ from .featured_car import FeaturedCar
 from .progress_kv import ProgressKV
 from .calculator_config import CalculatorConfig
 from .favorite import Favorite
+from .car_spec_reference import CarSpecReference
 
 __all__ = [
     "Source",
@@ -22,4 +23,5 @@ __all__ = [
     "FeaturedCar",
     "ProgressKV",
     "Favorite",
+    "CarSpecReference",
 ]

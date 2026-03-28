@@ -1181,6 +1181,7 @@
         const calcLine = `<div class="price-main">${priceText}</div>`
         const priceLines = []
         const footnote = car.price_note ? `<div class="price-note">${escapeHtml(car.price_note)}</div>` : ''
+        const variantLine = car.variant ? `<div class="car-card__subtitle">${escapeHtml(car.variant)}</div>` : ''
         let regLabel = ''
         if (car.registration_year) {
           const m = Number(car.registration_month || 1)
@@ -1247,6 +1248,7 @@
           <div class="car-card__body">
             <div>
               <div class="car-card__title">${car.brand || ''} ${car.model || ''}</div>
+              ${variantLine}
               ${metaLine ? `<div class="car-card__meta">${metaLine}</div>` : ''}
               ${specLines.length ? `<ul class="specs">${specLines.map((s) => `<li>${s}</li>`).join('')}</ul>` : ''}
             </div>
@@ -3103,6 +3105,7 @@
           let price = displayRub != null ? formatRub(displayRub) : ''
           if (!price) price = '—'
           const priceNote = car.price_note ? `<div class="price-note">${escapeHtml(car.price_note)}</div>` : ''
+          const variantLine = car.variant ? `<div class="car-card__subtitle">${escapeHtml(car.variant)}</div>` : ''
           card.innerHTML = `
             <div class="thumb-wrap">
               <img class="thumb" src="${thumb}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-thumb="${thumb}" data-orig="${origThumb}" data-id="${car.id}" onerror="this.onerror=null;this.src='/static/img/no-photo.svg';" />
@@ -3110,6 +3113,7 @@
             <div class="car-card__body">
               <div>
                 <div class="car-card__title">${car.brand || ''} ${car.model || ''}</div>
+                ${variantLine}
               </div>
               <div class="car-card__price">${price}</div>
               ${priceNote}

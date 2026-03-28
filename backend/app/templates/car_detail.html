@@ -92,6 +92,9 @@
       <div class="detail-info card">
         <div class="detail-heading">
           <h1 class="detail-title">{{ car.brand or '' }} {{ car.model or '' }}</h1>
+          {% if car.variant %}
+          <div class="detail-subtitle">{{ car.variant }}</div>
+          {% endif %}
           {% set months_ru = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'] %}
           {% set meta = [] %}
           {% if car.registration_year and car.registration_month and 1 <= car.registration_month <= 12 %}

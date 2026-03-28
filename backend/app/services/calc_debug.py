@@ -56,10 +56,13 @@ def build_calc_debug(
             price_source = "car.price_rub"
 
     notes = []
+    effective_engine_cc = car.engine_cc if car.engine_cc is not None else car.inferred_engine_cc
+    effective_power_hp = car.power_hp if car.power_hp is not None else car.inferred_power_hp
+    effective_power_kw = car.power_kw if car.power_kw is not None else car.inferred_power_kw
     is_electric = is_bev(
-        car.engine_cc,
-        float(car.power_kw) if car.power_kw is not None else None,
-        float(car.power_hp) if car.power_hp is not None else None,
+        effective_engine_cc,
+        float(effective_power_kw) if effective_power_kw is not None else None,
+        float(effective_power_hp) if effective_power_hp is not None else None,
         car.engine_type,
     )
     if car.engine_type and "electric" in car.engine_type.lower() and car.engine_cc and car.engine_cc > 0:
@@ -71,9 +74,9 @@ def build_calc_debug(
         scenario=scenario,
         price_net_eur=price_net_eur or 0,
         eur_rate=eur_rate_used,
-        engine_cc=car.engine_cc,
-        power_hp=float(car.power_hp) if car.power_hp is not None else None,
-        power_kw=float(car.power_kw) if car.power_kw is not None else None,
+        engine_cc=effective_engine_cc,
+        power_hp=float(effective_power_hp) if effective_power_hp is not None else None,
+        power_kw=float(effective_power_kw) if effective_power_kw is not None else None,
         is_electric=is_electric,
         reg_year=car.registration_year or fallback_reg_year,
         reg_month=car.registration_month or fallback_reg_month,
@@ -121,6 +124,15 @@ def build_calc_debug(
             "engine_cc": car.engine_cc,
             "power_hp": float(car.power_hp) if car.power_hp is not None else None,
             "power_kw": float(car.power_kw) if car.power_kw is not None else None,
+            "inferred_engine_cc": car.inferred_engine_cc,
+            "inferred_power_hp": float(car.inferred_power_hp) if car.inferred_power_hp is not None else None,
+            "inferred_power_kw": float(car.inferred_power_kw) if car.inferred_power_kw is not None else None,
+            "effective_engine_cc": effective_engine_cc,
+            "effective_power_hp": float(effective_power_hp) if effective_power_hp is not None else None,
+            "effective_power_kw": float(effective_power_kw) if effective_power_kw is not None else None,
+            "inferred_source_car_id": car.inferred_source_car_id,
+            "inferred_confidence": car.inferred_confidence,
+            "inferred_rule": car.inferred_rule,
             "registration_year": car.registration_year,
             "registration_month": car.registration_month,
             "registration_fallback_applied": bool(not car.registration_year or not car.registration_month),
@@ -168,13 +180,13 @@ def build_calc_compare(
         scenario=scenario,
         price_net_eur=inp.get("price_net_eur") or 0,
         eur_rate=inp.get("eur_rate"),
-        engine_cc=car.get("engine_cc"),
-        power_hp=car.get("power_hp"),
-        power_kw=car.get("power_kw"),
+        engine_cc=car.get("effective_engine_cc"),
+        power_hp=car.get("effective_power_hp"),
+        power_kw=car.get("effective_power_kw"),
         is_electric=is_bev(
-            car.get("engine_cc"),
-            car.get("power_kw"),
-            car.get("power_hp"),
+            car.get("effective_engine_cc"),
+            car.get("effective_power_kw"),
+            car.get("effective_power_hp"),
             car.get("engine_type"),
         ),
         reg_year=car.get("registration_year"),

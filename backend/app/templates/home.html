@@ -295,6 +295,9 @@
             <div class="car-card__title">
               {{ car.brand or '' }} {{ car.model or '' }}
             </div>
+            {% if car.variant %}
+            <div class="car-card__subtitle">{{ car.variant }}</div>
+            {% endif %}
             <div class="car-card__meta">
               {{ car.year or '' }} · {{ car.display_engine_type or car.engine_type or '' }} · {{
               car.display_transmission or car.transmission or '' }}

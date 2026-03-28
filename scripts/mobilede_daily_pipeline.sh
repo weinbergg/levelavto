@@ -25,6 +25,19 @@ docker compose exec -T web python -m backend.app.scripts.backfill_missing_regist
   --batch "${MISSING_REG_BACKFILL_BATCH:-2000}" \
   --chunk "${MISSING_REG_BACKFILL_CHUNK:-50000}"
 
+echo "[mobilede_pipeline] step=refresh_spec_inference"
+SPEC_INFERENCE_ARGS=()
+if [ "${SPEC_INFERENCE_FULL_REBUILD:-0}" = "1" ]; then
+  SPEC_INFERENCE_ARGS+=(--full-rebuild)
+fi
+docker compose exec -T web python -m backend.app.scripts.refresh_spec_inference \
+  --region EU \
+  --since-minutes "${SPEC_INFERENCE_SINCE_MINUTES:-2880}" \
+  --batch "${SPEC_INFERENCE_BATCH:-2000}" \
+  --chunk "${SPEC_INFERENCE_CHUNK:-50000}" \
+  --year-window "${SPEC_INFERENCE_YEAR_WINDOW:-2}" \
+  "${SPEC_INFERENCE_ARGS[@]}"
+
 echo "[mobilede_pipeline] step=car_counts_refresh"
 docker compose exec -T web python -m backend.app.tools.car_counts_refresh --report
 
@@ -72,6 +85,13 @@ docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
   --only-defaulted-registration \
   --since-minutes "${MISSING_REG_CALC_SINCE_MINUTES:-2880}" \
   --batch "${MISSING_REG_CALC_BATCH:-2000}"
+
+echo "[mobilede_pipeline] step=recalc_inferred_specs"
+docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
+  --region EU \
+  --only-inferred-specs \
+  --since-minutes "${SPEC_INFERENCE_SINCE_MINUTES:-2880}" \
+  --batch "${SPEC_INFERENCE_CALC_BATCH:-2000}"
 
 if [ "${MOBILEDE_PRUNE_UNUSED_MEDIA:-1}" = "1" ]; then
   echo "[mobilede_pipeline] step=prune_unused_local_media"

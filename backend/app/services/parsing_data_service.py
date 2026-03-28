@@ -131,12 +131,14 @@ class ParsingDataService:
                     for k, v in payload.items():
                         if hasattr(existing, k) and k not in ("id", "created_at", "first_seen_at"):
                             setattr(existing, k, v)
+                    self._clear_inferred_specs(existing)
                     existing.last_seen_at = now
                     existing.is_available = True
                     updated += 1
                 else:
                     if payload.get("source_payload") is not None and existing.source_payload != payload["source_payload"]:
                         existing.source_payload = payload["source_payload"]
+                        self._clear_inferred_specs(existing)
                         updated += 1
                     if getattr(existing, "description", None) != payload.get("description"):
                         existing.description = payload.get("description")
@@ -196,6 +198,16 @@ class ParsingDataService:
 
         self.db.commit()
         return inserted, updated, len(ext_ids)
+
+    @staticmethod
+    def _clear_inferred_specs(car: Car) -> None:
+        car.inferred_engine_cc = None
+        car.inferred_power_hp = None
+        car.inferred_power_kw = None
+        car.inferred_source_car_id = None
+        car.inferred_confidence = None
+        car.inferred_rule = None
+        car.spec_inferred_at = None
 
     def deactivate_missing(self, source: Source, seen_external_ids: List[str]) -> int:
         # Mark cars from this source not seen in this run as unavailable

@@ -27,6 +27,11 @@ def main() -> None:
         action="store_true",
         help="recalculate only cars with auto-defaulted registration date",
     )
+    ap.add_argument(
+        "--only-inferred-specs",
+        action="store_true",
+        help="recalculate only cars with inferred engine/power specs",
+    )
     ap.add_argument("--since-minutes", type=int, default=None)
     ap.add_argument("--chunk", type=int, default=50000, help="ids per window (avoid huge offsets)")
     ap.add_argument("--sleep", type=int, default=0, help="seconds to sleep between windows")
@@ -106,6 +111,14 @@ def main() -> None:
                     "false",
                 ) == "true"
             )
+        if args.only_inferred_specs:
+            base = base.filter(
+                or_(
+                    Car.inferred_engine_cc.is_not(None),
+                    Car.inferred_power_hp.is_not(None),
+                    Car.inferred_power_kw.is_not(None),
+                )
+            )
         if args.since_minutes:
             since_ts = datetime.utcnow() - timedelta(minutes=args.since_minutes)
             base = base.filter(Car.updated_at >= since_ts)
@@ -132,7 +145,9 @@ def main() -> None:
                         processed += 1
                         try:
                             force_recalc = bool(
-                                args.only_missing_registration or args.only_defaulted_registration
+                                args.only_missing_registration
+                                or args.only_defaulted_registration
+                                or args.only_inferred_specs
                             )
                             res = svc.ensure_calc_cache(car, force=force_recalc)
                             if res is None:

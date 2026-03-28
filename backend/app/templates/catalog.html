@@ -344,6 +344,9 @@
               <div class="car-card__body">
                 <div>
                   <div class="car-card__title">{{ car.brand or '' }} {{ car.model or '' }}</div>
+                  {% if car.variant %}
+                    <div class="car-card__subtitle">{{ car.variant }}</div>
+                  {% endif %}
                   {% set meta = [] %}
                   {% if car.registration_year %}
                     {% set reg_month = car.registration_month or 1 %}
