@@ -13,6 +13,7 @@ from ..utils.spec_inference import (
     build_reference_signature,
     choose_reference_consensus,
     has_complete_raw_specs,
+    normalize_engine_type,
     normalize_spec_text,
     normalized_power_hp,
     normalized_power_kw,
@@ -294,9 +295,27 @@ class CarSpecInferenceService:
         }
 
     def _apply_inferred_specs(self, car: Car, inference: Dict[str, Any]) -> None:
-        car.inferred_engine_cc = inference.get("engine_cc")
-        car.inferred_power_hp = inference.get("power_hp")
-        car.inferred_power_kw = inference.get("power_kw")
+        engine_type_norm = normalize_engine_type(car.engine_type)
+        applied_any = False
+
+        if car.engine_cc is None and engine_type_norm != "electric":
+            car.inferred_engine_cc = inference.get("engine_cc")
+            applied_any = applied_any or car.inferred_engine_cc is not None
+        else:
+            car.inferred_engine_cc = None
+
+        if car.power_hp is None and car.power_kw is None:
+            car.inferred_power_hp = inference.get("power_hp")
+            car.inferred_power_kw = inference.get("power_kw")
+            applied_any = applied_any or car.inferred_power_hp is not None or car.inferred_power_kw is not None
+        else:
+            car.inferred_power_hp = None
+            car.inferred_power_kw = None
+
+        if not applied_any:
+            self._clear_inferred_specs(car)
+            return
+
         car.inferred_source_car_id = inference.get("source_car_id")
         car.inferred_confidence = inference.get("confidence")
         car.inferred_rule = inference.get("rule")

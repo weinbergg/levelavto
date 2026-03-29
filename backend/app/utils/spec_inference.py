@@ -233,18 +233,18 @@ def choose_reference_consensus(
             -(item["source_car_id"] or 0),
         ),
     )[0]
+    support_count = int(tuples.get(best["tuple_key"], {}).get("count") or 0)
     if has_variant_key and target_year is not None and best["year"] == target_year:
         confidence = "high"
         rule = "variant_exact_year_exact"
     elif has_variant_key:
         confidence = "medium"
         rule = "variant_exact_year_window"
-    elif target_year is not None and best["year"] == target_year:
+    elif target_year is not None and best["year"] == target_year and support_count >= 2:
         confidence = "medium"
-        rule = "model_exact_year_exact_unique"
+        rule = "model_exact_year_exact_consensus"
     else:
-        confidence = "low"
-        rule = "model_exact_year_window_unique"
+        return None
     return {
         "engine_cc": best["engine_cc"],
         "power_hp": best["power_hp"],
@@ -252,6 +252,7 @@ def choose_reference_consensus(
         "source_car_id": best["source_car_id"],
         "confidence": confidence,
         "rule": rule,
+        "support_count": support_count,
     }
 
 

@@ -74,6 +74,35 @@ def test_choose_reference_consensus_rejects_conflicting_specs():
     assert choose_reference_consensus(candidates, target_year=2025, has_variant_key=True) is None
 
 
+def test_choose_reference_consensus_requires_supported_model_level_consensus():
+    candidates = [
+        {
+            "source_car_id": 31,
+            "variant_key": None,
+            "year": 2025,
+            "engine_cc": 1995,
+            "power_hp": 150,
+            "power_kw": 110.33,
+        },
+    ]
+    assert choose_reference_consensus(candidates, target_year=2025, has_variant_key=False) is None
+
+    candidates.append(
+        {
+            "source_car_id": 32,
+            "variant_key": None,
+            "year": 2025,
+            "engine_cc": 1995,
+            "power_hp": 150,
+            "power_kw": 110.33,
+        }
+    )
+    result = choose_reference_consensus(candidates, target_year=2025, has_variant_key=False)
+    assert result is not None
+    assert result["confidence"] == "medium"
+    assert result["rule"] == "model_exact_year_exact_consensus"
+
+
 def test_has_complete_raw_specs_supports_ev_and_ice_rules():
     assert has_complete_raw_specs("Diesel", 2993, 286, None) is True
     assert has_complete_raw_specs("Electric", None, 204, None) is True
