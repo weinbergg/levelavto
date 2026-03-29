@@ -76,8 +76,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=81' in template
-    assert '/static/css/styles.css?v=41' in template
+    assert '/static/js/app.js?v=82' in template
+    assert '/static/css/styles.css?v=42' in template
 
 
 def test_home_search_uses_line_params_and_js_submit():
@@ -121,6 +121,8 @@ def test_pages_home_uses_recommended_and_media_cache_helpers():
     assert "home_media_ctx:v4" in router
     assert 'static" / "home-collage"' in router
     assert "home_recommended:" in router
+    assert 'cfg.get("reg_year_min", 2021)' in router
+    assert 'cfg.get("power_hp_max", 160)' in router
 
 
 def test_home_collage_and_home_content_copy_are_updated():
@@ -128,6 +130,33 @@ def test_home_collage_and_home_content_copy_are_updated():
     home_content = _read("app/utils/home_content.py")
     assert "collage_images[:75]" in template
     assert "Показываем только марки, которые есть в каталоге" in home_content
+    assert 'href="#cases-collage"' in template
+    assert 'id="cases-collage"' in template
+
+
+def test_body_type_options_are_canonicalized_and_partner_logos_support_static_assets():
+    pages = _read("app/routers/pages.py")
+    catalog = _read("app/routers/catalog.py")
+    taxonomy = _read("app/utils/taxonomy.py")
+    home = _read("app/templates/home.html")
+    readme = _read("app/static/img/partners/README.md")
+    assert "build_body_type_options" in taxonomy
+    assert "normalize_body_type" in taxonomy
+    assert "body_aliases" in taxonomy
+    assert 'build_body_type_options(service.facet_counts(field="body_type"' in pages
+    assert 'build_body_type_options(service.facet_counts(field="body_type"' in catalog
+    assert "partner_logos" in pages
+    assert "partner-logo--text" in home
+    assert "alfa-leasing.svg" in readme
+
+
+def test_recommended_auto_uses_reg_year_and_effective_specs_limits():
+    service = _read("app/services/cars_service.py")
+    assert "reg_year_min: int | None = None" in service
+    assert "power_hp_max: int | None = None" in service
+    assert "engine_cc_max: int | None = None" in service
+    assert "power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)" in service
+    assert "engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)" in service
 
 
 def test_card_and_detail_templates_render_variant_subtitles():

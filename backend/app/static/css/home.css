@@ -212,10 +212,27 @@
   border: 1px solid var(--border-1);
   border-radius: 10px;
   background: var(--bg-elevated);
-  padding: 10px 12px;
+  padding: 12px 14px;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.partner-logo img {
+  max-width: 150px;
+  max-height: 34px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+.partner-logo span {
   font-size: 14px;
   font-weight: 600;
-  text-align: center;
+  color: var(--text-1);
+}
+.partner-logo--text {
+  border-style: dashed;
 }
 .stats-badge {
   display: inline-flex;
@@ -864,6 +881,7 @@ textarea {
 /* collage */
 .collage-wrap {
   overflow: visible;
+  scroll-margin-top: 92px;
   padding: var(--space-md) max(6px, env(safe-area-inset-left)) var(--space-md) max(6px, env(safe-area-inset-right));
   width: 100vw;
   margin-left: calc(50% - 50vw);

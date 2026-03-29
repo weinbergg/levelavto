@@ -22,6 +22,7 @@ from ..utils.country_map import normalize_country_code
 from ..utils.redis_cache import build_cars_count_key, redis_get_json, redis_set_json
 from ..utils.registration_defaults import get_missing_registration_default
 from ..utils.taxonomy import (
+    body_aliases,
     normalize_color,
     normalize_fuel,
     ru_color,
@@ -915,7 +916,12 @@ class CarsService:
                 conditions.append(reg_year_expr <= reg_year_max)
 
         if body_type and "body_type" not in exclude:
-            conditions.append(func.lower(Car.body_type) == body_type.lower())
+            aliases = body_aliases(body_type)
+            body_expr = func.lower(func.trim(Car.body_type))
+            if aliases:
+                conditions.append(or_(*[body_expr == alias.lower() for alias in aliases]))
+            else:
+                conditions.append(body_expr == body_type.lower())
         if engine_type and "engine_type" not in exclude:
             aliases = fuel_aliases(engine_type)
             if aliases:
@@ -2223,34 +2229,50 @@ class CarsService:
     def recommended_auto(
         self,
         *,
-        max_age_years: int | None = 5,
-        price_min: int | None = 1_000_000,
-        price_max: int | None = 4_000_000,
-        mileage_max: int | None = 80_000,
+        max_age_years: int | None = None,
+        price_min: int | None = None,
+        price_max: int | None = None,
+        mileage_max: int | None = None,
+        reg_year_min: int | None = None,
+        reg_year_max: int | None = None,
+        power_hp_max: int | None = None,
+        engine_cc_max: int | None = None,
         limit: int = 12,
     ) -> List[Car]:
         """
-        Подбор рекомендуемых без ручных списков: возраст, цена, пробег.
-        Возраст считаем по registration_year/month, иначе по year.
+        Подбор рекомендуемых без ручных списков.
+        Для домашней подборки используем год регистрации/выпуска и эффективные характеристики.
         """
         conditions = [self._available_expr()]
         now_year = func.extract("year", func.now())
         now_month = func.extract("month", func.now())
+        reg_year_expr = func.coalesce(Car.registration_year, Car.year)
+        reg_month_expr = func.coalesce(Car.registration_month, 1)
+        power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)
+        engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)
 
         if max_age_years is not None:
             # возраст в месяцах
             max_months = max_age_years * 12
-            reg_year = func.coalesce(Car.registration_year, Car.year)
-            reg_month = func.coalesce(Car.registration_month, 1)
-            age_months = (now_year - reg_year) * 12 + (now_month - reg_month)
+            age_months = (now_year - reg_year_expr) * 12 + (now_month - reg_month_expr)
             conditions.append(age_months <= max_months)
 
+        if reg_year_min is not None:
+            conditions.append(reg_year_expr >= reg_year_min)
+        if reg_year_max is not None:
+            conditions.append(reg_year_expr <= reg_year_max)
         if price_min is not None:
             conditions.append(Car.price_rub_cached >= price_min)
         if price_max is not None:
             conditions.append(Car.price_rub_cached <= price_max)
         if mileage_max is not None:
             conditions.append(Car.mileage <= mileage_max)
+        if power_hp_max is not None:
+            conditions.append(power_hp_expr.is_not(None))
+            conditions.append(power_hp_expr <= power_hp_max)
+        if engine_cc_max is not None:
+            conditions.append(engine_cc_expr.is_not(None))
+            conditions.append(engine_cc_expr <= engine_cc_max)
 
         stmt = (
             select(Car)

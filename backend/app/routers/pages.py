@@ -32,6 +32,7 @@ from ..auth import get_current_user
 from urllib.parse import quote, urlparse, parse_qs, unquote
 from ..utils.localization import display_body, display_color
 from ..utils.taxonomy import (
+    build_body_type_options,
     ru_body,
     ru_color,
     ru_fuel,
@@ -76,8 +77,9 @@ def _home_media_redis_key() -> str:
 def _home_recommended_redis_key(cfg: Dict[str, Any], limit: int) -> str:
     return (
         "home_recommended:"
-        f"{cfg.get('max_age_years')}:{cfg.get('price_min')}:{cfg.get('price_max')}:"
-        f"{cfg.get('mileage_max')}:{limit}:v{_home_dataset_version()}"
+        f"{cfg.get('reg_year_min', 2021)}:{cfg.get('reg_year_max', 2023)}:"
+        f"{cfg.get('power_hp_max', 160)}:{cfg.get('engine_cc_max', 1900)}:"
+        f"{limit}:v{_home_dataset_version()}"
     )
 
 
@@ -96,10 +98,10 @@ def _load_cars_by_ids(db: Session, ids: List[int]) -> List[Car]:
 
 def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any], limit: int = 12) -> List[Car]:
     cache_key = (
-        cfg.get("max_age_years"),
-        cfg.get("price_min"),
-        cfg.get("price_max"),
-        cfg.get("mileage_max"),
+        cfg.get("reg_year_min", 2021),
+        cfg.get("reg_year_max", 2023),
+        cfg.get("power_hp_max", 160),
+        cfg.get("engine_cc_max", 1900),
         limit,
         _home_dataset_version(),
     )
@@ -116,10 +118,10 @@ def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any]
             _HOME_RECOMMENDED_CACHE[cache_key] = cached_ids
             return cached_items
     items = service.recommended_auto(
-        max_age_years=cfg.get("max_age_years"),
-        price_min=cfg.get("price_min"),
-        price_max=cfg.get("price_max"),
-        mileage_max=cfg.get("mileage_max"),
+        reg_year_min=cfg.get("reg_year_min", 2021),
+        reg_year_max=cfg.get("reg_year_max", 2023),
+        power_hp_max=cfg.get("power_hp_max", 160),
+        engine_cc_max=cfg.get("engine_cc_max", 1900),
         limit=limit,
     )
     ids = [int(car.id) for car in items if getattr(car, "id", None)]
@@ -632,15 +634,7 @@ def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
             for item in base_ctx.get("brands") or []
             if item.get("value")
         ]
-        body_type_stats = [
-            {
-                "body_type": item.get("value"),
-                "label": item.get("label") or ru_body(item.get("value")) or display_body(item.get("value")) or item.get("value"),
-                "count": int(item.get("count") or 0),
-            }
-            for item in base_ctx.get("body_types") or []
-            if item.get("value")
-        ]
+        body_type_stats = build_body_type_options(base_ctx.get("body_types") or [])
         payload = {
             "regions": regions,
             "countries": countries,
@@ -676,15 +670,7 @@ def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
         for row in service.facet_counts(field="brand", filters={})
         if row.get("value")
     ]
-    body_type_stats = [
-        {
-            "body_type": row["value"],
-            "label": ru_body(row["value"]) or display_body(row["value"]) or row["value"],
-            "count": int(row["count"]),
-        }
-        for row in service.facet_counts(field="body_type", filters={})
-        if row.get("value")
-    ]
+    body_type_stats = build_body_type_options(service.facet_counts(field="body_type", filters={}))
     payload = {
         "regions": regions,
         "countries": countries,
@@ -1018,6 +1004,37 @@ def _home_context(
             )
             seen.add(b["brand"])
 
+    partner_logo_dir = Path(__file__).resolve().parent.parent / "static" / "img" / "partners"
+
+    def _partner_slug(name: str) -> str:
+        raw = str(name or "").strip().lower()
+        manual = {
+            "сбер": "sber",
+            "альфа-лизинг": "alfa-leasing",
+            "европлан": "europlan",
+            "ресо-лизинг": "reso-leasing",
+            "псб лизинг": "psb-leasing",
+            "совкомбанк лизинг": "sovcombank-leasing",
+        }
+        if raw in manual:
+            return manual[raw]
+        safe = "".join(ch if ch.isalnum() or ch in {" ", "-", "_"} else "" for ch in raw)
+        return safe.strip().replace(" ", "-")
+
+    partner_logos = []
+    for item in home_content.get("hero", {}).get("why_items", []) or []:
+        name = str(item or "").strip()
+        if not name:
+            continue
+        slug = _partner_slug(name)
+        logo = None
+        for ext in ("svg", "webp", "png", "jpg", "jpeg"):
+            candidate = partner_logo_dir / f"{slug}.{ext}"
+            if candidate.exists():
+                logo = f"/static/img/partners/{candidate.name}"
+                break
+        partner_logos.append({"name": name, "logo": logo})
+
     country_labels = home_filter_ctx.get("country_labels") or {}
     countries_list = home_filter_ctx.get("countries") or []
     countries_with_labels = [
@@ -1042,6 +1059,7 @@ def _home_context(
         "reg_months": home_filter_ctx["reg_months"],
         "brand_stats": brand_stats,
         "brand_logos": brand_logos,
+        "partner_logos": partner_logos,
         "body_type_stats": body_type_stats,
         "recommended_cars": recommended,
         "content": content,

@@ -7,6 +7,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "price_min": 1_000_000,
     "price_max": 4_000_000,
     "mileage_max": 80_000,
+    "reg_year_min": 2021,
+    "reg_year_max": 2023,
+    "power_hp_max": 160,
+    "engine_cc_max": 1900,
 }
 
 

@@ -7,6 +7,7 @@ from ..services.cars_service import CarsService, normalize_brand
 from ..schemas import CarDetailOut
 from ..utils.country_map import resolve_display_country, normalize_country_code, country_label_ru
 from ..utils.taxonomy import (
+    build_body_type_options,
     normalize_fuel,
     normalize_color,
     ru_fuel,
@@ -1292,17 +1293,7 @@ def filter_ctx_base(
             if v.get("value")
         ]
     )
-    body_types = _sort_by_label(
-        [
-            {
-                "value": v["value"],
-                "label": ru_body(v["value"]) or display_body(v["value"]) or v["value"],
-                "count": v.get("count", 0),
-            }
-            for v in service.facet_counts(field="body_type", filters=base_filters)
-            if v.get("value")
-        ]
-    )
+    body_types = _sort_by_label(build_body_type_options(service.facet_counts(field="body_type", filters=base_filters)))
     colors_basic, colors_other = _split_colors(service.facet_counts(field="color", filters=base_filters))
     interior_payload = service.payload_values_bulk_filtered(["interior_design"], **base_filters)
     payload = {
@@ -1629,17 +1620,7 @@ def filter_payload(
             if row.get("value")
         ]
     )
-    body_types = _sort_by_label(
-        [
-            {
-                "value": row["value"],
-                "label": ru_body(row["value"]) or display_body(row["value"]) or row["value"],
-                "count": row.get("count", 0),
-            }
-            for row in service.facet_counts_filtered(field="body_type", **common_filters)
-            if row.get("value")
-        ]
-    )
+    body_types = _sort_by_label(build_body_type_options(service.facet_counts_filtered(field="body_type", **common_filters)))
     generations = _sort_by_label(
         [
             {"value": row["value"], "label": row["value"], "count": row.get("count", 0)}

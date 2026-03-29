@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Dict, Optional, Set, Tuple, List, Any
 
-from .localization import display_color
+from .localization import display_body, display_color
 
 def _load_taxonomy() -> Tuple[Dict[str, Dict[str, str]], Dict[str, Dict[str, Set[str]]]]:
     base = Path(__file__).resolve().parents[1] / "resources"
@@ -50,6 +50,67 @@ def ru_label(category: str, value: Optional[str]) -> Optional[str]:
 
 def ru_body(body: Optional[str]) -> Optional[str]:
     return ru_label("body_type", body)
+
+
+def normalize_body_type(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    raw = str(value).strip().lower()
+    if not raw:
+        return None
+    variants = {
+        raw,
+        re.sub(r"\s+", " ", raw.replace("-", " ").replace("_", " ")).strip(),
+    }
+    aliases = _ALIASES.get("body_type", {})
+    for canonical, items in aliases.items():
+        normalized_items = {
+            item.strip().lower()
+            for item in items
+            if item and str(item).strip()
+        }
+        normalized_items.add(canonical.strip().lower())
+        normalized_items.add(canonical.replace("_", " ").strip().lower())
+        if variants & normalized_items:
+            return canonical
+    label = ru_body(raw) or display_body(raw)
+    if not label:
+        return None
+    for canonical, mapped in _TAX.get("body_type", {}).items():
+        if canonical in aliases and mapped == label:
+            return canonical
+    return None
+
+
+def body_aliases(value: Optional[str]) -> List[str]:
+    canonical = normalize_body_type(value)
+    if not canonical:
+        return []
+    aliases = set(_aliases_for("body_type", canonical))
+    aliases.add(canonical)
+    aliases.add(canonical.replace("_", " "))
+    return sorted(alias for alias in aliases if alias)
+
+
+def build_body_type_options(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for row in rows or []:
+        raw = str((row or {}).get("value") or "").strip()
+        if not raw:
+            continue
+        canonical = normalize_body_type(raw)
+        if not canonical:
+            continue
+        entry = buckets.get(canonical)
+        if entry is None:
+            entry = {
+                "value": canonical,
+                "label": ru_body(canonical) or display_body(raw) or raw,
+                "count": 0,
+            }
+            buckets[canonical] = entry
+        entry["count"] += int((row or {}).get("count") or 0)
+    return list(buckets.values())
 
 
 def ru_color(color: Optional[str]) -> Optional[str]:
@@ -586,7 +647,7 @@ def translate_payload_value(field: Optional[str], value: Optional[str]) -> Optio
     if field_key in {"drive_type", "drivetrain"}:
         return ru_drivetrain(raw) or _FREE_TEXT_EXACT.get(low) or raw
     if field_key == "body_type":
-        return ru_body(raw) or raw
+        return ru_body(raw) or display_body(raw) or raw
     if field_key in {"color", "manufacturer_color"}:
         normalized_color = normalize_color(raw)
         return (

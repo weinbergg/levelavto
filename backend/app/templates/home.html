@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
-<link rel="stylesheet" href="/static/css/home.css?v=17" />
+<link rel="stylesheet" href="/static/css/home.css?v=18" />
 {% endblock %} {% block content %}
 <section class="hero hero-with-video" id="hero">
   {% if hero_videos %}
@@ -157,7 +157,7 @@
         {% endfor %}
       </div>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="/catalog">{{ home.hero.actions.primary_label }}</a>
+        <a class="btn btn-primary" href="#cases-collage">{{ home.hero.actions.primary_label }}</a>
         <a class="btn btn-secondary" href="#lead-form">{{ home.hero.actions.secondary_label }}</a>
       </div>
       <div class="hero-note">{{ home.hero.note }}</div>
@@ -166,8 +166,14 @@
       <div class="card hero-partners-card">
         <h3 style="margin-top: 0">{{ home.hero.why_title }}</h3>
         <div class="partner-grid">
-          {% for item in home.hero.why_items %}
-          <div class="partner-logo">{{ item }}</div>
+          {% for item in partner_logos %}
+          <div class="partner-logo{% if not item.logo %} partner-logo--text{% endif %}">
+            {% if item.logo %}
+            <img src="{{ item.logo }}" alt="{{ item.name }}" loading="lazy" decoding="async" />
+            {% else %}
+            <span>{{ item.name }}</span>
+            {% endif %}
+          </div>
           {% endfor %}
         </div>
       </div>
@@ -186,7 +192,7 @@
       </div>
     </div>
   </div>
-  <div class="collage-wrap">
+  <div class="collage-wrap" id="cases-collage">
     {% set visible = collage_images[:75] %}
     <div class="collage-track" id="collage-track">
       {% for img in visible %}
