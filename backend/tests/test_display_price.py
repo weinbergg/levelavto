@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime, timedelta
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -88,3 +89,115 @@ def test_card_and_detail_use_same_field():
     detail_tpl = (base / "app" / "templates" / "car_detail.html").read_text(encoding="utf-8")
     assert "display_price_rub" in catalog_tpl
     assert "display_price_rub" in detail_tpl
+
+
+def test_light_list_refreshes_stale_card_prices(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.add(
+            Car(
+                id=1,
+                source_id=1,
+                external_id="1",
+                country="DE",
+                brand="BMW",
+                model="X5",
+                price_rub_cached=5_000_000,
+                total_price_rub_cached=4_000_000,
+                calc_breakdown_json=[{"title": "__without_util_fee", "amount_rub": 0}],
+                calc_updated_at=datetime.utcnow() - timedelta(days=2),
+                updated_at=datetime.utcnow() - timedelta(days=1),
+                is_available=True,
+            )
+        )
+        db.commit()
+        svc = CarsService(db)
+        monkeypatch.setattr(svc, "_load_lazy_recalc_versions", lambda: (True, None, None))
+
+        def fake_ensure_calc_cache(car, *, force=False):
+            car.total_price_rub_cached = 6_500_000
+            car.calc_breakdown_json = [{"title": "calc", "amount_rub": 6_500_000}]
+            car.calc_updated_at = datetime.utcnow()
+            db.commit()
+            return {"total_rub": 6_500_000, "breakdown": car.calc_breakdown_json}
+
+        monkeypatch.setattr(svc, "ensure_calc_cache", fake_ensure_calc_cache)
+        items, _ = svc.list_cars(page=1, page_size=10, light=True, use_fast_count=False)
+        assert items[0]["total_price_rub_cached"] == 6_500_000
+        assert items[0]["calc_breakdown_json"] == [{"title": "calc", "amount_rub": 6_500_000}]
+
+
+def test_light_list_exposes_effective_inferred_specs():
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.add(
+            Car(
+                id=1,
+                source_id=1,
+                external_id="1",
+                country="DE",
+                brand="BMW",
+                model="X5",
+                year=2025,
+                engine_type="Diesel",
+                engine_cc=None,
+                inferred_engine_cc=2993,
+                power_hp=None,
+                inferred_power_hp=352,
+                inferred_power_kw=258.9,
+                is_available=True,
+            )
+        )
+        db.commit()
+        svc = CarsService(db)
+        items, _ = svc.list_cars(page=1, page_size=10, light=True, use_fast_count=False)
+        assert items[0]["engine_cc"] == 2993
+        assert float(items[0]["power_hp"]) == 352.0
+        assert float(items[0]["power_kw"]) == 258.9
+
+
+def test_maybe_infer_specs_for_calc_applies_inference(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        car = Car(
+            id=1,
+            source_id=1,
+            external_id="1",
+            country="DE",
+            brand="BMW",
+            model="X5",
+            year=2025,
+            engine_type="Diesel",
+            engine_cc=None,
+            power_hp=None,
+            power_kw=None,
+            is_available=True,
+        )
+        db.add(car)
+        db.commit()
+        from backend.app.services import car_spec_inference_service as infer_mod
+
+        monkeypatch.setattr(
+            infer_mod.CarSpecInferenceService,
+            "infer_specs_for_car",
+            lambda self, car_obj, year_window=2: {
+                "engine_cc": 2993,
+                "power_hp": 352.0,
+                "power_kw": 258.9,
+                "source_car_id": 999,
+                "confidence": "high",
+                "rule": "variant_exact_year_exact",
+            },
+        )
+        svc = CarsService(db)
+        applied = svc._maybe_infer_specs_for_calc(car)
+        assert applied is True
+        assert car.inferred_engine_cc == 2993
+        assert float(car.inferred_power_hp) == 352.0
+        assert float(car.inferred_power_kw) == 258.9

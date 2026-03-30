@@ -7,11 +7,16 @@ from typing import Any, Optional, Dict, Tuple
 from decimal import Decimal
 from datetime import date, datetime
 
-import redis
+try:
+    import redis
+except Exception:  # pragma: no cover - optional dependency in local tooling
+    redis = None
+
+from .filter_values import normalize_csv_values
 
 
 logger = logging.getLogger(__name__)
-_redis_client: Optional[redis.Redis] = None
+_redis_client: Optional[Any] = None
 _redis_disabled_until: float = 0.0
 _redis_write_disabled_until: float = 0.0
 _redis_write_disabled_reason: Optional[str] = None
@@ -35,9 +40,11 @@ def _mark_redis_write_disabled(reason: str, seconds: int = 300) -> None:
     logger.warning("redis write disabled for %ss: %s", seconds, reason)
 
 
-def get_redis() -> Optional[redis.Redis]:
+def get_redis() -> Optional[Any]:
     global _redis_client, _redis_disabled_until
     if _redis_disabled_until and _redis_disabled_until > _now():
+        return None
+    if redis is None:
         return None
     url = os.getenv("REDIS_URL")
     if not url:
@@ -253,6 +260,11 @@ def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str
                 continue
         if key in {"region", "country", "kr_type"}:
             val = val.upper()
+        elif key == "color":
+            normalized_multi = normalize_csv_values(val)
+            if not normalized_multi:
+                continue
+            val = normalized_multi
         cleaned[key] = val
     # Ensure alias is not propagated.
     cleaned.pop("eu_country", None)
@@ -320,6 +332,11 @@ def normalize_count_params(params: Optional[Dict[str, Any]] = None) -> Dict[str,
                 continue
         if key in {"region", "country", "kr_type"}:
             val = val.upper()
+        elif key == "color":
+            normalized_multi = normalize_csv_values(val)
+            if not normalized_multi:
+                continue
+            val = normalized_multi
         cleaned[key] = val
     cleaned.pop("eu_country", None)
     return cleaned

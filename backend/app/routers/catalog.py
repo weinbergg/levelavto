@@ -3,7 +3,13 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Any
 import os
 from ..db import get_db
-from ..services.cars_service import CarsService, normalize_brand
+from ..services.cars_service import (
+    CarsService,
+    normalize_brand,
+    effective_engine_cc_value,
+    effective_power_hp_value,
+    effective_power_kw_value,
+)
 from ..schemas import CarDetailOut
 from ..utils.country_map import resolve_display_country, normalize_country_code, country_label_ru
 from ..utils.taxonomy import (
@@ -643,6 +649,9 @@ def list_cars(
                 display_rub = display_price_rub(None, float(c.get("price")) * fx_usd, allow_price_fallback=True)
             elif cur in {"RUB", "₽"}:
                 display_rub = display_price_rub(None, float(c.get("price")), allow_price_fallback=True)
+        effective_engine_cc = effective_engine_cc_value(c)
+        effective_power_hp = effective_power_hp_value(c)
+        effective_power_kw = effective_power_kw_value(c)
         payload_items.append(
             {
                 "id": c.get("id"),
@@ -676,8 +685,9 @@ def list_cars(
                     or c.get("color")
                 ),
                 "color_hex": color_hex(normalize_color(c.get("color")) or c.get("color")),
-                "engine_cc": c.get("engine_cc"),
-                "power_hp": c.get("power_hp"),
+                "engine_cc": effective_engine_cc,
+                "power_hp": effective_power_hp,
+                "power_kw": effective_power_kw,
                 "engine_type": c.get("engine_type"),
                 "display_engine_type": translate_payload_value("engine_type", c.get("engine_type")) or c.get("engine_type"),
                 "body_type": c.get("body_type"),
@@ -1094,6 +1104,9 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
         except Exception:
             pass
     detail = CarDetailOut.model_validate(car)
+    detail.engine_cc = effective_engine_cc_value(car)
+    detail.power_hp = effective_power_hp_value(car)
+    detail.power_kw = effective_power_kw_value(car)
     if car.images:
         detail.images = [im.url for im in car.images if im.url]
     detail.display_price_rub = display_price_rub(

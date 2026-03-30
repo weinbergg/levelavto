@@ -53,3 +53,8 @@ def test_normalize_count_keeps_extended_catalog_fields():
     assert out["interior_color"] == "black"
     assert out["interior_material"] == "leather"
     assert out["vat_reclaimable"] == "1"
+
+
+def test_normalize_count_sorts_multi_color_values_for_stable_cache_keys():
+    out = normalize_count_params({"color": "blue, black,red,blue"})
+    assert out["color"] == "black,blue,red"

@@ -21,6 +21,7 @@ from ..utils.color_groups import normalize_color_group_key
 from ..utils.country_map import normalize_country_code
 from ..utils.redis_cache import build_cars_count_key, redis_get_json, redis_set_json
 from ..utils.registration_defaults import get_missing_registration_default
+from ..utils.filter_values import normalize_csv_values, split_csv_values
 from ..utils.taxonomy import (
     body_aliases,
     normalize_color,
@@ -78,6 +79,33 @@ def brand_variants(value: Optional[str]) -> List[str]:
     if norm == "Rolls-Royce":
         variants.add("Rolls Royce")
     return sorted(variants, key=lambda v: v.lower())
+
+
+def _record_value(record: Any, field: str) -> Any:
+    if isinstance(record, dict):
+        return record.get(field)
+    return getattr(record, field, None)
+
+
+def effective_engine_cc_value(record: Any) -> Any:
+    value = _record_value(record, "engine_cc")
+    if value is not None:
+        return value
+    return _record_value(record, "inferred_engine_cc")
+
+
+def effective_power_hp_value(record: Any) -> Any:
+    value = _record_value(record, "power_hp")
+    if value is not None:
+        return value
+    return _record_value(record, "inferred_power_hp")
+
+
+def effective_power_kw_value(record: Any) -> Any:
+    value = _record_value(record, "power_kw")
+    if value is not None:
+        return value
+    return _record_value(record, "inferred_power_kw")
 
 
 class CarsService:
@@ -801,14 +829,24 @@ class CarsService:
         if interior_design and "interior_design" not in exclude:
             conditions.append(func.jsonb_extract_path_text(payload_json, "interior_design") == interior_design)
         interior_design_expr = func.lower(func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), ""))
+        interior_fallback_expr = func.lower(
+            func.concat_ws(
+                " ",
+                func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), ""),
+                func.coalesce(Car.description, ""),
+                func.coalesce(func.jsonb_extract_path_text(payload_json, "options"), ""),
+                func.coalesce(func.jsonb_extract_path_text(payload_json, "title"), ""),
+                func.coalesce(func.jsonb_extract_path_text(payload_json, "sub_title"), ""),
+            )
+        )
         if interior_color and "interior_color" not in exclude:
             aliases = interior_color_aliases(interior_color)
             if aliases:
-                conditions.append(or_(*[interior_design_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+                conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
         if interior_material and "interior_material" not in exclude:
             aliases = interior_material_aliases(interior_material)
             if aliases:
-                conditions.append(or_(*[interior_design_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+                conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
         if vat_reclaimable and "vat_reclaimable" not in exclude:
             vat_raw = str(vat_reclaimable).strip().lower()
             vat_nt = func.jsonb_extract_path_text(payload_json, "price_eur_nt")
@@ -845,15 +883,22 @@ class CarsService:
             conditions.append(func.lower(Car.generation).like(func.lower(f"%{generation.strip()}%")))
 
         if color and "color" not in exclude:
-            group_key = normalize_color_group_key(color)
-            if group_key:
-                conditions.append(Car.color_group == group_key)
-            else:
-                aliases = color_aliases(color)
+            color_values = split_csv_values(color)
+            color_conditions = []
+            for color_value in color_values:
+                group_key = normalize_color_group_key(color_value)
+                if group_key:
+                    color_conditions.append(Car.color_group == group_key)
+                    continue
+                aliases = color_aliases(color_value)
                 if aliases:
-                    conditions.append(or_(*[func.lower(Car.color).like(f"%{alias}%") for alias in aliases]))
+                    color_conditions.append(
+                        or_(*[func.lower(Car.color).like(f"%{alias}%") for alias in aliases])
+                    )
                 else:
-                    conditions.append(func.lower(Car.color) == color.lower())
+                    color_conditions.append(func.lower(Car.color) == color_value.lower())
+            if color_conditions:
+                conditions.append(or_(*color_conditions))
 
         if source_key and "source" not in exclude:
             keys: List[str] = []
@@ -1019,6 +1064,7 @@ class CarsService:
         use_fast_count: bool = True,
         hide_no_local_photo: bool = False,
     ) -> Tuple[List[Car] | List[dict], int]:
+        normalized_color = normalize_csv_values(color) or color
         conditions, resolved = self._build_list_conditions(
             region=region,
             country=country,
@@ -1029,7 +1075,7 @@ class CarsService:
             q=q,
             model=model,
             generation=generation,
-            color=color,
+            color=normalized_color,
             price_min=price_min,
             price_max=price_max,
             year_min=year_min,
@@ -1082,7 +1128,7 @@ class CarsService:
             q,
             model,
             generation,
-            color,
+            normalized_color,
             price_min,
             price_max,
             mileage_min,
@@ -1121,7 +1167,7 @@ class CarsService:
                 "brand": brand,
                 "model": model,
                 "generation": generation,
-                "color": color,
+                "color": normalized_color,
                 "price_min": price_min,
                 "price_max": price_max,
                 "mileage_min": mileage_min,
@@ -1179,7 +1225,7 @@ class CarsService:
                 source_key=source_key,
                 q=q,
                 generation=generation,
-                color=color,
+                color=normalized_color,
                 price_min=price_min,
                 price_max=price_max,
                 year_min=year_min,
@@ -1234,7 +1280,7 @@ class CarsService:
                 source_key=source_key,
                 q=q,
                 generation=generation,
-                color=color,
+                color=normalized_color,
                 price_min=price_min,
                 price_max=price_max,
                 year_min=year_min,
@@ -1353,13 +1399,17 @@ class CarsService:
                     Car.id,
                     Car.brand,
                     Car.model,
+                    Car.variant,
                     Car.year,
                     Car.registration_year,
                     Car.registration_month,
                     Car.mileage,
                     Car.total_price_rub_cached,
                     Car.price_rub_cached,
+                    Car.calc_breakdown_json,
                     Car.calc_updated_at,
+                    Car.updated_at,
+                    Car.spec_inferred_at,
                     Car.price,
                     Car.currency,
                     Car.thumbnail_url,
@@ -1368,10 +1418,15 @@ class CarsService:
                     Car.source_id,
                     Car.color,
                     Car.body_type,
+                    Car.engine_type,
                     Car.transmission,
                     Car.drive_type,
                     Car.engine_cc,
                     Car.power_hp,
+                    Car.power_kw,
+                    Car.inferred_engine_cc,
+                    Car.inferred_power_hp,
+                    Car.inferred_power_kw,
                 )
                 .where(where_expr)
                 .order_by(*(([thumb_rank] if use_thumb_rank else [])), *order_clause)
@@ -1440,9 +1495,18 @@ class CarsService:
                 page_size,
                 count_key,
             )
-        if not light and items:
+        if items:
             try:
-                self._lazy_recalc_items(items)
+                if light:
+                    self._lazy_recalc_light_items(items)
+                    for row in items:
+                        if not isinstance(row, dict):
+                            continue
+                        row["engine_cc"] = effective_engine_cc_value(row)
+                        row["power_hp"] = effective_power_hp_value(row)
+                        row["power_kw"] = effective_power_kw_value(row)
+                else:
+                    self._lazy_recalc_items(items)
             except Exception:
                 self.logger.exception("lazy_recalc_failed")
         return items, total
@@ -1453,32 +1517,10 @@ class CarsService:
                 return row.get("version")
         return None
 
-    def _needs_recalc_for_versions(
-        self,
-        car: Car,
-        cfg_version: str | None,
-        customs_version: str | None,
-        *,
-        lazy_enabled: bool,
-    ) -> bool:
-        if not lazy_enabled:
-            return False
-        if car.total_price_rub_cached is None or car.calc_breakdown_json is None:
-            return True
-        if car.calc_updated_at is not None and car.updated_at is not None:
-            if car.calc_updated_at < car.updated_at:
-                return True
-        breakdown = car.calc_breakdown_json or []
-        if customs_version and self._extract_breakdown_version(breakdown, "__customs_version") != customs_version:
-            return True
-        if cfg_version and self._extract_breakdown_version(breakdown, "__config_version") != cfg_version:
-            return True
-        return False
-
-    def _lazy_recalc_items(self, items: List[Car]) -> None:
+    def _load_lazy_recalc_versions(self) -> tuple[bool, str | None, str | None]:
         lazy_enabled = os.getenv("LAZY_RECALC_ENABLED", "1") != "0"
         if not lazy_enabled:
-            return
+            return False, None, None
         customs_version = None
         try:
             from backend.app.services.customs_config import get_customs_config
@@ -1504,6 +1546,42 @@ class CarsService:
                 cfg_version = cfg.payload.get("meta", {}).get("version")
         except Exception:
             cfg_version = None
+        return lazy_enabled, cfg_version, customs_version
+
+    def _needs_recalc_for_versions(
+        self,
+        record: Any,
+        cfg_version: str | None,
+        customs_version: str | None,
+        *,
+        lazy_enabled: bool,
+    ) -> bool:
+        if not lazy_enabled:
+            return False
+        total_price_rub_cached = _record_value(record, "total_price_rub_cached")
+        calc_breakdown_json = _record_value(record, "calc_breakdown_json")
+        calc_updated_at = _record_value(record, "calc_updated_at")
+        updated_at = _record_value(record, "updated_at")
+        spec_inferred_at = _record_value(record, "spec_inferred_at")
+        if total_price_rub_cached is None or calc_breakdown_json is None:
+            return True
+        if calc_updated_at is not None and updated_at is not None:
+            if calc_updated_at < updated_at:
+                return True
+        if calc_updated_at is not None and spec_inferred_at is not None:
+            if calc_updated_at < spec_inferred_at:
+                return True
+        breakdown = calc_breakdown_json or []
+        if customs_version and self._extract_breakdown_version(breakdown, "__customs_version") != customs_version:
+            return True
+        if cfg_version and self._extract_breakdown_version(breakdown, "__config_version") != cfg_version:
+            return True
+        return False
+
+    def _lazy_recalc_items(self, items: List[Car]) -> None:
+        lazy_enabled, cfg_version, customs_version = self._load_lazy_recalc_versions()
+        if not lazy_enabled:
+            return
 
         for car in items:
             if self._needs_recalc_for_versions(car, cfg_version, customs_version, lazy_enabled=lazy_enabled):
@@ -1511,6 +1589,99 @@ class CarsService:
                     self.ensure_calc_cache(car, force=True)
                 except Exception:
                     self.logger.exception("lazy_recalc_item_failed car=%s", getattr(car, "id", None))
+
+    def _merge_light_row_from_car(self, row: Dict[str, Any], car: Car) -> None:
+        row["variant"] = car.variant
+        row["engine_type"] = car.engine_type
+        row["engine_cc"] = car.engine_cc
+        row["power_hp"] = car.power_hp
+        row["power_kw"] = car.power_kw
+        row["inferred_engine_cc"] = car.inferred_engine_cc
+        row["inferred_power_hp"] = car.inferred_power_hp
+        row["inferred_power_kw"] = car.inferred_power_kw
+        row["total_price_rub_cached"] = car.total_price_rub_cached
+        row["price_rub_cached"] = car.price_rub_cached
+        row["calc_breakdown_json"] = car.calc_breakdown_json
+        row["calc_updated_at"] = car.calc_updated_at
+        row["updated_at"] = car.updated_at
+        row["spec_inferred_at"] = car.spec_inferred_at
+
+    def _lazy_recalc_light_items(self, items: List[Dict[str, Any]]) -> None:
+        lazy_enabled, cfg_version, customs_version = self._load_lazy_recalc_versions()
+        if not lazy_enabled:
+            return
+        candidate_ids: list[int] = []
+        for row in items:
+            if not isinstance(row, dict):
+                continue
+            if self._needs_recalc_for_versions(row, cfg_version, customs_version, lazy_enabled=lazy_enabled):
+                car_id = row.get("id")
+                if isinstance(car_id, int):
+                    candidate_ids.append(car_id)
+        if not candidate_ids:
+            return
+        cars = (
+            self.db.execute(select(Car).where(Car.id.in_(candidate_ids)))
+            .scalars()
+            .all()
+        )
+        cars_by_id = {car.id: car for car in cars}
+        for car_id in candidate_ids:
+            car = cars_by_id.get(car_id)
+            if car is None:
+                continue
+            try:
+                self.ensure_calc_cache(car, force=True)
+            except Exception:
+                self.logger.exception("lazy_recalc_light_item_failed car=%s", car_id)
+        for row in items:
+            if not isinstance(row, dict):
+                continue
+            car_id = row.get("id")
+            if not isinstance(car_id, int):
+                continue
+            car = cars_by_id.get(car_id)
+            if car is None:
+                continue
+            self._merge_light_row_from_car(row, car)
+
+    def _maybe_infer_specs_for_calc(self, car: Car) -> bool:
+        effective_engine_cc = effective_engine_cc_value(car)
+        effective_power_hp = effective_power_hp_value(car)
+        effective_power_kw = effective_power_kw_value(car)
+        if effective_engine_cc is not None and (effective_power_hp is not None or effective_power_kw is not None):
+            return False
+        try:
+            from .car_spec_inference_service import CarSpecInferenceService
+        except Exception:
+            self.logger.exception("calc_infer_import_failed car=%s", getattr(car, "id", None))
+            return False
+        try:
+            year_window = max(0, int(os.getenv("SPEC_INFERENCE_YEAR_WINDOW", "2")))
+        except Exception:
+            year_window = 2
+        try:
+            inference_service = CarSpecInferenceService(self.db)
+            inference = inference_service.infer_specs_for_car(car, year_window=year_window)
+        except Exception:
+            self.logger.exception("calc_infer_lookup_failed car=%s", getattr(car, "id", None))
+            return False
+        if not inference:
+            return False
+        try:
+            inference_service._apply_inferred_specs(car, inference)
+            self.db.commit()
+            self.logger.info(
+                "calc_inferred_specs car=%s rule=%s confidence=%s",
+                getattr(car, "id", None),
+                inference.get("rule"),
+                inference.get("confidence"),
+            )
+            return True
+        except Exception:
+            self.db.rollback()
+            self.logger.exception("calc_infer_apply_failed car=%s", getattr(car, "id", None))
+            return False
 
     def ensure_calc_cache(self, car: Car, *, force: bool = False) -> dict | None:
         if not car:
@@ -1678,9 +1849,16 @@ class CarsService:
                 price_net_eur = float(used_price) * (float(usd_rate) / float(eur_rate))
         if price_net_eur is None:
             return _fallback_total("no_price_net_eur")
-        effective_engine_cc = car.engine_cc if car.engine_cc is not None else car.inferred_engine_cc
-        effective_power_hp = car.power_hp if car.power_hp is not None else car.inferred_power_hp
-        effective_power_kw = car.power_kw if car.power_kw is not None else car.inferred_power_kw
+        effective_engine_cc = effective_engine_cc_value(car)
+        effective_power_hp = effective_power_hp_value(car)
+        effective_power_kw = effective_power_kw_value(car)
+        if (
+            effective_engine_cc is None
+            or (effective_power_hp is None and effective_power_kw is None)
+        ) and self._maybe_infer_specs_for_calc(car):
+            effective_engine_cc = effective_engine_cc_value(car)
+            effective_power_hp = effective_power_hp_value(car)
+            effective_power_kw = effective_power_kw_value(car)
         engine_type = (car.engine_type or "").lower()
         is_electric = is_bev(
             effective_engine_cc,
@@ -2421,12 +2599,13 @@ class CarsService:
         condition: Optional[str] = None,
         hide_no_local_photo: bool = False,
     ) -> int:
+        normalized_color = normalize_csv_values(color) or color
         _, total = self.list_cars(
             region=region,
             country=country,
             brand=brand,
             model=model,
-            color=color,
+            color=normalized_color,
             price_min=price_min,
             price_max=price_max,
             power_hp_min=power_hp_min,

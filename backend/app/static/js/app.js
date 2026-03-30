@@ -531,14 +531,38 @@
     window.history.replaceState(null, '', next)
   }
 
+  function parseSelectedColorValues(inputOrValue) {
+    const raw = typeof inputOrValue === 'string'
+      ? inputOrValue
+      : (inputOrValue?.value || '')
+    const values = []
+    const seen = new Set()
+    String(raw || '').split(',').forEach((item) => {
+      const value = String(item || '').trim()
+      if (!value) return
+      const key = value.toLowerCase()
+      if (seen.has(key)) return
+      seen.add(key)
+      values.push(value)
+    })
+    return values
+  }
+
+  function setSelectedColorValues(input, values) {
+    if (!input) return []
+    const cleaned = parseSelectedColorValues(Array.isArray(values) ? values.join(',') : String(values || ''))
+    input.value = cleaned.join(',')
+    return cleaned
+  }
+
   function syncColorChips(scope) {
     if (!scope) return
     const input = qs('input[name="color"]', scope)
     const chips = qsa('.color-chip', scope)
     if (!input || !chips.length) return
-    const value = input.value
+    const selected = new Set(parseSelectedColorValues(input))
     chips.forEach((chip) => {
-      chip.classList.toggle('active', chip.dataset.color === value)
+      chip.classList.toggle('active', selected.has(chip.dataset.color || ''))
     })
   }
 
@@ -552,16 +576,36 @@
       chip.dataset.bound = '1'
       chip.addEventListener('click', () => {
         const next = chip.dataset.color || ''
-        if (input.value === next) {
-          input.value = ''
-        } else {
-          input.value = next
-        }
+        const selected = parseSelectedColorValues(input)
+        const hasNext = selected.includes(next)
+        const updated = hasNext
+          ? selected.filter((value) => value !== next)
+          : [...selected, next]
+        setSelectedColorValues(input, updated)
         syncColorChips(scope)
+        bindOtherColorsToggle(scope)
         if (typeof onChange === 'function') onChange()
       })
     })
     syncColorChips(scope)
+  }
+
+  function syncOtherColorsToggle(scope) {
+    if (!scope) return
+    const toggles = qsa('[data-colors-toggle]', scope)
+    if (!toggles.length) return
+    toggles.forEach((toggle) => {
+      const targetId = toggle.dataset.target || ''
+      const extra = targetId ? qs(`#${targetId}`, scope) : null
+      if (!extra) return
+      const input = qs('input[name="color"]', scope)
+      const selected = new Set(parseSelectedColorValues(input))
+      const hasInExtra = qsa('.color-chip', extra).some((chip) => selected.has(chip.dataset.color || ''))
+      const expanded = toggle.dataset.manualExpanded === '1' || hasInExtra
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false')
+      extra.classList.toggle('is-collapsed', !expanded)
+      toggle.textContent = expanded ? 'Скрыть цвета' : 'Другие цвета'
+    })
   }
 
   function bindOtherColorsToggle(scope) {
@@ -573,26 +617,30 @@
       const targetId = toggle.dataset.target || ''
       const extra = targetId ? qs(`#${targetId}`, scope) : null
       if (!extra) return
-      const input = qs('input[name="color"]', scope)
-      const update = (expanded) => {
-        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false')
-        extra.classList.toggle('is-collapsed', !expanded)
-        toggle.textContent = expanded ? 'Скрыть цвета' : 'Другие цвета'
-      }
       toggle.addEventListener('click', () => {
         const expanded = toggle.getAttribute('aria-expanded') === 'true'
-        update(!expanded)
+        toggle.dataset.manualExpanded = expanded ? '0' : '1'
+        syncOtherColorsToggle(scope)
       })
       toggle.dataset.bound = '1'
-      if (input?.value) {
-        const hasInExtra = extra.querySelector(`.color-chip[data-color="${input.value}"]`)
-        if (hasInExtra) {
-          update(true)
-          return
-        }
-      }
-      update(false)
     })
+    syncOtherColorsToggle(scope)
+  }
+
+  function findColorChipLabel(scope, value) {
+    if (!scope || !value) return value
+    const chip = qsa('.color-chip', scope).find((item) => (item.dataset.color || '') === value)
+    return chip?.dataset?.label || value
+  }
+
+  function removeSelectedColor(scope, value) {
+    if (!scope || !value) return
+    const input = qs('input[name="color"]', scope)
+    const selected = parseSelectedColorValues(input)
+    const updated = selected.filter((item) => item !== value)
+    setSelectedColorValues(input, updated)
+    syncColorChips(scope)
+    bindOtherColorsToggle(scope)
   }
 
   function syncRegMonthState(scope) {
@@ -768,10 +816,7 @@
       const map = window.COUNTRY_LABELS || {}
       return map[value] || value
     }
-    const colorLabel = (value) => {
-      const chip = form.querySelector(`.color-chip[data-color="${value}"]`)
-      return chip?.dataset?.label || value
-    }
+    const colorLabel = (value) => findColorChipLabel(form, value)
     const regMinYear = params.get('reg_year_min')
     const regMinMonth = params.get('reg_month_min')
     const regMaxYear = params.get('reg_year_max')
@@ -812,7 +857,15 @@
         displayValue = Number.isFinite(n) ? `${n.toLocaleString('ru-RU')} см³` : value
       }
       if (key === 'color') {
-        displayValue = colorLabel(value)
+        parseSelectedColorValues(value).forEach((colorValue) => {
+          chips.push({
+            key,
+            label,
+            value: colorLabel(colorValue),
+            removeColor: colorValue,
+          })
+        })
+        return
       }
       chips.push({ key, label, value: displayValue })
     })
@@ -841,12 +894,21 @@
       return
     }
     container.innerHTML = ''
-    chips.forEach(({ key, keys, label, value }) => {
+    chips.forEach(({ key, keys, label, value, removeColor }) => {
       const chip = document.createElement('button')
       chip.type = 'button'
       chip.className = 'filter-chip'
       chip.innerHTML = `<span>${label}: ${value}</span><span class="chip-close">×</span>`
+      if (removeColor) {
+        chip.dataset.removeColor = removeColor
+      }
       chip.addEventListener('click', () => {
+        if (key === 'color' && value) {
+          removeSelectedColor(form, chip.dataset.removeColor || '')
+          updateCatalogUrlFromParams(collectParams(1))
+          loadCars(1)
+          return
+        }
         const toClear = keys || [key]
         if (!keys && key === 'region') {
           toClear.push('country', 'kr_type')
@@ -868,6 +930,7 @@
         }
         if (toClear.includes('color')) {
           syncColorChips(form)
+          bindOtherColorsToggle(form)
         }
         updateCatalogUrlFromParams(collectParams(1))
         loadCars(1)
@@ -2610,8 +2673,12 @@
       }
       if (colorInput) {
         const allowed = new Set([...basic, ...extra].map((item) => item.value))
-        if (colorInput.value && allowed.size && !allowed.has(colorInput.value)) {
-          colorInput.value = ''
+        const selected = parseSelectedColorValues(colorInput)
+        if (selected.length && allowed.size) {
+          const nextSelected = selected.filter((value) => allowed.has(value))
+          if (nextSelected.length !== selected.length) {
+            setSelectedColorValues(colorInput, nextSelected)
+          }
         }
       }
       bindColorChips(form, () => {

@@ -15,6 +15,25 @@ from ..parsing.mobile_de_feed import MobileDeFeedParser
 from ..importing.mobilede_csv import iter_mobilede_csv_rows
 from ..services.parsing_data_service import ParsingDataService
 from ..models import Source, ParserRun, ParserRunSource
+from ..utils.feed_deactivation import should_deactivate_feed
+
+
+def _latest_previous_seen(db, source_id: int, current_run_id: int) -> int | None:
+    row = db.execute(
+        select(ParserRunSource.total_seen)
+        .join(ParserRun, ParserRun.id == ParserRunSource.parser_run_id)
+        .where(
+            ParserRunSource.source_id == source_id,
+            ParserRunSource.parser_run_id != current_run_id,
+            ParserRun.status == "success",
+            ParserRunSource.total_seen > 0,
+        )
+        .order_by(ParserRun.started_at.desc())
+        .limit(1)
+    ).first()
+    if not row:
+        return None
+    return int(row[0] or 0) or None
 
 
 def main() -> None:
@@ -37,6 +56,24 @@ def main() -> None:
         "--skip-deactivate",
         action="store_true",
         help="Do not deactivate missing cars (useful for partial/short-lived feeds)",
+    )
+    ap.add_argument(
+        "--deactivate-mode",
+        choices=("auto", "force", "skip"),
+        default=os.getenv("MOBILEDE_DEACTIVATE_MODE", "auto"),
+        help="Deactivation mode: auto compares feed size with previous successful import; force always deactivates; skip disables deactivation.",
+    )
+    ap.add_argument(
+        "--deactivate-min-ratio",
+        type=float,
+        default=float(os.getenv("MOBILEDE_DEACTIVATE_MIN_RATIO", "0.93")),
+        help="Minimum current/previous total_seen ratio required for auto deactivation.",
+    )
+    ap.add_argument(
+        "--deactivate-min-seen",
+        type=int,
+        default=int(os.getenv("MOBILEDE_DEACTIVATE_MIN_SEEN", "100000")),
+        help="Minimum rows seen before auto deactivation can run.",
     )
     ap.add_argument(
         "--stats-file",
@@ -108,11 +145,27 @@ def main() -> None:
             seen_total += seen
 
         deactivated = 0
-        if not args.skip_deactivate:
-            if seen_total == 0:
-                print("Skip deactivation: zero rows imported (likely empty/failed feed).")
-            else:
-                deactivated = service.deactivate_missing_by_last_seen(source, run.started_at)
+        deactivate_mode = "skip" if args.skip_deactivate or os.getenv("MOBILEDE_SKIP_DEACTIVATE") == "1" else args.deactivate_mode
+        previous_seen = _latest_previous_seen(db, source.id, run.id)
+        allow_deactivate, deactivate_reason = should_deactivate_feed(
+            mode=deactivate_mode,
+            current_seen=seen_total,
+            previous_seen=previous_seen,
+            min_ratio=max(0.0, min(float(args.deactivate_min_ratio), 1.0)),
+            min_seen=max(0, int(args.deactivate_min_seen)),
+        )
+        ratio_text = "n/a"
+        if previous_seen:
+            ratio_text = f"{(float(seen_total) / float(previous_seen)):.4f}"
+        print(
+            "[mobilede_import] deactivation gate "
+            f"mode={deactivate_mode} current_seen={seen_total} previous_seen={previous_seen or 'n/a'} "
+            f"ratio={ratio_text} min_ratio={float(args.deactivate_min_ratio):.4f} min_seen={int(args.deactivate_min_seen)} "
+            f"decision={'allow' if allow_deactivate else 'skip'} reason={deactivate_reason}",
+            flush=True,
+        )
+        if allow_deactivate:
+            deactivated = service.deactivate_missing_by_last_seen(source, run.started_at)
 
         # Record per-source stats
         prs = ParserRunSource(
@@ -144,6 +197,9 @@ def main() -> None:
                 "updated": updated_total,
                 "deactivated": deactivated,
                 "skipped": skipped_total,
+                "deactivate_mode": deactivate_mode,
+                "deactivate_previous_seen": previous_seen,
+                "deactivate_reason": deactivate_reason,
                 "timestamp": datetime.utcnow().isoformat(),
             }
             os.makedirs(os.path.dirname(args.stats_file), exist_ok=True)

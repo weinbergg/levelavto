@@ -12,7 +12,13 @@ import random
 import math
 from email.mime.text import MIMEText
 from ..db import get_db
-from ..services.cars_service import CarsService, normalize_brand
+from ..services.cars_service import (
+    CarsService,
+    normalize_brand,
+    effective_engine_cc_value,
+    effective_power_hp_value,
+    effective_power_kw_value,
+)
 from ..utils.recommended_config import load_config
 from ..services.content_service import ContentService
 from sqlalchemy.orm import Session
@@ -1349,6 +1355,9 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                 c["display_engine_type"] = translate_payload_value("engine_type", c.get("engine_type")) or c.get("engine_type")
                 c["display_transmission"] = translate_payload_value("transmission", c.get("transmission")) or c.get("transmission")
                 c["display_drive_type"] = translate_payload_value("drive_type", c.get("drive_type")) or c.get("drive_type")
+                c["engine_cc"] = effective_engine_cc_value(c)
+                c["power_hp"] = effective_power_hp_value(c)
+                c["power_kw"] = effective_power_kw_value(c)
                 c["display_body_type"] = ru_body(c.get("body_type")) or display_body(c.get("body_type")) or c.get("body_type")
                 normalized_color = normalize_color(c.get("color"))
                 c["display_color"] = (
@@ -1672,6 +1681,9 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     calc = None
     if car:
         calc = service.ensure_calc_cache(car)
+        car.engine_cc = effective_engine_cc_value(car)
+        car.power_hp = effective_power_hp_value(car)
+        car.power_kw = effective_power_kw_value(car)
         car.display_body_type = ru_body(getattr(car, "body_type", None)) or display_body(getattr(car, "body_type", None)) or car.body_type
         normalized_color = normalize_color(getattr(car, "color", None))
         car.display_color = (

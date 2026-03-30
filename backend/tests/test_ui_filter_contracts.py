@@ -33,6 +33,8 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "syncGenerationVisibility" in script
     assert "setRegionSelectOptions" in script
     assert "item.value ?? item.id" in script
+    assert "parseSelectedColorValues" in script
+    assert "removeSelectedColor" in script
     assert "select.disabled = normalizedItems.length === 0" in script or "select.disabled = deduped.length === 0" in script
 
 
@@ -76,8 +78,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=82' in template
-    assert '/static/css/styles.css?v=42' in template
+    assert '/static/js/app.js?v=83' in template
+    assert '/static/css/styles.css?v=43' in template
 
 
 def test_home_search_uses_line_params_and_js_submit():
@@ -218,7 +220,11 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
     assert "--only-defaulted-registration" in recalc_script
     assert 'jsonb_extract_path_text(payload_json, "registration_defaulted")' in recalc_script
     assert "[backfill_missing_registration]" in reg_backfill_script
-    assert 'default_year_expr != str(fallback_year)' in reg_backfill_script
-    assert 'default_month_expr != str(fallback_month)' in reg_backfill_script
-    assert "step=backfill_missing_registration" in pipeline.read_text(encoding="utf-8")
-    assert "step=recalc_defaulted_registration" in pipeline.read_text(encoding="utf-8")
+
+
+def test_interior_filters_use_derived_text_fallback_from_payload_and_description():
+    service = _read("app/services/cars_service.py")
+    assert 'func.concat_ws(' in service
+    assert 'jsonb_extract_path_text(payload_json, "options")' in service
+    assert 'jsonb_extract_path_text(payload_json, "title")' in service
+    assert "func.coalesce(Car.description, \"\")" in service

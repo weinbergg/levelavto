@@ -66,7 +66,7 @@ def run_import(
     file_path: Path,
     trigger: str = "auto-daily",
     limit: int | None = None,
-    allow_deactivate: bool = False,
+    deactivate_mode: str = "auto",
     stats_file: Path | None = None,
 ) -> None:
     cmd = [
@@ -80,8 +80,7 @@ def run_import(
     ]
     if stats_file:
         cmd += ["--stats-file", str(stats_file)]
-    if not allow_deactivate:
-        cmd.append("--skip-deactivate")
+    cmd += ["--deactivate-mode", deactivate_mode]
     if limit:
         cmd += ["--limit", str(limit)]
     subprocess.run(cmd, check=True)
@@ -181,7 +180,13 @@ def main() -> None:
     ap.add_argument(
         "--allow-deactivate",
         action="store_true",
-        help="Allow deactivating missing cars (only for full/verified feeds)",
+        help="Legacy override: force deactivation for this run.",
+    )
+    ap.add_argument(
+        "--deactivate-mode",
+        choices=("auto", "force", "skip"),
+        default=os.getenv("MOBILEDE_DEACTIVATE_MODE", "auto"),
+        help="auto compares current feed with previous successful import; force always deactivates; skip disables deactivation.",
     )
     args = ap.parse_args()
 
@@ -199,11 +204,12 @@ def main() -> None:
 
     if not args.skip_import:
         stats_file = DOWNLOAD_DIR / "mobilede_import_stats.json"
+        deactivate_mode = "force" if args.allow_deactivate else args.deactivate_mode
         run_import(
             target,
             trigger="auto-daily",
             limit=args.limit,
-            allow_deactivate=args.allow_deactivate,
+            deactivate_mode=deactivate_mode,
             stats_file=stats_file,
         )
         if not args.skip_cache:
