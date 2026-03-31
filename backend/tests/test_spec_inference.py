@@ -120,3 +120,63 @@ def test_normalize_engine_type_drops_numeric_and_co2_noise():
 def test_variant_primary_token_extracts_core_variant():
     assert variant_primary_token("xdrive30d|m-sport|individual|manhattan") == "xdrive30d"
     assert variant_primary_token("p530|autobiography") == "p530"
+
+
+def test_choose_reference_consensus_can_infer_engine_only_when_power_conflicts():
+    candidates = [
+        {
+            "source_car_id": 41,
+            "variant_key": "xdrive30d",
+            "year": 2025,
+            "engine_cc": 2993,
+            "power_hp": 286,
+            "power_kw": 210.35,
+        },
+        {
+            "source_car_id": 42,
+            "variant_key": "xdrive30d",
+            "year": 2025,
+            "engine_cc": 2993,
+            "power_hp": 298,
+            "power_kw": 219.18,
+        },
+    ]
+    result = choose_reference_consensus(
+        candidates,
+        target_year=2025,
+        has_variant_key=True,
+        need_engine_cc=True,
+        need_power=False,
+    )
+    assert result is not None
+    assert result["engine_cc"] == 2993
+
+
+def test_choose_reference_consensus_can_infer_power_only_when_cc_conflicts():
+    candidates = [
+        {
+            "source_car_id": 51,
+            "variant_key": "xdrive40d",
+            "year": 2025,
+            "engine_cc": 2993,
+            "power_hp": 352,
+            "power_kw": 258.9,
+        },
+        {
+            "source_car_id": 52,
+            "variant_key": "xdrive40d",
+            "year": 2025,
+            "engine_cc": 3000,
+            "power_hp": 352,
+            "power_kw": 258.9,
+        },
+    ]
+    result = choose_reference_consensus(
+        candidates,
+        target_year=2025,
+        has_variant_key=True,
+        need_engine_cc=False,
+        need_power=True,
+    )
+    assert result is not None
+    assert result["power_hp"] == 352

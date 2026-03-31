@@ -210,6 +210,10 @@ class CarSpecInferenceService:
         }
 
     def infer_specs_for_car(self, car: Car, *, year_window: int = 2) -> Optional[Dict[str, Any]]:
+        need_engine_cc = car.engine_cc is None and normalize_engine_type(car.engine_type) != "electric"
+        need_power = car.power_hp is None and car.power_kw is None
+        if not need_engine_cc and not need_power:
+            return None
         sig = build_reference_signature(
             brand=normalize_brand(car.brand),
             model=car.model,
@@ -246,6 +250,8 @@ class CarSpecInferenceService:
                 exact_variant_rows,
                 target_year=sig["year"],
                 has_variant_key=True,
+                need_engine_cc=need_engine_cc,
+                need_power=need_power,
             )
             if consensus:
                 return consensus
@@ -260,6 +266,8 @@ class CarSpecInferenceService:
                     primary_variant_rows,
                     target_year=sig["year"],
                     has_variant_key=True,
+                    need_engine_cc=need_engine_cc,
+                    need_power=need_power,
                 )
                 if consensus:
                     rule = "variant_primary_year_exact"
@@ -274,6 +282,8 @@ class CarSpecInferenceService:
             rows,
             target_year=sig["year"],
             has_variant_key=False,
+            need_engine_cc=need_engine_cc,
+            need_power=need_power,
         )
 
     def _reference_payload_for_car(self, car: Car) -> Optional[Dict[str, Any]]:

@@ -213,6 +213,8 @@ def choose_reference_consensus(
     *,
     target_year: Optional[int],
     has_variant_key: bool,
+    need_engine_cc: bool = True,
+    need_power: bool = True,
 ) -> Optional[Dict[str, Any]]:
     usable: list[Dict[str, Any]] = []
     tuples: dict[tuple[Any, Any, Any], dict[str, Any]] = {}
@@ -220,11 +222,19 @@ def choose_reference_consensus(
         cc = _to_int(item.get("engine_cc"))
         hp = normalized_power_hp(item.get("power_hp"), item.get("power_kw"))
         kw = normalized_power_kw(item.get("power_hp"), item.get("power_kw"))
-        if cc is None and hp is None:
+        if need_engine_cc and cc is None:
+            continue
+        if need_power and hp is None and kw is None:
+            continue
+        if not need_engine_cc and not need_power:
             continue
         year = _to_int(item.get("year"))
         source_car_id = _to_int(item.get("source_car_id"))
-        tuple_key = (cc, round(hp or 0, 1) if hp is not None else None, round(kw or 0, 2) if kw is not None else None)
+        tuple_key = (
+            cc if need_engine_cc else "__skip_cc__",
+            round(hp or 0, 1) if need_power and hp is not None else ("__skip_hp__" if not need_power else None),
+            round(kw or 0, 2) if need_power and kw is not None else ("__skip_kw__" if not need_power else None),
+        )
         distance = 999 if target_year is None or year is None else abs(year - target_year)
         usable.append(
             {
