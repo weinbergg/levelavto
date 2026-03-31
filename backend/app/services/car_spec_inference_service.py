@@ -226,65 +226,91 @@ class CarSpecInferenceService:
         if not sig["brand_norm"] or not sig["model_norm"] or not sig["year"]:
             return None
 
-        query = self.db.query(CarSpecReference).filter(
-            CarSpecReference.brand_norm == sig["brand_norm"],
-            CarSpecReference.model_norm == sig["model_norm"],
-            CarSpecReference.source_car_id != car.id,
-        )
-        if sig["engine_type_norm"]:
-            query = query.filter(CarSpecReference.engine_type_norm == sig["engine_type_norm"])
-        if sig["body_type_norm"]:
-            query = query.filter(CarSpecReference.body_type_norm == sig["body_type_norm"])
-        if sig["year"]:
-            query = query.filter(
-                CarSpecReference.year.between(sig["year"] - year_window, sig["year"] + year_window)
+        def _query_rows(window: int) -> list[Dict[str, Any]]:
+            query = self.db.query(CarSpecReference).filter(
+                CarSpecReference.brand_norm == sig["brand_norm"],
+                CarSpecReference.model_norm == sig["model_norm"],
+                CarSpecReference.source_car_id != car.id,
             )
-        refs = query.all()
-        if not refs:
-            return None
+            if sig["engine_type_norm"]:
+                query = query.filter(CarSpecReference.engine_type_norm == sig["engine_type_norm"])
+            if sig["body_type_norm"]:
+                query = query.filter(CarSpecReference.body_type_norm == sig["body_type_norm"])
+            if sig["year"]:
+                query = query.filter(
+                    CarSpecReference.year.between(sig["year"] - window, sig["year"] + window)
+                )
+            refs = query.all()
+            return [self._reference_row_to_dict(ref) for ref in refs]
 
-        rows = [self._reference_row_to_dict(ref) for ref in refs]
-        if sig["variant_key"]:
-            exact_variant_rows = [row for row in rows if row.get("variant_key") == sig["variant_key"]]
-            consensus = choose_reference_consensus(
-                exact_variant_rows,
-                target_year=sig["year"],
-                has_variant_key=True,
-                need_engine_cc=need_engine_cc,
-                need_power=need_power,
-            )
-            if consensus:
-                return consensus
-            primary_token = variant_primary_token(sig["variant_key"])
-            if primary_token:
-                primary_variant_rows = [
-                    row
-                    for row in rows
-                    if variant_primary_token(row.get("variant_key")) == primary_token
-                ]
+        def _consensus_from_rows(rows: list[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+            if not rows:
+                return None
+            if sig["variant_key"]:
+                exact_variant_rows = [row for row in rows if row.get("variant_key") == sig["variant_key"]]
                 consensus = choose_reference_consensus(
-                    primary_variant_rows,
+                    exact_variant_rows,
                     target_year=sig["year"],
                     has_variant_key=True,
                     need_engine_cc=need_engine_cc,
                     need_power=need_power,
                 )
                 if consensus:
-                    rule = "variant_primary_year_exact"
-                    if consensus.get("rule") == "variant_exact_year_window":
-                        rule = "variant_primary_year_window"
-                    return {
-                        **consensus,
-                        "confidence": "medium",
-                        "rule": rule,
-                    }
-        return choose_reference_consensus(
-            rows,
-            target_year=sig["year"],
-            has_variant_key=False,
-            need_engine_cc=need_engine_cc,
-            need_power=need_power,
-        )
+                    return consensus
+                primary_token = variant_primary_token(sig["variant_key"])
+                if primary_token:
+                    primary_variant_rows = [
+                        row
+                        for row in rows
+                        if variant_primary_token(row.get("variant_key")) == primary_token
+                    ]
+                    consensus = choose_reference_consensus(
+                        primary_variant_rows,
+                        target_year=sig["year"],
+                        has_variant_key=True,
+                        need_engine_cc=need_engine_cc,
+                        need_power=need_power,
+                    )
+                    if consensus:
+                        rule = "variant_primary_year_exact"
+                        if consensus.get("rule") == "variant_exact_year_window":
+                            rule = "variant_primary_year_window"
+                        return {
+                            **consensus,
+                            "confidence": "medium",
+                            "rule": rule,
+                        }
+            return choose_reference_consensus(
+                rows,
+                target_year=sig["year"],
+                has_variant_key=False,
+                need_engine_cc=need_engine_cc,
+                need_power=need_power,
+            )
+
+        rows = _query_rows(year_window)
+        consensus = _consensus_from_rows(rows)
+        if consensus:
+            return consensus
+        expanded_year_window = max(year_window, 4)
+        if expanded_year_window == year_window:
+            return None
+        rows = _query_rows(expanded_year_window)
+        consensus = _consensus_from_rows(rows)
+        if not consensus:
+            return None
+        rule = str(consensus.get("rule") or "")
+        if "year_exact" in rule:
+            rule = rule.replace("year_exact", "year_expanded")
+        elif "year_window" in rule:
+            rule = rule.replace("year_window", "year_expanded")
+        else:
+            rule = f"{rule}_year_expanded" if rule else "year_expanded"
+        return {
+            **consensus,
+            "confidence": "medium",
+            "rule": rule,
+        }
 
     def _reference_payload_for_car(self, car: Car) -> Optional[Dict[str, Any]]:
         if not car.is_available:
