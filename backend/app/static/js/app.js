@@ -787,7 +787,7 @@
       efficiency_class: 'Эко-стикер',
       climatisation: 'Климат',
       airbags: 'Подушки',
-      interior_design: 'Интерьер',
+      interior_design: 'Отделка салона',
       interior_color: 'Цвет салона',
       interior_material: 'Материал салона',
       vat_reclaimable: 'НДС',
@@ -842,7 +842,7 @@
         const n = Number(value)
         displayValue = Number.isFinite(n) ? `${n.toLocaleString('ru-RU')} км` : value
       }
-      if (['engine_type', 'transmission', 'drive_type', 'body_type', 'condition'].includes(key)) {
+      if (['engine_type', 'transmission', 'drive_type', 'body_type', 'condition', 'interior_design'].includes(key)) {
         displayValue = selectLabel(key, value)
       }
       if (key === 'vat_reclaimable') {
@@ -906,7 +906,7 @@
         if (key === 'color' && value) {
           removeSelectedColor(form, chip.dataset.removeColor || '')
           updateCatalogUrlFromParams(collectParams(1))
-          loadCars(1)
+          loadCars(1, { scrollToTop: true })
           return
         }
         const toClear = keys || [key]
@@ -933,7 +933,7 @@
           bindOtherColorsToggle(form)
         }
         updateCatalogUrlFromParams(collectParams(1))
-        loadCars(1)
+        loadCars(1, { scrollToTop: true })
       })
       container.appendChild(chip)
     })
@@ -1035,7 +1035,7 @@
         modelSelect.disabled = true
         setAccordionSelectedModels(modelSelect, [])
       }
-      loadCars(1)
+      loadCars(1, { scrollToTop: true })
     })
   }
 
@@ -1107,7 +1107,19 @@
   let catalogController = null
   let catalogReqId = 0
 
-  async function loadCars(page = 1) {
+  function scrollCatalogToTop() {
+    const anchor = qs('.results-header') || qs('.catalog__content') || qs('#cards')
+    if (!anchor) return
+    const prefersReduce = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const top = Math.max(0, Math.round(anchor.getBoundingClientRect().top + window.scrollY - 12))
+    window.scrollTo({
+      top,
+      behavior: prefersReduce.matches ? 'auto' : 'smooth',
+    })
+  }
+
+  async function loadCars(page = 1, options = {}) {
+    const { scrollToTop = false } = options || {}
     const spinner = qs('#spinner')
     const cards = qs('#cards')
     const pageInfo = qs('#pageInfo')
@@ -1123,6 +1135,9 @@
     spinner.style.display = 'block'
     if (!reuseSSR) {
       renderSkeleton(cards)
+    }
+    if (scrollToTop) {
+      requestAnimationFrame(scrollCatalogToTop)
     }
     try {
       const params = paramsPreview
@@ -1148,7 +1163,7 @@
           const b = document.createElement('button')
           b.className = 'btn page-btn' + (p === data.page ? ' active' : '')
           b.textContent = label || String(p)
-          b.addEventListener('click', () => loadCars(p))
+          b.addEventListener('click', () => loadCars(p, { scrollToTop: true }))
           pageNumbers.appendChild(b)
         }
         addBtn(1)
@@ -1218,6 +1233,7 @@
         window.__pageSize = data.page_size
         window.__total = data.total
         cards.dataset.ssr = '0'
+        if (scrollToTop) requestAnimationFrame(scrollCatalogToTop)
         return
       }
 
@@ -1371,6 +1387,7 @@
       window.__page = data.page
       window.__pageSize = data.page_size
       window.__total = data.total
+      if (scrollToTop) requestAnimationFrame(scrollCatalogToTop)
     } catch (e) {
       if (e?.name === 'AbortError') return
       console.error(e)
@@ -1386,7 +1403,7 @@
     const saved = sessionStorage.getItem('catalogScroll')
     if (saved) {
       requestAnimationFrame(() => {
-        window.scrollTo({ top: Number(saved) || 0, behavior: 'instant' })
+        window.scrollTo({ top: Number(saved) || 0, behavior: 'auto' })
       })
       sessionStorage.removeItem('catalogScroll')
     }
@@ -1465,8 +1482,7 @@
         setSelectOptions(qs('[name="engine_type"]'), data.engine_types || [], { emptyLabel: 'Любое' })
         setSelectOptions(qs('[name="transmission"]'), data.transmissions || [], { emptyLabel: 'Любая' })
         setSelectOptions(qs('[name="drive_type"]'), data.drive_types || [], { emptyLabel: 'Любой' })
-        setSelectOptions(qs('select[name="interior_color"]'), data.interior_color_options || [], { emptyLabel: 'Не важно', labelKey: 'label', valueKey: 'value' })
-        setSelectOptions(qs('select[name="interior_material"]'), data.interior_material_options || [], { emptyLabel: 'Не важно', labelKey: 'label', valueKey: 'value' })
+        setSelectOptions(qs('select[name="interior_design"]'), data.interior_design_options || [], { emptyLabel: 'Не важно', labelKey: 'label', valueKey: 'value' })
         setSelectOptions(qs('#reg-year-min'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         setSelectOptions(qs('#reg-year-max'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         const countrySelect = qs('#country')
@@ -1482,7 +1498,7 @@
         if (DEBUG_FILTERS) {
           console.info('catalog: ctx loaded countries=' + (data.countries || []).length + ' kr_types=' + (data.kr_types || []).length)
         }
-        bindColorChips(filtersForm, () => loadCars(1))
+        bindColorChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
         bindOtherColorsToggle(filtersForm)
         syncColorChips(filtersForm)
       } catch (e) {
@@ -1524,21 +1540,21 @@
         modelSelect.disabled = true
       }
       sessionStorage.setItem('catalogScroll', String(0))
-      loadCars(1)
+      loadCars(1, { scrollToTop: true })
     })
 
     qs('#prevPage')?.addEventListener('click', () => {
       const p = Math.max(1, (window.__page || 1) - 1)
-      loadCars(p)
+      loadCars(p, { scrollToTop: true })
     })
     qs('#nextPage')?.addEventListener('click', () => {
       const max = Math.max(1, Math.ceil((window.__total || 0) / (window.__pageSize || 12)))
       const p = Math.min(max, (window.__page || 1) + 1)
-      loadCars(p)
+      loadCars(p, { scrollToTop: true })
     })
 
     if (filtersForm) {
-      bindColorChips(filtersForm, () => loadCars(1))
+      bindColorChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
       bindOtherColorsToggle(filtersForm)
       bindRegMonthState(filtersForm)
       bindRegionSelect(filtersForm)
@@ -1563,7 +1579,7 @@
           const params = collectParams(1)
           updateCatalogUrlFromParams(params)
           if (DEBUG_FILTERS) console.info('catalog: loadCars params', params.toString())
-          loadCars(1)
+          loadCars(1, { scrollToTop: true })
           updateAdvancedLink()
         }, 250)
       }
@@ -1615,7 +1631,7 @@
         sortTopbar.addEventListener('change', () => {
           const val = sortTopbar.value
           if (sortSelect) sortSelect.value = val
-          loadCars(1)
+          loadCars(1, { scrollToTop: true })
           updateAdvancedLink()
         })
       }
@@ -2629,8 +2645,6 @@
       climatisation: 'climatisation_options',
       airbags: 'airbags_options',
       interior_design: 'interior_design_options',
-      interior_color: 'interior_color_options',
-      interior_material: 'interior_material_options',
       price_rating_label: 'price_rating_labels',
     }
 

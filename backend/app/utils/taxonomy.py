@@ -371,15 +371,15 @@ def interior_color_key(value: Optional[str]) -> Optional[str]:
         return None
     if raw in _INTERIOR_COLOR_LABELS:
         return raw
+    matched = _match_keywords(raw, _INTERIOR_COLOR_KEYWORDS, _INTERIOR_COLOR_ORDER)
+    if matched:
+        return matched
     translated = translate_payload_value("color", raw)
     if translated:
         translated_key = _normalize_interior_text(translated)
         for key, label in _INTERIOR_COLOR_LABELS.items():
             if translated_key == _normalize_interior_text(label):
                 return key
-    matched = _match_keywords(raw, _INTERIOR_COLOR_KEYWORDS, _INTERIOR_COLOR_ORDER)
-    if matched:
-        return matched
     normalized = normalize_color(raw)
     if normalized in _INTERIOR_COLOR_LABELS:
         return normalized
@@ -433,6 +433,76 @@ def interior_material_aliases(value: Optional[str]) -> List[str]:
     if label:
         aliases.add(label.lower())
     return sorted(alias for alias in aliases if alias)
+
+
+def interior_trim_token(
+    *,
+    material_key: Optional[str] = None,
+    color_key: Optional[str] = None,
+) -> Optional[str]:
+    parts: List[str] = []
+    if material_key:
+        parts.append(f"m:{material_key}")
+    if color_key:
+        parts.append(f"c:{color_key}")
+    if not parts:
+        return None
+    return "trim:" + "|".join(parts)
+
+
+def parse_interior_trim_token(value: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    raw = str(value or "").strip().lower()
+    if not raw.startswith("trim:"):
+        return None, None
+    material_key: Optional[str] = None
+    color_key: Optional[str] = None
+    for part in raw[5:].split("|"):
+        part = part.strip()
+        if not part:
+            continue
+        if part.startswith("m:"):
+            candidate = part[2:].strip()
+            if candidate in _INTERIOR_MATERIAL_LABELS:
+                material_key = candidate
+        elif part.startswith("c:"):
+            candidate = part[2:].strip()
+            if candidate in _INTERIOR_COLOR_LABELS:
+                color_key = candidate
+    return material_key, color_key
+
+
+def interior_trim_label(value: Optional[str]) -> Optional[str]:
+    material_key, color_key = parse_interior_trim_token(value)
+    if not material_key and not color_key:
+        return None
+    parts: List[str] = []
+    if material_key:
+        parts.append(_INTERIOR_MATERIAL_LABELS.get(material_key, material_key))
+    if color_key:
+        parts.append(_INTERIOR_COLOR_LABELS.get(color_key, color_key))
+    return " · ".join(parts)
+
+
+def build_interior_trim_options(values: List[Any]) -> List[Dict[str, str]]:
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for raw_value in values or []:
+        material_key = interior_material_key(raw_value)
+        color_key = interior_color_key(raw_value)
+        token = interior_trim_token(material_key=material_key, color_key=color_key)
+        if not token:
+            continue
+        entry = buckets.get(token)
+        if entry is None:
+            entry = {
+                "value": token,
+                "label": interior_trim_label(token) or str(raw_value),
+                "count": 0,
+            }
+            buckets[token] = entry
+        entry["count"] += 1
+    items = list(buckets.values())
+    items.sort(key=lambda item: (-int(item.get("count") or 0), str(item.get("label") or "").casefold()))
+    return [{"value": str(item["value"]), "label": str(item["label"])} for item in items]
 
 
 def build_interior_options(values: List[Any], kind: str) -> List[Dict[str, str]]:

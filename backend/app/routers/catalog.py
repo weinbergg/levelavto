@@ -24,6 +24,7 @@ from ..utils.taxonomy import (
     color_hex,
     build_labeled_options,
     build_interior_options,
+    build_interior_trim_options,
     translate_payload_value,
 )
 from ..utils.localization import display_body, display_color
@@ -1201,12 +1202,7 @@ def filter_options(
 
 
 def _split_colors(raw_colors: List[dict]) -> tuple[list[dict], list[dict]]:
-    return split_color_facets(
-        raw_colors,
-        top_limit=12,
-        label_for=lambda value: ru_color(value) or display_color(value) or value,
-        hex_for=color_hex,
-    )
+    return split_color_facets(raw_colors)
 
 
 @router.get("/filter_ctx_base")
@@ -1228,7 +1224,11 @@ def filter_ctx_base(
     t0 = time.perf_counter()
     cached = redis_get_json(cache_key)
     if cached:
-        if "interior_color_options" not in cached or "interior_material_options" not in cached:
+        if (
+            "interior_design_options" not in cached
+            or "interior_color_options" not in cached
+            or "interior_material_options" not in cached
+        ):
             cached = None
         else:
             print("FILTER_CTX_BASE_CACHE hit=1 source=redis", flush=True)
@@ -1321,6 +1321,7 @@ def filter_ctx_base(
         "drive_types": drive_types,
         "colors_basic": colors_basic,
         "colors_other": colors_other,
+        "interior_design_options": build_interior_trim_options(interior_payload.get("interior_design", [])),
         "interior_color_options": build_interior_options(interior_payload.get("interior_design", []), "color"),
         "interior_material_options": build_interior_options(interior_payload.get("interior_design", []), "material"),
         "reg_years": reg_years,
@@ -1544,7 +1545,11 @@ def filter_payload(
     cache_key = build_filter_payload_key(params)
     cached = redis_get_json(cache_key)
     if cached:
-        if "interior_color_options_eu" in cached and "interior_material_options_eu" in cached:
+        if (
+            "interior_design_options_eu" in cached
+            and "interior_color_options_eu" in cached
+            and "interior_material_options_eu" in cached
+        ):
             if timing_enabled:
                 print("FILTER_PAYLOAD_CACHE hit=1 source=redis payload_total_ms=0.0", flush=True)
             return cached
@@ -1692,7 +1697,7 @@ def filter_payload(
         "efficiency_classes_eu": build_labeled_options(eu_payload.get("efficiency_class", []), "efficiency_class"),
         "climatisation_options_eu": build_labeled_options(eu_payload.get("climatisation", []), "climatisation"),
         "airbags_options_eu": build_labeled_options(eu_payload.get("airbags", []), "airbags"),
-        "interior_design_options_eu": build_labeled_options(eu_payload.get("interior_design", []), "interior_design"),
+        "interior_design_options_eu": build_interior_trim_options(eu_payload.get("interior_design", [])),
         "interior_color_options_eu": build_interior_options(eu_payload.get("interior_design", []), "color"),
         "interior_material_options_eu": build_interior_options(eu_payload.get("interior_design", []), "material"),
         "price_rating_labels_eu": build_labeled_options(eu_payload.get("price_rating_label", []), "price_rating_label"),
@@ -1703,7 +1708,7 @@ def filter_payload(
         "efficiency_classes_kr": build_labeled_options(kr_payload.get("efficiency_class", []), "efficiency_class"),
         "climatisation_options_kr": build_labeled_options(kr_payload.get("climatisation", []), "climatisation"),
         "airbags_options_kr": build_labeled_options(kr_payload.get("airbags", []), "airbags"),
-        "interior_design_options_kr": build_labeled_options(kr_payload.get("interior_design", []), "interior_design"),
+        "interior_design_options_kr": build_interior_trim_options(kr_payload.get("interior_design", [])),
         "interior_color_options_kr": build_interior_options(kr_payload.get("interior_design", []), "color"),
         "interior_material_options_kr": build_interior_options(kr_payload.get("interior_design", []), "material"),
         "price_rating_labels_kr": build_labeled_options(kr_payload.get("price_rating_label", []), "price_rating_label"),

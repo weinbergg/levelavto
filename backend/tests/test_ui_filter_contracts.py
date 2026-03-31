@@ -24,8 +24,7 @@ def test_search_template_keeps_core_selects_clickable():
     assert '<select name="transmission">' in template
     assert '<select name="drive_type">' in template
     assert '<select name="engine_type">' in template
-    assert 'name="interior_color"' in template
-    assert 'name="interior_material"' in template
+    assert 'name="interior_design"' in template
 
 
 def test_js_updates_generation_visibility_and_select_disabled_state():
@@ -42,6 +41,7 @@ def test_filter_payload_includes_dynamic_brand_options():
     router = _read("app/routers/catalog.py")
     assert 'field="brand"' in router
     assert '"brands": brands' in router
+    assert '"interior_design_options_eu": build_interior_trim_options' in router
     assert '"interior_color_options_eu": build_interior_options' in router
     assert '"interior_material_options_eu": build_interior_options' in router
 
@@ -78,8 +78,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=83' in template
-    assert '/static/css/styles.css?v=43' in template
+    assert '/static/js/app.js?v=84' in template
+    assert '/static/css/styles.css?v=44' in template
 
 
 def test_home_search_uses_line_params_and_js_submit():
@@ -115,6 +115,8 @@ def test_taxonomy_contains_extra_body_and_interior_translations():
     assert '"kunstleder": "экокожа"' in utils
     assert "_INTERIOR_COLOR_LABELS" in utils
     assert "_INTERIOR_MATERIAL_LABELS" in utils
+    assert "build_interior_trim_options" in utils
+    assert 'return "trim:" + "|".join(parts)' in utils
 
 
 def test_pages_home_uses_recommended_and_media_cache_helpers():
@@ -186,6 +188,17 @@ def test_catalog_and_search_color_filters_use_non_label_wrapper():
     assert '<div class="field field--full"><span class="field-label">Цвет кузова</span>' in catalog_template
 
 
+def test_catalog_scroll_and_grouped_filters_contracts():
+    script = _read("app/static/js/app.js")
+    color_utils = _read("app/utils/color_groups.py")
+    assert "function scrollCatalogToTop()" in script
+    assert "loadCars(p, { scrollToTop: true })" in script
+    assert "loadCars(1, { scrollToTop: true })" in script
+    assert "ColorFamily" in color_utils
+    assert '"Серый / серебристый"' in color_utils
+    assert "return basics, []" in color_utils
+
+
 def test_registration_year_filters_fallback_to_car_year_when_missing():
     service = _read("app/services/cars_service.py")
     assert "reg_year_expr = func.coalesce(Car.registration_year, Car.year)" in service
@@ -228,3 +241,5 @@ def test_interior_filters_use_derived_text_fallback_from_payload_and_description
     assert 'jsonb_extract_path_text(payload_json, "options")' in service
     assert 'jsonb_extract_path_text(payload_json, "title")' in service
     assert "func.coalesce(Car.description, \"\")" in service
+    assert "parse_interior_trim_token" in service
+    assert "trim_conditions.append" in service

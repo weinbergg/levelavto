@@ -28,7 +28,9 @@ def test_pipeline_and_recalc_support_inferred_specs_refresh():
     util = _read("app/utils/spec_inference.py")
     assert "step=refresh_spec_inference" in pipeline
     assert "step=recalc_inferred_specs" in pipeline
+    assert "step=recalc_recoverable_fallbacks" in pipeline
     assert "--only-inferred-specs" in recalc
+    assert "--only-recoverable-fallback" in recalc
     assert "class CarSpecInferenceService" in service
     assert "build_variant_key" in util
     assert "expanded_year_window = max(year_window, 4)" in service

@@ -32,6 +32,11 @@ def main() -> None:
         action="store_true",
         help="recalculate only cars with inferred engine/power specs",
     )
+    ap.add_argument(
+        "--only-recoverable-fallback",
+        action="store_true",
+        help="recalculate cars that still show fallback Europe/KR price markers and may now be recoverable",
+    )
     ap.add_argument("--since-minutes", type=int, default=None)
     ap.add_argument("--chunk", type=int, default=50000, help="ids per window (avoid huge offsets)")
     ap.add_argument("--sleep", type=int, default=0, help="seconds to sleep between windows")
@@ -119,6 +124,12 @@ def main() -> None:
                     Car.inferred_power_kw.is_not(None),
                 )
             )
+        if args.only_recoverable_fallback:
+            payload_json = cast(Car.calc_breakdown_json, JSONB)
+            base = base.filter(
+                payload_json.is_not(None),
+                payload_json.contains([{"title": "__without_util_fee"}]),
+            )
         if args.since_minutes:
             since_ts = datetime.utcnow() - timedelta(minutes=args.since_minutes)
             base = base.filter(Car.updated_at >= since_ts)
@@ -148,6 +159,7 @@ def main() -> None:
                                 args.only_missing_registration
                                 or args.only_defaulted_registration
                                 or args.only_inferred_specs
+                                or args.only_recoverable_fallback
                             )
                             res = svc.ensure_calc_cache(car, force=force_recalc)
                             if res is None:

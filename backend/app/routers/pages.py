@@ -47,6 +47,7 @@ from ..utils.taxonomy import (
     translate_payload_value,
     build_labeled_options,
     build_interior_options,
+    build_interior_trim_options,
     normalize_fuel,
     normalize_color as _normalize_color,
     color_hex,
@@ -411,12 +412,7 @@ def _build_filter_context(
     colors = service.facet_counts(field="color", filters=facet_filters)
     if timing_enabled:
         print(f"FILTER_CTX_STAGE name=colors ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
-    colors_basic, colors_other = split_color_facets(
-        colors,
-        top_limit=12,
-        label_for=lambda value: ru_color(value) or display_color(value) or value,
-        hex_for=color_hex,
-    )
+    colors_basic, colors_other = split_color_facets(colors)
     countries_sorted = sorted(eu_countries, key=lambda c: (country_label_ru(c) or c).casefold())
     t0 = time.perf_counter()
     body_types = []
@@ -463,7 +459,7 @@ def _build_filter_context(
         efficiency_classes_eu = build_labeled_options(eu_payload.get("efficiency_class", []), "efficiency_class")
         climatisation_options_eu = build_labeled_options(eu_payload.get("climatisation", []), "climatisation")
         airbags_options_eu = build_labeled_options(eu_payload.get("airbags", []), "airbags")
-        interior_design_options_eu = build_labeled_options(eu_payload.get("interior_design", []), "interior_design")
+        interior_design_options_eu = build_interior_trim_options(eu_payload.get("interior_design", []))
         interior_color_options_eu = build_interior_options(eu_payload.get("interior_design", []), "color")
         interior_material_options_eu = build_interior_options(eu_payload.get("interior_design", []), "material")
         price_rating_labels_eu = build_labeled_options(eu_payload.get("price_rating_label", []), "price_rating_label")
@@ -474,7 +470,7 @@ def _build_filter_context(
         efficiency_classes_kr = build_labeled_options(kr_payload.get("efficiency_class", []), "efficiency_class")
         climatisation_options_kr = build_labeled_options(kr_payload.get("climatisation", []), "climatisation")
         airbags_options_kr = build_labeled_options(kr_payload.get("airbags", []), "airbags")
-        interior_design_options_kr = build_labeled_options(kr_payload.get("interior_design", []), "interior_design")
+        interior_design_options_kr = build_interior_trim_options(kr_payload.get("interior_design", []))
         interior_color_options_kr = build_interior_options(kr_payload.get("interior_design", []), "color")
         interior_material_options_kr = build_interior_options(kr_payload.get("interior_design", []), "material")
         price_rating_labels_kr = build_labeled_options(kr_payload.get("price_rating_label", []), "price_rating_label")

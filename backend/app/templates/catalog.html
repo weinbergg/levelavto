@@ -232,19 +232,11 @@
               <span>Пневмоподвеска</span>
             </label>
             {% endif %}
-            <label>Цвет салона
-              <select name="interior_color">
+            <label>Отделка салона
+              <select name="interior_design">
                 <option value="">Не важно</option>
-                {% for opt in interior_color_options %}
-                <option value="{{ opt.value }}" {% if params.get('interior_color') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>Материал салона
-              <select name="interior_material">
-                <option value="">Не важно</option>
-                {% for opt in interior_material_options %}
-                <option value="{{ opt.value }}" {% if params.get('interior_material') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                {% for opt in interior_design_options %}
+                <option value="{{ opt.value }}" {% if params.get('interior_design') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -267,7 +259,7 @@
         {% for line in params.getlist('line') %}
         <input type="hidden" name="line" value="{{ line }}" data-catalog-line="1">
         {% endfor %}
-        {% set adv_keys = ['num_seats','doors_count','emission_class','efficiency_class','climatisation','airbags','interior_design','interior_color','interior_material','vat_reclaimable','price_rating_label','owners_count'] %}
+        {% set adv_keys = ['num_seats','doors_count','emission_class','efficiency_class','climatisation','airbags','interior_design','vat_reclaimable','price_rating_label','owners_count'] %}
         {% for key in adv_keys %}
           {% if params.get(key) %}
           <input type="hidden" name="{{ key }}" value="{{ params.get(key) }}">

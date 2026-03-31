@@ -93,6 +93,13 @@ docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
   --since-minutes "${SPEC_INFERENCE_SINCE_MINUTES:-2880}" \
   --batch "${SPEC_INFERENCE_CALC_BATCH:-2000}"
 
+echo "[mobilede_pipeline] step=recalc_recoverable_fallbacks"
+docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
+  --region EU \
+  --only-recoverable-fallback \
+  --since-minutes "${RECOVERABLE_FALLBACK_SINCE_MINUTES:-10080}" \
+  --batch "${RECOVERABLE_FALLBACK_BATCH:-2000}"
+
 if [ "${MOBILEDE_PRUNE_UNUSED_MEDIA:-1}" = "1" ]; then
   echo "[mobilede_pipeline] step=prune_unused_local_media"
   docker compose exec -T web python -m backend.app.scripts.prune_unused_local_media \

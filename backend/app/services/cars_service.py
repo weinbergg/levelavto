@@ -17,7 +17,7 @@ import requests
 import time
 from ..models import Car, Source, FeaturedCar
 from ..utils.localization import display_color
-from ..utils.color_groups import normalize_color_group_key
+from ..utils.color_groups import color_family_group_keys, normalize_color_family_key, normalize_color_group_key
 from ..utils.country_map import normalize_country_code
 from ..utils.redis_cache import build_cars_count_key, redis_get_json, redis_set_json
 from ..utils.registration_defaults import get_missing_registration_default
@@ -35,6 +35,7 @@ from ..utils.taxonomy import (
     is_color_base,
     interior_color_aliases,
     interior_material_aliases,
+    parse_interior_trim_token,
 )
 from ..utils.breakdown_labels import label_for
 from .calculator_config_service import CalculatorConfigService
@@ -826,9 +827,6 @@ class CarsService:
             conditions.append(func.jsonb_extract_path_text(payload_json, "climatisation") == climatisation)
         if airbags and "airbags" not in exclude:
             conditions.append(func.jsonb_extract_path_text(payload_json, "airbags") == airbags)
-        if interior_design and "interior_design" not in exclude:
-            conditions.append(func.jsonb_extract_path_text(payload_json, "interior_design") == interior_design)
-        interior_design_expr = func.lower(func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), ""))
         interior_fallback_expr = func.lower(
             func.concat_ws(
                 " ",
@@ -839,6 +837,21 @@ class CarsService:
                 func.coalesce(func.jsonb_extract_path_text(payload_json, "sub_title"), ""),
             )
         )
+        if interior_design and "interior_design" not in exclude:
+            trim_material_key, trim_color_key = parse_interior_trim_token(interior_design)
+            trim_conditions = []
+            if trim_material_key:
+                aliases = interior_material_aliases(trim_material_key)
+                if aliases:
+                    trim_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+            if trim_color_key:
+                aliases = interior_color_aliases(trim_color_key)
+                if aliases:
+                    trim_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+            if trim_conditions:
+                conditions.append(and_(*trim_conditions))
+            else:
+                conditions.append(func.jsonb_extract_path_text(payload_json, "interior_design") == interior_design)
         if interior_color and "interior_color" not in exclude:
             aliases = interior_color_aliases(interior_color)
             if aliases:
@@ -886,6 +899,12 @@ class CarsService:
             color_values = split_csv_values(color)
             color_conditions = []
             for color_value in color_values:
+                family_key = normalize_color_family_key(color_value)
+                if family_key:
+                    group_keys = color_family_group_keys(family_key)
+                    if group_keys:
+                        color_conditions.append(Car.color_group.in_(group_keys))
+                        continue
                 group_key = normalize_color_group_key(color_value)
                 if group_key:
                     color_conditions.append(Car.color_group == group_key)

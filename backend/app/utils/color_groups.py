@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, List, Optional
+from typing import Any, List, Optional
 import re
 import unicodedata
 import colorsys
@@ -12,6 +12,14 @@ class ColorGroup:
     key: str
     label: str
     patterns: List[str]
+
+
+@dataclass(frozen=True)
+class ColorFamily:
+    key: str
+    label: str
+    group_keys: List[str]
+    hex_value: str
 
 
 _GROUPS: List[ColorGroup] = [
@@ -28,6 +36,18 @@ _GROUPS: List[ColorGroup] = [
     ColorGroup("beige", "Бежевый", []),
     ColorGroup("purple", "Фиолетовый", []),
     ColorGroup("pink", "Розовый", []),
+]
+
+_FAMILIES: List[ColorFamily] = [
+    ColorFamily("black", "Черный", ["black"], "#0d0f14"),
+    ColorFamily("white", "Белый", ["white"], "#f5f6fa"),
+    ColorFamily("gray", "Серый / серебристый", ["gray", "silver"], "#7d8594"),
+    ColorFamily("red", "Красный / бордовый", ["red", "pink"], "#c94545"),
+    ColorFamily("blue", "Синий / голубой", ["blue"], "#2f6bd1"),
+    ColorFamily("green", "Зеленый / бирюзовый", ["green"], "#3b8d4c"),
+    ColorFamily("yellow", "Желтый / оранжевый", ["yellow", "orange"], "#e8ad2c"),
+    ColorFamily("brown", "Коричневый / бежевый", ["brown", "beige"], "#9a7150"),
+    ColorFamily("purple", "Фиолетовый", ["purple"], "#7a4bd8"),
 ]
 
 _STOPWORDS = {
@@ -69,6 +89,17 @@ _LABEL_TO_KEY.update({
     "фиолетовый": "purple",
     "розовый": "pink",
 })
+
+_FAMILY_BY_KEY = {family.key: family for family in _FAMILIES}
+_FAMILY_BY_GROUP_KEY = {
+    group_key: family.key
+    for family in _FAMILIES
+    for group_key in family.group_keys
+}
+_FAMILY_LABEL_TO_KEY = {
+    family.label.lower(): family.key
+    for family in _FAMILIES
+}
 
 
 def _strip_accents(text: str) -> str:
@@ -161,74 +192,76 @@ def color_groups() -> List[ColorGroup]:
     return list(_GROUPS)
 
 
+def color_families() -> List[ColorFamily]:
+    return list(_FAMILIES)
+
+
+def normalize_color_family_key(raw: Optional[str]) -> Optional[str]:
+    if not raw:
+        return None
+    key = str(raw).strip().lower()
+    if not key:
+        return None
+    if key in _FAMILY_BY_KEY:
+        return key
+    if key in _FAMILY_LABEL_TO_KEY:
+        return _FAMILY_LABEL_TO_KEY[key]
+    group_key = normalize_color_group_key(key)
+    if group_key and group_key in _FAMILY_BY_GROUP_KEY:
+        return _FAMILY_BY_GROUP_KEY[group_key]
+    return None
+
+
+def color_family_group_keys(raw: Optional[str]) -> List[str]:
+    family_key = normalize_color_family_key(raw)
+    if not family_key:
+        return []
+    family = _FAMILY_BY_KEY.get(family_key)
+    return list(family.group_keys) if family else []
+
+
+def color_family_label(raw: Optional[str]) -> Optional[str]:
+    family_key = normalize_color_family_key(raw)
+    if not family_key:
+        return None
+    family = _FAMILY_BY_KEY.get(family_key)
+    return family.label if family else None
+
+
+def color_family_hex(raw: Optional[str]) -> Optional[str]:
+    family_key = normalize_color_family_key(raw)
+    if not family_key:
+        return None
+    family = _FAMILY_BY_KEY.get(family_key)
+    return family.hex_value if family else None
+
+
 def split_color_facets(
     raw_colors: list[dict[str, Any]],
-    *,
-    top_limit: int = 12,
-    label_for: Optional[Callable[[str], Optional[str]]] = None,
-    hex_for: Optional[Callable[[str], Optional[str]]] = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    base_counts: dict[str, int] = {}
-    shades: list[dict[str, Any]] = []
-    seen_values: set[str] = set()
+    family_counts: dict[str, int] = {}
 
     for raw in raw_colors or []:
         value = str((raw or {}).get("value") or "").strip()
         if not value:
             continue
         count = int((raw or {}).get("count") or 0)
-        group_key = normalize_color_group(value)
-        base_counts[group_key] = base_counts.get(group_key, 0) + count
-
-        value_key = value.casefold()
-        if value_key in seen_values:
+        family_key = normalize_color_family_key(value)
+        if not family_key:
             continue
-        seen_values.add(value_key)
-
-        resolved_label = label_for(value) if label_for else None
-        shades.append(
-            {
-                "value": value,
-                "label": resolved_label or value,
-                "hex": hex_for(value) if hex_for else None,
-                "count": count,
-                "group": group_key,
-                "group_label": color_group_label(group_key),
-            }
-        )
+        family_counts[family_key] = family_counts.get(family_key, 0) + count
 
     basics: list[dict[str, Any]] = []
-    for key, count in base_counts.items():
+    for family in _FAMILIES:
+        count = int(family_counts.get(family.key) or 0)
+        if count <= 0:
+            continue
         basics.append(
             {
-                "value": key,
-                "label": color_group_label(key),
-                "hex": hex_for(key) if hex_for else None,
+                "value": family.key,
+                "label": family.label,
+                "hex": family.hex_value,
                 "count": count,
             }
         )
-    basics.sort(key=lambda item: (-int(item.get("count") or 0), str(item.get("label") or "")))
-    basics = basics[:top_limit]
-
-    visible_groups = {item.get("value") for item in basics}
-    other: list[dict[str, Any]] = []
-    for item in shades:
-        group_key = item.get("group")
-        if group_key not in visible_groups:
-            continue
-        base_label = color_group_label(str(group_key or ""))
-        shade_label = str(item.get("label") or item.get("value") or "")
-        base_key = str(group_key or "")
-        if shade_label.casefold() == base_label.casefold() or shade_label.casefold() == base_key.casefold():
-            continue
-        other.append(
-            {
-                "value": item.get("value"),
-                "label": f"{base_label}: {shade_label}",
-                "hex": item.get("hex"),
-                "count": item.get("count"),
-            }
-        )
-
-    other.sort(key=lambda item: (-int(item.get("count") or 0), str(item.get("label") or "")))
-    return basics, other
+    return basics, []
