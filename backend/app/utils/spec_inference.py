@@ -8,6 +8,18 @@ import re
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+(?:[._+-][a-z0-9]+)?", re.IGNORECASE)
 _MULTISPACE_RE = re.compile(r"\s+")
+_ENGINE_CC_RE = re.compile(r"\b([1-9][0-9]{3,4})\s*(?:cc|ccm|cm3|cm³)\b", re.IGNORECASE)
+_ENGINE_LITER_RE = re.compile(
+    r"\b([0-9](?:[.,][0-9])?)\s*(?:l|liter|litre)\b",
+    re.IGNORECASE,
+)
+_ENGINE_LITER_CONTEXT_RE = re.compile(
+    r"\b([0-9](?:[.,][0-9])?)\s*(?:"
+    r"turbo|hybrid|diesel|petrol|benzin|benzina|gasoline|engine|motor|"
+    r"v[0-9]|i[0-9]|tdi|tsi|tfsi|fsi|dci|cdi|mjt|multijet|ecoboost|tce"
+    r")\b",
+    re.IGNORECASE,
+)
 _GENERIC_STOPWORDS = {
     "hud",
     "led",
@@ -254,6 +266,7 @@ def choose_reference_consensus(
             bucket["count"] += 1
     if not usable:
         return None
+    second_count = 0
     if need_engine_cc and need_power:
         if len(tuples) != 1:
             return None
@@ -290,6 +303,9 @@ def choose_reference_consensus(
     elif target_year is not None and best["year"] == target_year and support_count >= 2:
         confidence = "medium"
         rule = "model_exact_year_exact_consensus"
+    elif target_year is None and support_count >= 2 and second_count == 0:
+        confidence = "medium"
+        rule = "model_exact_consensus"
     else:
         return None
     return {
@@ -301,6 +317,47 @@ def choose_reference_consensus(
         "rule": rule,
         "support_count": support_count,
     }
+
+
+def infer_engine_cc_from_text(*values: Any) -> Optional[int]:
+    scored: dict[int, int] = {}
+    first_seen: list[int] = []
+    for value in values:
+        text = normalize_spec_text(value)
+        if not text:
+            continue
+        for match in _ENGINE_CC_RE.finditer(text):
+            candidate = _to_int(match.group(1))
+            if candidate is None or candidate < 600 or candidate > 10000:
+                continue
+            if candidate not in scored:
+                first_seen.append(candidate)
+                scored[candidate] = 0
+            scored[candidate] += 3
+        for regex in (_ENGINE_LITER_RE, _ENGINE_LITER_CONTEXT_RE):
+            for match in regex.finditer(text):
+                raw_value = str(match.group(1) or "").replace(",", ".")
+                try:
+                    liters = float(raw_value)
+                except ValueError:
+                    continue
+                if liters < 0.6 or liters > 9.9:
+                    continue
+                candidate = int(round(liters * 1000))
+                if candidate not in scored:
+                    first_seen.append(candidate)
+                    scored[candidate] = 0
+                scored[candidate] += 1
+    if not scored:
+        return None
+    best = sorted(
+        scored.items(),
+        key=lambda item: (
+            -item[1],
+            first_seen.index(item[0]),
+        ),
+    )[0][0]
+    return best
 
 
 def _tokenize(value: str) -> list[str]:

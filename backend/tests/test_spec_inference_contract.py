@@ -34,3 +34,5 @@ def test_pipeline_and_recalc_support_inferred_specs_refresh():
     assert "class CarSpecInferenceService" in service
     assert "build_variant_key" in util
     assert "expanded_year_window = max(year_window, 4)" in service
+    assert "text_engine_cc" in service
+    assert "infer_engine_cc_from_text" in util

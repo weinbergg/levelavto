@@ -2,6 +2,7 @@ from backend.app.utils.spec_inference import (
     build_variant_key,
     choose_reference_consensus,
     has_complete_raw_specs,
+    infer_engine_cc_from_text,
     normalize_engine_type,
     variant_primary_token,
 )
@@ -218,3 +219,34 @@ def test_choose_reference_consensus_can_infer_power_only_when_cc_conflicts():
     )
     assert result is not None
     assert result["power_hp"] == 352
+
+
+def test_choose_reference_consensus_allows_no_year_model_consensus_when_unanimous():
+    candidates = [
+        {
+            "source_car_id": 71,
+            "variant_key": None,
+            "year": 2023,
+            "engine_cc": 2992,
+            "power_hp": 829,
+            "power_kw": 609.73,
+        },
+        {
+            "source_car_id": 72,
+            "variant_key": None,
+            "year": 2024,
+            "engine_cc": 2992,
+            "power_hp": 829,
+            "power_kw": 609.73,
+        },
+    ]
+    result = choose_reference_consensus(candidates, target_year=None, has_variant_key=False)
+    assert result is not None
+    assert result["engine_cc"] == 2992
+    assert result["rule"] == "model_exact_consensus"
+
+
+def test_infer_engine_cc_from_text_parses_explicit_liter_patterns():
+    assert infer_engine_cc_from_text("296 gtb 3.0 turbo v6 hybride 830 ch") == 3000
+    assert infer_engine_cc_from_text("4.0 V8", "some title") == 4000
+    assert infer_engine_cc_from_text("2993 cc diesel") == 2993

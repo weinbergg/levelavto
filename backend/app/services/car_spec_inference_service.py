@@ -13,6 +13,7 @@ from ..utils.spec_inference import (
     build_reference_signature,
     choose_reference_consensus,
     has_complete_raw_specs,
+    infer_engine_cc_from_text,
     normalize_engine_type,
     normalize_spec_text,
     normalized_power_hp,
@@ -214,6 +215,25 @@ class CarSpecInferenceService:
         need_power = car.power_hp is None and car.power_kw is None
         if not need_engine_cc and not need_power:
             return None
+        payload = car.source_payload or {}
+        parsed_engine_cc = None
+        if need_engine_cc:
+            parsed_engine_cc = infer_engine_cc_from_text(
+                car.variant,
+                payload.get("sub_title"),
+                payload.get("title"),
+                car.description,
+            )
+            if parsed_engine_cc is not None and not need_power:
+                return {
+                    "engine_cc": parsed_engine_cc,
+                    "power_hp": None,
+                    "power_kw": None,
+                    "source_car_id": None,
+                    "confidence": "medium",
+                    "rule": "text_engine_cc",
+                    "support_count": 1,
+                }
         sig = build_reference_signature(
             brand=normalize_brand(car.brand),
             model=car.model,
@@ -221,9 +241,9 @@ class CarSpecInferenceService:
             engine_type=car.engine_type,
             body_type=car.body_type,
             year=car.year,
-            source_payload=car.source_payload or {},
+            source_payload=payload,
         )
-        if not sig["brand_norm"] or not sig["model_norm"] or not sig["year"]:
+        if not sig["brand_norm"] or not sig["model_norm"]:
             return None
 
         def _query_rows(window: int) -> list[Dict[str, Any]]:
@@ -246,16 +266,23 @@ class CarSpecInferenceService:
         def _consensus_from_rows(rows: list[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
             if not rows:
                 return None
+            consensus_need_engine_cc = need_engine_cc and parsed_engine_cc is None
             if sig["variant_key"]:
                 exact_variant_rows = [row for row in rows if row.get("variant_key") == sig["variant_key"]]
                 consensus = choose_reference_consensus(
                     exact_variant_rows,
                     target_year=sig["year"],
                     has_variant_key=True,
-                    need_engine_cc=need_engine_cc,
+                    need_engine_cc=consensus_need_engine_cc,
                     need_power=need_power,
                 )
                 if consensus:
+                    if parsed_engine_cc is not None:
+                        return {
+                            **consensus,
+                            "engine_cc": parsed_engine_cc,
+                            "rule": f"text_engine_cc_plus_{consensus.get('rule')}",
+                        }
                     return consensus
                 primary_token = variant_primary_token(sig["variant_key"])
                 if primary_token:
@@ -268,25 +295,35 @@ class CarSpecInferenceService:
                         primary_variant_rows,
                         target_year=sig["year"],
                         has_variant_key=True,
-                        need_engine_cc=need_engine_cc,
+                        need_engine_cc=consensus_need_engine_cc,
                         need_power=need_power,
                     )
                     if consensus:
                         rule = "variant_primary_year_exact"
                         if consensus.get("rule") == "variant_exact_year_window":
                             rule = "variant_primary_year_window"
+                        if str(consensus.get("rule") or "").endswith("year_expanded"):
+                            rule = "variant_primary_year_expanded"
                         return {
                             **consensus,
+                            "engine_cc": parsed_engine_cc if parsed_engine_cc is not None else consensus.get("engine_cc"),
                             "confidence": "medium",
-                            "rule": rule,
+                            "rule": f"text_engine_cc_plus_{rule}" if parsed_engine_cc is not None else rule,
                         }
-            return choose_reference_consensus(
+            consensus = choose_reference_consensus(
                 rows,
                 target_year=sig["year"],
                 has_variant_key=False,
-                need_engine_cc=need_engine_cc,
+                need_engine_cc=consensus_need_engine_cc,
                 need_power=need_power,
             )
+            if consensus and parsed_engine_cc is not None:
+                return {
+                    **consensus,
+                    "engine_cc": parsed_engine_cc,
+                    "rule": f"text_engine_cc_plus_{consensus.get('rule')}",
+                }
+            return consensus
 
         rows = _query_rows(year_window)
         consensus = _consensus_from_rows(rows)
