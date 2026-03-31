@@ -143,6 +143,24 @@ def normalized_power_kw(power_hp: Any, power_kw: Any) -> Optional[float]:
     return None
 
 
+def filter_candidates_by_target_power(
+    candidates: Iterable[Dict[str, Any]],
+    target_power_hp: Any,
+) -> list[Dict[str, Any]]:
+    target_hp = _to_float(target_power_hp)
+    if target_hp is None or target_hp <= 0:
+        return list(candidates)
+    tolerance = max(12.0, target_hp * 0.02)
+    matched: list[Dict[str, Any]] = []
+    for item in candidates:
+        hp = normalized_power_hp(item.get("power_hp"), item.get("power_kw"))
+        if hp is None:
+            continue
+        if abs(hp - target_hp) <= tolerance:
+            matched.append(item)
+    return matched
+
+
 def has_complete_raw_specs(
     engine_type: Any,
     engine_cc: Any,

@@ -36,3 +36,5 @@ def test_pipeline_and_recalc_support_inferred_specs_refresh():
     assert "expanded_year_window = max(year_window, 4)" in service
     assert "text_engine_cc" in service
     assert "infer_engine_cc_from_text" in util
+    assert "filter_candidates_by_target_power" in util
+    assert "power_matched" in service

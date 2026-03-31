@@ -12,6 +12,7 @@ from ..services.cars_service import normalize_brand
 from ..utils.spec_inference import (
     build_reference_signature,
     choose_reference_consensus,
+    filter_candidates_by_target_power,
     has_complete_raw_specs,
     infer_engine_cc_from_text,
     normalize_engine_type,
@@ -215,6 +216,7 @@ class CarSpecInferenceService:
         need_power = car.power_hp is None and car.power_kw is None
         if not need_engine_cc and not need_power:
             return None
+        target_power_hp = normalized_power_hp(car.power_hp, car.power_kw)
         payload = car.source_payload or {}
         parsed_engine_cc = None
         if need_engine_cc:
@@ -267,22 +269,57 @@ class CarSpecInferenceService:
             if not rows:
                 return None
             consensus_need_engine_cc = need_engine_cc and parsed_engine_cc is None
-            if sig["variant_key"]:
-                exact_variant_rows = [row for row in rows if row.get("variant_key") == sig["variant_key"]]
+            power_matched_rows = (
+                filter_candidates_by_target_power(rows, target_power_hp)
+                if consensus_need_engine_cc and not need_power and target_power_hp is not None
+                else []
+            )
+
+            def _try_consensus(
+                candidate_rows: list[Dict[str, Any]],
+                *,
+                has_variant_key: bool,
+                rule_prefix: str = "",
+                confidence_override: Optional[str] = None,
+            ) -> Optional[Dict[str, Any]]:
+                if not candidate_rows:
+                    return None
                 consensus = choose_reference_consensus(
-                    exact_variant_rows,
+                    candidate_rows,
                     target_year=sig["year"],
-                    has_variant_key=True,
+                    has_variant_key=has_variant_key,
                     need_engine_cc=consensus_need_engine_cc,
                     need_power=need_power,
                 )
+                if not consensus:
+                    return None
+                rule = str(consensus.get("rule") or "")
+                if rule_prefix:
+                    rule = f"{rule_prefix}_{rule}" if rule else rule_prefix
+                if parsed_engine_cc is not None:
+                    rule = f"text_engine_cc_plus_{rule}" if rule else "text_engine_cc"
+                    consensus = {
+                        **consensus,
+                        "engine_cc": parsed_engine_cc,
+                        "rule": rule,
+                    }
+                elif rule:
+                    consensus = {**consensus, "rule": rule}
+                if confidence_override:
+                    consensus = {**consensus, "confidence": confidence_override}
+                return consensus
+
+            if sig["variant_key"]:
+                exact_variant_rows = [row for row in rows if row.get("variant_key") == sig["variant_key"]]
+                consensus = _try_consensus(
+                    filter_candidates_by_target_power(exact_variant_rows, target_power_hp),
+                    has_variant_key=True,
+                    rule_prefix="power_matched",
+                ) if power_matched_rows else None
                 if consensus:
-                    if parsed_engine_cc is not None:
-                        return {
-                            **consensus,
-                            "engine_cc": parsed_engine_cc,
-                            "rule": f"text_engine_cc_plus_{consensus.get('rule')}",
-                        }
+                    return consensus
+                consensus = _try_consensus(exact_variant_rows, has_variant_key=True)
+                if consensus:
                     return consensus
                 primary_token = variant_primary_token(sig["variant_key"])
                 if primary_token:
@@ -291,39 +328,59 @@ class CarSpecInferenceService:
                         for row in rows
                         if variant_primary_token(row.get("variant_key")) == primary_token
                     ]
-                    consensus = choose_reference_consensus(
-                        primary_variant_rows,
-                        target_year=sig["year"],
+                    consensus = _try_consensus(
+                        filter_candidates_by_target_power(primary_variant_rows, target_power_hp),
                         has_variant_key=True,
-                        need_engine_cc=consensus_need_engine_cc,
-                        need_power=need_power,
-                    )
+                        rule_prefix="power_matched_variant_primary",
+                        confidence_override="medium",
+                    ) if power_matched_rows else None
                     if consensus:
-                        rule = "variant_primary_year_exact"
-                        if consensus.get("rule") == "variant_exact_year_window":
-                            rule = "variant_primary_year_window"
-                        if str(consensus.get("rule") or "").endswith("year_expanded"):
-                            rule = "variant_primary_year_expanded"
+                        rule = str(consensus.get("rule") or "")
+                        rule = rule.replace("variant_exact_year_exact", "variant_primary_year_exact")
+                        rule = rule.replace("variant_exact_year_window", "variant_primary_year_window")
+                        rule = rule.replace("variant_exact_year_expanded", "variant_primary_year_expanded")
                         return {
                             **consensus,
-                            "engine_cc": parsed_engine_cc if parsed_engine_cc is not None else consensus.get("engine_cc"),
                             "confidence": "medium",
-                            "rule": f"text_engine_cc_plus_{rule}" if parsed_engine_cc is not None else rule,
+                            "rule": rule,
                         }
-            consensus = choose_reference_consensus(
-                rows,
-                target_year=sig["year"],
-                has_variant_key=False,
-                need_engine_cc=consensus_need_engine_cc,
-                need_power=need_power,
-            )
-            if consensus and parsed_engine_cc is not None:
-                return {
-                    **consensus,
-                    "engine_cc": parsed_engine_cc,
-                    "rule": f"text_engine_cc_plus_{consensus.get('rule')}",
-                }
-            return consensus
+                    consensus = _try_consensus(
+                        primary_variant_rows,
+                        has_variant_key=True,
+                        confidence_override="medium",
+                    )
+                    if consensus:
+                        rule = str(consensus.get("rule") or "")
+                        rule = rule.replace("variant_exact_year_exact", "variant_primary_year_exact")
+                        rule = rule.replace("variant_exact_year_window", "variant_primary_year_window")
+                        rule = rule.replace("variant_exact_year_expanded", "variant_primary_year_expanded")
+                        return {
+                            **consensus,
+                            "confidence": "medium",
+                            "rule": rule,
+                        }
+            else:
+                plain_rows = [row for row in rows if not row.get("variant_key")]
+                if power_matched_rows:
+                    power_matched_plain_rows = [row for row in power_matched_rows if not row.get("variant_key")]
+                    consensus = _try_consensus(
+                        power_matched_plain_rows,
+                        has_variant_key=False,
+                        rule_prefix="power_matched_plain_model",
+                    )
+                    if consensus:
+                        return consensus
+                    consensus = _try_consensus(
+                        power_matched_rows,
+                        has_variant_key=False,
+                        rule_prefix="power_matched",
+                    )
+                    if consensus:
+                        return consensus
+                consensus = _try_consensus(plain_rows, has_variant_key=False, rule_prefix="plain_model")
+                if consensus:
+                    return consensus
+            return _try_consensus(rows, has_variant_key=False)
 
         rows = _query_rows(year_window)
         consensus = _consensus_from_rows(rows)

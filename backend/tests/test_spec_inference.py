@@ -1,6 +1,7 @@
 from backend.app.utils.spec_inference import (
     build_variant_key,
     choose_reference_consensus,
+    filter_candidates_by_target_power,
     has_complete_raw_specs,
     infer_engine_cc_from_text,
     normalize_engine_type,
@@ -250,3 +251,15 @@ def test_infer_engine_cc_from_text_parses_explicit_liter_patterns():
     assert infer_engine_cc_from_text("296 gtb 3.0 turbo v6 hybride 830 ch") == 3000
     assert infer_engine_cc_from_text("4.0 V8", "some title") == 4000
     assert infer_engine_cc_from_text("2993 cc diesel") == 2993
+
+
+def test_filter_candidates_by_target_power_prefers_close_matches_only():
+    candidates = [
+        {"power_hp": 551, "power_kw": 405.26, "engine_cc": 3996},
+        {"power_hp": 549, "power_kw": 403.79, "engine_cc": 3996},
+        {"power_hp": 462, "power_kw": 339.80, "engine_cc": 2995},
+        {"power_hp": 650, "power_kw": 478.07, "engine_cc": 3996},
+    ]
+    matched = filter_candidates_by_target_power(candidates, 551)
+    assert len(matched) == 2
+    assert {row["engine_cc"] for row in matched} == {3996}
