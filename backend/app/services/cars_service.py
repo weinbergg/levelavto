@@ -1710,6 +1710,12 @@ class CarsService:
                     return
             breakdown.append({"title": title, "amount_rub": 0, "version": version})
 
+        def _has_without_util_marker(breakdown: list[dict] | None) -> bool:
+            return any(
+                isinstance(row, dict) and row.get("title") == "__without_util_fee"
+                for row in (breakdown or [])
+            )
+
         def _needs_recalc(cfg_version: str | None) -> bool:
             if not lazy_enabled:
                 return False
@@ -1818,6 +1824,12 @@ class CarsService:
         if not cfg:
             return None
         cfg_version = cfg.payload.get("meta", {}).get("version")
+        effective_engine_cc = effective_engine_cc_value(car)
+        effective_power_hp = effective_power_hp_value(car)
+        effective_power_kw = effective_power_kw_value(car)
+        fallback_cache_might_be_recoverable = _has_without_util_marker(car.calc_breakdown_json) and (
+            effective_engine_cc is None or (effective_power_hp is None and effective_power_kw is None)
+        )
         if (
             not force
             and car.total_price_rub_cached is not None
@@ -1826,6 +1838,7 @@ class CarsService:
             and car.updated_at is not None
             and car.calc_updated_at >= car.updated_at
             and not _needs_recalc(cfg_version)
+            and not fallback_cache_might_be_recoverable
         ):
             return {
                 "total_rub": float(car.total_price_rub_cached),
@@ -1849,9 +1862,6 @@ class CarsService:
                 price_net_eur = float(used_price) * (float(usd_rate) / float(eur_rate))
         if price_net_eur is None:
             return _fallback_total("no_price_net_eur")
-        effective_engine_cc = effective_engine_cc_value(car)
-        effective_power_hp = effective_power_hp_value(car)
-        effective_power_kw = effective_power_kw_value(car)
         if (
             effective_engine_cc is None
             or (effective_power_hp is None and effective_power_kw is None)
