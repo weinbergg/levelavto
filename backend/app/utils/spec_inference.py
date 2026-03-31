@@ -252,18 +252,35 @@ def choose_reference_consensus(
             tuples[tuple_key] = {"count": 1}
         else:
             bucket["count"] += 1
-    if not usable or len(tuples) != 1:
+    if not usable:
         return None
-
+    if need_engine_cc and need_power:
+        if len(tuples) != 1:
+            return None
+        selected_tuple_key = next(iter(tuples))
+    else:
+        ranked_tuples = sorted(
+            tuples.items(),
+            key=lambda item: (
+                -(int(item[1].get("count") or 0)),
+                item[0],
+            ),
+        )
+        selected_tuple_key, selected_meta = ranked_tuples[0]
+        support_count = int(selected_meta.get("count") or 0)
+        second_count = int(ranked_tuples[1][1].get("count") or 0) if len(ranked_tuples) > 1 else 0
+        if support_count < 2 or support_count <= second_count:
+            return None
+    best_candidates = [item for item in usable if item["tuple_key"] == selected_tuple_key]
     best = sorted(
-        usable,
+        best_candidates,
         key=lambda item: (
             item["distance"],
             0 if target_year is not None and item["year"] == target_year else 1,
             -(item["source_car_id"] or 0),
         ),
     )[0]
-    support_count = int(tuples.get(best["tuple_key"], {}).get("count") or 0)
+    support_count = int(tuples.get(selected_tuple_key, {}).get("count") or 0)
     if has_variant_key and target_year is not None and best["year"] == target_year:
         confidence = "high"
         rule = "variant_exact_year_exact"

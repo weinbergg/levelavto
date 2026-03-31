@@ -152,6 +152,44 @@ def test_choose_reference_consensus_can_infer_engine_only_when_power_conflicts()
     assert result["engine_cc"] == 2993
 
 
+def test_choose_reference_consensus_engine_only_uses_clear_majority():
+    candidates = [
+        {
+            "source_car_id": 61,
+            "variant_key": "xdrive30d",
+            "year": 2026,
+            "engine_cc": 2993,
+            "power_hp": 286,
+            "power_kw": 210.35,
+        },
+        {
+            "source_car_id": 62,
+            "variant_key": "xdrive30d",
+            "year": 2026,
+            "engine_cc": 2993,
+            "power_hp": 298,
+            "power_kw": 219.18,
+        },
+        {
+            "source_car_id": 63,
+            "variant_key": "xdrive30d",
+            "year": 2026,
+            "engine_cc": 3000,
+            "power_hp": 286,
+            "power_kw": 210.35,
+        },
+    ]
+    result = choose_reference_consensus(
+        candidates,
+        target_year=2023,
+        has_variant_key=True,
+        need_engine_cc=True,
+        need_power=False,
+    )
+    assert result is not None
+    assert result["engine_cc"] == 2993
+
+
 def test_choose_reference_consensus_can_infer_power_only_when_cc_conflicts():
     candidates = [
         {
