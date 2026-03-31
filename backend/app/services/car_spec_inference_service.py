@@ -17,6 +17,7 @@ from ..utils.spec_inference import (
     normalize_spec_text,
     normalized_power_hp,
     normalized_power_kw,
+    variant_primary_token,
 )
 
 
@@ -248,6 +249,27 @@ class CarSpecInferenceService:
             )
             if consensus:
                 return consensus
+            primary_token = variant_primary_token(sig["variant_key"])
+            if primary_token:
+                primary_variant_rows = [
+                    row
+                    for row in rows
+                    if variant_primary_token(row.get("variant_key")) == primary_token
+                ]
+                consensus = choose_reference_consensus(
+                    primary_variant_rows,
+                    target_year=sig["year"],
+                    has_variant_key=True,
+                )
+                if consensus:
+                    rule = "variant_primary_year_exact"
+                    if consensus.get("rule") == "variant_exact_year_window":
+                        rule = "variant_primary_year_window"
+                    return {
+                        **consensus,
+                        "confidence": "medium",
+                        "rule": rule,
+                    }
         return choose_reference_consensus(
             rows,
             target_year=sig["year"],

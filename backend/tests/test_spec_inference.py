@@ -2,6 +2,8 @@ from backend.app.utils.spec_inference import (
     build_variant_key,
     choose_reference_consensus,
     has_complete_raw_specs,
+    normalize_engine_type,
+    variant_primary_token,
 )
 
 
@@ -107,3 +109,14 @@ def test_has_complete_raw_specs_supports_ev_and_ice_rules():
     assert has_complete_raw_specs("Diesel", 2993, 286, None) is True
     assert has_complete_raw_specs("Electric", None, 204, None) is True
     assert has_complete_raw_specs("Petrol", None, 245, None) is False
+
+
+def test_normalize_engine_type_drops_numeric_and_co2_noise():
+    assert normalize_engine_type("210") == ""
+    assert normalize_engine_type("based on co₂ emissions (combined)") == ""
+    assert normalize_engine_type("Diesel") == "diesel"
+
+
+def test_variant_primary_token_extracts_core_variant():
+    assert variant_primary_token("xdrive30d|m-sport|individual|manhattan") == "xdrive30d"
+    assert variant_primary_token("p530|autobiography") == "p530"

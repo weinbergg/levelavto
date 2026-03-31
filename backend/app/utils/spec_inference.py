@@ -83,6 +83,17 @@ def normalize_engine_type(value: Any) -> str:
     raw = normalize_spec_text(value)
     if not raw:
         return ""
+    if re.fullmatch(r"[0-9]+(?:[.,][0-9]+)?", raw):
+        return ""
+    if (
+        "based on" in raw
+        or "emission" in raw
+        or "co2" in raw
+        or "co₂" in raw
+        or "consumption" in raw
+        or "combined" in raw
+    ):
+        return ""
     if "electric" in raw or re.search(r"\bev\b", raw):
         return "electric"
     if "hybrid" in raw or "plug in" in raw or "plug-in" in raw or "phev" in raw:
@@ -93,7 +104,7 @@ def normalize_engine_type(value: Any) -> str:
         return "petrol"
     if "lpg" in raw or re.search(r"\bgpl\b", raw):
         return "lpg"
-    return raw
+    return ""
 
 
 def normalize_body_type(value: Any) -> str:
@@ -186,6 +197,15 @@ def build_reference_signature(
         "body_type_norm": normalize_body_type(body_type),
         "year": _to_int(year),
     }
+
+
+def variant_primary_token(value: Any) -> Optional[str]:
+    raw = str(value or "").strip().casefold()
+    if not raw:
+        return None
+    token = raw.split("|", 1)[0] if "|" in raw else raw
+    token = normalize_spec_text(token)
+    return token or None
 
 
 def choose_reference_consensus(
