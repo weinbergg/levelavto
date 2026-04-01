@@ -1679,7 +1679,7 @@ def filter_payload(
             if row.get("value")
         ]
     )
-    colors_basic, colors_other = _split_colors(service.facet_counts_filtered(field="color", **common_filters))
+    colors_basic, colors_other = _split_colors(service.facet_counts_filtered(field="color_group", **common_filters))
     data = {
         "brands": brands,
         "countries": countries,

@@ -1,1 +1,1 @@
-15 9 * * * cd /opt/levelavto && /bin/bash scripts/mobilede_daily_pipeline.sh >> /var/log/mobilede_daily.log 2>&1
+15 9 * * * cd /opt/levelavto && FX_UPDATE_TELEGRAM=1 MOBILEDE_STRICT_DEACTIVATION_GUARD=1 /bin/bash scripts/mobilede_daily_pipeline.sh >> /var/log/mobilede_daily.log 2>&1

@@ -1479,7 +1479,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
     t0 = time.perf_counter()
     raw_params = dict(request.query_params)
     params = normalize_filter_params(raw_params)
-    cache_key = build_filter_ctx_key(params, include_payload=False)
+    cache_key = build_filter_ctx_key(params, include_payload=True)
     cached = redis_get_json(cache_key)
     cache_hit = 0
     cache_source = "fallback"
@@ -1488,7 +1488,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
         cache_hit = 1
         cache_source = "redis"
     else:
-        filter_ctx = _build_filter_context(service, db, include_payload=False, params=params)
+        filter_ctx = _build_filter_context(service, db, include_payload=True, params=params)
     contact_content = ContentService(db).content_map(
         [
             "contact_phone",

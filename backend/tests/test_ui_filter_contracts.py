@@ -43,6 +43,7 @@ def test_filter_payload_includes_dynamic_brand_options():
     router = _read("app/routers/catalog.py")
     assert 'field="brand"' in router
     assert '"brands": brands' in router
+    assert 'field="color_group"' in router
     assert '"interior_design_options_eu": build_interior_trim_options' in router
     assert '"interior_color_options_eu": build_interior_options' in router
     assert '"interior_material_options_eu": build_interior_options' in router
@@ -80,8 +81,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=84' in template
-    assert '/static/css/styles.css?v=44' in template
+    assert '/static/js/app.js?v=85' in template
+    assert '/static/css/styles.css?v=45' in template
 
 
 def test_home_search_uses_line_params_and_js_submit():
@@ -208,8 +209,18 @@ def test_catalog_and_search_interior_filters_use_chip_multiselect():
     script = _read("app/static/js/app.js")
     assert 'data-chip-input="interior_design"' in catalog_template
     assert 'data-chip-input="interior_design"' in search_template
+    assert 'Цвет и материал салона' in catalog_template
+    assert 'Цвет и материал салона' in search_template
     assert 'data-region-chip-options' in search_template
     assert 'parseSelectedCsvValues(value).forEach((trimValue)' in script
+
+
+def test_search_page_uses_payload_on_initial_render_and_has_telegram_ping_tool():
+    pages = _read("app/routers/pages.py")
+    tg_ping = _read("app/tools/telegram_ping.py")
+    assert "include_payload=True" in pages
+    assert "resolve_telegram_chat_id" in tg_ping
+    assert 'parser.add_argument("--dry-run"' in tg_ping
 
 
 def test_registration_year_filters_fallback_to_car_year_when_missing():
