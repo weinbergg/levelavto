@@ -9,15 +9,62 @@ echo "[mobilede_pipeline] start $(date -Iseconds)"
 echo "[mobilede_pipeline] step=mobilede_daily"
 DAILY_ARGS=()
 RUN_ENV_ARGS=()
+MOBILEDE_STRICT_DEACTIVATION_GUARD="${MOBILEDE_STRICT_DEACTIVATION_GUARD:-1}"
 if [ "${MOBILEDE_ALLOW_DEACTIVATE:-0}" = "1" ]; then
   DAILY_ARGS+=(--allow-deactivate)
 fi
-for env_name in KEEP_CSV MOBILEDE_HOST MOBILEDE_LOGIN MOBILEDE_PASSWORD MOBILEDE_USER MOBILEDE_PASS MOBILEDE_TMP_DIR MOBILEDE_MIN_FREE_GB RUN_EU_CALC_AFTER_DAILY EU_CALC_SINCE_MIN MOBILEDE_DEACTIVATE_MODE MOBILEDE_DEACTIVATE_MIN_RATIO MOBILEDE_DEACTIVATE_MIN_SEEN MOBILEDE_SKIP_DEACTIVATE; do
+for env_name in KEEP_CSV MOBILEDE_HOST MOBILEDE_LOGIN MOBILEDE_PASSWORD MOBILEDE_USER MOBILEDE_PASS MOBILEDE_TMP_DIR MOBILEDE_MIN_FREE_GB RUN_EU_CALC_AFTER_DAILY EU_CALC_SINCE_MIN MOBILEDE_DEACTIVATE_MODE MOBILEDE_DEACTIVATE_MIN_RATIO MOBILEDE_DEACTIVATE_MIN_SEEN MOBILEDE_SKIP_DEACTIVATE MOBILEDE_STRICT_DEACTIVATION_GUARD TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_ADMIN_CHAT_ID TELEGRAM_ALLOWED_IDS EURO_RATE USD_RATE FX_ADD_RUB; do
   if [ -n "${!env_name:-}" ]; then
     RUN_ENV_ARGS+=(-e "${env_name}=${!env_name}")
   fi
 done
 docker compose run --rm "${RUN_ENV_ARGS[@]}" web python -m backend.app.tools.mobilede_daily "${DAILY_ARGS[@]}"
+
+echo "[mobilede_pipeline] step=verify_deactivation_gate"
+VERIFY_ENV_ARGS=(
+  -e "MOBILEDE_STRICT_DEACTIVATION_GUARD=${MOBILEDE_STRICT_DEACTIVATION_GUARD}"
+)
+if [ -n "${MOBILEDE_TMP_DIR:-}" ]; then
+  VERIFY_ENV_ARGS+=(-e "MOBILEDE_TMP_DIR=${MOBILEDE_TMP_DIR}")
+fi
+docker compose exec -T "${VERIFY_ENV_ARGS[@]}" web python - <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+stats_path = Path(os.getenv("MOBILEDE_TMP_DIR", "/app/tmp")) / "mobilede_import_stats.json"
+strict = os.getenv("MOBILEDE_STRICT_DEACTIVATION_GUARD", "0") == "1"
+
+if not stats_path.exists():
+    msg = f"[mobilede_pipeline] deactivation stats missing: {stats_path}"
+    print(msg, flush=True)
+    if strict:
+        raise SystemExit(msg)
+    raise SystemExit(0)
+
+stats = json.loads(stats_path.read_text(encoding="utf-8"))
+allowed = stats.get("deactivation_allowed")
+mode = str(stats.get("deactivate_mode") or "")
+reason = str(stats.get("deactivate_reason") or "-")
+print(
+    f"[mobilede_pipeline] deactivation stats mode={mode or '-'} "
+    f"allowed={allowed!r} reason={reason}",
+    flush=True,
+)
+if strict and mode == "auto" and allowed is not True:
+    raise SystemExit(
+        "[mobilede_pipeline] strict deactivation guard failed: "
+        f"mode={mode or '-'} allowed={allowed!r} reason={reason}"
+    )
+PY
+
+echo "[mobilede_pipeline] step=update_fx_prices"
+FX_ARGS=(--batch "${FX_UPDATE_BATCH:-2000}" --sleep "${FX_UPDATE_SLEEP_SEC:-0}")
+if [ "${FX_UPDATE_TELEGRAM:-0}" = "1" ]; then
+  FX_ARGS+=(--telegram)
+fi
+docker compose exec -T web python -m backend.app.scripts.update_fx_prices "${FX_ARGS[@]}"
 
 echo "[mobilede_pipeline] step=backfill_missing_registration"
 docker compose exec -T web python -m backend.app.scripts.backfill_missing_registration \

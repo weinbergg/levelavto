@@ -12,8 +12,18 @@ import time
 from pathlib import Path
 
 import requests
+from sqlalchemy import select
+
+from backend.app.importing.mobilede_csv import iter_mobilede_csv_rows
+from backend.app.models import ParserRun, ParserRunSource, Source
+from backend.app.parsing.config import load_sites_config
+from backend.app.utils.feed_deactivation import should_deactivate_feed
 from backend.app.utils.redis_cache import redis_delete_by_pattern, bump_dataset_version
-from backend.app.utils.telegram import format_daily_report, send_telegram_message
+from backend.app.utils.telegram import (
+    format_daily_report,
+    resolve_telegram_chat_id,
+    send_telegram_message,
+)
 
 
 HOST = os.getenv("MOBILEDE_HOST", "https://parsers1-valdez.auto-parser.ru")
@@ -62,11 +72,62 @@ def download_file(for_date: dt.date, dest: Path) -> None:
                     f.write(chunk)
 
 
+def estimate_feed_seen(file_path: Path) -> int:
+    return sum(1 for _ in iter_mobilede_csv_rows(str(file_path)))
+
+
+def get_previous_success_seen(source_key: str) -> int | None:
+    from backend.app.db import SessionLocal
+
+    with SessionLocal() as db:
+        source_id = db.execute(
+            select(Source.id).where(Source.key == source_key)
+        ).scalar_one_or_none()
+        if source_id is None:
+            return None
+        row = db.execute(
+            select(ParserRunSource.total_seen)
+            .join(ParserRun, ParserRun.id == ParserRunSource.parser_run_id)
+            .where(
+                ParserRunSource.source_id == source_id,
+                ParserRun.status == "success",
+                ParserRunSource.total_seen > 0,
+            )
+            .order_by(ParserRun.started_at.desc())
+            .limit(1)
+        ).first()
+        if not row:
+            return None
+        return int(row[0] or 0) or None
+
+
+def preflight_deactivation_guard(
+    *,
+    file_path: Path,
+    source_key: str,
+    deactivate_mode: str,
+    min_ratio: float,
+    min_seen: int,
+) -> tuple[int, int | None, bool, str]:
+    current_seen = estimate_feed_seen(file_path)
+    previous_seen = get_previous_success_seen(source_key)
+    allow_deactivate, deactivate_reason = should_deactivate_feed(
+        mode=deactivate_mode,
+        current_seen=current_seen,
+        previous_seen=previous_seen,
+        min_ratio=min_ratio,
+        min_seen=min_seen,
+    )
+    return current_seen, previous_seen, allow_deactivate, deactivate_reason
+
+
 def run_import(
     file_path: Path,
     trigger: str = "auto-daily",
     limit: int | None = None,
     deactivate_mode: str = "auto",
+    deactivate_min_ratio: float = 0.93,
+    deactivate_min_seen: int = 100_000,
     stats_file: Path | None = None,
 ) -> None:
     cmd = [
@@ -81,6 +142,8 @@ def run_import(
     if stats_file:
         cmd += ["--stats-file", str(stats_file)]
     cmd += ["--deactivate-mode", deactivate_mode]
+    cmd += ["--deactivate-min-ratio", str(deactivate_min_ratio)]
+    cmd += ["--deactivate-min-seen", str(deactivate_min_seen)]
     if limit:
         cmd += ["--limit", str(limit)]
     subprocess.run(cmd, check=True)
@@ -188,7 +251,26 @@ def main() -> None:
         default=os.getenv("MOBILEDE_DEACTIVATE_MODE", "auto"),
         help="auto compares current feed with previous successful import; force always deactivates; skip disables deactivation.",
     )
+    ap.add_argument(
+        "--deactivate-min-ratio",
+        type=float,
+        default=float(os.getenv("MOBILEDE_DEACTIVATE_MIN_RATIO", "0.93")),
+        help="Minimum current/previous feed ratio required before auto deactivation is allowed.",
+    )
+    ap.add_argument(
+        "--deactivate-min-seen",
+        type=int,
+        default=int(os.getenv("MOBILEDE_DEACTIVATE_MIN_SEEN", "100000")),
+        help="Minimum feed size required before auto deactivation is allowed.",
+    )
+    ap.add_argument(
+        "--strict-deactivation-guard",
+        action="store_true",
+        default=os.getenv("MOBILEDE_STRICT_DEACTIVATION_GUARD", "0") == "1",
+        help="Abort before import when auto deactivation would be skipped; prevents adding fresh cars without deactivating disappeared ones.",
+    )
     args = ap.parse_args()
+    cfg = load_sites_config().get("mobile_de")
 
     if args.date:
         run_date = dt.datetime.strptime(args.date, "%Y-%m-%d").date()
@@ -205,11 +287,44 @@ def main() -> None:
     if not args.skip_import:
         stats_file = DOWNLOAD_DIR / "mobilede_import_stats.json"
         deactivate_mode = "force" if args.allow_deactivate else args.deactivate_mode
+        if args.strict_deactivation_guard and deactivate_mode == "auto":
+            current_seen, previous_seen, allow_deactivate, deactivate_reason = preflight_deactivation_guard(
+                file_path=target,
+                source_key=cfg.key,
+                deactivate_mode=deactivate_mode,
+                min_ratio=max(0.0, min(float(args.deactivate_min_ratio), 1.0)),
+                min_seen=max(0, int(args.deactivate_min_seen)),
+            )
+            print(
+                "[mobilede_daily] strict deactivation preflight "
+                f"current_seen={current_seen} previous_seen={previous_seen or 'n/a'} "
+                f"decision={'allow' if allow_deactivate else 'block'} reason={deactivate_reason}",
+                flush=True,
+            )
+            if not allow_deactivate:
+                token = os.getenv("TELEGRAM_BOT_TOKEN")
+                chat_id = resolve_telegram_chat_id()
+                if token and chat_id:
+                    send_telegram_message(
+                        token,
+                        chat_id,
+                        (
+                            "LevelAvto nightly blocked before import\n"
+                            f"deactivation_guard: mode={deactivate_mode} current_seen={current_seen} "
+                            f"prev_seen={previous_seen or '-'} reason={deactivate_reason}"
+                        ),
+                    )
+                raise RuntimeError(
+                    "Daily import blocked by strict deactivation guard: "
+                    f"{deactivate_reason} (current_seen={current_seen}, previous_seen={previous_seen or 'n/a'})"
+                )
         run_import(
             target,
             trigger="auto-daily",
             limit=args.limit,
             deactivate_mode=deactivate_mode,
+            deactivate_min_ratio=max(0.0, min(float(args.deactivate_min_ratio), 1.0)),
+            deactivate_min_seen=max(0, int(args.deactivate_min_seen)),
             stats_file=stats_file,
         )
         if not args.skip_cache:
@@ -238,7 +353,7 @@ def main() -> None:
                     print(f"[mobilede_daily] cleanup_tmp_files.sh failed: {exc}", flush=True)
         # Telegram report (optional)
         token = os.getenv("TELEGRAM_BOT_TOKEN")
-        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        chat_id = resolve_telegram_chat_id()
         if token and chat_id:
             stats = {}
             try:

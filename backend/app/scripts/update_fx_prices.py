@@ -8,7 +8,7 @@ from typing import Any, Iterable
 from backend.app.db import SessionLocal
 from backend.app.models import Car
 from backend.app.services.cars_service import CarsService
-from backend.app.utils.telegram import send_telegram_message
+from backend.app.utils.telegram import resolve_telegram_chat_id, send_telegram_message
 from backend.app.utils.price_utils import ceil_to_step, get_round_step_rub
 
 
@@ -165,7 +165,7 @@ def main() -> None:
         print(summary)
         if args.telegram:
             token = os.getenv("TELEGRAM_BOT_TOKEN")
-            chat_id = os.getenv("TELEGRAM_CHAT_ID")
+            chat_id = resolve_telegram_chat_id()
             if token and chat_id:
                 send_telegram_message(token, chat_id, summary)
 

@@ -197,6 +197,7 @@ def main() -> None:
                 "updated": updated_total,
                 "deactivated": deactivated,
                 "skipped": skipped_total,
+                "deactivation_allowed": allow_deactivate,
                 "deactivate_mode": deactivate_mode,
                 "deactivate_previous_seen": previous_seen,
                 "deactivate_reason": deactivate_reason,
