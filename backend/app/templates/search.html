@@ -318,19 +318,28 @@
         <h2 class="advanced-section__title">Интерьер</h2>
         <div class="search-filters">
           <div class="filters-primary-grid advanced-grid">
-            <label data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">Отделка салона
-              <select
-                name="interior_design"
-                data-region-options
+            <div class="field field--full" data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">
+              <span class="field-label">Отделка салона</span>
+              <div
+                class="choice-chips"
+                data-chip-input="interior_design"
+                data-region-chip-options
+                data-option-base="interior_design_options"
                 data-options-eu='{{ interior_design_options_eu | tojson }}'
                 data-options-kr='{{ interior_design_options_kr | tojson }}'
               >
-                <option value="">Не важно</option>
                 {% for opt in interior_design_options_eu %}
-                <option value="{{ opt.value }}" {% if params.get('interior_design') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                <button
+                  type="button"
+                  class="choice-chip"
+                  data-value="{{ opt.value }}"
+                  data-label="{{ opt.label }}"
+                  aria-label="{{ opt.label }}"
+                >{{ opt.label }}</button>
                 {% endfor %}
-              </select>
-            </label>
+              </div>
+              <input type="hidden" name="interior_design" value="{{ params.get('interior_design','') }}">
+            </div>
           </div>
         </div>
       </section>

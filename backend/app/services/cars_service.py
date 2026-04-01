@@ -357,7 +357,7 @@ class CarsService:
             "brand": Car.brand,
             "model": Car.model,
             "color": Car.color,
-            "color_group": Car.color_group,
+            "color_group": func.coalesce(Car.color_group, literal("other")),
             "engine_type": Car.engine_type,
             "transmission": Car.transmission,
             "body_type": Car.body_type,
@@ -465,6 +465,8 @@ class CarsService:
         return out
 
     def facet_counts(self, *, field: str, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+        if field == "color_group":
+            return self._facet_counts_from_cars(field=field, filters=filters)
         table_map = {
             "region": ("car_counts_core", "region", {"region"}),
             "country": ("car_counts_core", "country", {"region"}),
@@ -838,28 +840,40 @@ class CarsService:
             )
         )
         if interior_design and "interior_design" not in exclude:
-            trim_material_key, trim_color_key = parse_interior_trim_token(interior_design)
-            trim_conditions = []
-            if trim_material_key:
-                aliases = interior_material_aliases(trim_material_key)
-                if aliases:
-                    trim_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
-            if trim_color_key:
-                aliases = interior_color_aliases(trim_color_key)
-                if aliases:
-                    trim_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
-            if trim_conditions:
-                conditions.append(and_(*trim_conditions))
-            else:
-                conditions.append(func.jsonb_extract_path_text(payload_json, "interior_design") == interior_design)
+            trim_token_conditions = []
+            for trim_value in split_csv_values(interior_design):
+                trim_material_key, trim_color_key = parse_interior_trim_token(trim_value)
+                trim_conditions = []
+                if trim_material_key:
+                    aliases = interior_material_aliases(trim_material_key)
+                    if aliases:
+                        trim_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+                if trim_color_key:
+                    aliases = interior_color_aliases(trim_color_key)
+                    if aliases:
+                        trim_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+                if trim_conditions:
+                    trim_token_conditions.append(and_(*trim_conditions))
+                else:
+                    trim_token_conditions.append(func.jsonb_extract_path_text(payload_json, "interior_design") == trim_value)
+            if trim_token_conditions:
+                conditions.append(or_(*trim_token_conditions))
         if interior_color and "interior_color" not in exclude:
-            aliases = interior_color_aliases(interior_color)
-            if aliases:
-                conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+            color_conditions = []
+            for color_value in split_csv_values(interior_color):
+                aliases = interior_color_aliases(color_value)
+                if aliases:
+                    color_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+            if color_conditions:
+                conditions.append(or_(*color_conditions))
         if interior_material and "interior_material" not in exclude:
-            aliases = interior_material_aliases(interior_material)
-            if aliases:
-                conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+            material_conditions = []
+            for material_value in split_csv_values(interior_material):
+                aliases = interior_material_aliases(material_value)
+                if aliases:
+                    material_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+            if material_conditions:
+                conditions.append(or_(*material_conditions))
         if vat_reclaimable and "vat_reclaimable" not in exclude:
             vat_raw = str(vat_reclaimable).strip().lower()
             vat_nt = func.jsonb_extract_path_text(payload_json, "price_eur_nt")
@@ -903,11 +917,29 @@ class CarsService:
                 if family_key:
                     group_keys = color_family_group_keys(family_key)
                     if group_keys:
-                        color_conditions.append(Car.color_group.in_(group_keys))
+                        if "other" in group_keys:
+                            named_groups = [group_key for group_key in group_keys if group_key != "other"]
+                            if named_groups:
+                                color_conditions.append(
+                                    or_(
+                                        Car.color_group.in_(named_groups),
+                                        Car.color_group == "other",
+                                        Car.color_group.is_(None),
+                                    )
+                                )
+                            else:
+                                color_conditions.append(
+                                    or_(Car.color_group == "other", Car.color_group.is_(None))
+                                )
+                        else:
+                            color_conditions.append(Car.color_group.in_(group_keys))
                         continue
                 group_key = normalize_color_group_key(color_value)
                 if group_key:
-                    color_conditions.append(Car.color_group == group_key)
+                    if group_key == "other":
+                        color_conditions.append(or_(Car.color_group == "other", Car.color_group.is_(None)))
+                    else:
+                        color_conditions.append(Car.color_group == group_key)
                     continue
                 aliases = color_aliases(color_value)
                 if aliases:
@@ -1084,6 +1116,9 @@ class CarsService:
         hide_no_local_photo: bool = False,
     ) -> Tuple[List[Car] | List[dict], int]:
         normalized_color = normalize_csv_values(color) or color
+        normalized_interior_design = normalize_csv_values(interior_design) or interior_design
+        normalized_interior_color = normalize_csv_values(interior_color) or interior_color
+        normalized_interior_material = normalize_csv_values(interior_material) or interior_material
         conditions, resolved = self._build_list_conditions(
             region=region,
             country=country,
@@ -1115,9 +1150,9 @@ class CarsService:
             efficiency_class=efficiency_class,
             climatisation=climatisation,
             airbags=airbags,
-            interior_design=interior_design,
-            interior_color=interior_color,
-            interior_material=interior_material,
+            interior_design=normalized_interior_design,
+            interior_color=normalized_interior_color,
+            interior_material=normalized_interior_material,
             vat_reclaimable=vat_reclaimable,
             air_suspension=air_suspension,
             price_rating_label=price_rating_label,
@@ -1166,9 +1201,9 @@ class CarsService:
             efficiency_class,
             climatisation,
             airbags,
-            interior_design,
-            interior_color,
-            interior_material,
+            normalized_interior_design,
+            normalized_interior_color,
+            normalized_interior_material,
             vat_reclaimable,
             air_suspension,
             price_rating_label,
@@ -1205,9 +1240,9 @@ class CarsService:
                 "efficiency_class": efficiency_class,
                 "climatisation": climatisation,
                 "airbags": airbags,
-                "interior_design": interior_design,
-                "interior_color": interior_color,
-                "interior_material": interior_material,
+                "interior_design": normalized_interior_design,
+                "interior_color": normalized_interior_color,
+                "interior_material": normalized_interior_material,
                 "vat_reclaimable": vat_reclaimable,
                 "air_suspension": air_suspension,
                 "price_rating_label": price_rating_label,

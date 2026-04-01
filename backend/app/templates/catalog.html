@@ -232,14 +232,20 @@
               <span>Пневмоподвеска</span>
             </label>
             {% endif %}
-            <label>Отделка салона
-              <select name="interior_design">
-                <option value="">Не важно</option>
+            <div class="field field--full"><span class="field-label">Отделка салона</span>
+              <div class="choice-chips" data-chip-input="interior_design">
                 {% for opt in interior_design_options %}
-                <option value="{{ opt.value }}" {% if params.get('interior_design') == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                <button
+                  type="button"
+                  class="choice-chip"
+                  data-value="{{ opt.value }}"
+                  data-label="{{ opt.label }}"
+                  aria-label="{{ opt.label }}"
+                >{{ opt.label }}</button>
                 {% endfor %}
-              </select>
-            </label>
+              </div>
+              <input type="hidden" name="interior_design" value="{{ params.get('interior_design','') }}">
+            </div>
             <label>НДС
               <select name="vat_reclaimable">
                 <option value="">Не важно</option>

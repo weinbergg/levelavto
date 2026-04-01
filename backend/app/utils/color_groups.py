@@ -48,6 +48,7 @@ _FAMILIES: List[ColorFamily] = [
     ColorFamily("yellow", "Желтый / оранжевый", ["yellow", "orange"], "#e8ad2c"),
     ColorFamily("brown", "Коричневый / бежевый", ["brown", "beige"], "#9a7150"),
     ColorFamily("purple", "Фиолетовый", ["purple"], "#7a4bd8"),
+    ColorFamily("other", "Другие", ["other"], "#8c94a3"),
 ]
 
 _STOPWORDS = {
@@ -176,8 +177,6 @@ def normalize_color_group_key(raw: Optional[str]) -> Optional[str]:
     if not raw:
         return None
     key = normalize_color_group(raw)
-    if key == "other":
-        return None
     return key
 
 
@@ -185,7 +184,7 @@ def color_group_label(key: str) -> str:
     for group in _GROUPS:
         if group.key == key:
             return group.label
-    return "Другое"
+    return "Другие"
 
 
 def color_groups() -> List[ColorGroup]:
@@ -252,16 +251,19 @@ def split_color_facets(
         family_counts[family_key] = family_counts.get(family_key, 0) + count
 
     basics: list[dict[str, Any]] = []
+    other: list[dict[str, Any]] = []
     for family in _FAMILIES:
         count = int(family_counts.get(family.key) or 0)
         if count <= 0:
             continue
-        basics.append(
-            {
-                "value": family.key,
-                "label": family.label,
-                "hex": family.hex_value,
-                "count": count,
-            }
-        )
-    return basics, []
+        item = {
+            "value": family.key,
+            "label": family.label,
+            "hex": family.hex_value,
+            "count": count,
+        }
+        if family.key == "other":
+            other.append(item)
+        else:
+            basics.append(item)
+    return basics, other

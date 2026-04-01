@@ -409,7 +409,7 @@ def _build_filter_context(
     if timing_enabled:
         print(f"FILTER_CTX_STAGE name=generations ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     t0 = time.perf_counter()
-    colors = service.facet_counts(field="color", filters=facet_filters)
+    colors = service.facet_counts(field="color_group", filters=facet_filters)
     if timing_enabled:
         print(f"FILTER_CTX_STAGE name=colors ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     colors_basic, colors_other = split_color_facets(colors)

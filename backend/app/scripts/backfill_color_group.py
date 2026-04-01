@@ -4,6 +4,7 @@ from datetime import datetime
 from backend.app.db import SessionLocal
 from backend.app.models import Car
 from backend.app.utils.color_groups import normalize_color_group
+from backend.app.utils.taxonomy import color_hex
 
 
 def main() -> None:
@@ -25,7 +26,7 @@ def main() -> None:
         batch = []
         for car in q.yield_per(args.batch):
             scanned += 1
-            group = normalize_color_group(car.color, car.color_hex)
+            group = normalize_color_group(car.color, color_hex(car.color))
             if car.color_group != group:
                 car.color_group = group
                 batch.append(car)

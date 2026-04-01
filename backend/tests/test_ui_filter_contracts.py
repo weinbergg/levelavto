@@ -34,6 +34,8 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "item.value ?? item.id" in script
     assert "parseSelectedColorValues" in script
     assert "removeSelectedColor" in script
+    assert "bindChoiceChips" in script
+    assert "syncChoiceChips" in script
     assert "select.disabled = normalizedItems.length === 0" in script or "select.disabled = deduped.length === 0" in script
 
 
@@ -196,7 +198,18 @@ def test_catalog_scroll_and_grouped_filters_contracts():
     assert "loadCars(1, { scrollToTop: true })" in script
     assert "ColorFamily" in color_utils
     assert '"Серый / серебристый"' in color_utils
-    assert "return basics, []" in color_utils
+    assert '"Другие"' in color_utils
+    assert "return basics, other" in color_utils
+
+
+def test_catalog_and_search_interior_filters_use_chip_multiselect():
+    catalog_template = _read("app/templates/catalog.html")
+    search_template = _read("app/templates/search.html")
+    script = _read("app/static/js/app.js")
+    assert 'data-chip-input="interior_design"' in catalog_template
+    assert 'data-chip-input="interior_design"' in search_template
+    assert 'data-region-chip-options' in search_template
+    assert 'parseSelectedCsvValues(value).forEach((trimValue)' in script
 
 
 def test_registration_year_filters_fallback_to_car_year_when_missing():
@@ -237,9 +250,11 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
 
 def test_interior_filters_use_derived_text_fallback_from_payload_and_description():
     service = _read("app/services/cars_service.py")
+    pages = _read("app/routers/pages.py")
     assert 'func.concat_ws(' in service
     assert 'jsonb_extract_path_text(payload_json, "options")' in service
     assert 'jsonb_extract_path_text(payload_json, "title")' in service
     assert "func.coalesce(Car.description, \"\")" in service
     assert "parse_interior_trim_token" in service
-    assert "trim_conditions.append" in service
+    assert "trim_token_conditions" in service
+    assert 'field="color_group"' in pages

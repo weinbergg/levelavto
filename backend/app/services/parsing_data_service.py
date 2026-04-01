@@ -68,8 +68,7 @@ class ParsingDataService:
             payload.setdefault("country", source.country)
             payload.setdefault("thumbnail_url", None)
             payload.setdefault("is_available", True)
-            if "color" in payload:
-                payload["color_group"] = normalize_color_group(payload.get("color"))
+            payload["color_group"] = normalize_color_group(payload.get("color"))
             # normalize KR market type
             if payload.get("country") == "KR":
                 if not payload.get("kr_market_type"):

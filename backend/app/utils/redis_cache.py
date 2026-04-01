@@ -260,7 +260,7 @@ def normalize_filter_params(params: Optional[Dict[str, Any]] = None) -> Dict[str
                 continue
         if key in {"region", "country", "kr_type"}:
             val = val.upper()
-        elif key == "color":
+        elif key in {"color", "interior_design", "interior_color", "interior_material"}:
             normalized_multi = normalize_csv_values(val)
             if not normalized_multi:
                 continue
@@ -332,7 +332,7 @@ def normalize_count_params(params: Optional[Dict[str, Any]] = None) -> Dict[str,
                 continue
         if key in {"region", "country", "kr_type"}:
             val = val.upper()
-        elif key == "color":
+        elif key in {"color", "interior_design", "interior_color", "interior_material"}:
             normalized_multi = normalize_csv_values(val)
             if not normalized_multi:
                 continue
