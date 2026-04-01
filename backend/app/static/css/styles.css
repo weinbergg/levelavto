@@ -2262,6 +2262,69 @@ input[type="number"]::-webkit-outer-spin-button {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+.choice-chip--swatch {
+  min-height: auto;
+  padding: 6px 10px 6px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+}
+.choice-chip--swatch::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: var(--chip-color, #8c94a3);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  flex: 0 0 18px;
+}
+.choice-chip--swatch[data-value="other"]::before {
+  background: linear-gradient(135deg, #d74141 0%, #d7a63b 25%, #4f9a43 50%, #2f6bd1 75%, #7a4bd8 100%);
+}
+.choice-chip--swatch:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.choice-chip--swatch.active {
+  background: rgba(224, 38, 38, 0.1);
+  border-color: rgba(224, 38, 38, 0.38);
+  box-shadow: 0 0 0 1px rgba(224, 38, 38, 0.12);
+}
+.choice-chip--checkbox {
+  min-height: auto;
+  padding: 4px 6px 4px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+}
+.choice-chip--checkbox::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.03);
+  flex: 0 0 18px;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.choice-chip--checkbox:hover {
+  background: transparent;
+  border-color: transparent;
+}
+.choice-chip--checkbox.active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.choice-chip--checkbox.active::before {
+  border-color: rgba(224, 38, 38, 0.7);
+  background: rgba(224, 38, 38, 0.12);
+  box-shadow: inset 0 0 0 4px rgba(224, 38, 38, 0.32);
+}
 
 /* Color mappings (fallback if no hex provided) */
 .color-chip[data-label="Белый"],

@@ -232,20 +232,39 @@
               <span>Пневмоподвеска</span>
             </label>
             {% endif %}
-            <div class="field field--full"><span class="field-label">Цвет и материал салона</span>
-              <div class="choice-chips" data-chip-input="interior_design">
-                {% for opt in interior_design_options %}
+            {% if interior_color_options and interior_color_options|length > 0 %}
+            <div class="field field--full"><span class="field-label">Цвет салона</span>
+              <div class="choice-chips" data-chip-input="interior_color" data-chip-variant="swatch">
+                {% for opt in interior_color_options %}
                 <button
                   type="button"
-                  class="choice-chip"
+                  class="choice-chip choice-chip--swatch"
+                  data-value="{{ opt.value }}"
+                  data-label="{{ opt.label }}"
+                  aria-label="{{ opt.label }}"
+                  {% if opt.hex %}style="--chip-color: {{ opt.hex }}"{% endif %}
+                >{{ opt.label }}</button>
+                {% endfor %}
+              </div>
+              <input type="hidden" name="interior_color" value="{{ params.get('interior_color','') }}">
+            </div>
+            {% endif %}
+            {% if interior_material_options and interior_material_options|length > 0 %}
+            <div class="field field--full"><span class="field-label">Материал салона</span>
+              <div class="choice-chips" data-chip-input="interior_material" data-chip-variant="checkbox">
+                {% for opt in interior_material_options %}
+                <button
+                  type="button"
+                  class="choice-chip choice-chip--checkbox"
                   data-value="{{ opt.value }}"
                   data-label="{{ opt.label }}"
                   aria-label="{{ opt.label }}"
                 >{{ opt.label }}</button>
                 {% endfor %}
               </div>
-              <input type="hidden" name="interior_design" value="{{ params.get('interior_design','') }}">
+              <input type="hidden" name="interior_material" value="{{ params.get('interior_material','') }}">
             </div>
+            {% endif %}
             <label>НДС
               <select name="vat_reclaimable">
                 <option value="">Не важно</option>
@@ -265,7 +284,7 @@
         {% for line in params.getlist('line') %}
         <input type="hidden" name="line" value="{{ line }}" data-catalog-line="1">
         {% endfor %}
-        {% set adv_keys = ['num_seats','doors_count','emission_class','efficiency_class','climatisation','airbags','interior_design','vat_reclaimable','price_rating_label','owners_count'] %}
+        {% set adv_keys = ['num_seats','doors_count','emission_class','efficiency_class','climatisation','airbags','interior_color','interior_material','vat_reclaimable','price_rating_label','owners_count'] %}
         {% for key in adv_keys %}
           {% if params.get(key) %}
           <input type="hidden" name="{{ key }}" value="{{ params.get(key) }}">

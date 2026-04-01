@@ -312,33 +312,62 @@
         </div>
       </section>
 
-      {% set interior_has_eu = interior_design_options_eu and interior_design_options_eu|length > 0 %}
-      {% set interior_has_kr = interior_design_options_kr and interior_design_options_kr|length > 0 %}
+      {% set interior_color_has_eu = interior_color_options_eu and interior_color_options_eu|length > 0 %}
+      {% set interior_color_has_kr = interior_color_options_kr and interior_color_options_kr|length > 0 %}
+      {% set interior_material_has_eu = interior_material_options_eu and interior_material_options_eu|length > 0 %}
+      {% set interior_material_has_kr = interior_material_options_kr and interior_material_options_kr|length > 0 %}
+      {% set interior_has_eu = interior_color_has_eu or interior_material_has_eu %}
+      {% set interior_has_kr = interior_color_has_kr or interior_material_has_kr %}
       <section class="advanced-section" id="advanced-interior" data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">
         <h2 class="advanced-section__title">Интерьер</h2>
         <div class="search-filters">
           <div class="filters-primary-grid advanced-grid">
-            <div class="field field--full" data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">
-              <span class="field-label">Цвет и материал салона</span>
+            <div class="field field--full" data-has-eu="{{ 1 if interior_color_has_eu else 0 }}" data-has-kr="{{ 1 if interior_color_has_kr else 0 }}">
+              <span class="field-label">Цвет салона</span>
               <div
                 class="choice-chips"
-                data-chip-input="interior_design"
+                data-chip-input="interior_color"
+                data-chip-variant="swatch"
                 data-region-chip-options
-                data-option-base="interior_design_options"
-                data-options-eu='{{ interior_design_options_eu | tojson }}'
-                data-options-kr='{{ interior_design_options_kr | tojson }}'
+                data-option-base="interior_color_options"
+                data-options-eu='{{ interior_color_options_eu | tojson }}'
+                data-options-kr='{{ interior_color_options_kr | tojson }}'
               >
-                {% for opt in interior_design_options_eu %}
+                {% for opt in interior_color_options_eu %}
                 <button
                   type="button"
-                  class="choice-chip"
+                  class="choice-chip choice-chip--swatch"
+                  data-value="{{ opt.value }}"
+                  data-label="{{ opt.label }}"
+                  aria-label="{{ opt.label }}"
+                  {% if opt.hex %}style="--chip-color: {{ opt.hex }}"{% endif %}
+                >{{ opt.label }}</button>
+                {% endfor %}
+              </div>
+              <input type="hidden" name="interior_color" value="{{ params.get('interior_color','') }}">
+            </div>
+            <div class="field field--full" data-has-eu="{{ 1 if interior_material_has_eu else 0 }}" data-has-kr="{{ 1 if interior_material_has_kr else 0 }}">
+              <span class="field-label">Материал салона</span>
+              <div
+                class="choice-chips"
+                data-chip-input="interior_material"
+                data-chip-variant="checkbox"
+                data-region-chip-options
+                data-option-base="interior_material_options"
+                data-options-eu='{{ interior_material_options_eu | tojson }}'
+                data-options-kr='{{ interior_material_options_kr | tojson }}'
+              >
+                {% for opt in interior_material_options_eu %}
+                <button
+                  type="button"
+                  class="choice-chip choice-chip--checkbox"
                   data-value="{{ opt.value }}"
                   data-label="{{ opt.label }}"
                   aria-label="{{ opt.label }}"
                 >{{ opt.label }}</button>
                 {% endfor %}
               </div>
-              <input type="hidden" name="interior_design" value="{{ params.get('interior_design','') }}">
+              <input type="hidden" name="interior_material" value="{{ params.get('interior_material','') }}">
             </div>
           </div>
         </div>

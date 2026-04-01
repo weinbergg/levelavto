@@ -24,7 +24,8 @@ def test_search_template_keeps_core_selects_clickable():
     assert '<select name="transmission">' in template
     assert '<select name="drive_type">' in template
     assert '<select name="engine_type">' in template
-    assert 'name="interior_design"' in template
+    assert 'name="interior_color"' in template
+    assert 'name="interior_material"' in template
 
 
 def test_js_updates_generation_visibility_and_select_disabled_state():
@@ -207,12 +208,14 @@ def test_catalog_and_search_interior_filters_use_chip_multiselect():
     catalog_template = _read("app/templates/catalog.html")
     search_template = _read("app/templates/search.html")
     script = _read("app/static/js/app.js")
-    assert 'data-chip-input="interior_design"' in catalog_template
-    assert 'data-chip-input="interior_design"' in search_template
-    assert 'Цвет и материал салона' in catalog_template
-    assert 'Цвет и материал салона' in search_template
+    assert 'data-chip-input="interior_color"' in catalog_template
+    assert 'data-chip-input="interior_material"' in catalog_template
+    assert 'data-chip-input="interior_color"' in search_template
+    assert 'data-chip-input="interior_material"' in search_template
+    assert 'Материал салона' in catalog_template
+    assert 'Цвет салона' in search_template
     assert 'data-region-chip-options' in search_template
-    assert 'parseSelectedCsvValues(value).forEach((trimValue)' in script
+    assert 'syncChoiceInputOptions' in script
 
 
 def test_search_page_uses_payload_on_initial_render_and_has_telegram_ping_tool():
@@ -269,3 +272,22 @@ def test_interior_filters_use_derived_text_fallback_from_payload_and_description
     assert "parse_interior_trim_token" in service
     assert "trim_token_conditions" in service
     assert 'field="color_group"' in pages
+
+
+def test_catalog_and_search_use_separate_interior_color_and_material_filters():
+    catalog_template = _read("app/templates/catalog.html")
+    search_template = _read("app/templates/search.html")
+    script = _read("app/static/js/app.js")
+    taxonomy = _read("app/utils/taxonomy.py")
+    css = _read("app/static/css/styles.css")
+    assert 'data-chip-input="interior_color"' in catalog_template
+    assert 'data-chip-input="interior_material"' in catalog_template
+    assert 'data-chip-input="interior_color"' in search_template
+    assert 'data-chip-input="interior_material"' in search_template
+    assert "Материал салона" in catalog_template
+    assert "Цвет салона" in search_template
+    assert "syncChoiceInputOptions" in script
+    assert "removeChoiceInput" in script
+    assert "interior_color_hex" in taxonomy
+    assert ".choice-chip--swatch" in css
+    assert ".choice-chip--checkbox" in css

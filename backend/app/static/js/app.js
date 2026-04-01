@@ -654,18 +654,39 @@
 
   function renderChoiceChips(container, items) {
     if (!container) return
+    const variant = container.dataset.chipVariant || ''
     container.replaceChildren()
     ;(items || []).forEach((item) => {
       if (!item || !item.value) return
       const chip = document.createElement('button')
       chip.type = 'button'
       chip.className = 'choice-chip'
+      if (variant === 'swatch') chip.classList.add('choice-chip--swatch')
+      if (variant === 'checkbox') chip.classList.add('choice-chip--checkbox')
       chip.dataset.value = item.value
       chip.dataset.label = item.label || item.value
+      if (variant) chip.dataset.chipVariant = variant
+      if (item.hex) chip.style.setProperty('--chip-color', item.hex)
       chip.textContent = item.label || item.value
       chip.setAttribute('aria-label', item.label || item.value)
       container.appendChild(chip)
     })
+  }
+
+  function syncChoiceInputOptions(scope, inputName, items) {
+    if (!scope || !inputName) return
+    const wrap = qs(`[data-chip-input="${inputName}"]`, scope)
+    if (!wrap) return
+    renderChoiceChips(wrap, items || [])
+    const input = qs(`input[name="${inputName}"]`, scope)
+    if (!input) return
+    const allowed = new Set((items || []).map((item) => item.value))
+    const selected = parseSelectedCsvValues(input)
+    if (!selected.length) return
+    const nextSelected = selected.filter((value) => allowed.has(value))
+    if (nextSelected.length !== selected.length) {
+      setSelectedCsvValues(input, nextSelected)
+    }
   }
 
   function syncChoiceChips(scope, inputName = '') {
@@ -902,6 +923,8 @@
     }
     const colorLabel = (value) => findColorChipLabel(form, value)
     const interiorLabel = (value) => findChoiceChipLabel(form, 'interior_design', value)
+    const interiorColorLabel = (value) => findChoiceChipLabel(form, 'interior_color', value)
+    const interiorMaterialLabel = (value) => findChoiceChipLabel(form, 'interior_material', value)
     const regMinYear = params.get('reg_year_min')
     const regMinMonth = params.get('reg_month_min')
     const regMaxYear = params.get('reg_year_max')
@@ -959,6 +982,31 @@
             label,
             value: interiorLabel(trimValue),
             removeChoice: trimValue,
+            removeChoiceInput: 'interior_design',
+          })
+        })
+        return
+      }
+      if (key === 'interior_color') {
+        parseSelectedCsvValues(value).forEach((colorValue) => {
+          chips.push({
+            key,
+            label,
+            value: interiorColorLabel(colorValue),
+            removeChoice: colorValue,
+            removeChoiceInput: 'interior_color',
+          })
+        })
+        return
+      }
+      if (key === 'interior_material') {
+        parseSelectedCsvValues(value).forEach((materialValue) => {
+          chips.push({
+            key,
+            label,
+            value: interiorMaterialLabel(materialValue),
+            removeChoice: materialValue,
+            removeChoiceInput: 'interior_material',
           })
         })
         return
@@ -990,7 +1038,7 @@
       return
     }
     container.innerHTML = ''
-    chips.forEach(({ key, keys, label, value, removeColor, removeChoice }) => {
+    chips.forEach(({ key, keys, label, value, removeColor, removeChoice, removeChoiceInput }) => {
       const chip = document.createElement('button')
       chip.type = 'button'
       chip.className = 'filter-chip'
@@ -1001,6 +1049,9 @@
       if (removeChoice) {
         chip.dataset.removeChoice = removeChoice
       }
+      if (removeChoiceInput) {
+        chip.dataset.removeChoiceInput = removeChoiceInput
+      }
       chip.addEventListener('click', () => {
         if (key === 'color' && value) {
           removeSelectedColor(form, chip.dataset.removeColor || '')
@@ -1008,8 +1059,8 @@
           loadCars(1, { scrollToTop: true })
           return
         }
-        if (key === 'interior_design' && chip.dataset.removeChoice) {
-          removeSelectedChoice(form, 'interior_design', chip.dataset.removeChoice || '')
+        if ((key === 'interior_design' || key === 'interior_color' || key === 'interior_material') && chip.dataset.removeChoice) {
+          removeSelectedChoice(form, chip.dataset.removeChoiceInput || key, chip.dataset.removeChoice || '')
           updateCatalogUrlFromParams(collectParams(1))
           loadCars(1, { scrollToTop: true })
           return
@@ -1037,9 +1088,9 @@
           syncColorChips(form)
           bindOtherColorsToggle(form)
         }
-        if (toClear.includes('interior_design')) {
-          syncChoiceChips(form, 'interior_design')
-        }
+        if (toClear.includes('interior_design')) syncChoiceChips(form, 'interior_design')
+        if (toClear.includes('interior_color')) syncChoiceChips(form, 'interior_color')
+        if (toClear.includes('interior_material')) syncChoiceChips(form, 'interior_material')
         updateCatalogUrlFromParams(collectParams(1))
         loadCars(1, { scrollToTop: true })
       })
@@ -1590,23 +1641,8 @@
         setSelectOptions(qs('[name="engine_type"]'), data.engine_types || [], { emptyLabel: 'Любое' })
         setSelectOptions(qs('[name="transmission"]'), data.transmissions || [], { emptyLabel: 'Любая' })
         setSelectOptions(qs('[name="drive_type"]'), data.drive_types || [], { emptyLabel: 'Любой' })
-        const interiorWrap = qs('[data-chip-input="interior_design"]', filtersForm)
-        if (interiorWrap) {
-          renderChoiceChips(interiorWrap, data.interior_design_options || [])
-          const interiorInput = qs('input[name="interior_design"]', filtersForm)
-          if (interiorInput) {
-            const allowed = new Set((data.interior_design_options || []).map((item) => item.value))
-            const selected = parseSelectedCsvValues(interiorInput)
-            if (selected.length) {
-              const nextSelected = selected.filter((value) => allowed.has(value))
-              if (nextSelected.length !== selected.length) {
-                setSelectedCsvValues(interiorInput, nextSelected)
-              }
-            }
-          }
-          bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }), 'interior_design')
-          syncChoiceChips(filtersForm, 'interior_design')
-        }
+        syncChoiceInputOptions(filtersForm, 'interior_color', data.interior_color_options || [])
+        syncChoiceInputOptions(filtersForm, 'interior_material', data.interior_material_options || [])
         setSelectOptions(qs('#reg-year-min'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         setSelectOptions(qs('#reg-year-max'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         const countrySelect = qs('#country')
@@ -1623,10 +1659,10 @@
           console.info('catalog: ctx loaded countries=' + (data.countries || []).length + ' kr_types=' + (data.kr_types || []).length)
         }
         bindColorChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
-        bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }), 'interior_design')
+        bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
         bindOtherColorsToggle(filtersForm)
         syncColorChips(filtersForm)
-        syncChoiceChips(filtersForm, 'interior_design')
+        syncChoiceChips(filtersForm)
       } catch (e) {
         console.warn('filters base', e)
       }
@@ -2798,6 +2834,8 @@
       setSelectOptions(qs('select[name="engine_type"]', form), Array.isArray(data.engine_types) ? data.engine_types : [], { emptyLabel: 'Любое' })
       setSelectOptions(qs('select[name="transmission"]', form), Array.isArray(data.transmissions) ? data.transmissions : [], { emptyLabel: 'Любая' })
       setSelectOptions(qs('select[name="drive_type"]', form), Array.isArray(data.drive_types) ? data.drive_types : [], { emptyLabel: 'Любой' })
+      syncChoiceInputOptions(form, 'interior_color', data.interior_color_options || [])
+      syncChoiceInputOptions(form, 'interior_material', data.interior_material_options || [])
       const colorInput = qs('input[name="color"]', form)
       const basicWrap = qs('.color-swatches--basic[data-color-chips]', form)
       const extraWrap = qs('#colors-extra-search[data-color-chips]', form)
@@ -2827,10 +2865,10 @@
       bindChoiceChips(form, () => {
         scheduleCount()
         scheduleOptionsRefresh()
-      }, 'interior_design')
+      })
       bindOtherColorsToggle(form)
       syncColorChips(form)
-      syncChoiceChips(form, 'interior_design')
+      syncChoiceChips(form)
       syncAdvancedGenerationVisibility()
     }
 
@@ -2956,8 +2994,8 @@
       bindChoiceChips(form, () => {
         scheduleCount()
         scheduleOptionsRefresh()
-      }, 'interior_design')
-      syncChoiceChips(form, 'interior_design')
+      })
+      syncChoiceChips(form)
     }
 
     const updateRegionSub = () => {
@@ -3462,9 +3500,9 @@
     bindChoiceChips(form, () => {
       scheduleCount()
       scheduleOptionsRefresh()
-    }, 'interior_design')
+    })
     bindOtherColorsToggle(form)
-    syncChoiceChips(form, 'interior_design')
+    syncChoiceChips(form)
     const ctrls = qsa('input, select', form)
     ctrls.forEach((el) => {
       el.addEventListener('change', () => {

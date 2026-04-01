@@ -288,6 +288,7 @@ _INTERIOR_COLOR_LABELS: Dict[str, str] = {
     "brown": "Коричневый",
     "purple": "Фиолетовый",
     "pink": "Розовый",
+    "other": "Прочее",
 }
 
 _INTERIOR_COLOR_KEYWORDS: Dict[str, Tuple[str, ...]] = {
@@ -313,6 +314,7 @@ _INTERIOR_COLOR_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "brown": ("brown", "braun", "marron", "коричн", "шокол", "кофе"),
     "purple": ("purple", "violet", "lila", "фиолет", "пурпур"),
     "pink": ("pink", "rose", "rosa", "роз"),
+    "other": ("other", "multicolor", "rainbow", "прочее", "другое", "не указано"),
 }
 
 _INTERIOR_MATERIAL_LABELS: Dict[str, str] = {
@@ -325,7 +327,7 @@ _INTERIOR_MATERIAL_LABELS: Dict[str, str] = {
     "suede": "Замша",
     "microfiber": "Микрофибра",
     "vinyl": "Винил",
-    "other": "Другое",
+    "other": "Прочее",
 }
 
 _INTERIOR_MATERIAL_KEYWORDS: Dict[str, Tuple[str, ...]] = {
@@ -407,6 +409,40 @@ def interior_material_label(value: Optional[str]) -> Optional[str]:
     if not key:
         return None
     return _INTERIOR_MATERIAL_LABELS.get(key)
+
+
+_INTERIOR_COLOR_HEX: Dict[str, str] = {
+    "anthracite": "#4a4e57",
+    "charcoal": "#2f3137",
+    "cognac": "#8a562a",
+    "camel": "#b08d57",
+    "taupe": "#8b7f74",
+    "tan": "#c4a06b",
+    "ivory": "#e8dfcf",
+    "cream": "#ede2c8",
+    "burgundy": "#8a1f2d",
+    "black": "#151515",
+    "white": "#f4f4f1",
+    "gray": "#8f8f92",
+    "silver": "#b7b8bc",
+    "blue": "#2451b8",
+    "red": "#c62828",
+    "green": "#3d8a51",
+    "yellow": "#d7ae38",
+    "orange": "#d47a28",
+    "beige": "#cdb27b",
+    "brown": "#6f4b1f",
+    "purple": "#7c4bcf",
+    "pink": "#d26c96",
+    "other": "#8c94a3",
+}
+
+
+def interior_color_hex(value: Optional[str]) -> Optional[str]:
+    key = interior_color_key(value)
+    if not key:
+        return None
+    return _INTERIOR_COLOR_HEX.get(key)
 
 
 def interior_color_aliases(value: Optional[str]) -> List[str]:
@@ -506,8 +542,7 @@ def build_interior_trim_options(values: List[Any]) -> List[Dict[str, str]]:
 
 
 def build_interior_options(values: List[Any], kind: str) -> List[Dict[str, str]]:
-    items: List[Dict[str, str]] = []
-    seen: Set[str] = set()
+    buckets: Dict[str, Dict[str, str]] = {}
     if kind == "color":
         key_fn = interior_color_key
         label_fn = interior_color_label
@@ -518,10 +553,20 @@ def build_interior_options(values: List[Any], kind: str) -> List[Dict[str, str]]
         order = _INTERIOR_MATERIAL_ORDER
     for value in values or []:
         key = key_fn(value)
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        items.append({"value": key, "label": label_fn(key) or key})
+        if not key:
+            raw = _normalize_interior_text(str(value or ""))
+            if not raw:
+                continue
+            key = "other"
+        entry = buckets.get(key)
+        if entry is None:
+            entry = {"value": key, "label": label_fn(key) or key}
+            if kind == "color":
+                color_hex_value = interior_color_hex(key)
+                if color_hex_value:
+                    entry["hex"] = color_hex_value
+            buckets[key] = entry
+    items = list(buckets.values())
     order_index = {key: idx for idx, key in enumerate(order)}
     items.sort(key=lambda item: (order_index.get(item["value"], 999), item["label"].casefold()))
     return items
