@@ -6,6 +6,9 @@ cd "$ROOT_DIR"
 
 echo "[mobilede_pipeline] start $(date -Iseconds)"
 
+echo "[mobilede_pipeline] step=ensure_services"
+docker compose up -d db redis web
+
 echo "[mobilede_pipeline] step=mobilede_daily"
 DAILY_ARGS=()
 RUN_ENV_ARGS=()
