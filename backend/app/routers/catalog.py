@@ -14,6 +14,7 @@ from ..schemas import CarDetailOut
 from ..utils.country_map import resolve_display_country, normalize_country_code, country_label_ru
 from ..utils.taxonomy import (
     build_body_type_options,
+    build_engine_type_options,
     normalize_fuel,
     normalize_color,
     ru_fuel,
@@ -1231,6 +1232,7 @@ def filter_ctx_base(
             or "interior_color_options" not in cached
             or "interior_material_options" not in cached
             or cached.get("_color_source") != "color_group"
+            or cached.get("_engine_type_source") != "normalized"
         ):
             cached = None
         else:
@@ -1276,17 +1278,7 @@ def filter_ctx_base(
         [int(r["value"]) for r in service.facet_counts(field="reg_year", filters=base_filters) if r.get("value")],
         reverse=True,
     )
-    engine_types = _sort_by_label(
-        [
-            {
-                "value": v["value"],
-                "label": translate_payload_value("engine_type", v["value"]) or v["value"],
-                "count": v.get("count", 0),
-            }
-            for v in service.facet_counts(field="engine_type", filters=base_filters)
-            if v.get("value")
-        ]
-    )
+    engine_types = _sort_by_label(build_engine_type_options(service.facet_counts(field="engine_type", filters=base_filters)))
     transmissions = _sort_by_label(
         [
             {
@@ -1314,6 +1306,7 @@ def filter_ctx_base(
     interior_payload = service.payload_values_bulk_filtered(["interior_design"], **base_filters)
     payload = {
         "_color_source": "color_group",
+        "_engine_type_source": "normalized",
         "regions": regions,
         "countries": countries,
         "country_labels": country_labels,
@@ -1553,6 +1546,8 @@ def filter_payload(
             "interior_design_options_eu" in cached
             and "interior_color_options_eu" in cached
             and "interior_material_options_eu" in cached
+            and "reg_years" in cached
+            and cached.get("_engine_type_source") == "normalized"
         ):
             if timing_enabled:
                 print("FILTER_PAYLOAD_CACHE hit=1 source=redis payload_total_ms=0.0", flush=True)
@@ -1650,17 +1645,7 @@ def filter_payload(
             if row.get("value")
         ]
     )
-    engine_types = _sort_by_label(
-        [
-            {
-                "value": row["value"],
-                "label": translate_payload_value("engine_type", row["value"]) or row["value"],
-                "count": row.get("count", 0),
-            }
-            for row in service.facet_counts_filtered(field="engine_type", **common_filters)
-            if row.get("value")
-        ]
-    )
+    engine_types = _sort_by_label(build_engine_type_options(service.facet_counts_filtered(field="engine_type", **common_filters)))
     transmissions = _sort_by_label(
         [
             {
@@ -1684,7 +1669,16 @@ def filter_payload(
         ]
     )
     colors_basic, colors_other = _split_colors(service.facet_counts_filtered(field="color_group", **common_filters))
+    reg_years = sorted(
+        [
+            int(row["value"])
+            for row in service.facet_counts_filtered(field="reg_year", **common_filters)
+            if row.get("value")
+        ],
+        reverse=True,
+    )
     data = {
+        "_engine_type_source": "normalized",
         "brands": brands,
         "countries": countries,
         "body_types": body_types,
@@ -1694,6 +1688,8 @@ def filter_payload(
         "drive_types": drive_types,
         "colors_basic": colors_basic,
         "colors_other": colors_other,
+        "reg_years": reg_years,
+        "reg_months": [{"value": i + 1, "label": m} for i, m in enumerate(["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"])],
         "seats_options_eu": build_labeled_options(_sort_numeric_strings(eu_payload.get("num_seats", [])), "num_seats"),
         "doors_options_eu": build_labeled_options(_sort_numeric_strings(eu_payload.get("doors_count", [])), "doors_count"),
         "owners_options_eu": build_labeled_options(_sort_numeric_strings(eu_payload.get("owners_count", [])), "owners_count"),

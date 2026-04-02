@@ -284,7 +284,7 @@
         {% for line in params.getlist('line') %}
         <input type="hidden" name="line" value="{{ line }}" data-catalog-line="1">
         {% endfor %}
-        {% set adv_keys = ['num_seats','doors_count','emission_class','efficiency_class','climatisation','airbags','interior_color','interior_material','vat_reclaimable','price_rating_label','owners_count'] %}
+        {% set adv_keys = ['num_seats','doors_count','emission_class','efficiency_class','climatisation','airbags','vat_reclaimable','price_rating_label','owners_count'] %}
         {% for key in adv_keys %}
           {% if params.get(key) %}
           <input type="hidden" name="{{ key }}" value="{{ params.get(key) }}">
@@ -407,6 +407,8 @@
                 <div class="car-card__price">
                   {% if car.display_price_rub %}
                     <div class="price-main">{{ '{:,.0f}'.format(car.display_price_rub).replace(',', ' ') }} ₽</div>
+                  {% elif car.price %}
+                    <div class="price-main">{{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}</div>
                   {% else %}
                     <div class="price-main">—</div>
                   {% endif %}

@@ -522,6 +522,7 @@
       }
     })
     syncColorChips(form)
+    syncChoiceChips(form)
     syncRegMonthState(form)
   }
 
@@ -1044,7 +1045,10 @@
       const chip = document.createElement('button')
       chip.type = 'button'
       chip.className = 'filter-chip'
-      chip.innerHTML = `<span>${label}: ${value}</span><span class="chip-close">×</span>`
+      const summaryOnly = Boolean(removeColor || removeChoice)
+      chip.innerHTML = summaryOnly
+        ? `<span>${label}: ${value}</span>`
+        : `<span>${label}: ${value}</span><span class="chip-close">×</span>`
       if (removeColor) {
         chip.dataset.removeColor = removeColor
       }
@@ -1053,6 +1057,12 @@
       }
       if (removeChoiceInput) {
         chip.dataset.removeChoiceInput = removeChoiceInput
+      }
+      if (summaryOnly) {
+        chip.style.cursor = 'default'
+        chip.setAttribute('aria-disabled', 'true')
+        container.appendChild(chip)
+        return
       }
       chip.addEventListener('click', () => {
         if (key === 'color' && value) {
@@ -1425,6 +1435,13 @@
         const more = (photosCount && photosCount > 1 && car.thumbnail_url) ? `<span class="more-badge">+${photosCount - 1} фото</span>` : ''
         const displayRub = car.display_price_rub
         let priceText = displayRub != null ? formatRub(displayRub) : ''
+        if (!priceText && car.price != null) {
+          const rawPrice = Number(car.price)
+          if (Number.isFinite(rawPrice)) {
+            const cur = String(car.currency || '').trim().toUpperCase()
+            priceText = `${rawPrice.toLocaleString('ru-RU')} ${cur || ''}`.trim()
+          }
+        }
         if (!priceText) priceText = '—'
         const calcLine = `<div class="price-main">${priceText}</div>`
         const priceLines = []
@@ -1664,8 +1681,12 @@
         }
         const basic = qs('.color-swatches--basic')
         const extra = qs('#colors-extra-catalog')
-        renderColorChips(basic, data.colors_basic || [])
-        renderColorChips(extra, data.colors_other || [])
+        if (basic && ((data.colors_basic || []).length || !basic.children.length)) {
+          renderColorChips(basic, data.colors_basic || [])
+        }
+        if (extra && ((data.colors_other || []).length || !extra.children.length)) {
+          renderColorChips(extra, data.colors_other || [])
+        }
         if (DEBUG_FILTERS) {
           console.info('catalog: ctx loaded countries=' + (data.countries || []).length + ' kr_types=' + (data.kr_types || []).length)
         }
@@ -2870,22 +2891,25 @@
       setSelectOptions(qs('select[name="engine_type"]', form), Array.isArray(data.engine_types) ? data.engine_types : [], { emptyLabel: 'Любое' })
       setSelectOptions(qs('select[name="transmission"]', form), Array.isArray(data.transmissions) ? data.transmissions : [], { emptyLabel: 'Любая' })
       setSelectOptions(qs('select[name="drive_type"]', form), Array.isArray(data.drive_types) ? data.drive_types : [], { emptyLabel: 'Любой' })
-      syncChoiceInputOptions(form, 'interior_color', data.interior_color_options || [])
-      syncChoiceInputOptions(form, 'interior_material', data.interior_material_options || [])
+      if (Array.isArray(data.reg_years) && data.reg_years.length) {
+        setSelectOptions(qs('#reg-year-min', form), data.reg_years, { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
+        setSelectOptions(qs('#reg-year-max', form), data.reg_years, { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
+      }
       const colorInput = qs('input[name="color"]', form)
       const basicWrap = qs('.color-swatches--basic[data-color-chips]', form)
       const extraWrap = qs('#colors-extra-search[data-color-chips]', form)
       const toggle = qs('[data-colors-toggle][data-target="colors-extra-search"]', form)
       const basic = Array.isArray(data.colors_basic) ? data.colors_basic : []
       const extra = Array.isArray(data.colors_other) ? data.colors_other : []
-      if (basicWrap) rebuildColorChipGroup(basicWrap, basic)
-      if (extraWrap) rebuildColorChipGroup(extraWrap, extra)
+      if (basicWrap && (basic.length || !basicWrap.children.length)) rebuildColorChipGroup(basicWrap, basic)
+      if (extraWrap && (extra.length || !extraWrap.children.length)) rebuildColorChipGroup(extraWrap, extra)
       if (toggle) {
-        toggle.classList.toggle('is-hidden', extra.length === 0)
-        if (!extra.length) toggle.setAttribute('aria-expanded', 'false')
+        const renderedExtraCount = extra.length || qsa('.color-chip', extraWrap || form).length
+        toggle.classList.toggle('is-hidden', renderedExtraCount === 0)
+        if (renderedExtraCount === 0) toggle.setAttribute('aria-expanded', 'false')
       }
       if (colorInput) {
-        const allowed = new Set([...basic, ...extra].map((item) => item.value))
+        const allowed = new Set(qsa('.color-chip', form).map((item) => item.dataset.color || '').filter(Boolean))
         const selected = parseSelectedColorValues(colorInput)
         if (selected.length) {
           const nextSelected = selected.filter((value) => allowed.has(value))
@@ -3437,6 +3461,13 @@
           const origThumb = normalizeThumbUrl(thumbRaw)
           const displayRub = car.display_price_rub
           let price = displayRub != null ? formatRub(displayRub) : ''
+          if (!price && car.price != null) {
+            const rawPrice = Number(car.price)
+            if (Number.isFinite(rawPrice)) {
+              const cur = String(car.currency || '').trim().toUpperCase()
+              price = `${rawPrice.toLocaleString('ru-RU')} ${cur || ''}`.trim()
+            }
+          }
           if (!price) price = '—'
           const priceNote = car.price_note ? `<div class="price-note">${escapeHtml(car.price_note)}</div>` : ''
           const variantLine = car.variant ? `<div class="car-card__subtitle">${escapeHtml(car.variant)}</div>` : ''

@@ -839,3 +839,24 @@ def build_labeled_options(values: List[Any], field: str) -> List[Dict[str, str]]
             }
         )
     return out
+
+
+def build_engine_type_options(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    agg: Dict[str, Dict[str, Any]] = {}
+    for row in rows or []:
+        raw = str((row or {}).get("value") or "").strip()
+        if not raw:
+            continue
+        normalized = normalize_fuel(raw)
+        if not normalized or not re.search(r"[a-zа-я]", normalized, re.IGNORECASE):
+            continue
+        entry = agg.get(normalized)
+        if entry is None:
+            entry = {
+                "value": normalized,
+                "label": ru_fuel(normalized) or translate_payload_value("engine_type", raw) or raw,
+                "count": 0,
+            }
+            agg[normalized] = entry
+        entry["count"] += int((row or {}).get("count") or 0)
+    return list(agg.values())

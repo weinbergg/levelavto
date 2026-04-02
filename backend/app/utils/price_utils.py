@@ -4,6 +4,7 @@ from typing import Optional
 
 PRICE_NOTE_WITHOUT_UTIL = "*Без учета утилизационного сбора РФ"
 PRICE_NOTE_EUROPE = "Цена в Европе"
+PRICE_NOTE_MOSCOW = "Цена в Москве"
 
 
 def get_round_step_rub() -> int:
@@ -58,11 +59,11 @@ def price_without_util_note(
     if is_korea:
         if has_without_util_marker or total_price_rub_cached is None:
             return PRICE_NOTE_WITHOUT_UTIL
-        return None
+        return PRICE_NOTE_MOSCOW
     if has_without_util_marker:
         return PRICE_NOTE_EUROPE
     if total_price_rub_cached is not None:
-        return None
+        return PRICE_NOTE_MOSCOW
     if reg == "EU":
         return PRICE_NOTE_EUROPE
     if not reg and c and c != "RU" and not c.startswith("KR"):

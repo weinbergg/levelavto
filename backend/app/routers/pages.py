@@ -39,6 +39,7 @@ from urllib.parse import quote, urlparse, parse_qs, unquote
 from ..utils.localization import display_body, display_color
 from ..utils.taxonomy import (
     build_body_type_options,
+    build_engine_type_options,
     ru_body,
     ru_color,
     ru_fuel,
@@ -527,14 +528,7 @@ def _build_filter_context(
     if timing_enabled:
         print(f"FILTER_CTX_STAGE name=brands ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     t0 = time.perf_counter()
-    engine_types = [
-        {
-            "value": v["value"],
-            "label": translate_payload_value("engine_type", v["value"]) or v["value"],
-            "count": v["count"],
-        }
-        for v in service.facet_counts(field="engine_type", filters=facet_filters)
-    ]
+    engine_types = build_engine_type_options(service.facet_counts(field="engine_type", filters=facet_filters))
     if timing_enabled:
         print(f"FILTER_CTX_STAGE name=engine_types ms={(time.perf_counter()-t0)*1000:.2f}", flush=True)
     t0 = time.perf_counter()
@@ -576,6 +570,7 @@ def _build_filter_context(
         "engine_types": engine_types,
         "transmissions": transmissions,
         "drive_types": drive_types,
+        "_engine_type_source": "normalized",
         "seats_options": seats_options,
         "doors_options": doors_options,
         "owners_options": owners_options,
@@ -635,6 +630,7 @@ def _load_cached_filter_ctx_base(params: Optional[Dict[str, Any]] = None) -> Opt
         or "transmissions" not in cached
         or "drive_types" not in cached
         or cached.get("_color_source") != "color_group"
+        or cached.get("_engine_type_source") != "normalized"
     ):
         return None
     return cached
@@ -647,11 +643,11 @@ def _search_ssr_filter_context(
 ) -> tuple[Dict[str, Any], int, str, str]:
     full_cache_key = build_filter_ctx_key(params, include_payload=True)
     full_cached = redis_get_json(full_cache_key)
-    if full_cached:
+    if full_cached and full_cached.get("_engine_type_source") == "normalized":
         return {**full_cached, "payload_deferred": False}, 1, "redis", full_cache_key
 
     fallback_cached = _FILTER_CTX_CACHE.get(full_cache_key)
-    if fallback_cached:
+    if fallback_cached and fallback_cached.get("_engine_type_source") == "normalized":
         return {**fallback_cached, "payload_deferred": False}, 1, "fallback", full_cache_key
 
     base_cached = _load_cached_filter_ctx_base(params)
@@ -728,6 +724,7 @@ def _search_ssr_filter_context(
             "price_rating_labels_kr": [],
             "has_air_suspension": service.has_air_suspension(),
             "payload_deferred": True,
+            "_engine_type_source": "normalized",
         }
         return ctx, 0, "base_redis", build_filter_ctx_base_key(normalize_filter_params({"region": params.get("region"), "country": params.get("country")}))
 
@@ -1377,6 +1374,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     cached_colors_other = (base_ctx_cached or {}).get("colors_other") or []
     cached_interior_color_options = (base_ctx_cached or {}).get("interior_color_options") or []
     cached_interior_material_options = (base_ctx_cached or {}).get("interior_material_options") or []
+    cached_reg_years = [int(v) for v in (base_ctx_cached or {}).get("reg_years") or [] if v not in (None, "")]
     def _int_val(key: str) -> Optional[int]:
         raw = params.get(key)
         if raw is None or raw == "":
@@ -1523,6 +1521,29 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         logger.exception("catalog_initial_items_failed")
     t0 = time.perf_counter()
     fx_rates = service.get_fx_rates(allow_fetch=False) or {}
+    fx_eur = float(fx_rates.get("EUR") or 0)
+    fx_usd = float(fx_rates.get("USD") or 0)
+    if isinstance(initial_items, list):
+        for c in initial_items:
+            if not isinstance(c, dict) or c.get("display_price_rub") is not None or c.get("price") is None:
+                continue
+            cur = str(c.get("currency") or "").upper()
+            try:
+                if cur == "EUR" and fx_eur > 0:
+                    c["display_price_rub"] = display_price_rub(None, float(c.get("price")) * fx_eur, allow_price_fallback=True)
+                elif cur == "USD" and fx_usd > 0:
+                    c["display_price_rub"] = display_price_rub(None, float(c.get("price")) * fx_usd, allow_price_fallback=True)
+                elif cur in {"RUB", "₽"}:
+                    c["display_price_rub"] = display_price_rub(None, float(c.get("price")), allow_price_fallback=True)
+                c["price_note"] = price_without_util_note(
+                    display_price=c.get("display_price_rub"),
+                    total_price_rub_cached=c.get("total_price_rub_cached"),
+                    calc_breakdown=c.get("calc_breakdown_json"),
+                    region=params.get("region"),
+                    country=c.get("country"),
+                )
+            except Exception:
+                continue
     timing["fx_rates_ms"] = (time.perf_counter() - t0) * 1000
     t0 = time.perf_counter()
     contact_content = ContentService(db).content_map(
@@ -1571,7 +1592,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "countries": countries,
             "country_labels": country_labels,
             "kr_types": kr_types,
-            "reg_years": [],
+            "reg_years": cached_reg_years,
             "reg_months": reg_months,
             "price_options": [],
             "mileage_options": [],

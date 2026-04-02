@@ -47,6 +47,8 @@ def test_filter_payload_includes_dynamic_brand_options():
     assert 'field="brand"' in router
     assert '"brands": brands' in router
     assert 'field="color_group"' in router
+    assert '"reg_years": reg_years' in router
+    assert '"_engine_type_source": "normalized"' in router
     assert '"interior_design_options_eu": build_interior_trim_options' in router
     assert '"interior_color_options_eu": build_interior_options' in router
     assert '"interior_material_options_eu": build_interior_options' in router
@@ -84,7 +86,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=87' in template
+    assert '/static/js/app.js?v=88' in template
     assert '/static/css/styles.css?v=49' in template
 
 
@@ -92,6 +94,15 @@ def test_search_page_passes_payload_deferred_flag():
     router = _read("app/routers/pages.py")
     assert '"payload_deferred": bool(filter_ctx.get("payload_deferred"))' in router
     assert '"payload_deferred": True' in router
+    assert '"_engine_type_source": "normalized"' in router
+
+
+def test_catalog_template_does_not_duplicate_visible_interior_hidden_inputs():
+    template = _read("app/templates/catalog.html")
+    assert "data-chip-input=\"interior_color\"" in template
+    assert "data-chip-input=\"interior_material\"" in template
+    assert "'interior_color'" not in template.split("{% set adv_keys = ", 1)[1].split("%}", 1)[0]
+    assert "'interior_material'" not in template.split("{% set adv_keys = ", 1)[1].split("%}", 1)[0]
 
 
 def test_home_search_uses_line_params_and_js_submit():
