@@ -26,6 +26,8 @@ def test_search_template_keeps_core_selects_clickable():
     assert '<select name="engine_type">' in template
     assert 'name="interior_color"' in template
     assert 'name="interior_material"' in template
+    assert "payload_deferred or (interior_color_options_eu" in template
+    assert 'data-has-eu="{{ 1 if payload_deferred or (seats_options_eu' in template
 
 
 def test_js_updates_generation_visibility_and_select_disabled_state():
@@ -84,6 +86,12 @@ def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
     assert '/static/js/app.js?v=87' in template
     assert '/static/css/styles.css?v=49' in template
+
+
+def test_search_page_passes_payload_deferred_flag():
+    router = _read("app/routers/pages.py")
+    assert '"payload_deferred": bool(filter_ctx.get("payload_deferred"))' in router
+    assert '"payload_deferred": True' in router
 
 
 def test_home_search_uses_line_params_and_js_submit():

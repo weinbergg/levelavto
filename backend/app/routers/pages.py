@@ -648,11 +648,11 @@ def _search_ssr_filter_context(
     full_cache_key = build_filter_ctx_key(params, include_payload=True)
     full_cached = redis_get_json(full_cache_key)
     if full_cached:
-        return full_cached, 1, "redis", full_cache_key
+        return {**full_cached, "payload_deferred": False}, 1, "redis", full_cache_key
 
     fallback_cached = _FILTER_CTX_CACHE.get(full_cache_key)
     if fallback_cached:
-        return fallback_cached, 1, "fallback", full_cache_key
+        return {**fallback_cached, "payload_deferred": False}, 1, "fallback", full_cache_key
 
     base_cached = _load_cached_filter_ctx_base(params)
     if base_cached:
@@ -727,10 +727,12 @@ def _search_ssr_filter_context(
             "interior_material_options_kr": [],
             "price_rating_labels_kr": [],
             "has_air_suspension": service.has_air_suspension(),
+            "payload_deferred": True,
         }
         return ctx, 0, "base_redis", build_filter_ctx_base_key(normalize_filter_params({"region": params.get("region"), "country": params.get("country")}))
 
     base_ctx = _build_filter_context(service, db, include_payload=False, params=params)
+    base_ctx["payload_deferred"] = True
     return base_ctx, 0, "base_fallback", build_filter_ctx_key(params, include_payload=False)
 
 
@@ -1694,6 +1696,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "interior_material_options_kr": filter_ctx.get("interior_material_options_kr") or [],
             "price_rating_labels_kr": filter_ctx["price_rating_labels_kr"],
             "has_air_suspension": filter_ctx["has_air_suspension"],
+            "payload_deferred": bool(filter_ctx.get("payload_deferred")),
             "content": contact_content,
             "contact_phone": contact_content.get("contact_phone"),
             "contact_email": contact_content.get("contact_email"),

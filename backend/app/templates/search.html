@@ -306,10 +306,10 @@
         </div>
       </section>
 
-      {% set interior_color_has_eu = interior_color_options_eu and interior_color_options_eu|length > 0 %}
-      {% set interior_color_has_kr = interior_color_options_kr and interior_color_options_kr|length > 0 %}
-      {% set interior_material_has_eu = interior_material_options_eu and interior_material_options_eu|length > 0 %}
-      {% set interior_material_has_kr = interior_material_options_kr and interior_material_options_kr|length > 0 %}
+      {% set interior_color_has_eu = payload_deferred or (interior_color_options_eu and interior_color_options_eu|length > 0) %}
+      {% set interior_color_has_kr = payload_deferred or (interior_color_options_kr and interior_color_options_kr|length > 0) %}
+      {% set interior_material_has_eu = payload_deferred or (interior_material_options_eu and interior_material_options_eu|length > 0) %}
+      {% set interior_material_has_kr = payload_deferred or (interior_material_options_kr and interior_material_options_kr|length > 0) %}
       {% set interior_has_eu = interior_color_has_eu or interior_material_has_eu %}
       {% set interior_has_kr = interior_color_has_kr or interior_material_has_kr %}
       <section class="advanced-section" id="advanced-interior" data-has-eu="{{ 1 if interior_has_eu else 0 }}" data-has-kr="{{ 1 if interior_has_kr else 0 }}">
@@ -367,13 +367,13 @@
         </div>
       </section>
 
-      {% set details_has_eu = (seats_options_eu and seats_options_eu|length > 0) or (doors_options_eu and doors_options_eu|length > 0) or (owners_options_eu and owners_options_eu|length > 0) or (climatisation_options_eu and climatisation_options_eu|length > 0) or (airbags_options_eu and airbags_options_eu|length > 0) or (emission_classes_eu and emission_classes_eu|length > 0) or (efficiency_classes_eu and efficiency_classes_eu|length > 0) or (price_rating_labels_eu and price_rating_labels_eu|length > 0) %}
-      {% set details_has_kr = (seats_options_kr and seats_options_kr|length > 0) or (doors_options_kr and doors_options_kr|length > 0) or (owners_options_kr and owners_options_kr|length > 0) or (climatisation_options_kr and climatisation_options_kr|length > 0) or (airbags_options_kr and airbags_options_kr|length > 0) or (emission_classes_kr and emission_classes_kr|length > 0) or (efficiency_classes_kr and efficiency_classes_kr|length > 0) or (price_rating_labels_kr and price_rating_labels_kr|length > 0) %}
+      {% set details_has_eu = payload_deferred or (seats_options_eu and seats_options_eu|length > 0) or (doors_options_eu and doors_options_eu|length > 0) or (owners_options_eu and owners_options_eu|length > 0) or (climatisation_options_eu and climatisation_options_eu|length > 0) or (airbags_options_eu and airbags_options_eu|length > 0) or (emission_classes_eu and emission_classes_eu|length > 0) or (efficiency_classes_eu and efficiency_classes_eu|length > 0) or (price_rating_labels_eu and price_rating_labels_eu|length > 0) %}
+      {% set details_has_kr = payload_deferred or (seats_options_kr and seats_options_kr|length > 0) or (doors_options_kr and doors_options_kr|length > 0) or (owners_options_kr and owners_options_kr|length > 0) or (climatisation_options_kr and climatisation_options_kr|length > 0) or (airbags_options_kr and airbags_options_kr|length > 0) or (emission_classes_kr and emission_classes_kr|length > 0) or (efficiency_classes_kr and efficiency_classes_kr|length > 0) or (price_rating_labels_kr and price_rating_labels_kr|length > 0) %}
       <section class="advanced-section" id="advanced-details" data-has-eu="{{ 1 if details_has_eu else 0 }}" data-has-kr="{{ 1 if details_has_kr else 0 }}">
         <h2 class="advanced-section__title">Детали предложения</h2>
         <div class="search-filters">
           <div class="filters-primary-grid advanced-grid">
-            <label class="field" data-has-eu="{{ 1 if (seats_options_eu and seats_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (seats_options_kr and seats_options_kr|length > 0) else 0 }}">Количество мест
+            <label class="field" data-has-eu="{{ 1 if payload_deferred or (seats_options_eu and seats_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if payload_deferred or (seats_options_kr and seats_options_kr|length > 0) else 0 }}">Количество мест
               <select
                 name="num_seats"
                 data-region-options
@@ -386,7 +386,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label class="field" data-has-eu="{{ 1 if (doors_options_eu and doors_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (doors_options_kr and doors_options_kr|length > 0) else 0 }}">Количество дверей
+            <label class="field" data-has-eu="{{ 1 if payload_deferred or (doors_options_eu and doors_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if payload_deferred or (doors_options_kr and doors_options_kr|length > 0) else 0 }}">Количество дверей
               <select
                 name="doors_count"
                 data-region-options
@@ -399,7 +399,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label class="field" data-has-eu="{{ 1 if (owners_options_eu and owners_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (owners_options_kr and owners_options_kr|length > 0) else 0 }}">Количество владельцев
+            <label class="field" data-has-eu="{{ 1 if payload_deferred or (owners_options_eu and owners_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if payload_deferred or (owners_options_kr and owners_options_kr|length > 0) else 0 }}">Количество владельцев
               <select
                 name="owners_count"
                 data-region-options
@@ -412,7 +412,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label class="field" data-has-eu="{{ 1 if (climatisation_options_eu and climatisation_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (climatisation_options_kr and climatisation_options_kr|length > 0) else 0 }}">Климат
+            <label class="field" data-has-eu="{{ 1 if payload_deferred or (climatisation_options_eu and climatisation_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if payload_deferred or (climatisation_options_kr and climatisation_options_kr|length > 0) else 0 }}">Климат
               <select
                 name="climatisation"
                 data-region-options
@@ -425,7 +425,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label class="field" data-has-eu="{{ 1 if (airbags_options_eu and airbags_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (airbags_options_kr and airbags_options_kr|length > 0) else 0 }}">Подушки безопасности
+            <label class="field" data-has-eu="{{ 1 if payload_deferred or (airbags_options_eu and airbags_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if payload_deferred or (airbags_options_kr and airbags_options_kr|length > 0) else 0 }}">Подушки безопасности
               <select
                 name="airbags"
                 data-region-options
@@ -438,7 +438,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label class="field" data-has-eu="{{ 1 if (emission_classes_eu and emission_classes_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (emission_classes_kr and emission_classes_kr|length > 0) else 0 }}">Экокласс
+            <label class="field" data-has-eu="{{ 1 if payload_deferred or (emission_classes_eu and emission_classes_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if payload_deferred or (emission_classes_kr and emission_classes_kr|length > 0) else 0 }}">Экокласс
               <select
                 name="emission_class"
                 data-region-options
@@ -451,7 +451,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label class="field" data-has-eu="{{ 1 if (efficiency_classes_eu and efficiency_classes_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (efficiency_classes_kr and efficiency_classes_kr|length > 0) else 0 }}">Класс эффективности
+            <label class="field" data-has-eu="{{ 1 if payload_deferred or (efficiency_classes_eu and efficiency_classes_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if payload_deferred or (efficiency_classes_kr and efficiency_classes_kr|length > 0) else 0 }}">Класс эффективности
               <select
                 name="efficiency_class"
                 data-region-options
@@ -464,7 +464,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label class="field" data-has-eu="{{ 1 if (price_rating_labels_eu and price_rating_labels_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (price_rating_labels_kr and price_rating_labels_kr|length > 0) else 0 }}">Оценка цены
+            <label class="field" data-has-eu="{{ 1 if payload_deferred or (price_rating_labels_eu and price_rating_labels_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if payload_deferred or (price_rating_labels_kr and price_rating_labels_kr|length > 0) else 0 }}">Оценка цены
               <select
                 name="price_rating_label"
                 data-region-options
