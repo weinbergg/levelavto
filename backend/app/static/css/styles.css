@@ -1496,6 +1496,7 @@ body.filters-open {
 }
 .filters-primary-grid label {
   line-height: 1.2;
+  min-width: 0;
 }
 .filters-range {
   grid-column: 1 / -1;
@@ -1702,6 +1703,9 @@ body.filters-open {
 .advanced-row .field {
   display: grid;
   gap: 6px;
+  min-width: 0;
+}
+.search-filters label {
   min-width: 0;
 }
 .field-pair {
@@ -2184,6 +2188,10 @@ input[type="number"]::-webkit-outer-spin-button {
   color: var(--text-1);
   font: inherit;
   line-height: 1.2;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
   position: relative;
 }
 .color-chip:hover {
@@ -2235,6 +2243,10 @@ input[type="number"]::-webkit-outer-spin-button {
   color: var(--text-1);
   font: inherit;
   line-height: 1.2;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
 }
@@ -2261,6 +2273,7 @@ input[type="number"]::-webkit-outer-spin-button {
   gap: 8px;
   border: 1px solid transparent;
   background: transparent;
+  max-width: 100%;
 }
 .choice-chip--swatch::before {
   content: "";
@@ -2291,6 +2304,7 @@ input[type="number"]::-webkit-outer-spin-button {
   gap: 8px;
   border: none;
   background: transparent;
+  max-width: 100%;
 }
 .choice-chip--checkbox::before {
   content: "";
@@ -3851,6 +3865,18 @@ select:focus {
   }
 }
 @media (max-width: 720px) {
+  .filters-panel input,
+  .filters-panel select,
+  .filters-panel textarea,
+  .search-filters input,
+  .search-filters select,
+  .search-filters textarea,
+  .field input,
+  .field select {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
   .filters-primary-grid,
   .filters-row,
   .filters-range,
@@ -3875,5 +3901,10 @@ select:focus {
   }
   .color-chip {
     padding: 6px 9px 6px 6px;
+  }
+  .choice-chips,
+  .color-swatches {
+    min-width: 0;
+    max-width: 100%;
   }
 }
