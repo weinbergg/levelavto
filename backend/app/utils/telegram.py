@@ -65,6 +65,11 @@ def send_telegram_message(token: str, chat_id: str, text: str) -> bool:
         return False
 
 
+def telegram_enabled() -> bool:
+    raw = str(os.environ.get("TELEGRAM_ENABLED", "1") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def resolve_telegram_chat_id() -> str:
     return (
         os.environ.get("TELEGRAM_ADMIN_CHAT_ID")

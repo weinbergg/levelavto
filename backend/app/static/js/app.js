@@ -264,6 +264,7 @@
     if (!container) return
     container.innerHTML = ''
     ;(colors || []).forEach((c) => {
+      if (!c || !c.value) return
       const btn = document.createElement('button')
       btn.type = 'button'
       btn.className = 'color-chip'
@@ -272,6 +273,7 @@
       btn.title = c.label
       btn.setAttribute('aria-label', c.label)
       if (c.hex) btn.style.setProperty('--chip-color', c.hex)
+      btn.textContent = c.label || c.value
       container.appendChild(btn)
     })
   }
@@ -2822,6 +2824,7 @@
         chip.title = item.label || item.value
         chip.setAttribute('aria-label', item.label || item.value)
         if (item.hex) chip.style.setProperty('--chip-color', item.hex)
+        chip.textContent = item.label || item.value
         wrap.appendChild(chip)
       })
     }

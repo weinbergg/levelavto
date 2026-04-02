@@ -277,7 +277,7 @@
                   title="{{ c.label }}"
                   aria-label="{{ c.label }}"
                   {% if c.hex %}style="--chip-color: {{ c.hex }}"{% endif %}
-                ></button>
+                >{{ c.label }}</button>
                 {% endfor %}
               </div>
               {% endif %}
@@ -301,7 +301,7 @@
                   title="{{ c.label }}"
                   aria-label="{{ c.label }}"
                   {% if c.hex %}style="--chip-color: {{ c.hex }}"{% endif %}
-                ></button>
+                >{{ c.label }}</button>
                 {% endfor %}
               </div>
               {% endif %}

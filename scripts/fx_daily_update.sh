@@ -4,10 +4,23 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-exec /usr/bin/docker compose exec -T web python -m backend.app.scripts.update_fx_prices \
-  --batch "${BATCH:-2000}" \
-  --sleep "${SLEEP_SEC:-1}" \
-  ${COUNTRY:+--country "$COUNTRY"} \
-  ${ONLY_IDS:+--only-ids "$ONLY_IDS"} \
-  ${DRY_RUN:+--dry-run} \
-  ${TELEGRAM:+--telegram}
+echo "[fx_daily_update] start $(date -Iseconds)"
+echo "[fx_daily_update] step=ensure_services"
+/usr/bin/docker compose up -d db redis web
+
+FX_ARGS=(--batch "${BATCH:-2000}" --sleep "${SLEEP_SEC:-1}")
+if [ -n "${COUNTRY:-}" ]; then
+  FX_ARGS+=(--country "$COUNTRY")
+fi
+if [ -n "${ONLY_IDS:-}" ]; then
+  FX_ARGS+=(--only-ids "$ONLY_IDS")
+fi
+if [ "${DRY_RUN:-0}" = "1" ]; then
+  FX_ARGS+=(--dry-run)
+fi
+if [ "${TELEGRAM:-0}" = "1" ]; then
+  FX_ARGS+=(--telegram)
+fi
+
+/usr/bin/docker compose exec -T web python -m backend.app.scripts.update_fx_prices "${FX_ARGS[@]}"
+echo "[fx_daily_update] done $(date -Iseconds)"

@@ -82,8 +82,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=85' in template
-    assert '/static/css/styles.css?v=45' in template
+    assert '/static/js/app.js?v=86' in template
+    assert '/static/css/styles.css?v=46' in template
 
 
 def test_home_search_uses_line_params_and_js_submit():
@@ -224,6 +224,7 @@ def test_search_page_uses_payload_on_initial_render_and_has_telegram_ping_tool()
     assert "include_payload=True" in pages
     assert "resolve_telegram_chat_id" in tg_ping
     assert 'parser.add_argument("--dry-run"' in tg_ping
+    assert "telegram_enabled" in tg_ping
 
 
 def test_registration_year_filters_fallback_to_car_year_when_missing():
@@ -245,11 +246,14 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
     recalc_script = _read("app/scripts/recalc_calc_cache.py")
     reg_backfill_script = _read("app/scripts/backfill_missing_registration.py")
     pipeline = Path(__file__).resolve().parents[2] / "scripts" / "mobilede_daily_pipeline.sh"
+    fx_daily = Path(__file__).resolve().parents[2] / "scripts" / "fx_daily_update.sh"
     assert "get_missing_registration_default" in service
     assert "car.display_description" in detail_template
     assert "description=row.description" in parser
     assert 'description: Mapped[str | None] = mapped_column(Text, nullable=True)' in model
     assert "mobilede_daily_pipeline.sh" in cron.read_text(encoding="utf-8")
+    assert "scripts/fx_daily_update.sh" in cron.read_text(encoding="utf-8")
+    assert "TELEGRAM_ENABLED=0" in cron.read_text(encoding="utf-8")
     assert 'car.description = item["payload"].get("description")' in backfill
     assert 'or os.getenv("CALC_MISSING_REG_YEAR")' in reg_defaults
     assert 'or os.getenv("CALC_MISSING_REG_MONTH")' in reg_defaults
@@ -260,11 +264,13 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
     assert "--only-defaulted-registration" in recalc_script
     assert 'jsonb_extract_path_text(payload_json, "registration_defaulted")' in recalc_script
     assert "[backfill_missing_registration]" in reg_backfill_script
+    assert "step=ensure_services" in fx_daily.read_text(encoding="utf-8")
 
 
 def test_interior_filters_use_derived_text_fallback_from_payload_and_description():
     service = _read("app/services/cars_service.py")
     pages = _read("app/routers/pages.py")
+    catalog = _read("app/routers/catalog.py")
     assert 'func.concat_ws(' in service
     assert 'jsonb_extract_path_text(payload_json, "options")' in service
     assert 'jsonb_extract_path_text(payload_json, "title")' in service
@@ -272,6 +278,7 @@ def test_interior_filters_use_derived_text_fallback_from_payload_and_description
     assert "parse_interior_trim_token" in service
     assert "trim_token_conditions" in service
     assert 'field="color_group"' in pages
+    assert 'field="color_group"' in catalog
 
 
 def test_catalog_and_search_use_separate_interior_color_and_material_filters():
@@ -286,6 +293,8 @@ def test_catalog_and_search_use_separate_interior_color_and_material_filters():
     assert 'data-chip-input="interior_material"' in search_template
     assert "Материал салона" in catalog_template
     assert "Цвет салона" in search_template
+    assert "{{ c.label }}" in catalog_template
+    assert "{{ c.label }}" in search_template
     assert "syncChoiceInputOptions" in script
     assert "removeChoiceInput" in script
     assert "interior_color_hex" in taxonomy

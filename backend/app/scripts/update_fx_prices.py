@@ -8,7 +8,11 @@ from typing import Any, Iterable
 from backend.app.db import SessionLocal
 from backend.app.models import Car
 from backend.app.services.cars_service import CarsService
-from backend.app.utils.telegram import resolve_telegram_chat_id, send_telegram_message
+from backend.app.utils.telegram import (
+    resolve_telegram_chat_id,
+    send_telegram_message,
+    telegram_enabled,
+)
 from backend.app.utils.price_utils import ceil_to_step, get_round_step_rub
 
 
@@ -163,7 +167,7 @@ def main() -> None:
                 time.sleep(args.sleep)
         summary = f"fx_update checked={total_checked} updated={total_updated} eur={eur_rate} usd={usd_rate}"
         print(summary)
-        if args.telegram:
+        if args.telegram and telegram_enabled():
             token = os.getenv("TELEGRAM_BOT_TOKEN")
             chat_id = resolve_telegram_chat_id()
             if token and chat_id:

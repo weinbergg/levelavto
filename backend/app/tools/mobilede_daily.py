@@ -23,6 +23,7 @@ from backend.app.utils.telegram import (
     format_daily_report,
     resolve_telegram_chat_id,
     send_telegram_message,
+    telegram_enabled,
 )
 
 
@@ -304,7 +305,7 @@ def main() -> None:
             if not allow_deactivate:
                 token = os.getenv("TELEGRAM_BOT_TOKEN")
                 chat_id = resolve_telegram_chat_id()
-                if token and chat_id:
+                if telegram_enabled() and token and chat_id:
                     send_telegram_message(
                         token,
                         chat_id,
@@ -354,7 +355,7 @@ def main() -> None:
         # Telegram report (optional)
         token = os.getenv("TELEGRAM_BOT_TOKEN")
         chat_id = resolve_telegram_chat_id()
-        if token and chat_id:
+        if telegram_enabled() and token and chat_id:
             stats = {}
             try:
                 if stats_file.exists():

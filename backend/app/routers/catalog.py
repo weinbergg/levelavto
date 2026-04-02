@@ -1225,9 +1225,12 @@ def filter_ctx_base(
     cached = redis_get_json(cache_key)
     if cached:
         if (
-            "interior_design_options" not in cached
+            "colors_basic" not in cached
+            or "colors_other" not in cached
+            or "interior_design_options" not in cached
             or "interior_color_options" not in cached
             or "interior_material_options" not in cached
+            or cached.get("_color_source") != "color_group"
         ):
             cached = None
         else:
@@ -1307,9 +1310,10 @@ def filter_ctx_base(
         ]
     )
     body_types = _sort_by_label(build_body_type_options(service.facet_counts(field="body_type", filters=base_filters)))
-    colors_basic, colors_other = _split_colors(service.facet_counts(field="color", filters=base_filters))
+    colors_basic, colors_other = _split_colors(service.facet_counts(field="color_group", filters=base_filters))
     interior_payload = service.payload_values_bulk_filtered(["interior_design"], **base_filters)
     payload = {
+        "_color_source": "color_group",
         "regions": regions,
         "countries": countries,
         "country_labels": country_labels,
