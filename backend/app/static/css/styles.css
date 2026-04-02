@@ -1499,7 +1499,7 @@ body.filters-open {
 .advanced-grid > .field,
 .advanced-grid > label {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   align-content: start;
 }
@@ -1550,11 +1550,23 @@ body.filters-open {
 }
 .advanced-grid {
   grid-template-columns: repeat(4, minmax(180px, 1fr));
-  gap: 12px;
+  column-gap: 12px;
+  row-gap: 18px;
 }
 .advanced-grid label {
   display: grid;
-  gap: 6px;
+  gap: 8px;
+}
+.filters-primary-grid > .field input,
+.filters-primary-grid > .field select,
+.filters-primary-grid > label input,
+.filters-primary-grid > label select,
+.advanced-grid > .field input,
+.advanced-grid > .field select,
+.advanced-grid > label input,
+.advanced-grid > label select {
+  width: 100%;
+  min-width: 0;
 }
 .advanced-grid .field--wide {
   grid-column: span 2;
@@ -2356,6 +2368,16 @@ input[type="number"]::-webkit-outer-spin-button {
 .choice-chip--swatch[aria-label="Черный"],
 .choice-chip--swatch[aria-label="Чёрный"] {
   --chip-color: #0d0f14;
+}
+.color-chip[data-label="Черный"]::before,
+.color-chip[title="Черный"]::before,
+.color-chip[data-label="Чёрный"]::before,
+.color-chip[title="Чёрный"]::before,
+.choice-chip--swatch[data-label="Черный"]::before,
+.choice-chip--swatch[data-label="Чёрный"]::before,
+.choice-chip--swatch[aria-label="Черный"]::before,
+.choice-chip--swatch[aria-label="Чёрный"]::before {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 .color-chip[data-label="Серый"],
 .color-chip[title="Серый"],
