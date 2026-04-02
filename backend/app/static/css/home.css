@@ -367,6 +367,9 @@
 .inline-actions .links .btn {
   color: var(--text-1);
 }
+#home-submit {
+  justify-content: center;
+}
 .checkbox {
   display: flex;
   align-items: center;
@@ -847,6 +850,20 @@ textarea {
   .inline-actions {
     align-items: flex-start;
     gap: 12px;
+  }
+  #home-search .inline-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    width: 100%;
+  }
+  #home-search #home-submit {
+    width: 100%;
+    min-width: 0;
+  }
+  #home-search .inline-actions .links {
+    width: 100%;
+    justify-content: space-between;
   }
   .leader-card {
     grid-template-columns: 1fr;

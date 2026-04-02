@@ -616,6 +616,124 @@ def _build_filter_context(
     return ctx
 
 
+def _load_cached_filter_ctx_base(params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    normalized = normalize_filter_params(
+        {
+            "region": (params or {}).get("region"),
+            "country": (params or {}).get("country"),
+        }
+    )
+    cached = redis_get_json(build_filter_ctx_base_key(normalized))
+    if not cached:
+        return None
+    if (
+        "colors_basic" not in cached
+        or "colors_other" not in cached
+        or "brands" not in cached
+        or "body_types" not in cached
+        or "engine_types" not in cached
+        or "transmissions" not in cached
+        or "drive_types" not in cached
+        or cached.get("_color_source") != "color_group"
+    ):
+        return None
+    return cached
+
+
+def _search_ssr_filter_context(
+    service: CarsService,
+    db: Session,
+    params: Dict[str, Any],
+) -> tuple[Dict[str, Any], int, str, str]:
+    full_cache_key = build_filter_ctx_key(params, include_payload=True)
+    full_cached = redis_get_json(full_cache_key)
+    if full_cached:
+        return full_cached, 1, "redis", full_cache_key
+
+    fallback_cached = _FILTER_CTX_CACHE.get(full_cache_key)
+    if fallback_cached:
+        return fallback_cached, 1, "fallback", full_cache_key
+
+    base_cached = _load_cached_filter_ctx_base(params)
+    if base_cached:
+        countries = [
+            str(item.get("value") or "").strip()
+            for item in base_cached.get("countries") or []
+            if item.get("value")
+        ]
+        regions = [
+            str(item.get("value") or "").strip()
+            for item in base_cached.get("regions") or []
+            if item.get("value")
+        ]
+        brands = [
+            str(item.get("value") or "").strip()
+            for item in base_cached.get("brands") or []
+            if item.get("value")
+        ]
+        country_labels = base_cached.get("country_labels") or {
+            **{code: country_label_ru(code) or code for code in countries},
+            "EU": "Европа",
+            "KR": "Корея",
+        }
+        ctx = {
+            "regions": regions,
+            "countries": countries,
+            "country_labels": country_labels,
+            "kr_types": base_cached.get("kr_types") or [],
+            "reg_years": [int(v) for v in base_cached.get("reg_years") or [] if v not in (None, "")],
+            "reg_months": base_cached.get("reg_months") or [{"value": i + 1, "label": MONTHS_RU[i]} for i in range(12)],
+            "price_options": [],
+            "mileage_options": [],
+            "generations": [],
+            "colors_basic": base_cached.get("colors_basic") or [],
+            "colors_other": base_cached.get("colors_other") or [],
+            "body_types": base_cached.get("body_types") or [],
+            "brands": brands,
+            "engine_types": base_cached.get("engine_types") or [],
+            "transmissions": base_cached.get("transmissions") or [],
+            "drive_types": base_cached.get("drive_types") or [],
+            "seats_options": [],
+            "doors_options": [],
+            "owners_options": [],
+            "emission_classes": [],
+            "efficiency_classes": [],
+            "climatisation_options": [],
+            "airbags_options": [],
+            "interior_design_options": [],
+            "interior_color_options": [],
+            "interior_material_options": [],
+            "price_rating_labels": [],
+            "seats_options_eu": [],
+            "doors_options_eu": [],
+            "owners_options_eu": [],
+            "emission_classes_eu": [],
+            "efficiency_classes_eu": [],
+            "climatisation_options_eu": [],
+            "airbags_options_eu": [],
+            "interior_design_options_eu": [],
+            "interior_color_options_eu": [],
+            "interior_material_options_eu": [],
+            "price_rating_labels_eu": [],
+            "seats_options_kr": [],
+            "doors_options_kr": [],
+            "owners_options_kr": [],
+            "emission_classes_kr": [],
+            "efficiency_classes_kr": [],
+            "climatisation_options_kr": [],
+            "airbags_options_kr": [],
+            "interior_design_options_kr": [],
+            "interior_color_options_kr": [],
+            "interior_material_options_kr": [],
+            "price_rating_labels_kr": [],
+            "has_air_suspension": service.has_air_suspension(),
+        }
+        return ctx, 0, "base_redis", build_filter_ctx_base_key(normalize_filter_params({"region": params.get("region"), "country": params.get("country")}))
+
+    base_ctx = _build_filter_context(service, db, include_payload=False, params=params)
+    return base_ctx, 0, "base_fallback", build_filter_ctx_key(params, include_payload=False)
+
+
 def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
     cache_key = "home_filter_ctx:all"
     cached = _HOME_FILTER_CTX_CACHE.get(cache_key)
@@ -1243,6 +1361,20 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     canon_kr_type = str(params.get("kr_type") or "").strip().upper() or None
     canon_brand = normalize_brand(params.get("brand")).strip() if params.get("brand") else None
     canon_model = str(params.get("model") or "").strip() or None
+    base_ctx_cached = _load_cached_filter_ctx_base({"region": canon_region, "country": canon_country})
+    cached_brands = [
+        str(item.get("value") or "").strip()
+        for item in (base_ctx_cached or {}).get("brands") or []
+        if item.get("value")
+    ]
+    cached_body_types = (base_ctx_cached or {}).get("body_types") or []
+    cached_engine_types = (base_ctx_cached or {}).get("engine_types") or []
+    cached_transmissions = (base_ctx_cached or {}).get("transmissions") or []
+    cached_drive_types = (base_ctx_cached or {}).get("drive_types") or []
+    cached_colors_basic = (base_ctx_cached or {}).get("colors_basic") or []
+    cached_colors_other = (base_ctx_cached or {}).get("colors_other") or []
+    cached_interior_color_options = (base_ctx_cached or {}).get("interior_color_options") or []
+    cached_interior_material_options = (base_ctx_cached or {}).get("interior_material_options") or []
     def _int_val(key: str) -> Optional[int]:
         raw = params.get(key)
         if raw is None or raw == "":
@@ -1432,7 +1564,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         {
             "request": request,
             "user": getattr(request.state, "user", None),
-            "brands": [],
+            "brands": cached_brands,
             "regions": regions,
             "countries": countries,
             "country_labels": country_labels,
@@ -1442,16 +1574,18 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "price_options": [],
             "mileage_options": [],
             "generations": [],
-            "colors_basic": [],
-            "colors_other": [],
-            "body_types": [],
-            "engine_types": [],
-            "transmissions": [],
-            "drive_types": [],
-            "interior_color_options": [],
-            "interior_material_options": [],
+            "colors_basic": cached_colors_basic,
+            "colors_other": cached_colors_other,
+            "body_types": cached_body_types,
+            "engine_types": cached_engine_types,
+            "transmissions": cached_transmissions,
+            "drive_types": cached_drive_types,
+            "interior_color_options": cached_interior_color_options,
+            "interior_material_options": cached_interior_material_options,
             "has_air_suspension": service.has_air_suspension(),
+            "filters_base_hydrated": bool(base_ctx_cached),
             "initial_items": initial_items,
+            "initial_total": initial_total,
             "fx_rates": fx_rates,
             "content": contact_content,
             "contact_phone": contact_content.get("contact_phone"),
@@ -1479,16 +1613,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
     t0 = time.perf_counter()
     raw_params = dict(request.query_params)
     params = normalize_filter_params(raw_params)
-    cache_key = build_filter_ctx_key(params, include_payload=True)
-    cached = redis_get_json(cache_key)
-    cache_hit = 0
-    cache_source = "fallback"
-    if cached:
-        filter_ctx = cached
-        cache_hit = 1
-        cache_source = "redis"
-    else:
-        filter_ctx = _build_filter_context(service, db, include_payload=True, params=params)
+    filter_ctx, cache_hit, cache_source, cache_key = _search_ssr_filter_context(service, db, params)
     contact_content = ContentService(db).content_map(
         [
             "contact_phone",

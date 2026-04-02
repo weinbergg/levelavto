@@ -1494,6 +1494,15 @@ body.filters-open {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 10px;
 }
+.filters-primary-grid > .field,
+.filters-primary-grid > label,
+.advanced-grid > .field,
+.advanced-grid > label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  align-content: start;
+}
 .filters-primary-grid label {
   line-height: 1.2;
   min-width: 0;
@@ -2333,48 +2342,81 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* Color mappings (fallback if no hex provided) */
 .color-chip[data-label="Белый"],
-.color-chip[title="Белый"] {
-  background: #f5f6fa;
+.color-chip[title="Белый"],
+.choice-chip--swatch[data-label="Белый"],
+.choice-chip--swatch[aria-label="Белый"] {
+  --chip-color: #f5f6fa;
 }
 .color-chip[data-label="Черный"],
-.color-chip[title="Черный"] {
-  background: #0d0f14;
+.color-chip[title="Черный"],
+.color-chip[data-label="Чёрный"],
+.color-chip[title="Чёрный"],
+.choice-chip--swatch[data-label="Черный"],
+.choice-chip--swatch[data-label="Чёрный"],
+.choice-chip--swatch[aria-label="Черный"],
+.choice-chip--swatch[aria-label="Чёрный"] {
+  --chip-color: #0d0f14;
 }
 .color-chip[data-label="Серый"],
-.color-chip[title="Серый"] {
-  background: #6f7683;
+.color-chip[title="Серый"],
+.choice-chip--swatch[data-label="Серый"],
+.choice-chip--swatch[aria-label="Серый"] {
+  --chip-color: #8c94a3;
 }
 .color-chip[data-label="Красный"],
-.color-chip[title="Красный"] {
-  background: #d13b3b;
+.color-chip[title="Красный"],
+.choice-chip--swatch[data-label="Красный"],
+.choice-chip--swatch[aria-label="Красный"] {
+  --chip-color: #d34f43;
 }
 .color-chip[data-label="Синий"],
-.color-chip[title="Cиний"] {
-  background: #2f6bd1;
+.color-chip[title="Синий"],
+.color-chip[title="Cиний"],
+.choice-chip--swatch[data-label="Синий"],
+.choice-chip--swatch[aria-label="Синий"] {
+  --chip-color: #325fd5;
 }
 .color-chip[data-label="Зеленый"],
-.color-chip[title="Зеленый"] {
-  background: #3b8d4c;
+.color-chip[title="Зеленый"],
+.choice-chip--swatch[data-label="Зеленый"],
+.choice-chip--swatch[aria-label="Зеленый"] {
+  --chip-color: #3b8d4c;
 }
 .color-chip[data-label="Желтый"],
-.color-chip[title="Желтый"] {
-  background: #f0c63c;
+.color-chip[title="Желтый"],
+.choice-chip--swatch[data-label="Желтый"],
+.choice-chip--swatch[aria-label="Желтый"] {
+  --chip-color: #f0c63c;
 }
 .color-chip[data-label="Оранж"],
-.color-chip[title="Оранж"] {
-  background: #f28f3b;
+.color-chip[title="Оранж"],
+.choice-chip--swatch[data-label="Оранж"],
+.choice-chip--swatch[aria-label="Оранж"] {
+  --chip-color: #f28f3b;
 }
 .color-chip[data-label="Фиолетовый"],
-.color-chip[title="Фиолетовый"] {
-  background: #7a4bd8;
+.color-chip[title="Фиолетовый"],
+.choice-chip--swatch[data-label="Фиолетовый"],
+.choice-chip--swatch[aria-label="Фиолетовый"] {
+  --chip-color: #7a4bd8;
 }
 .color-chip[data-label="Бирюзовый"],
-.color-chip[title="Бирюзовый"] {
-  background: #2fb2b5;
+.color-chip[title="Бирюзовый"],
+.choice-chip--swatch[data-label="Бирюзовый"],
+.choice-chip--swatch[aria-label="Бирюзовый"] {
+  --chip-color: #2fb2b5;
 }
 .color-chip[data-label="Коричневый"],
-.color-chip[title="Коричневый"] {
-  background: #7a5234;
+.color-chip[title="Коричневый"],
+.choice-chip--swatch[data-label="Коричневый"],
+.choice-chip--swatch[aria-label="Коричневый"] {
+  --chip-color: #8c6239;
+}
+.color-chip[data-label="Бежевый"],
+.color-chip[title="Бежевый"],
+.choice-chip--swatch[data-label="Бежевый"],
+.choice-chip--swatch[aria-label="Бежевый"] {
+  --chip-color: #d6be7d;
 }
 .filters-actions {
   display: flex;

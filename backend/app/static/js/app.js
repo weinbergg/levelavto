@@ -1279,12 +1279,62 @@
     })
   }
 
+  function renderCatalogMeta(page, pageSize, total) {
+    const pageInfo = qs('#pageInfo')
+    const resultCount = qs('#resultCount')
+    const pageNumbers = qs('#pageNumbers')
+    const safePageSize = Math.max(1, Number(pageSize) || 12)
+    const safePage = Math.max(1, Number(page) || 1)
+    const safeTotal = Math.max(0, Number(total) || 0)
+    const totalPages = Math.max(1, Math.ceil(safeTotal / safePageSize))
+
+    if (pageInfo) {
+      pageInfo.textContent = `Страница ${safePage} из ${totalPages}`
+    }
+
+    if (resultCount) {
+      if (safeTotal === 0) {
+        resultCount.textContent = 'Ничего не найдено. Измените фильтры.'
+      } else {
+        const from = (safePage - 1) * safePageSize + 1
+        const to = Math.min(safeTotal, safePage * safePageSize)
+        resultCount.textContent = `Показано ${from}-${to} из ${safeTotal}`
+      }
+    }
+
+    if (!pageNumbers) return
+    pageNumbers.innerHTML = ''
+    const addBtn = (targetPage, label = null) => {
+      const button = document.createElement('button')
+      button.className = 'btn page-btn' + (targetPage === safePage ? ' active' : '')
+      button.textContent = label || String(targetPage)
+      button.addEventListener('click', () => loadCars(targetPage, { scrollToTop: true }))
+      pageNumbers.appendChild(button)
+    }
+    addBtn(1)
+    const windowSize = 5
+    const start = Math.max(2, safePage - 2)
+    const end = Math.min(totalPages - 1, start + windowSize - 1)
+    if (start > 2) {
+      const dots = document.createElement('span')
+      dots.className = 'page-dots'
+      dots.textContent = '…'
+      pageNumbers.appendChild(dots)
+    }
+    for (let p = start; p <= end; p += 1) addBtn(p)
+    if (end < totalPages - 1) {
+      const dots = document.createElement('span')
+      dots.className = 'page-dots'
+      dots.textContent = '…'
+      pageNumbers.appendChild(dots)
+    }
+    if (totalPages > 1) addBtn(totalPages)
+  }
+
   async function loadCars(page = 1, options = {}) {
     const { scrollToTop = false } = options || {}
     const spinner = qs('#spinner')
     const cards = qs('#cards')
-    const pageInfo = qs('#pageInfo')
-    const resultCount = qs('#resultCount')
     if (!spinner || !cards) return
     const paramsPreview = collectParams(page)
     if (DEBUG_FILTERS) console.info('filters:catalog loadCars', paramsPreview.toString())
@@ -1313,49 +1363,7 @@
       const data = await res.json()
       if (reqId !== catalogReqId) return
       renderActiveFilters(params)
-      if (pageInfo) {
-      pageInfo.textContent = `Страница ${data.page} из ${Math.max(1, Math.ceil(data.total / data.page_size))}`
-      }
-      const pageNumbers = qs('#pageNumbers')
-      const totalPages = Math.max(1, Math.ceil(data.total / data.page_size))
-      if (pageNumbers) {
-        pageNumbers.innerHTML = ''
-        const addBtn = (p, label = null) => {
-          const b = document.createElement('button')
-          b.className = 'btn page-btn' + (p === data.page ? ' active' : '')
-          b.textContent = label || String(p)
-          b.addEventListener('click', () => loadCars(p, { scrollToTop: true }))
-          pageNumbers.appendChild(b)
-        }
-        addBtn(1)
-        const windowSize = 5
-        const start = Math.max(2, data.page - 2)
-        const end = Math.min(totalPages - 1, start + windowSize - 1)
-        if (start > 2) {
-          const dots = document.createElement('span')
-          dots.className = 'page-dots'
-          dots.textContent = '…'
-          pageNumbers.appendChild(dots)
-        }
-        for (let p = start; p <= end; p++) addBtn(p)
-        if (end < totalPages - 1) {
-          const dots = document.createElement('span')
-          dots.className = 'page-dots'
-          dots.textContent = '…'
-          pageNumbers.appendChild(dots)
-        }
-        if (totalPages > 1) addBtn(totalPages)
-      }
-
-      if (resultCount) {
-        if (data.total === 0) {
-          resultCount.textContent = 'Ничего не найдено. Измените фильтры.'
-        } else {
-          const from = (data.page - 1) * data.page_size + 1
-          const to = Math.min(data.total, data.page * data.page_size)
-          resultCount.textContent = `Показано ${from}-${to} из ${data.total}`
-        }
-      }
+      renderCatalogMeta(data.page, data.page_size, data.total)
 
       if (!reuseSSR) {
         cards.innerHTML = ''
@@ -1587,6 +1595,7 @@
     const generationSelect = qs('#generation')
     const generationField = generationSelect ? generationSelect.closest('[data-generation-field]') : null
     const advancedLink = qs('#catalog-advanced-link')
+    const cards = qs('#cards')
     normalizeBrandOptions(brandSelect)
     let initialReapplyDone = false
     const initialLineModels = selectedFilters
@@ -1660,6 +1669,7 @@
         if (DEBUG_FILTERS) {
           console.info('catalog: ctx loaded countries=' + (data.countries || []).length + ' kr_types=' + (data.kr_types || []).length)
         }
+        filtersForm.dataset.baseHydrated = '1'
         bindColorChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
         bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
         bindOtherColorsToggle(filtersForm)
@@ -1668,6 +1678,21 @@
       } catch (e) {
         console.warn('filters base', e)
       }
+    }
+
+    const hydrateCatalogFromSSR = () => {
+      if (!cards || cards.dataset.ssr !== '1' || !cards.querySelector('.car-card')) return false
+      const total = Number(cards.dataset.ssrTotal || '0')
+      const page = Number(cards.dataset.ssrPage || String(initialPage || 1))
+      const pageSize = Number(cards.dataset.ssrPageSize || '12')
+      if (!total || !pageSize) return false
+      const params = collectParams(page)
+      renderActiveFilters(params)
+      renderCatalogMeta(page, pageSize, total)
+      window.__page = page
+      window.__pageSize = pageSize
+      window.__total = total
+      return true
     }
 
     if (DEBUG_FILTERS) {
@@ -1901,16 +1926,24 @@
       }
     })
     const loadInitial = async () => {
-      await loadCatalogFilterBase()
+      const baseHydrated = filtersForm?.dataset.baseHydrated === '1'
+      const basePromise = baseHydrated ? Promise.resolve() : loadCatalogFilterBase()
       if (!initialReapplyDone) {
         reapplySelected()
         initialReapplyDone = true
       }
+      const ssrHydrated = hydrateCatalogFromSSR()
+      if (!ssrHydrated) {
+        loadCars(initialPage)
+      }
       if (brandSelect && brandSelect.value) {
+        await basePromise
         await updateCatalogModels()
       }
       syncGenerationVisibility()
-      loadCars(initialPage)
+      if (!baseHydrated) {
+        void basePromise
+      }
     }
     loadInitial()
   }

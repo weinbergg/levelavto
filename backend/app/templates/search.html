@@ -264,9 +264,7 @@
         <h2 class="advanced-section__title">Экстерьер</h2>
         <div class="search-filters">
           <div class="filters-primary-grid advanced-grid">
-            {% if (colors_basic and colors_basic|length > 0) or (colors_other and colors_other|length > 0) %}
             <div class="field field--full"><span class="field-label">Цвет кузова</span>
-              {% if colors_basic and colors_basic|length > 0 %}
               <div class="color-swatches color-swatches--basic" data-color-chips>
                 {% for c in colors_basic %}
                 <button
@@ -280,14 +278,12 @@
                 >{{ c.label }}</button>
                 {% endfor %}
               </div>
-              {% endif %}
-              {% if colors_other and colors_other|length > 0 %}
               <button
                 type="button"
-                class="btn btn-ghost btn-small color-toggle"
+                class="btn btn-ghost btn-small color-toggle{% if not (colors_other and colors_other|length > 0) %} is-hidden{% endif %}"
                 data-colors-toggle
                 data-target="colors-extra-search"
-                aria-expanded="false"
+                aria-expanded="{{ 'true' if colors_other and colors_other|length > 0 else 'false' }}"
               >
                 Другие цвета
               </button>
@@ -304,10 +300,8 @@
                 >{{ c.label }}</button>
                 {% endfor %}
               </div>
-              {% endif %}
               <input type="hidden" name="color" value="{{ params.get('color','') }}">
             </div>
-            {% endif %}
           </div>
         </div>
       </section>
@@ -379,8 +373,7 @@
         <h2 class="advanced-section__title">Детали предложения</h2>
         <div class="search-filters">
           <div class="filters-primary-grid advanced-grid">
-            {% if (seats_options_eu and seats_options_eu|length > 0) or (seats_options_kr and seats_options_kr|length > 0) %}
-            <label data-has-eu="{{ 1 if (seats_options_eu and seats_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (seats_options_kr and seats_options_kr|length > 0) else 0 }}">Количество мест
+            <label class="field" data-has-eu="{{ 1 if (seats_options_eu and seats_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (seats_options_kr and seats_options_kr|length > 0) else 0 }}">Количество мест
               <select
                 name="num_seats"
                 data-region-options
@@ -393,9 +386,7 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if (doors_options_eu and doors_options_eu|length > 0) or (doors_options_kr and doors_options_kr|length > 0) %}
-            <label data-has-eu="{{ 1 if (doors_options_eu and doors_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (doors_options_kr and doors_options_kr|length > 0) else 0 }}">Количество дверей
+            <label class="field" data-has-eu="{{ 1 if (doors_options_eu and doors_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (doors_options_kr and doors_options_kr|length > 0) else 0 }}">Количество дверей
               <select
                 name="doors_count"
                 data-region-options
@@ -408,9 +399,7 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if (owners_options_eu and owners_options_eu|length > 0) or (owners_options_kr and owners_options_kr|length > 0) %}
-            <label data-has-eu="{{ 1 if (owners_options_eu and owners_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (owners_options_kr and owners_options_kr|length > 0) else 0 }}">Количество владельцев
+            <label class="field" data-has-eu="{{ 1 if (owners_options_eu and owners_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (owners_options_kr and owners_options_kr|length > 0) else 0 }}">Количество владельцев
               <select
                 name="owners_count"
                 data-region-options
@@ -423,9 +412,7 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if (climatisation_options_eu and climatisation_options_eu|length > 0) or (climatisation_options_kr and climatisation_options_kr|length > 0) %}
-            <label data-has-eu="{{ 1 if (climatisation_options_eu and climatisation_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (climatisation_options_kr and climatisation_options_kr|length > 0) else 0 }}">Климат
+            <label class="field" data-has-eu="{{ 1 if (climatisation_options_eu and climatisation_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (climatisation_options_kr and climatisation_options_kr|length > 0) else 0 }}">Климат
               <select
                 name="climatisation"
                 data-region-options
@@ -438,9 +425,7 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if (airbags_options_eu and airbags_options_eu|length > 0) or (airbags_options_kr and airbags_options_kr|length > 0) %}
-            <label data-has-eu="{{ 1 if (airbags_options_eu and airbags_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (airbags_options_kr and airbags_options_kr|length > 0) else 0 }}">Подушки безопасности
+            <label class="field" data-has-eu="{{ 1 if (airbags_options_eu and airbags_options_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (airbags_options_kr and airbags_options_kr|length > 0) else 0 }}">Подушки безопасности
               <select
                 name="airbags"
                 data-region-options
@@ -453,9 +438,7 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if (emission_classes_eu and emission_classes_eu|length > 0) or (emission_classes_kr and emission_classes_kr|length > 0) %}
-            <label data-has-eu="{{ 1 if (emission_classes_eu and emission_classes_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (emission_classes_kr and emission_classes_kr|length > 0) else 0 }}">Экокласс
+            <label class="field" data-has-eu="{{ 1 if (emission_classes_eu and emission_classes_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (emission_classes_kr and emission_classes_kr|length > 0) else 0 }}">Экокласс
               <select
                 name="emission_class"
                 data-region-options
@@ -468,9 +451,7 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if (efficiency_classes_eu and efficiency_classes_eu|length > 0) or (efficiency_classes_kr and efficiency_classes_kr|length > 0) %}
-            <label data-has-eu="{{ 1 if (efficiency_classes_eu and efficiency_classes_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (efficiency_classes_kr and efficiency_classes_kr|length > 0) else 0 }}">Класс эффективности
+            <label class="field" data-has-eu="{{ 1 if (efficiency_classes_eu and efficiency_classes_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (efficiency_classes_kr and efficiency_classes_kr|length > 0) else 0 }}">Класс эффективности
               <select
                 name="efficiency_class"
                 data-region-options
@@ -483,9 +464,7 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            {% if (price_rating_labels_eu and price_rating_labels_eu|length > 0) or (price_rating_labels_kr and price_rating_labels_kr|length > 0) %}
-            <label data-has-eu="{{ 1 if (price_rating_labels_eu and price_rating_labels_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (price_rating_labels_kr and price_rating_labels_kr|length > 0) else 0 }}">Оценка цены
+            <label class="field" data-has-eu="{{ 1 if (price_rating_labels_eu and price_rating_labels_eu|length > 0) else 0 }}" data-has-kr="{{ 1 if (price_rating_labels_kr and price_rating_labels_kr|length > 0) else 0 }}">Оценка цены
               <select
                 name="price_rating_label"
                 data-region-options
@@ -498,8 +477,7 @@
                 {% endfor %}
               </select>
             </label>
-            {% endif %}
-            <label>НДС
+            <label class="field">НДС
               <select name="vat_reclaimable">
                 <option value="">Не важно</option>
                 <option value="1" {% if params.get('vat_reclaimable') == '1' %}selected{% endif %}>Возмещается</option>

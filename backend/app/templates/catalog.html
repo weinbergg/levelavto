@@ -9,7 +9,7 @@
         <h3>Фильтры</h3>
         <button class="filters-panel__close" type="button" id="filtersClose" aria-label="Закрыть фильтры">×</button>
       </div>
-      <form id="filters" onsubmit="return false;">
+      <form id="filters" data-base-hydrated="{{ 1 if filters_base_hydrated else 0 }}" onsubmit="return false;">
         {% set params = request.query_params %}
         <div class="filters-primary">
           <div class="filters-primary-grid">
@@ -319,7 +319,7 @@
         <div id="activeFilters" class="active-filters"></div>
       </div>
       <div id="spinner" class="spinner" style="display:none;">Загрузка…</div>
-      <div id="cards" class="cards" data-ssr="{{ 1 if initial_items and initial_items|length > 0 else 0 }}" data-ssr-params="{{ request.url.query }}">
+      <div id="cards" class="cards" data-ssr="{{ 1 if initial_items and initial_items|length > 0 else 0 }}" data-ssr-params="{{ request.url.query }}" data-ssr-total="{{ initial_total or 0 }}" data-ssr-page="{{ request.query_params.get('page', '1') if request else '1' }}" data-ssr-page-size="12">
         {% if initial_items and initial_items|length > 0 %}
           {% for car in initial_items %}
             <a class="car-card" href="/car/{{ car.id }}" data-id="{{ car.id }}">
