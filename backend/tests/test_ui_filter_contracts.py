@@ -116,6 +116,18 @@ def test_pages_base_filter_cache_requires_interior_payload_keys():
     assert '"interior_material_options" not in cached' in router
 
 
+def test_price_sensitive_catalog_paths_bypass_stale_cache():
+    catalog_router = _read("app/routers/catalog.py")
+    pages_router = _read("app/routers/pages.py")
+    service = _read("app/services/cars_service.py")
+    assert "def _bypass_price_sensitive_cache(" in catalog_router
+    assert "price_cache_bypass = _bypass_price_sensitive_cache(" in catalog_router
+    assert "if not price_cache_bypass:" in catalog_router
+    assert "price_cache_bypass = normalized.get(\"price_min\") is not None or normalized.get(\"price_max\") is not None" in pages_router
+    assert "def _refresh_price_sensitive_candidates(" in service
+    assert "self._refresh_price_sensitive_candidates(" in service
+
+
 def test_home_search_uses_line_params_and_js_submit():
     script = _read("app/static/js/app.js")
     assert "const getHomeSelectedModels = () =>" in script

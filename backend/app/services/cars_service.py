@@ -1171,6 +1171,18 @@ class CarsService:
         strict_local_photo_mode = bool(resolved.get("strict_local_photo_mode"))
 
         where_expr = and_(*conditions) if conditions else None
+        price_sensitive = (
+            price_min is not None
+            or price_max is not None
+            or sort in {"price_asc", "price_desc"}
+        )
+        if where_expr is not None and price_sensitive:
+            self._refresh_price_sensitive_candidates(
+                where_expr,
+                sort=sort,
+                page=page,
+                page_size=page_size,
+            )
 
         # cached count for repeated requests
         count_key = (
@@ -1698,6 +1710,77 @@ class CarsService:
             if car is None:
                 continue
             self._merge_light_row_from_car(row, car)
+
+    def _refresh_price_sensitive_candidates(
+        self,
+        where_expr: Any,
+        *,
+        sort: Optional[str],
+        page: int,
+        page_size: int,
+    ) -> int:
+        lazy_enabled = os.getenv("LAZY_RECALC_ENABLED", "1") != "0"
+        if not lazy_enabled:
+            return 0
+        try:
+            batch_size = max(
+                int(os.getenv("PRICE_SENSITIVE_RECALC_BATCH", "120")),
+                max(1, int(page or 1)) * max(1, int(page_size or 20)),
+            )
+        except Exception:
+            batch_size = max(120, max(1, int(page or 1)) * max(1, int(page_size or 20)))
+        stale_expr = or_(
+            Car.total_price_rub_cached.is_(None),
+            Car.calc_breakdown_json.is_(None),
+            Car.calc_updated_at.is_(None),
+            and_(Car.updated_at.is_not(None), Car.calc_updated_at < Car.updated_at),
+            and_(Car.spec_inferred_at.is_not(None), Car.calc_updated_at < Car.spec_inferred_at),
+        )
+        price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+        if sort == "price_desc":
+            order_clause = [price_expr.desc().nullslast(), Car.id.asc()]
+        else:
+            order_clause = [price_expr.asc().nullslast(), Car.id.asc()]
+        candidate_ids = [
+            int(car_id)
+            for car_id in self.db.execute(
+                select(Car.id)
+                .where(where_expr, stale_expr)
+                .order_by(*order_clause)
+                .limit(batch_size)
+            ).scalars().all()
+            if car_id is not None
+        ]
+        if not candidate_ids:
+            return 0
+        cars = (
+            self.db.execute(select(Car).where(Car.id.in_(candidate_ids)))
+            .scalars()
+            .all()
+        )
+        cars_by_id = {car.id: car for car in cars}
+        refreshed = 0
+        for car_id in candidate_ids:
+            car = cars_by_id.get(car_id)
+            if car is None:
+                continue
+            try:
+                before_total = car.total_price_rub_cached
+                before_calc = car.calc_updated_at
+                self.ensure_calc_cache(car, force=True)
+                if car.total_price_rub_cached != before_total or car.calc_updated_at != before_calc:
+                    refreshed += 1
+            except Exception:
+                self.logger.exception("price_sensitive_recalc_failed car=%s", car_id)
+        if refreshed:
+            self.logger.info(
+                "price_sensitive_recalc refreshed=%s sort=%s page=%s size=%s",
+                refreshed,
+                sort,
+                page,
+                page_size,
+            )
+        return refreshed
 
     def _maybe_infer_specs_for_calc(self, car: Car) -> bool:
         effective_engine_cc = effective_engine_cc_value(car)

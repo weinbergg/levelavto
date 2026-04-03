@@ -209,6 +209,60 @@ def _cacheable_catalog_filters(
     return True
 
 
+def _bypass_price_sensitive_cache(
+    *,
+    sort: Optional[str],
+    price_min: Optional[float],
+    price_max: Optional[float],
+    brand: Optional[str],
+    model: Optional[str],
+    generation: Optional[str],
+    color: Optional[str],
+    body_type: Optional[str],
+    engine_type: Optional[str],
+    transmission: Optional[str],
+    drive_type: Optional[str],
+    year_min: Optional[int],
+    year_max: Optional[int],
+    mileage_min: Optional[int],
+    mileage_max: Optional[int],
+    reg_year_min: Optional[int],
+    reg_month_min: Optional[int],
+    reg_year_max: Optional[int],
+    reg_month_max: Optional[int],
+    q: Optional[str],
+    line: Optional[List[str]],
+    source: Optional[str | List[str]],
+) -> bool:
+    if price_min is not None or price_max is not None:
+        return True
+    if (sort or "price_asc") not in {"price_asc", "price_desc"}:
+        return False
+    return any(
+        [
+            brand,
+            model,
+            generation,
+            color,
+            body_type,
+            engine_type,
+            transmission,
+            drive_type,
+            year_min is not None,
+            year_max is not None,
+            mileage_min is not None,
+            mileage_max is not None,
+            reg_year_min is not None,
+            reg_month_min is not None,
+            reg_year_max is not None,
+            reg_month_max is not None,
+            q,
+            line,
+            source,
+        ]
+    )
+
+
 def _sort_by_label(items: list[dict]) -> list[dict]:
     return sorted(items, key=lambda x: (x.get("label") or x.get("value") or "").strip().casefold())
 
@@ -407,11 +461,35 @@ def list_cars(
         price_rating_label=price_rating_label,
         owners_count=owners_count,
     )
+    price_cache_bypass = _bypass_price_sensitive_cache(
+        sort=sort,
+        price_min=price_min,
+        price_max=price_max,
+        brand=canon.get("brand"),
+        model=model,
+        generation=generation,
+        color=color,
+        body_type=body_type,
+        engine_type=engine_type,
+        transmission=transmission,
+        drive_type=drive_type,
+        year_min=year_min,
+        year_max=year_max,
+        mileage_min=mileage_min,
+        mileage_max=mileage_max,
+        reg_year_min=reg_year_min,
+        reg_month_min=reg_month_min,
+        reg_year_max=reg_year_max,
+        reg_month_max=reg_month_max,
+        q=q,
+        line=line,
+        source=source,
+    )
     cache_key = None
     cache_lock_key = None
     cache_lock_token = None
     strict_photo_mode = _strict_photo_cache_mode(canon.get("region"))
-    if cache_ok:
+    if cache_ok and not price_cache_bypass:
         cache_key = build_cars_list_key(
             canon.get("region"),
             canon.get("country"),
@@ -433,7 +511,7 @@ def list_cars(
             if waited is not None:
                 print("CARS_LIST_CACHE hit=1 source=redis_wait key=%s" % cache_key, flush=True)
                 return waited
-    else:
+    elif not price_cache_bypass:
         full_cache_params = {
             "region": canon.get("region"),
             "country": canon.get("country"),
@@ -809,6 +887,30 @@ def cars_count(
     normalized = normalize_count_params(params)
     strict_photo_mode = _strict_photo_cache_mode(canon.get("region"))
     normalized["hide_no_local_photo"] = strict_photo_mode
+    price_cache_bypass = _bypass_price_sensitive_cache(
+        sort="price_asc",
+        price_min=price_min,
+        price_max=price_max,
+        brand=canon.get("brand"),
+        model=model,
+        generation=None,
+        color=color,
+        body_type=body_type,
+        engine_type=engine_type,
+        transmission=transmission,
+        drive_type=drive_type,
+        year_min=year_min,
+        year_max=year_max,
+        mileage_min=mileage_min,
+        mileage_max=mileage_max,
+        reg_year_min=reg_year_min,
+        reg_month_min=None,
+        reg_year_max=reg_year_max,
+        reg_month_max=None,
+        q=None,
+        line=line,
+        source=None,
+    )
     cache_ok = _cacheable_catalog_filters(
         region=canon.get("region"),
         country=canon.get("country"),
@@ -854,22 +956,25 @@ def cars_count(
         owners_count=None,
     )
     cache_key = build_cars_count_key(normalized)
-    cached = redis_get_json(cache_key)
-    if cached is not None:
-        print("CARS_COUNT_FULL_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
-        return {"count": int(cached)}
-    print("CARS_COUNT_FULL_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
+    cache_lock_key = None
+    cache_lock_token = None
+    if not price_cache_bypass:
+        cached = redis_get_json(cache_key)
+        if cached is not None:
+            print("CARS_COUNT_FULL_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
+            return {"count": int(cached)}
+        print("CARS_COUNT_FULL_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
 
-    cache_lock_key = f"{cache_key}:lock"
-    cache_lock_token = redis_try_lock(cache_lock_key, ttl_sec=20)
-    if cache_lock_token is None:
-        waited = redis_wait_json(cache_key, timeout_ms=2000, poll_ms=120)
-        if waited is not None:
-            print("CARS_COUNT_FULL_CACHE hit=1 source=redis_wait key=%s" % cache_key, flush=True)
-            return {"count": int(waited)}
+        cache_lock_key = f"{cache_key}:lock"
+        cache_lock_token = redis_try_lock(cache_lock_key, ttl_sec=20)
+        if cache_lock_token is None:
+            waited = redis_wait_json(cache_key, timeout_ms=2000, poll_ms=120)
+            if waited is not None:
+                print("CARS_COUNT_FULL_CACHE hit=1 source=redis_wait key=%s" % cache_key, flush=True)
+                return {"count": int(waited)}
 
     cache_key_simple = None
-    if cache_ok:
+    if cache_ok and not price_cache_bypass:
         cache_key_simple = build_cars_count_simple_key(
             canon.get("region"),
             canon.get("country"),
@@ -946,8 +1051,9 @@ def cars_count(
                 condition=condition,
                 hide_no_local_photo=(strict_photo_mode == "1"),
             )
-        redis_set_json(cache_key, int(total), ttl_sec=1800)
-        if cache_ok and cache_key_simple:
+        if not price_cache_bypass:
+            redis_set_json(cache_key, int(total), ttl_sec=1800)
+        if cache_ok and cache_key_simple and not price_cache_bypass:
             redis_set_json(cache_key_simple, int(total), ttl_sec=1200)
         return {"count": int(total)}
     finally:
@@ -1022,19 +1128,46 @@ def advanced_count(request: Request, db: Session = Depends(get_db)):
     }
     normalized = normalize_count_params(raw_params)
     normalized["hide_no_local_photo"] = _strict_photo_cache_mode(canon.get("region"))
+    price_cache_bypass = _bypass_price_sensitive_cache(
+        sort=qp.get("sort") or "price_asc",
+        price_min=_to_float(qp.get("price_min")),
+        price_max=_to_float(qp.get("price_max")),
+        brand=canon.get("brand"),
+        model=canon.get("model"),
+        generation=qp.get("generation"),
+        color=qp.get("color"),
+        body_type=qp.get("body_type"),
+        engine_type=qp.get("engine_type"),
+        transmission=qp.get("transmission"),
+        drive_type=qp.get("drive_type"),
+        year_min=_to_int(qp.get("year_min")),
+        year_max=_to_int(qp.get("year_max")),
+        mileage_min=_to_int(qp.get("mileage_min")),
+        mileage_max=_to_int(qp.get("mileage_max")),
+        reg_year_min=_to_int(qp.get("reg_year_min")),
+        reg_month_min=_to_int(qp.get("reg_month_min")),
+        reg_year_max=_to_int(qp.get("reg_year_max")),
+        reg_month_max=_to_int(qp.get("reg_month_max")),
+        q=qp.get("q"),
+        line=lines,
+        source=source_value,
+    )
     cache_key = build_cars_count_key(normalized)
-    cached = redis_get_json(cache_key)
-    if cached is not None:
-        print("ADVANCED_COUNT_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
-        return {"count": int(cached)}
-    print("ADVANCED_COUNT_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
-    lock_key = f"{cache_key}:lock"
-    token = redis_try_lock(lock_key, ttl_sec=20)
-    if token is None:
-        waited = redis_wait_json(cache_key, timeout_ms=2200, poll_ms=120)
-        if waited is not None:
-            print("ADVANCED_COUNT_CACHE hit=1 source=redis_wait key=%s" % cache_key, flush=True)
-            return {"count": int(waited)}
+    lock_key = None
+    token = None
+    if not price_cache_bypass:
+        cached = redis_get_json(cache_key)
+        if cached is not None:
+            print("ADVANCED_COUNT_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
+            return {"count": int(cached)}
+        print("ADVANCED_COUNT_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
+        lock_key = f"{cache_key}:lock"
+        token = redis_try_lock(lock_key, ttl_sec=20)
+        if token is None:
+            waited = redis_wait_json(cache_key, timeout_ms=2200, poll_ms=120)
+            if waited is not None:
+                print("ADVANCED_COUNT_CACHE hit=1 source=redis_wait key=%s" % cache_key, flush=True)
+                return {"count": int(waited)}
     try:
         _, total = service.list_cars(
             region=canon.get("region"),
@@ -1087,7 +1220,8 @@ def advanced_count(request: Request, db: Session = Depends(get_db)):
             use_fast_count=os.getenv("CATALOG_USE_FAST_COUNT", "1") != "0",
             hide_no_local_photo=(_strict_photo_cache_mode(canon.get("region")) == "1"),
         )
-        redis_set_json(cache_key, int(total), ttl_sec=1800)
+        if not price_cache_bypass:
+            redis_set_json(cache_key, int(total), ttl_sec=1800)
         return {"count": int(total)}
     finally:
         if token:
