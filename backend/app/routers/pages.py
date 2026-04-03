@@ -1584,7 +1584,6 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "filters_base_hydrated": bool(base_ctx_cached),
             "initial_items": initial_items,
             "initial_total": initial_total,
-            "fx_rates": fx_rates,
             "content": contact_content,
             "contact_phone": contact_content.get("contact_phone"),
             "contact_email": contact_content.get("contact_email"),
