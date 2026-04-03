@@ -232,7 +232,6 @@
               <span>Пневмоподвеска</span>
             </label>
             {% endif %}
-            {% if interior_color_options and interior_color_options|length > 0 %}
             <div class="field field--full"><span class="field-label">Цвет салона</span>
               <div class="choice-chips" data-chip-input="interior_color" data-chip-variant="swatch">
                 {% for opt in interior_color_options %}
@@ -248,8 +247,6 @@
               </div>
               <input type="hidden" name="interior_color" value="{{ params.get('interior_color','') }}">
             </div>
-            {% endif %}
-            {% if interior_material_options and interior_material_options|length > 0 %}
             <div class="field field--full"><span class="field-label">Материал салона</span>
               <div class="choice-chips" data-chip-input="interior_material" data-chip-variant="checkbox">
                 {% for opt in interior_material_options %}
@@ -264,7 +261,6 @@
               </div>
               <input type="hidden" name="interior_material" value="{{ params.get('interior_material','') }}">
             </div>
-            {% endif %}
             <label>НДС
               <select name="vat_reclaimable">
                 <option value="">Не важно</option>

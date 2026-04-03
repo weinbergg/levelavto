@@ -629,6 +629,9 @@ def _load_cached_filter_ctx_base(params: Optional[Dict[str, Any]] = None) -> Opt
         or "engine_types" not in cached
         or "transmissions" not in cached
         or "drive_types" not in cached
+        or "interior_design_options" not in cached
+        or "interior_color_options" not in cached
+        or "interior_material_options" not in cached
         or cached.get("_color_source") != "color_group"
         or cached.get("_engine_type_source") != "normalized"
     ):
@@ -652,6 +655,31 @@ def _search_ssr_filter_context(
 
     base_cached = _load_cached_filter_ctx_base(params)
     if base_cached:
+        base_interior_design_options = base_cached.get("interior_design_options") or []
+        base_interior_color_options = base_cached.get("interior_color_options") or []
+        base_interior_material_options = base_cached.get("interior_material_options") or []
+        region_key = str(params.get("region") or "").upper()
+        if region_key == "KR":
+            interior_design_options_eu = []
+            interior_color_options_eu = []
+            interior_material_options_eu = []
+            interior_design_options_kr = base_interior_design_options
+            interior_color_options_kr = base_interior_color_options
+            interior_material_options_kr = base_interior_material_options
+        elif region_key == "EU":
+            interior_design_options_eu = base_interior_design_options
+            interior_color_options_eu = base_interior_color_options
+            interior_material_options_eu = base_interior_material_options
+            interior_design_options_kr = []
+            interior_color_options_kr = []
+            interior_material_options_kr = []
+        else:
+            interior_design_options_eu = base_interior_design_options
+            interior_color_options_eu = base_interior_color_options
+            interior_material_options_eu = base_interior_material_options
+            interior_design_options_kr = base_interior_design_options
+            interior_color_options_kr = base_interior_color_options
+            interior_material_options_kr = base_interior_material_options
         countries = [
             str(item.get("value") or "").strip()
             for item in base_cached.get("countries") or []
@@ -696,9 +724,9 @@ def _search_ssr_filter_context(
             "efficiency_classes": [],
             "climatisation_options": [],
             "airbags_options": [],
-            "interior_design_options": [],
-            "interior_color_options": [],
-            "interior_material_options": [],
+            "interior_design_options": base_interior_design_options,
+            "interior_color_options": base_interior_color_options,
+            "interior_material_options": base_interior_material_options,
             "price_rating_labels": [],
             "seats_options_eu": [],
             "doors_options_eu": [],
@@ -707,9 +735,9 @@ def _search_ssr_filter_context(
             "efficiency_classes_eu": [],
             "climatisation_options_eu": [],
             "airbags_options_eu": [],
-            "interior_design_options_eu": [],
-            "interior_color_options_eu": [],
-            "interior_material_options_eu": [],
+            "interior_design_options_eu": interior_design_options_eu,
+            "interior_color_options_eu": interior_color_options_eu,
+            "interior_material_options_eu": interior_material_options_eu,
             "price_rating_labels_eu": [],
             "seats_options_kr": [],
             "doors_options_kr": [],
@@ -718,9 +746,9 @@ def _search_ssr_filter_context(
             "efficiency_classes_kr": [],
             "climatisation_options_kr": [],
             "airbags_options_kr": [],
-            "interior_design_options_kr": [],
-            "interior_color_options_kr": [],
-            "interior_material_options_kr": [],
+            "interior_design_options_kr": interior_design_options_kr,
+            "interior_color_options_kr": interior_color_options_kr,
+            "interior_material_options_kr": interior_material_options_kr,
             "price_rating_labels_kr": [],
             "has_air_suspension": service.has_air_suspension(),
             "payload_deferred": True,
@@ -1405,6 +1433,9 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         return None
     initial_items: List[dict] = []
     initial_total: Optional[int] = None
+    fx_rates = service.get_fx_rates() or {}
+    fx_eur = float(fx_rates.get("EUR") or 0)
+    fx_usd = float(fx_rates.get("USD") or 0)
     try:
         source_list = qp.getlist("source") if hasattr(qp, "getlist") else []
         source_value: Optional[str | List[str]] = source_list if source_list else params.get("source")
@@ -1473,6 +1504,19 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     c.get("price_rub_cached"),
                     allow_price_fallback=True,
                 )
+                if c["display_price_rub"] is None and c.get("price") is not None:
+                    cur = str(c.get("currency") or "").upper()
+                    try:
+                        raw_price = float(c.get("price"))
+                    except (TypeError, ValueError):
+                        raw_price = None
+                    if raw_price is not None:
+                        if cur == "EUR" and fx_eur > 0:
+                            c["display_price_rub"] = display_price_rub(None, raw_price * fx_eur, allow_price_fallback=True)
+                        elif cur == "USD" and fx_usd > 0:
+                            c["display_price_rub"] = display_price_rub(None, raw_price * fx_usd, allow_price_fallback=True)
+                        elif cur in {"RUB", "₽"}:
+                            c["display_price_rub"] = display_price_rub(None, raw_price, allow_price_fallback=True)
                 c["price_note"] = price_without_util_note(
                     display_price=c.get("display_price_rub"),
                     total_price_rub_cached=c.get("total_price_rub_cached"),

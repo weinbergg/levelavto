@@ -40,6 +40,8 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "bindChoiceChips" in script
     assert "syncChoiceChips" in script
     assert "select.disabled = normalizedItems.length === 0" in script or "select.disabled = deduped.length === 0" in script
+    assert "bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))" in script
+    assert "const priceMain = card.querySelector('.price-main')" in script
 
 
 def test_filter_payload_includes_dynamic_brand_options():
@@ -86,8 +88,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=89' in template
-    assert '/static/css/styles.css?v=50' in template
+    assert '/static/js/app.js?v=90' in template
+    assert '/static/css/styles.css?v=51' in template
 
 
 def test_search_page_passes_payload_deferred_flag():
@@ -101,8 +103,17 @@ def test_catalog_template_does_not_duplicate_visible_interior_hidden_inputs():
     template = _read("app/templates/catalog.html")
     assert "data-chip-input=\"interior_color\"" in template
     assert "data-chip-input=\"interior_material\"" in template
+    assert "<span class=\"field-label\">Цвет салона</span>" in template
+    assert "<span class=\"field-label\">Материал салона</span>" in template
     assert "'interior_color'" not in template.split("{% set adv_keys = ", 1)[1].split("%}", 1)[0]
     assert "'interior_material'" not in template.split("{% set adv_keys = ", 1)[1].split("%}", 1)[0]
+
+
+def test_pages_base_filter_cache_requires_interior_payload_keys():
+    router = _read("app/routers/pages.py")
+    assert '"interior_design_options" not in cached' in router
+    assert '"interior_color_options" not in cached' in router
+    assert '"interior_material_options" not in cached' in router
 
 
 def test_home_search_uses_line_params_and_js_submit():

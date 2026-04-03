@@ -1615,17 +1615,19 @@ body.filters-open {
   column-gap: 10px;
   width: 100%;
   box-sizing: border-box;
-  min-height: 38px;
-  padding: 6px 10px;
+  min-height: 44px;
+  padding: 10px 12px;
   border: 1px solid var(--border-1);
   border-radius: 10px;
   background: transparent;
   color: var(--color-text-primary);
   cursor: pointer;
+  line-height: 1.15;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 .filters-primary-grid .field--checkbox span,
 .search-filters .field--checkbox span {
+  display: block;
   min-width: 0;
   line-height: 1.2;
   font-weight: 500;
@@ -3602,8 +3604,8 @@ textarea {
   font-size: 14px;
 }
 .filters-primary-grid .field--checkbox {
-  min-height: 42px;
-  padding: 0 10px;
+  min-height: 44px;
+  padding: 10px 12px;
   border-radius: 10px;
 }
 .filters-primary-grid .field--checkbox input {

@@ -1415,6 +1415,28 @@
             }
             applyThumbFallback(img)
           }
+          const priceMain = card.querySelector('.price-main')
+          if (priceMain) {
+            const displayRub = item.display_price_rub
+            const priceText = displayRub != null ? formatRub(displayRub) : '—'
+            priceMain.textContent = priceText
+          }
+          const priceNote = card.querySelector('.price-note')
+          if (item.price_note) {
+            if (priceNote) {
+              priceNote.textContent = item.price_note
+            } else {
+              const priceWrap = card.querySelector('.car-card__price')
+              if (priceWrap) {
+                const note = document.createElement('div')
+                note.className = 'price-note'
+                note.textContent = item.price_note
+                priceWrap.appendChild(note)
+              }
+            }
+          } else if (priceNote) {
+            priceNote.remove()
+          }
         })
         bindFavoriteButtons(cards)
         window.__page = data.page
@@ -1767,7 +1789,9 @@
 
     if (filtersForm) {
       bindColorChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
+      bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
       bindOtherColorsToggle(filtersForm)
+      syncChoiceChips(filtersForm)
       bindRegMonthState(filtersForm)
       bindRegionSelect(filtersForm)
       const ctrls = qsa('input, select', filtersForm)
