@@ -1519,32 +1519,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                         c["thumbnail_url"] = "/static/img/no-photo.svg"
     except Exception:
         logger.exception("catalog_initial_items_failed")
-    t0 = time.perf_counter()
-    fx_rates = service.get_fx_rates(allow_fetch=False) or {}
-    fx_eur = float(fx_rates.get("EUR") or 0)
-    fx_usd = float(fx_rates.get("USD") or 0)
-    if isinstance(initial_items, list):
-        for c in initial_items:
-            if not isinstance(c, dict) or c.get("display_price_rub") is not None or c.get("price") is None:
-                continue
-            cur = str(c.get("currency") or "").upper()
-            try:
-                if cur == "EUR" and fx_eur > 0:
-                    c["display_price_rub"] = display_price_rub(None, float(c.get("price")) * fx_eur, allow_price_fallback=True)
-                elif cur == "USD" and fx_usd > 0:
-                    c["display_price_rub"] = display_price_rub(None, float(c.get("price")) * fx_usd, allow_price_fallback=True)
-                elif cur in {"RUB", "₽"}:
-                    c["display_price_rub"] = display_price_rub(None, float(c.get("price")), allow_price_fallback=True)
-                c["price_note"] = price_without_util_note(
-                    display_price=c.get("display_price_rub"),
-                    total_price_rub_cached=c.get("total_price_rub_cached"),
-                    calc_breakdown=c.get("calc_breakdown_json"),
-                    region=params.get("region"),
-                    country=c.get("country"),
-                )
-            except Exception:
-                continue
-    timing["fx_rates_ms"] = (time.perf_counter() - t0) * 1000
+    timing["fx_rates_ms"] = 0.0
     t0 = time.perf_counter()
     contact_content = ContentService(db).content_map(
         [
@@ -1803,11 +1778,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
                 car.thumbnail_url = resolved_thumb
                 if local_detail:
                     detail_images = [local_detail] + [u for u in detail_images if u != local_detail]
-                    if resolved_thumb not in detail_images:
-                        detail_images.insert(1 if len(detail_images) > 0 else 0, resolved_thumb)
-                elif resolved_thumb in detail_images:
-                    detail_images = [resolved_thumb] + [u for u in detail_images if u != resolved_thumb]
-                else:
+                elif not detail_images:
                     detail_images.insert(0, resolved_thumb)
         except Exception:
             pass

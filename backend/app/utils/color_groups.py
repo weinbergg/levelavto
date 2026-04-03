@@ -38,6 +38,40 @@ _GROUPS: List[ColorGroup] = [
     ColorGroup("pink", "Розовый", []),
 ]
 
+_GROUP_ORDER: list[str] = [
+    "black",
+    "white",
+    "gray",
+    "silver",
+    "red",
+    "blue",
+    "green",
+    "yellow",
+    "orange",
+    "brown",
+    "beige",
+    "purple",
+    "pink",
+    "other",
+]
+
+_GROUP_HEX: dict[str, str] = {
+    "black": "#0d0f14",
+    "white": "#f5f6fa",
+    "gray": "#7d8594",
+    "silver": "#b8bec8",
+    "red": "#c94545",
+    "blue": "#2f6bd1",
+    "green": "#3b8d4c",
+    "yellow": "#e8ad2c",
+    "orange": "#e28b25",
+    "brown": "#8a5b3d",
+    "beige": "#d6be7d",
+    "purple": "#7a4bd8",
+    "pink": "#d95da4",
+    "other": "#8c94a3",
+}
+
 _FAMILIES: List[ColorFamily] = [
     ColorFamily("black", "Черный", ["black"], "#0d0f14"),
     ColorFamily("white", "Белый", ["white"], "#f5f6fa"),
@@ -237,33 +271,42 @@ def color_family_hex(raw: Optional[str]) -> Optional[str]:
 
 def split_color_facets(
     raw_colors: list[dict[str, Any]],
+    top_limit: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    family_counts: dict[str, int] = {}
+    group_counts: dict[str, int] = {}
 
     for raw in raw_colors or []:
         value = str((raw or {}).get("value") or "").strip()
         if not value:
             continue
         count = int((raw or {}).get("count") or 0)
-        family_key = normalize_color_family_key(value)
-        if not family_key:
+        group_key = normalize_color_group_key(value)
+        if not group_key:
             continue
-        family_counts[family_key] = family_counts.get(family_key, 0) + count
+        group_counts[group_key] = group_counts.get(group_key, 0) + count
 
-    basics: list[dict[str, Any]] = []
-    other: list[dict[str, Any]] = []
-    for family in _FAMILIES:
-        count = int(family_counts.get(family.key) or 0)
+    ordered_items: list[dict[str, Any]] = []
+    for key in _GROUP_ORDER:
+        count = int(group_counts.get(key) or 0)
         if count <= 0:
             continue
-        item = {
-            "value": family.key,
-            "label": family.label,
-            "hex": family.hex_value,
-            "count": count,
-        }
-        if family.key == "other":
-            other.append(item)
-        else:
-            basics.append(item)
+        ordered_items.append(
+            {
+                "value": key,
+                "label": color_group_label(key),
+                "hex": _GROUP_HEX.get(key, _GROUP_HEX["other"]),
+                "count": count,
+            }
+        )
+
+    if top_limit is None or top_limit <= 0:
+        return ordered_items, []
+
+    rank = {key: idx for idx, key in enumerate(_GROUP_ORDER)}
+    limited_items = sorted(
+        ordered_items,
+        key=lambda item: (-int(item.get("count") or 0), rank.get(str(item.get("value") or ""), 999)),
+    )
+    basics = limited_items[:top_limit]
+    other = limited_items[top_limit:]
     return basics, other

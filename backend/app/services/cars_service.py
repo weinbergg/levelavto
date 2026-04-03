@@ -913,6 +913,13 @@ class CarsService:
             color_values = split_csv_values(color)
             color_conditions = []
             for color_value in color_values:
+                group_key = normalize_color_group_key(color_value)
+                if group_key:
+                    if group_key == "other":
+                        color_conditions.append(or_(Car.color_group == "other", Car.color_group.is_(None)))
+                    else:
+                        color_conditions.append(Car.color_group == group_key)
+                    continue
                 family_key = normalize_color_family_key(color_value)
                 if family_key:
                     group_keys = color_family_group_keys(family_key)
@@ -934,13 +941,6 @@ class CarsService:
                         else:
                             color_conditions.append(Car.color_group.in_(group_keys))
                         continue
-                group_key = normalize_color_group_key(color_value)
-                if group_key:
-                    if group_key == "other":
-                        color_conditions.append(or_(Car.color_group == "other", Car.color_group.is_(None)))
-                    else:
-                        color_conditions.append(Car.color_group == group_key)
-                    continue
                 aliases = color_aliases(color_value)
                 if aliases:
                     color_conditions.append(
@@ -2642,7 +2642,11 @@ class CarsService:
         country: Optional[str] = None,
         brand: Optional[str] = None,
         model: Optional[str] = None,
+        generation: Optional[str] = None,
         color: Optional[str] = None,
+        q: Optional[str] = None,
+        lines: Optional[List[str]] = None,
+        source_key: Optional[str | List[str]] = None,
         price_min: Optional[float] = None,
         price_max: Optional[float] = None,
         power_hp_min: Optional[float] = None,
@@ -2660,16 +2664,36 @@ class CarsService:
         engine_type: Optional[str] = None,
         transmission: Optional[str] = None,
         drive_type: Optional[str] = None,
+        num_seats: Optional[str] = None,
+        doors_count: Optional[str] = None,
+        emission_class: Optional[str] = None,
+        efficiency_class: Optional[str] = None,
+        climatisation: Optional[str] = None,
+        airbags: Optional[str] = None,
+        interior_design: Optional[str] = None,
+        interior_color: Optional[str] = None,
+        interior_material: Optional[str] = None,
+        vat_reclaimable: Optional[str] = None,
+        air_suspension: Optional[bool] = None,
+        price_rating_label: Optional[str] = None,
+        owners_count: Optional[str] = None,
         condition: Optional[str] = None,
         hide_no_local_photo: bool = False,
     ) -> int:
         normalized_color = normalize_csv_values(color) or color
+        normalized_interior_design = normalize_csv_values(interior_design) or interior_design
+        normalized_interior_color = normalize_csv_values(interior_color) or interior_color
+        normalized_interior_material = normalize_csv_values(interior_material) or interior_material
         _, total = self.list_cars(
             region=region,
             country=country,
             brand=brand,
             model=model,
+            generation=generation,
             color=normalized_color,
+            q=q,
+            lines=lines,
+            source_key=source_key,
             price_min=price_min,
             price_max=price_max,
             power_hp_min=power_hp_min,
@@ -2687,6 +2711,19 @@ class CarsService:
             engine_type=engine_type,
             transmission=transmission,
             drive_type=drive_type,
+            num_seats=num_seats,
+            doors_count=doors_count,
+            emission_class=emission_class,
+            efficiency_class=efficiency_class,
+            climatisation=climatisation,
+            airbags=airbags,
+            interior_design=normalized_interior_design,
+            interior_color=normalized_interior_color,
+            interior_material=normalized_interior_material,
+            vat_reclaimable=vat_reclaimable,
+            air_suspension=air_suspension,
+            price_rating_label=price_rating_label,
+            owners_count=owners_count,
             condition=condition,
             page=1,
             page_size=1,

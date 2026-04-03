@@ -15,6 +15,8 @@
         {% set primary_raw = (primary or '')|trim %}
         {% if not primary_raw %}
           {% set primary_src = '/static/img/no-photo.svg' %}
+        {% elif primary_raw.startswith('/thumb?') %}
+          {% set primary_src = primary_raw %}
         {% elif 'img.classistatic.de' in primary_raw %}
           {% set primary_src = "/thumb?u=" ~ (primary_raw | urlencode) ~ "&w=960&fmt=webp&rev=4" %}
         {% elif primary_raw.startswith('/api/v1/mo-prod/images/') %}

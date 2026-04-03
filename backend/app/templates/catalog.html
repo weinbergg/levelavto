@@ -407,8 +407,6 @@
                 <div class="car-card__price">
                   {% if car.display_price_rub %}
                     <div class="price-main">{{ '{:,.0f}'.format(car.display_price_rub).replace(',', ' ') }} ₽</div>
-                  {% elif car.price %}
-                    <div class="price-main">{{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}</div>
                   {% else %}
                     <div class="price-main">—</div>
                   {% endif %}

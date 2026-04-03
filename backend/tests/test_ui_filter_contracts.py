@@ -86,8 +86,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=88' in template
-    assert '/static/css/styles.css?v=49' in template
+    assert '/static/js/app.js?v=89' in template
+    assert '/static/css/styles.css?v=50' in template
 
 
 def test_search_page_passes_payload_deferred_flag():
@@ -218,9 +218,9 @@ def test_catalog_scroll_and_grouped_filters_contracts():
     assert "loadCars(p, { scrollToTop: true })" in script
     assert "loadCars(1, { scrollToTop: true })" in script
     assert "ColorFamily" in color_utils
-    assert '"Серый / серебристый"' in color_utils
+    assert '"Серебристый"' in color_utils
     assert '"Другие"' in color_utils
-    assert "return basics, other" in color_utils
+    assert "return ordered_items, []" in color_utils
 
 
 def test_catalog_and_search_interior_filters_use_chip_multiselect():
@@ -235,6 +235,27 @@ def test_catalog_and_search_interior_filters_use_chip_multiselect():
     assert 'Цвет салона' in search_template
     assert 'data-region-chip-options' in search_template
     assert 'syncChoiceInputOptions' in script
+
+
+def test_catalog_cards_stay_rub_only_and_detail_primary_accepts_thumb_proxy():
+    catalog_template = _read("app/templates/catalog.html")
+    detail_template = _read("app/templates/car_detail.html")
+    script = _read("app/static/js/app.js")
+    pages = _read("app/routers/pages.py")
+    assert "{% elif car.price %}" not in catalog_template
+    assert "primary_raw.startswith('/thumb?')" in detail_template
+    assert "if (!img.dataset.origRetried)" in script
+    assert "elif not detail_images:" in pages
+
+
+def test_count_cars_keeps_interior_filters_in_count_path():
+    service = _read("app/services/cars_service.py")
+    assert "normalized_interior_color = normalize_csv_values(interior_color) or interior_color" in service
+    assert "normalized_interior_material = normalize_csv_values(interior_material) or interior_material" in service
+    assert "interior_color=normalized_interior_color" in service
+    assert "interior_material=normalized_interior_material" in service
+    assert "num_seats=num_seats" in service
+    assert "owners_count=owners_count" in service
 
 
 def test_search_page_uses_payload_on_initial_render_and_has_telegram_ping_tool():

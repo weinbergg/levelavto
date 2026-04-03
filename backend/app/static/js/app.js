@@ -213,6 +213,15 @@
           }, 120)
           return
         }
+        if (!img.dataset.origRetried) {
+          const origRaw = img.dataset.orig || ''
+          const origSrc = normalizeThumbUrl(origRaw, { thumb: false })
+          if (origSrc && origSrc !== '/static/img/no-photo.svg' && origSrc !== currentSrc) {
+            img.dataset.origRetried = '1'
+            img.src = origSrc
+            return
+          }
+        }
         if (img.dataset.fallbackApplied) return
         img.dataset.fallbackApplied = '1'
         img.src = '/static/img/no-photo.svg'
@@ -1435,13 +1444,6 @@
         const more = (photosCount && photosCount > 1 && car.thumbnail_url) ? `<span class="more-badge">+${photosCount - 1} фото</span>` : ''
         const displayRub = car.display_price_rub
         let priceText = displayRub != null ? formatRub(displayRub) : ''
-        if (!priceText && car.price != null) {
-          const rawPrice = Number(car.price)
-          if (Number.isFinite(rawPrice)) {
-            const cur = String(car.currency || '').trim().toUpperCase()
-            priceText = `${rawPrice.toLocaleString('ru-RU')} ${cur || ''}`.trim()
-          }
-        }
         if (!priceText) priceText = '—'
         const calcLine = `<div class="price-main">${priceText}</div>`
         const priceLines = []
@@ -3461,13 +3463,6 @@
           const origThumb = normalizeThumbUrl(thumbRaw)
           const displayRub = car.display_price_rub
           let price = displayRub != null ? formatRub(displayRub) : ''
-          if (!price && car.price != null) {
-            const rawPrice = Number(car.price)
-            if (Number.isFinite(rawPrice)) {
-              const cur = String(car.currency || '').trim().toUpperCase()
-              price = `${rawPrice.toLocaleString('ru-RU')} ${cur || ''}`.trim()
-            }
-          }
           if (!price) price = '—'
           const priceNote = car.price_note ? `<div class="price-note">${escapeHtml(car.price_note)}</div>` : ''
           const variantLine = car.variant ? `<div class="car-card__subtitle">${escapeHtml(car.variant)}</div>` : ''

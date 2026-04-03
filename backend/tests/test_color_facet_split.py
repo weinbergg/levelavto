@@ -9,17 +9,14 @@ def test_split_color_facets_groups_and_shades():
         {"value": "Schwarz", "count": 10},
     ]
 
-    basics, other = split_color_facets(raw, top_limit=12)
+    basics, other = split_color_facets(raw)
 
     basics_by_value = {item["value"]: item for item in basics}
     assert basics_by_value["blue"]["count"] == 20
     assert basics_by_value["black"]["count"] == 10
     assert basics_by_value["red"]["count"] == 5
 
-    labels = {item["label"] for item in other}
-    assert any(label.startswith("Синий: ") for label in labels)
-    assert any(label.startswith("Черный: ") for label in labels)
-    assert any(label.startswith("Красный: ") for label in labels)
+    assert other == []
 
 
 def test_split_color_facets_respects_top_limit():
@@ -34,6 +31,4 @@ def test_split_color_facets_respects_top_limit():
 
     assert len(basics) == 2
     assert {item["value"] for item in basics} == {"blue", "red"}
-    # shades for groups outside top_limit must not be rendered
-    assert all(not item["label"].startswith("Черный: ") for item in other)
-    assert all(not item["label"].startswith("Белый: ") for item in other)
+    assert {item["value"] for item in other} == {"black", "white"}

@@ -17,10 +17,12 @@ def test_split_color_facets_groups_related_shades_into_base_families():
         ]
     )
     by_key = {item["value"]: item for item in basics}
-    assert by_key["gray"]["count"] == 15
-    assert by_key["brown"]["count"] == 7
-    assert by_key["yellow"]["count"] == 3
-    assert other == [{"value": "other", "label": "Другие", "hex": "#8c94a3", "count": 4}]
+    assert by_key["silver"]["count"] == 10
+    assert by_key["gray"]["count"] == 5
+    assert by_key["beige"]["count"] == 7
+    assert by_key["orange"]["count"] == 3
+    assert by_key["other"]["count"] == 4
+    assert other == []
 
 
 def test_build_interior_trim_options_combines_material_and_color():
