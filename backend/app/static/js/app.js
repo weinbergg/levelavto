@@ -282,7 +282,10 @@
       btn.title = c.label
       btn.setAttribute('aria-label', c.label)
       if (c.hex) btn.style.setProperty('--chip-color', c.hex)
-      btn.textContent = c.label || c.value
+      const text = document.createElement('span')
+      text.className = 'color-chip__text'
+      text.textContent = c.label || c.value
+      btn.appendChild(text)
       container.appendChild(btn)
     })
   }
@@ -1979,10 +1982,10 @@
         reapplySelected()
         initialReapplyDone = true
       }
-      const ssrHydrated = hydrateCatalogFromSSR()
-      if (!ssrHydrated) {
-        loadCars(initialPage)
-      }
+      hydrateCatalogFromSSR()
+      // Reconcile SSR cards against fresh API data on first paint so price
+      // placeholders do not persist until the user changes filters or sorting.
+      void loadCars(initialPage)
       if (brandSelect && brandSelect.value) {
         await basePromise
         await updateCatalogModels()

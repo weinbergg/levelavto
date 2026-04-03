@@ -42,6 +42,7 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "select.disabled = normalizedItems.length === 0" in script or "select.disabled = deduped.length === 0" in script
     assert "bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))" in script
     assert "const priceMain = card.querySelector('.price-main')" in script
+    assert "void loadCars(initialPage)" in script
 
 
 def test_filter_payload_includes_dynamic_brand_options():
@@ -88,8 +89,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=90' in template
-    assert '/static/css/styles.css?v=51' in template
+    assert '/static/js/app.js?v=91' in template
+    assert '/static/css/styles.css?v=52' in template
 
 
 def test_search_page_passes_payload_deferred_flag():

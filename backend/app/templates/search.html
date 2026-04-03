@@ -275,7 +275,7 @@
                   title="{{ c.label }}"
                   aria-label="{{ c.label }}"
                   {% if c.hex %}style="--chip-color: {{ c.hex }}"{% endif %}
-                >{{ c.label }}</button>
+                ><span class="color-chip__text">{{ c.label }}</span></button>
                 {% endfor %}
               </div>
               <button
@@ -297,7 +297,7 @@
                   title="{{ c.label }}"
                   aria-label="{{ c.label }}"
                   {% if c.hex %}style="--chip-color: {{ c.hex }}"{% endif %}
-                >{{ c.label }}</button>
+                ><span class="color-chip__text">{{ c.label }}</span></button>
                 {% endfor %}
               </div>
               <input type="hidden" name="color" value="{{ params.get('color','') }}">

@@ -2219,6 +2219,10 @@ input[type="number"]::-webkit-outer-spin-button {
   max-width: 100%;
   position: relative;
 }
+.color-chip__text {
+  display: block;
+  min-width: 0;
+}
 .color-chip:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.08);
@@ -2358,6 +2362,18 @@ input[type="number"]::-webkit-outer-spin-button {
   border-color: rgba(224, 38, 38, 0.7);
   background: rgba(224, 38, 38, 0.12);
   box-shadow: inset 0 0 0 4px rgba(224, 38, 38, 0.32);
+}
+@media (min-width: 721px) {
+  .color-swatches {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(152px, 1fr));
+    gap: 10px 12px;
+  }
+  .color-chip {
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+  }
 }
 
 /* Color mappings (fallback if no hex provided) */
@@ -3969,6 +3985,7 @@ select:focus {
     border-radius: 16px;
   }
   .color-swatches {
+    display: flex;
     gap: 6px;
   }
   .color-chip {
