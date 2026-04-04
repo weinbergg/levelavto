@@ -114,7 +114,7 @@ def test_light_list_refreshes_stale_card_prices(monkeypatch):
         )
         db.commit()
         svc = CarsService(db)
-        monkeypatch.setattr(svc, "_load_lazy_recalc_versions", lambda: (True, None, None))
+        monkeypatch.setattr(svc, "_load_lazy_recalc_versions", lambda: (True, None, None, None))
 
         def fake_ensure_calc_cache(car, *, force=False):
             car.total_price_rub_cached = 6_500_000
@@ -127,6 +127,39 @@ def test_light_list_refreshes_stale_card_prices(monkeypatch):
         items, _ = svc.list_cars(page=1, page_size=10, light=True, use_fast_count=False)
         assert items[0]["total_price_rub_cached"] == 6_500_000
         assert items[0]["calc_breakdown_json"] == [{"title": "calc", "amount_rub": 6_500_000}]
+
+
+def test_needs_recalc_when_fx_signature_changes():
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        car = Car(
+            id=1,
+            source_id=1,
+            external_id="1",
+            country="DE",
+            is_available=True,
+            total_price_rub_cached=5_000_000,
+            price_rub_cached=4_000_000,
+            calc_breakdown_json=[
+                {"title": "__config_version", "amount_rub": 0, "version": "cfg:v1"},
+                {"title": "__customs_version", "amount_rub": 0, "version": "customs:v1"},
+                {"title": "__fx_signature", "amount_rub": 0, "version": "eur:98.0000|usd:90.0000"},
+            ],
+            calc_updated_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        db.add(car)
+        db.commit()
+        svc = CarsService(db)
+        assert svc._needs_recalc_for_versions(
+            car,
+            "cfg:v1",
+            "customs:v1",
+            "eur:99.0000|usd:91.0000",
+            lazy_enabled=True,
+        ) is True
 
 
 def test_light_list_exposes_effective_inferred_specs():

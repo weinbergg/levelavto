@@ -69,6 +69,7 @@ _TOTAL_CARS_CACHE: TTLCache = TTLCache(maxsize=32, ttl=300)
 _HOME_FILTER_CTX_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
 _HOME_MEDIA_CACHE: TTLCache = TTLCache(maxsize=2, ttl=3600)
 _HOME_RECOMMENDED_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
+_HOME_MORE_OFFERS_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
 
 
 def _home_dataset_version() -> str:
@@ -91,6 +92,10 @@ def _home_recommended_redis_key(cfg: Dict[str, Any], limit: int) -> str:
     )
 
 
+def _home_more_offers_redis_key(limit: int) -> str:
+    return f"home_more_offers:2021:160:1900:40000:suv:{limit}:v{_home_dataset_version()}"
+
+
 def _load_cars_by_ids(db: Session, ids: List[int]) -> List[Car]:
     if not ids:
         return []
@@ -102,6 +107,43 @@ def _load_cars_by_ids(db: Session, ids: List[int]) -> List[Car]:
             .order_by(ordering)
         ).scalars().all()
     )
+
+
+def _decorate_showcase_car(car: Car) -> Car:
+    code, label = resolve_display_country(car)
+    car.display_country_code = code
+    car.display_country_label = label
+    car.display_engine_type = translate_payload_value("engine_type", car.engine_type) or car.engine_type
+    car.display_transmission = translate_payload_value("transmission", car.transmission) or car.transmission
+    car.display_drive_type = translate_payload_value("drive_type", car.drive_type) or car.drive_type
+    car.display_body_type = ru_body(car.body_type) or display_body(car.body_type) or car.body_type
+    normalized_color = normalize_color(getattr(car, "color", None))
+    car.display_color = (
+        ru_color(getattr(car, "color", None))
+        or display_color(getattr(car, "color", None))
+        or (ru_color(normalized_color) if normalized_color else None)
+        or (display_color(normalized_color) if normalized_color else None)
+        or car.color
+    )
+    car.display_price_rub = display_price_rub(
+        car.total_price_rub_cached,
+        car.price_rub_cached,
+    )
+    car.price_note = price_without_util_note(
+        display_price=car.display_price_rub,
+        total_price_rub_cached=car.total_price_rub_cached,
+        calc_breakdown=car.calc_breakdown_json,
+        country=car.country,
+    )
+    thumb = resolve_thumbnail_url(
+        getattr(car, "thumbnail_url", None),
+        getattr(car, "thumbnail_local_path", None),
+    )
+    if thumb:
+        car.thumbnail_url = thumb
+    if not getattr(car, "thumbnail_url", None):
+        car.thumbnail_url = "/static/img/no-photo.svg"
+    return car
 
 
 def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any], limit: int = 12) -> List[Car]:
@@ -135,6 +177,35 @@ def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any]
     ids = [int(car.id) for car in items if getattr(car, "id", None)]
     if ids:
         _HOME_RECOMMENDED_CACHE[cache_key] = ids
+        redis_set_json(redis_key, ids, ttl_sec=1800)
+    return items
+
+
+def _get_home_more_offers(service: CarsService, db: Session, limit: int = 18) -> List[Car]:
+    cache_key = (limit, _home_dataset_version())
+    cached_ids = _HOME_MORE_OFFERS_CACHE.get(cache_key)
+    if cached_ids:
+        cached_items = _load_cars_by_ids(db, [int(car_id) for car_id in cached_ids if car_id])
+        if cached_items:
+            return cached_items
+    redis_key = _home_more_offers_redis_key(limit)
+    cached_ids = redis_get_json(redis_key)
+    if isinstance(cached_ids, list) and cached_ids:
+        cached_items = _load_cars_by_ids(db, [int(car_id) for car_id in cached_ids if car_id])
+        if cached_items:
+            _HOME_MORE_OFFERS_CACHE[cache_key] = cached_ids
+            return cached_items
+    items = service.recommended_auto(
+        reg_year_min=2021,
+        mileage_max=40_000,
+        power_hp_max=160,
+        engine_cc_max=1900,
+        body_type="suv",
+        limit=limit,
+    )
+    ids = [int(car.id) for car in items if getattr(car, "id", None)]
+    if ids:
+        _HOME_MORE_OFFERS_CACHE[cache_key] = ids
         redis_set_json(redis_key, ids, ttl_sec=1800)
     return items
 
@@ -1050,39 +1121,12 @@ def _home_context(
     recommended = _get_home_recommended(service, db, reco_cfg, limit=12)
     _stage("recommended_ms", t0)
     for car in recommended:
-        code, label = resolve_display_country(car)
-        car.display_country_code = code
-        car.display_country_label = label
-        car.display_engine_type = translate_payload_value("engine_type", car.engine_type) or car.engine_type
-        car.display_transmission = translate_payload_value("transmission", car.transmission) or car.transmission
-        car.display_drive_type = translate_payload_value("drive_type", car.drive_type) or car.drive_type
-        car.display_body_type = ru_body(car.body_type) or display_body(car.body_type) or car.body_type
-        normalized_color = normalize_color(getattr(car, "color", None))
-        car.display_color = (
-            ru_color(getattr(car, "color", None))
-            or display_color(getattr(car, "color", None))
-            or (ru_color(normalized_color) if normalized_color else None)
-            or (display_color(normalized_color) if normalized_color else None)
-            or car.color
-        )
-        car.display_price_rub = display_price_rub(
-            car.total_price_rub_cached,
-            car.price_rub_cached,
-        )
-        car.price_note = price_without_util_note(
-            display_price=car.display_price_rub,
-            total_price_rub_cached=car.total_price_rub_cached,
-            calc_breakdown=car.calc_breakdown_json,
-            country=car.country,
-        )
-        thumb = resolve_thumbnail_url(
-            getattr(car, "thumbnail_url", None),
-            getattr(car, "thumbnail_local_path", None),
-        )
-        if thumb:
-            car.thumbnail_url = thumb
-        if not getattr(car, "thumbnail_url", None):
-            car.thumbnail_url = "/static/img/no-photo.svg"
+        _decorate_showcase_car(car)
+    t0 = time.perf_counter()
+    more_offers = _get_home_more_offers(service, db, limit=18)
+    _stage("more_offers_ms", t0)
+    for car in more_offers:
+        _decorate_showcase_car(car)
     t0 = time.perf_counter()
     content = ContentService(db).content_map(
         [
@@ -1212,6 +1256,7 @@ def _home_context(
         "partner_logos": partner_logos,
         "body_type_stats": body_type_stats,
         "recommended_cars": recommended,
+        "more_offer_cars": more_offers,
         "content": content,
         "home": home_content,
         "fx_rates": fx_rates,
@@ -1762,6 +1807,21 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     templates = request.app.state.templates
     service = CarsService(db)
     car = service.get_car(car_id)
+    contact_content = ContentService(db).content_map(
+        [
+            "contact_phone",
+            "contact_email",
+            "contact_address",
+            "contact_tg",
+            "contact_wa",
+            "contact_ig",
+            "contact_vk",
+            "contact_avito",
+            "contact_autoru",
+            "contact_max",
+            "contact_map_link",
+        ]
+    )
     detail_images: list[str] = []
     if car:
         code, label = resolve_display_country(car)
@@ -1841,6 +1901,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     details = []
     options = []
     calc = None
+    pricing = None
     if car:
         calc = service.ensure_calc_cache(car)
         car.engine_cc = effective_engine_cc_value(car)
@@ -1936,6 +1997,18 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             "car_options": options,
             "calc": calc,
             "pricing": pricing,
+            "content": contact_content,
+            "contact_phone": contact_content.get("contact_phone"),
+            "contact_email": contact_content.get("contact_email"),
+            "contact_address": contact_content.get("contact_address"),
+            "contact_tg": contact_content.get("contact_tg"),
+            "contact_wa": contact_content.get("contact_wa"),
+            "contact_ig": contact_content.get("contact_ig"),
+            "contact_vk": contact_content.get("contact_vk"),
+            "contact_avito": contact_content.get("contact_avito"),
+            "contact_autoru": contact_content.get("contact_autoru"),
+            "contact_max": contact_content.get("contact_max"),
+            "contact_map_link": contact_content.get("contact_map_link"),
         },
     )
 

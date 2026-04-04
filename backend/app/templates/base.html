@@ -5,10 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Автокаталог{% endblock %}</title>
     <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/css/styles.css?v=52" />
+    <link rel="stylesheet" href="/static/css/styles.css?v=53" />
     {% block head_extra %}{% endblock %}
   </head>
   <body data-auth="{{ 1 if user else 0 }}">
+    {% set content_map = content if content is defined and content else {} %}
+    {% set page_phone = contact_phone or content_map.get('contact_phone') or '+7 (911) 070-75-00' %}
+    {% set page_email = contact_email or content_map.get('contact_email') or 'Level.avto@mail.ru' %}
+    {% set page_address = contact_address or content_map.get('contact_address') %}
+    {% set page_tg = contact_tg or content_map.get('contact_tg') or 'https://t.me/levelavto' %}
+    {% set page_max = contact_max or content_map.get('contact_max') or 'https://max.ru/' %}
+    {% set page_vk = contact_vk or content_map.get('contact_vk') or 'https://vk.ru/levelavto' %}
+    {% set page_avito = contact_avito or content_map.get('contact_avito') or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
+    {% set page_autoru = contact_autoru or content_map.get('contact_autoru') or 'https://auto.ru/profile/28529976' %}
+    {% set page_wa = contact_wa or content_map.get('contact_wa') %}
+    {% set page_ig = contact_ig or content_map.get('contact_ig') %}
     <header class="header">
       <div class="header__bar header__bar--single">
         <div class="la-container">
@@ -84,9 +95,17 @@
                   {% endif %}
                 </div>
               </div>
-              <a class="btn btn-primary btn-cta header__cta" href="/#lead-form"
-                >Связаться</a
-              >
+              <div class="header__contact-actions">
+                <a class="btn btn-primary btn-cta header__cta" href="tel:{{ page_phone|replace(' ','') }}"
+                  >Позвонить</a
+                >
+                <a class="header__messenger" href="{{ page_tg }}" target="_blank" rel="noopener" aria-label="Telegram">
+                  <img class="header__messenger-icon" src="/static/img/social/telegram.png" alt="Telegram" />
+                </a>
+                <a class="header__messenger" href="{{ page_max }}" target="_blank" rel="noopener" aria-label="MAX">
+                  <img class="header__messenger-icon" src="/static/img/social/max.png" alt="MAX" />
+                </a>
+              </div>
               <button
                 class="header__burger header__burger--main"
                 aria-label="Открыть меню"
@@ -126,7 +145,17 @@
             <a class="header__link" href="/login">Вход</a>
             <a class="header__link" href="/register">Регистрация</a>
             {% endif %}
-            <a class="btn btn-primary btn-cta" href="/#lead-form">Связаться</a>
+            <div class="header__drawer-contact">
+              <a class="btn btn-primary btn-cta" href="tel:{{ page_phone|replace(' ','') }}">Позвонить</a>
+              <div class="header__drawer-messengers">
+                <a class="header__messenger" href="{{ page_tg }}" target="_blank" rel="noopener" aria-label="Telegram">
+                  <img class="header__messenger-icon" src="/static/img/social/telegram.png" alt="Telegram" />
+                </a>
+                <a class="header__messenger" href="{{ page_max }}" target="_blank" rel="noopener" aria-label="MAX">
+                  <img class="header__messenger-icon" src="/static/img/social/max.png" alt="MAX" />
+                </a>
+              </div>
+            </div>
           </nav>
         </div>
       </div>
@@ -144,30 +173,20 @@
           <a href="/privacy">Политика конфиденциальности</a>
           <a href="/terms">Пользовательское соглашение</a>
         </div>
-        {% set phone = contact_phone or content.get('contact_phone') if content is defined else contact_phone %}
-        {% set email = contact_email or content.get('contact_email') if content is defined else contact_email %}
-        {% set address = contact_address or content.get('contact_address') if content is defined else contact_address %}
-        {% set tg = (contact_tg or content.get('contact_tg') if content is defined else contact_tg) or 'https://t.me/levelavto' %}
-        {% set max_link = (contact_max or content.get('contact_max') if content is defined else contact_max) or 'https://max.ru/' %}
-        {% set vk = (contact_vk or content.get('contact_vk') if content is defined else contact_vk) or 'https://vk.ru/levelavto' %}
-        {% set avito = (contact_avito or content.get('contact_avito') if content is defined else contact_avito) or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
-        {% set autoru = (contact_autoru or content.get('contact_autoru') if content is defined else contact_autoru) or 'https://auto.ru/profile/28529976' %}
-        {% set wa = contact_wa or content.get('contact_wa') if content is defined else contact_wa %}
-        {% set ig = contact_ig or content.get('contact_ig') if content is defined else contact_ig %}
         <div class="footer-meta">
-          <div>Тел.: <a href="tel:{{ (phone or '+7 (911) 070-75-00')|replace(' ','') }}">{{ phone or '+7 (911) 070-75-00' }}</a></div>
+          <div>Тел.: <a href="tel:{{ page_phone|replace(' ','') }}">{{ page_phone }}</a></div>
           <div>
-            Email: <a href="mailto:{{ email or 'Level.avto@mail.ru' }}">{{ email or 'Level.avto@mail.ru' }}</a>
+            Email: <a href="mailto:{{ page_email }}">{{ page_email }}</a>
           </div>
-          {% if address %}<div>{{ address }}</div>{% endif %}
+          {% if page_address %}<div>{{ page_address }}</div>{% endif %}
           <div class="footer-social">
-            <a class="social-link social-link--icon-only" href="{{ tg }}" target="_blank" rel="noopener" aria-label="Telegram"><img class="social-link__icon-image" src="/static/img/social/telegram.png" alt="Telegram" /></a>
-            <a class="social-link social-link--icon-only" href="{{ max_link }}" target="_blank" rel="noopener" aria-label="MAX"><img class="social-link__icon-image" src="/static/img/social/max.png" alt="MAX" /></a>
-            <a class="social-link social-link--icon-only" href="{{ vk }}" target="_blank" rel="noopener" aria-label="VK"><img class="social-link__icon-image" src="/static/img/social/vk.svg" alt="VK" /></a>
-            <a class="social-link social-link--icon-only" href="{{ avito }}" target="_blank" rel="noopener" aria-label="Avito"><img class="social-link__icon-image social-link__icon-image--wide social-link__icon-image--mono-text" src="/static/img/social/avito.svg" alt="Avito" /></a>
-            <a class="social-link social-link--icon-only" href="{{ autoru }}" target="_blank" rel="noopener" aria-label="Auto.ru"><img class="social-link__icon-image social-link__icon-image--wide social-link__icon-image--mono-text" src="/static/img/social/autoru.svg" alt="Auto.ru" /></a>
-            {% if wa %}<a class="social-link social-link--icon-only" href="{{ wa }}" target="_blank" rel="noopener" aria-label="WhatsApp"><span class="social-link__icon">WA</span></a>{% endif %}
-            {% if ig %}<a class="social-link social-link--icon-only" href="{{ ig }}" target="_blank" rel="noopener" aria-label="Instagram"><span class="social-link__icon">IG</span></a>{% endif %}
+            <a class="social-link social-link--icon-only" href="{{ page_tg }}" target="_blank" rel="noopener" aria-label="Telegram"><img class="social-link__icon-image" src="/static/img/social/telegram.png" alt="Telegram" /></a>
+            <a class="social-link social-link--icon-only" href="{{ page_max }}" target="_blank" rel="noopener" aria-label="MAX"><img class="social-link__icon-image" src="/static/img/social/max.png" alt="MAX" /></a>
+            <a class="social-link social-link--icon-only" href="{{ page_vk }}" target="_blank" rel="noopener" aria-label="VK"><img class="social-link__icon-image" src="/static/img/social/vk.svg" alt="VK" /></a>
+            <a class="social-link social-link--icon-only" href="{{ page_avito }}" target="_blank" rel="noopener" aria-label="Avito"><img class="social-link__icon-image social-link__icon-image--wide social-link__icon-image--mono-text" src="/static/img/social/avito.svg" alt="Avito" /></a>
+            <a class="social-link social-link--icon-only" href="{{ page_autoru }}" target="_blank" rel="noopener" aria-label="Auto.ru"><img class="social-link__icon-image social-link__icon-image--wide social-link__icon-image--mono-text" src="/static/img/social/autoru.svg" alt="Auto.ru" /></a>
+            {% if page_wa %}<a class="social-link social-link--icon-only" href="{{ page_wa }}" target="_blank" rel="noopener" aria-label="WhatsApp"><span class="social-link__icon">WA</span></a>{% endif %}
+            {% if page_ig %}<a class="social-link social-link--icon-only" href="{{ page_ig }}" target="_blank" rel="noopener" aria-label="Instagram"><span class="social-link__icon">IG</span></a>{% endif %}
           </div>
           <div>© {{ 2025 }} Level Avto</div>
         </div>
@@ -175,7 +194,7 @@
     </footer>
     <button id="backToTop" class="back-to-top" type="button" aria-label="Наверх">↑</button>
     <script>window.ENABLE_MODEL_ACCORDION = true;</script>
-    <script src="/static/js/app.js?v=91"></script>
+    <script src="/static/js/app.js?v=92"></script>
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>

@@ -331,6 +331,70 @@
   </div>
 </section>
 
+{% if more_offer_cars %}
+<section class="section section--more-offers" id="more-offers">
+  <div class="la-container">
+    <div class="section-header section-header--stacked">
+      <div>
+        <h2 class="section-title">Все предложения</h2>
+        <p class="section-sub">До 160 л.с., до 1 900 см³, от 2021 года, внедорожники, до 40 000 км.</p>
+      </div>
+      <button
+        type="button"
+        class="btn btn-secondary section-toggle-btn"
+        data-expand-toggle="home-more-offers-grid"
+        aria-expanded="false"
+      >
+        Все предложения
+      </button>
+    </div>
+    <div class="cards cards-highlights is-collapsed" id="home-more-offers-grid" hidden>
+      {% for car in more_offer_cars %}
+      <a class="card car-card" href="/car/{{ car.id }}">
+        <div class="thumb-wrap">
+          <img
+            class="thumb"
+            src="{% if car.thumbnail_url and 'img.classistatic.de' in car.thumbnail_url %}/thumb?u={{ car.thumbnail_url | urlencode }}&w=360&fmt=webp&rev=2{% else %}{{ car.thumbnail_url or '/static/img/no-photo.svg' }}{% endif %}"
+            width="320"
+            height="200"
+            alt=""
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+            onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
+          />
+        </div>
+        <div class="car-card__body">
+          <div>
+            <div class="car-card__title">{{ car.brand or '' }} {{ car.model or '' }}</div>
+            {% if car.variant %}
+            <div class="car-card__subtitle">{{ car.variant }}</div>
+            {% endif %}
+            <div class="car-card__meta">
+              {{ car.year or '' }} · {{ car.display_engine_type or car.engine_type or '' }} · {{ car.display_transmission or car.transmission or '' }}
+            </div>
+            <ul class="specs">
+              <li>Пробег: {{ car.mileage or '—' }}</li>
+              <li>Кузов: {{ car.display_body_type or car.body_type or '—' }}</li>
+              <li>Страна: {{ car.display_country_label or car.country or '—' }}</li>
+            </ul>
+          </div>
+          <div class="car-card__price">
+            {% if car.display_price_rub %}
+            <span>{{ '{:,.0f}'.format(car.display_price_rub).replace(',', ' ') }} ₽</span>
+            {% endif %}
+            {% if car.price_note %}
+            <div class="price-note">{{ car.price_note }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
 <section class="section" id="vehicle-types">
   <div class="la-container">
     <div class="section-header">

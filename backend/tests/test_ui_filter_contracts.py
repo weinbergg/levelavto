@@ -89,8 +89,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=91' in template
-    assert '/static/css/styles.css?v=52' in template
+    assert '/static/js/app.js?v=92' in template
+    assert '/static/css/styles.css?v=53' in template
 
 
 def test_search_page_passes_payload_deferred_flag():
@@ -169,9 +169,11 @@ def test_taxonomy_contains_extra_body_and_interior_translations():
 def test_pages_home_uses_recommended_and_media_cache_helpers():
     router = _read("app/routers/pages.py")
     assert "_get_home_recommended(service, db, reco_cfg, limit=12)" in router
+    assert "_get_home_more_offers(service, db, limit=18)" in router
     assert "home_media_ctx:v4" in router
     assert 'static" / "home-collage"' in router
     assert "home_recommended:" in router
+    assert "home_more_offers:" in router
     assert 'cfg.get("reg_year_min", 2021)' in router
     assert 'cfg.get("power_hp_max", 160)' in router
 
@@ -180,6 +182,8 @@ def test_home_collage_and_home_content_copy_are_updated():
     template = _read("app/templates/home.html")
     home_content = _read("app/utils/home_content.py")
     assert "collage_images[:75]" in template
+    assert 'data-expand-toggle="home-more-offers-grid"' in template
+    assert 'id="home-more-offers-grid"' in template
     assert "Показываем только марки, которые есть в каталоге" in home_content
     assert 'href="#cases-collage"' in template
     assert 'id="cases-collage"' in template
@@ -206,6 +210,7 @@ def test_recommended_auto_uses_reg_year_and_effective_specs_limits():
     assert "reg_year_min: int | None = None" in service
     assert "power_hp_max: int | None = None" in service
     assert "engine_cc_max: int | None = None" in service
+    assert "body_type: str | None = None" in service
     assert "power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)" in service
     assert "engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)" in service
 
@@ -226,6 +231,22 @@ def test_card_and_detail_templates_render_variant_subtitles():
     assert '"variant": c.get("variant")' in api_router
     assert ".car-card__subtitle" in css
     assert ".detail-subtitle" in css
+
+
+def test_detail_and_header_contact_actions_use_call_and_messengers():
+    base_template = _read("app/templates/base.html")
+    detail_template = _read("app/templates/car_detail.html")
+    account_template = _read("app/templates/account/index.html")
+    account_router = _read("app/routers/account.py")
+    css = _read("app/static/css/styles.css")
+    assert ">Позвонить<" in base_template
+    assert "header__contact-actions" in base_template
+    assert "header__messenger" in base_template
+    assert "detail-messenger-link" in detail_template
+    assert 'id="detail-lead-btn"' in detail_template
+    assert "display_price_rub" in account_template
+    assert "_prepare_favorites" in account_router
+    assert ".detail-messenger-link" in css
 
 
 def test_catalog_and_search_color_filters_use_non_label_wrapper():

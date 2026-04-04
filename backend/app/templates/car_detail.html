@@ -5,6 +5,9 @@
     {% if not car %}
     <div class="card">Автомобиль не найден.</div>
     {% else %}
+    {% set phone = contact_phone or content.get('contact_phone') or '+7 (911) 070-75-00' %}
+    {% set tg_link = contact_tg or content.get('contact_tg') %}
+    {% set max_link = contact_max or content.get('contact_max') %}
     <div style="margin-bottom:12px;">
       <a id="back-to-catalog" class="btn btn-ghost btn-small" href="/catalog" style="display:none;">← Назад в каталог</a>
     </div>
@@ -144,9 +147,7 @@
             {% if car.display_country_label or car.country %}Страна: {{ car.display_country_label or car.country }} · {% endif %} Фото:
             <span id="detailPhotoCount">{{ image_urls|length if image_urls else 0 }}</span>
           </p>
-          {% if user %}
           <button class="fav-btn" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>
-          {% endif %}
         </div>
         <div class="detail-specs">
           {% if car.mileage %}
@@ -169,41 +170,19 @@
           <div class="chip">Объём: {{ car.engine_cc }} см³</div>
           {% endif %}
         </div>
-        {% if car_details and car_details|length > 0 %}
-        <div class="detail-state card">
-          <h3>Состояние авто</h3>
-          <div class="detail-state__grid">
-            {% for item in car_details %}
-            <div class="detail-state__item">
-              <span class="label">{{ item.label }}</span>
-              <span class="value">{{ item.value }}</span>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-        {% if car_options and car_options|length > 0 %}
-        <div class="detail-options card">
-          <h3>Оснащение</h3>
-          <div class="detail-options__chips">
-            {% for opt in car_options %}
-            <div class="calc-chip">{{ opt }}</div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-        {% if car.display_description %}
-        <div class="detail-description card">
-          <h3>Описание</h3>
-          <div class="detail-description__text">{{ car.display_description }}</div>
-        </div>
-        {% endif %}
-        <div class="detail-actions">
-          <div class="detail-actions__lead">
-            <button class="btn cta-lead" id="detail-lead-btn" type="button" onclick="return window.toggleLeadForm(event);">
-              Связаться
-            </button>
-          </div>
+        <div class="detail-actions detail-actions--contact">
+          <a class="btn cta-lead" href="tel:{{ phone|replace(' ','') }}">Позвонить</a>
+          {% if tg_link %}
+          <a class="detail-messenger-link" href="{{ tg_link }}" target="_blank" rel="noopener" aria-label="Telegram">
+            <img class="detail-messenger-link__icon" src="/static/img/social/telegram.png" alt="Telegram" />
+          </a>
+          {% endif %}
+          {% if max_link %}
+          <a class="detail-messenger-link" href="{{ max_link }}" target="_blank" rel="noopener" aria-label="MAX">
+            <img class="detail-messenger-link__icon" src="/static/img/social/max.png" alt="MAX" />
+          </a>
+          {% endif %}
+          <button class="btn btn-secondary" id="detail-lead-btn" type="button">Оставить заявку</button>
         </div>
         <div id="detail-lead-form" class="card" style="margin-top:12px; display:none;">
           <form method="post" action="/lead" class="form-grid form-grid--12 lead-form-grid">
@@ -236,6 +215,35 @@
             </div>
           </form>
         </div>
+        {% if car_details and car_details|length > 0 %}
+        <div class="detail-state card">
+          <h3>Состояние авто</h3>
+          <div class="detail-state__grid">
+            {% for item in car_details %}
+            <div class="detail-state__item">
+              <span class="label">{{ item.label }}</span>
+              <span class="value">{{ item.value }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        {% if car_options and car_options|length > 0 %}
+        <div class="detail-options card">
+          <h3>Оснащение</h3>
+          <div class="detail-options__chips">
+            {% for opt in car_options %}
+            <div class="calc-chip">{{ opt }}</div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        {% if car.display_description %}
+        <div class="detail-description card">
+          <h3>Описание</h3>
+          <div class="detail-description__text">{{ car.display_description }}</div>
+        </div>
+        {% endif %}
       </div>
     </div>
     {% set original_raw = (car.source_url or '')|trim %}

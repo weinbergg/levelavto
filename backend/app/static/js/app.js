@@ -2315,11 +2315,28 @@
       clearBtn.type = 'button'
       clearBtn.className = 'model-accordion__clear'
       clearBtn.textContent = emptyLabel
+      const applyBtn = document.createElement('button')
+      applyBtn.type = 'button'
+      applyBtn.className = 'model-accordion__apply'
+      applyBtn.textContent = 'Применить'
+      const actionsWrap = document.createElement('div')
+      actionsWrap.className = 'model-accordion__actions'
       const initialSelectedValues = isCatalogModelSelect ? getGeneratedModelValues() : getAccordionSelectedModels(select)
       const selectedModels = new Set(initialSelectedValues)
       if (!selectedModels.size && select.value) selectedModels.add(select.value)
+      const draftSelectedModels = new Set(selectedModels)
       setAccordionSelectedModels(select, Array.from(selectedModels))
+      const syncDraftState = () => {
+        setAccordionState(container, select.value || '', Array.from(draftSelectedModels))
+      }
+      const resetDraftSelection = () => {
+        draftSelectedModels.clear()
+        selectedModels.forEach((value) => draftSelectedModels.add(value))
+        syncDraftState()
+      }
       const applySelection = () => {
+        selectedModels.clear()
+        draftSelectedModels.forEach((value) => selectedModels.add(value))
         const values = Array.from(selectedModels)
         setAccordionSelectedModels(select, values)
         if (values.length === 1) {
@@ -2329,17 +2346,17 @@
         }
         syncGeneratedModelLines(values)
         setAccordionState(container, select.value || '', values)
-        root.open = true
+        root.open = false
         select.dispatchEvent(new Event('change', { bubbles: true }))
       }
       const toggleModelSelection = (value) => {
         if (!value) return
-        if (selectedModels.has(value)) {
-          selectedModels.delete(value)
+        if (draftSelectedModels.has(value)) {
+          draftSelectedModels.delete(value)
         } else {
-          selectedModels.add(value)
+          draftSelectedModels.add(value)
         }
-        applySelection()
+        syncDraftState()
       }
       clearBtn.addEventListener('mousedown', (event) => {
         event.preventDefault()
@@ -2347,13 +2364,8 @@
       clearBtn.addEventListener('click', (event) => {
         event.preventDefault()
         event.stopPropagation()
-        selectedModels.clear()
-        setAccordionSelectedModels(select, [])
-        select.value = ''
-        syncGeneratedModelLines([])
-        select.dispatchEvent(new Event('change', { bubbles: true }))
-        setAccordionState(container, '', [])
-        root.open = false
+        draftSelectedModels.clear()
+        syncDraftState()
       })
       rootBody.appendChild(clearBtn)
 
@@ -2404,15 +2416,15 @@
           allBtn.addEventListener('click', (event) => {
             event.preventDefault()
             event.stopPropagation()
-            const shouldClearGroup = groupValues.every((value) => selectedModels.has(value))
+            const shouldClearGroup = groupValues.every((value) => draftSelectedModels.has(value))
             groupValues.forEach((value) => {
               if (shouldClearGroup) {
-                selectedModels.delete(value)
+                draftSelectedModels.delete(value)
               } else {
-                selectedModels.add(value)
+                draftSelectedModels.add(value)
               }
             })
-            applySelection()
+            syncDraftState()
           })
           modelsWrap.appendChild(allBtn)
         }
@@ -2438,6 +2450,24 @@
         rootBody.appendChild(details)
       })
 
+      actionsWrap.appendChild(applyBtn)
+      rootBody.appendChild(actionsWrap)
+      applyBtn.addEventListener('mousedown', (event) => {
+        event.preventDefault()
+      })
+      applyBtn.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        applySelection()
+      })
+      root.addEventListener('toggle', () => {
+        if (!root.open) {
+          resetDraftSelection()
+        } else {
+          resetDraftSelection()
+        }
+      })
+
       setAccordionState(container, select.value || '', Array.from(selectedModels))
       if (select.__modelAccordionChangeHandler) {
         select.removeEventListener('change', select.__modelAccordionChangeHandler)
@@ -2457,7 +2487,7 @@
           syncGeneratedModelLines([])
         }
         setAccordionSelectedModels(select, Array.from(selectedModels))
-        setAccordionState(container, select.value || '', Array.from(selectedModels))
+        resetDraftSelection()
       }
       select.addEventListener('change', handleModelAccordionChange)
       select.__modelAccordionChangeHandler = handleModelAccordionChange
@@ -3645,6 +3675,25 @@
     })
   }
 
+  function initExpandToggles() {
+    qsa('[data-expand-toggle]').forEach((btn) => {
+      if (btn.dataset.bound === '1') return
+      btn.dataset.bound = '1'
+      const targetId = btn.getAttribute('data-expand-toggle')
+      const target = targetId ? document.getElementById(targetId) : null
+      if (!target) return
+      btn.addEventListener('click', (event) => {
+        event.preventDefault()
+        const expanded = btn.getAttribute('aria-expanded') === 'true'
+        const nextExpanded = !expanded
+        btn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false')
+        target.hidden = !nextExpanded
+        target.classList.toggle('is-collapsed', !nextExpanded)
+        btn.textContent = nextExpanded ? 'Скрыть предложения' : 'Все предложения'
+      })
+    })
+  }
+
   function initDetailGallery() {
     const main = qs('.detail-hero__main')
     const img = qs('#primaryImage')
@@ -3830,6 +3879,7 @@
     safeInit('favorites', loadFavoritesState)
     safeInit('catalog', initCatalog)
     safeInit('home', initHome)
+    safeInit('expand-toggles', initExpandToggles)
     safeInit('advanced-search', initAdvancedSearch)
     safeInit('detail-gallery', initDetailGallery)
     safeInit('detail-actions', initDetailActions)

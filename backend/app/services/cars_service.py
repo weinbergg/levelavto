@@ -25,6 +25,7 @@ from ..utils.filter_values import normalize_csv_values, split_csv_values
 from ..utils.taxonomy import (
     body_aliases,
     normalize_color,
+    normalize_body_type,
     normalize_fuel,
     ru_color,
     ru_fuel,
@@ -1583,10 +1584,21 @@ class CarsService:
                 return row.get("version")
         return None
 
-    def _load_lazy_recalc_versions(self) -> tuple[bool, str | None, str | None]:
+    def _fx_signature(self, rates: dict[str, Any] | None = None) -> str | None:
+        fx = rates if rates is not None else (self.get_fx_rates() or {})
+        try:
+            eur = float(fx.get("EUR") or 0)
+            usd = float(fx.get("USD") or 0)
+        except Exception:
+            return None
+        if eur <= 0 and usd <= 0:
+            return None
+        return f"eur:{eur:.4f}|usd:{usd:.4f}"
+
+    def _load_lazy_recalc_versions(self) -> tuple[bool, str | None, str | None, str | None]:
         lazy_enabled = os.getenv("LAZY_RECALC_ENABLED", "1") != "0"
         if not lazy_enabled:
-            return False, None, None
+            return False, None, None, None
         customs_version = None
         try:
             from backend.app.services.customs_config import get_customs_config
@@ -1612,13 +1624,14 @@ class CarsService:
                 cfg_version = cfg.payload.get("meta", {}).get("version")
         except Exception:
             cfg_version = None
-        return lazy_enabled, cfg_version, customs_version
+        return lazy_enabled, cfg_version, customs_version, self._fx_signature()
 
     def _needs_recalc_for_versions(
         self,
         record: Any,
         cfg_version: str | None,
         customs_version: str | None,
+        fx_signature: str | None,
         *,
         lazy_enabled: bool,
     ) -> bool:
@@ -1642,15 +1655,23 @@ class CarsService:
             return True
         if cfg_version and self._extract_breakdown_version(breakdown, "__config_version") != cfg_version:
             return True
+        if fx_signature and self._extract_breakdown_version(breakdown, "__fx_signature") != fx_signature:
+            return True
         return False
 
     def _lazy_recalc_items(self, items: List[Car]) -> None:
-        lazy_enabled, cfg_version, customs_version = self._load_lazy_recalc_versions()
+        lazy_enabled, cfg_version, customs_version, fx_signature = self._load_lazy_recalc_versions()
         if not lazy_enabled:
             return
 
         for car in items:
-            if self._needs_recalc_for_versions(car, cfg_version, customs_version, lazy_enabled=lazy_enabled):
+            if self._needs_recalc_for_versions(
+                car,
+                cfg_version,
+                customs_version,
+                fx_signature,
+                lazy_enabled=lazy_enabled,
+            ):
                 try:
                     self.ensure_calc_cache(car, force=True)
                 except Exception:
@@ -1673,14 +1694,20 @@ class CarsService:
         row["spec_inferred_at"] = car.spec_inferred_at
 
     def _lazy_recalc_light_items(self, items: List[Dict[str, Any]]) -> None:
-        lazy_enabled, cfg_version, customs_version = self._load_lazy_recalc_versions()
+        lazy_enabled, cfg_version, customs_version, fx_signature = self._load_lazy_recalc_versions()
         if not lazy_enabled:
             return
         candidate_ids: list[int] = []
         for row in items:
             if not isinstance(row, dict):
                 continue
-            if self._needs_recalc_for_versions(row, cfg_version, customs_version, lazy_enabled=lazy_enabled):
+            if self._needs_recalc_for_versions(
+                row,
+                cfg_version,
+                customs_version,
+                fx_signature,
+                lazy_enabled=lazy_enabled,
+            ):
                 car_id = row.get("id")
                 if isinstance(car_id, int):
                     candidate_ids.append(car_id)
@@ -1729,13 +1756,6 @@ class CarsService:
             )
         except Exception:
             batch_size = max(120, max(1, int(page or 1)) * max(1, int(page_size or 20)))
-        stale_expr = or_(
-            Car.total_price_rub_cached.is_(None),
-            Car.calc_breakdown_json.is_(None),
-            Car.calc_updated_at.is_(None),
-            and_(Car.updated_at.is_not(None), Car.calc_updated_at < Car.updated_at),
-            and_(Car.spec_inferred_at.is_not(None), Car.calc_updated_at < Car.spec_inferred_at),
-        )
         price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
         if sort == "price_desc":
             order_clause = [price_expr.desc().nullslast(), Car.id.asc()]
@@ -1745,7 +1765,7 @@ class CarsService:
             int(car_id)
             for car_id in self.db.execute(
                 select(Car.id)
-                .where(where_expr, stale_expr)
+                .where(where_expr)
                 .order_by(*order_clause)
                 .limit(batch_size)
             ).scalars().all()
@@ -1767,7 +1787,7 @@ class CarsService:
             try:
                 before_total = car.total_price_rub_cached
                 before_calc = car.calc_updated_at
-                self.ensure_calc_cache(car, force=True)
+                self.ensure_calc_cache(car, force=False)
                 if car.total_price_rub_cached != before_total or car.calc_updated_at != before_calc:
                     refreshed += 1
             except Exception:
@@ -1825,6 +1845,10 @@ class CarsService:
             return None
         lazy_enabled = os.getenv("LAZY_RECALC_ENABLED", "1") != "0"
         customs_version = None
+        cfg_version: str | None = None
+        eur_rate: float | None = None
+        usd_rate: float | None = None
+        fx_signature: str | None = None
         try:
             from backend.app.services.customs_config import get_customs_config
 
@@ -1869,33 +1893,35 @@ class CarsService:
                 return True
             if cfg_version and _extract_version(breakdown, "__config_version") != cfg_version:
                 return True
+            if fx_signature and _extract_version(breakdown, "__fx_signature") != fx_signature:
+                return True
             return False
 
         def _fallback_total(reason: str) -> dict | None:
-            # Use existing cached RUB price if available; otherwise derive from price+currency.
+            # Derive fallback from current source price and current FX first; only then use cached RUB.
             fx_local = self.get_fx_rates() or {}
-            eur = fx_local.get("EUR") or 95.0
-            usd = fx_local.get("USD") or 85.0
+            eur = fx_local.get("EUR") or eur_rate or 95.0
+            usd = fx_local.get("USD") or usd_rate or 85.0
             total = None
-            if car.price_rub_cached is not None:
-                total = float(car.price_rub_cached)
-            else:
-                cur_local = str(car.currency or "EUR").strip().upper()
-                if car.price is None:
-                    total = None
-                elif cur_local == "EUR":
+            cur_local = str(car.currency or "EUR").strip().upper()
+            if car.price is not None:
+                if cur_local == "EUR":
                     total = float(car.price) * float(eur)
                 elif cur_local == "USD":
                     total = float(car.price) * float(usd)
                 elif cur_local in ("RUB", "₽"):
                     total = float(car.price)
+            elif car.price_rub_cached is not None:
+                total = float(car.price_rub_cached)
             if total is None:
                 return None
             car.total_price_rub_cached = total
             if car.calc_breakdown_json is None:
                 car.calc_breakdown_json = []
             _upsert_version(car.calc_breakdown_json, "__without_util_fee", "1")
+            _upsert_version(car.calc_breakdown_json, "__config_version", cfg_version or "")
             _upsert_version(car.calc_breakdown_json, "__customs_version", customs_version or "")
+            _upsert_version(car.calc_breakdown_json, "__fx_signature", fx_signature or "")
             car.calc_updated_at = datetime.utcnow()
             self.db.commit()
             self.logger.info("calc_fallback_total car=%s reason=%s", car.id, reason)
@@ -1961,6 +1987,10 @@ class CarsService:
         if not cfg:
             return None
         cfg_version = cfg.payload.get("meta", {}).get("version")
+        fx = self.get_fx_rates() or {}
+        eur_rate = fx.get("EUR") or cfg.payload.get("meta", {}).get("eur_rate_default") or 95.0
+        usd_rate = fx.get("USD") or cfg.payload.get("meta", {}).get("usd_rate_default") or 85.0
+        fx_signature = self._fx_signature({"EUR": eur_rate, "USD": usd_rate})
         effective_engine_cc = effective_engine_cc_value(car)
         effective_power_hp = effective_power_hp_value(car)
         effective_power_kw = effective_power_kw_value(car)
@@ -1984,9 +2014,6 @@ class CarsService:
                 "used_price": used_price,
                 "used_currency": used_currency,
             }
-        fx = self.get_fx_rates() or {}
-        eur_rate = fx.get("EUR") or cfg.payload.get("meta", {}).get("eur_rate_default") or 95.0
-        usd_rate = fx.get("USD") or cfg.payload.get("meta", {}).get("usd_rate_default") or 85.0
         cur = str(used_currency or "EUR").strip().upper()
         price_net_eur = None
         if cur == "EUR":
@@ -2059,6 +2086,8 @@ class CarsService:
             _upsert_version(display, "__config_version", cfg_version)
         if customs_version:
             _upsert_version(display, "__customs_version", customs_version)
+        if fx_signature:
+            _upsert_version(display, "__fx_signature", fx_signature)
         if result.get("without_util_fee"):
             _upsert_version(display, "__without_util_fee", "1")
         total_rub = float(result.get("total_rub") or 0)
@@ -2562,6 +2591,7 @@ class CarsService:
         reg_year_max: int | None = None,
         power_hp_max: int | None = None,
         engine_cc_max: int | None = None,
+        body_type: str | None = None,
         limit: int = 12,
     ) -> List[Car]:
         """
@@ -2575,6 +2605,7 @@ class CarsService:
         reg_month_expr = func.coalesce(Car.registration_month, 1)
         power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)
         engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)
+        price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
 
         if max_age_years is not None:
             # возраст в месяцах
@@ -2587,9 +2618,9 @@ class CarsService:
         if reg_year_max is not None:
             conditions.append(reg_year_expr <= reg_year_max)
         if price_min is not None:
-            conditions.append(Car.price_rub_cached >= price_min)
+            conditions.append(price_expr >= price_min)
         if price_max is not None:
-            conditions.append(Car.price_rub_cached <= price_max)
+            conditions.append(price_expr <= price_max)
         if mileage_max is not None:
             conditions.append(Car.mileage <= mileage_max)
         if power_hp_max is not None:
@@ -2598,12 +2629,14 @@ class CarsService:
         if engine_cc_max is not None:
             conditions.append(engine_cc_expr.is_not(None))
             conditions.append(engine_cc_expr <= engine_cc_max)
+        if body_type is not None:
+            conditions.append(Car.body_type == (normalize_body_type(body_type) or body_type))
 
         stmt = (
             select(Car)
             .where(and_(*conditions))
             .order_by(
-                Car.price_rub_cached.asc().nullslast(),
+                price_expr.asc().nullslast(),
                 Car.mileage.asc().nullslast(),
                 Car.year.desc().nullslast(),
                 Car.created_at.desc(),

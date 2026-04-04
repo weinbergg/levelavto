@@ -58,13 +58,38 @@ content %}
           <button class="fav-btn active" data-fav-button data-car-id="{{ car.id }}" aria-label="Убрать из избранного">★</button>
         </div>
         <div class="car-card__body">
-          <div class="car-card__title">{{ car.brand or '' }} {{ car.model or '' }}</div>
-          <div class="car-card__meta">
-            {% set meta = [car.year or '', car.engine_type or '', car.transmission or ''] | reject('equalto','') | list %}
-            {{ meta|join(' · ') }}
+          <div>
+            <div class="car-card__title">{{ car.brand or '' }} {{ car.model or '' }}</div>
+            {% if car.variant %}
+            <div class="car-card__subtitle">{{ car.variant }}</div>
+            {% endif %}
+            <div class="car-card__meta">
+              {% set meta = [car.year or '', car.display_engine_type or car.engine_type or '', car.display_transmission or car.transmission or ''] | reject('equalto','') | list %}
+              {{ meta|join(' · ') }}
+            </div>
+            <ul class="specs">
+              {% if car.mileage %}
+              <li><span class="spec-line">Пробег: {{ "{:,.0f}".format(car.mileage).replace(',', ' ') }} км</span></li>
+              {% endif %}
+              {% if car.display_body_type or car.body_type %}
+              <li><span class="spec-line">{{ car.display_body_type or car.body_type }}</span></li>
+              {% endif %}
+              {% if car.display_country_label or car.country %}
+              <li><span class="spec-line">{{ car.display_country_label or car.country }}</span></li>
+              {% endif %}
+            </ul>
           </div>
           <div class="car-card__price">
-            {% if car.price is not none %}{{ "{:,.0f}".format(car.price).replace(',', ' ') }} {{ car.currency or '' }}{% else %}Цена по запросу{% endif %}
+            <div class="price-main">
+              {% if car.display_price_rub %}
+              {{ "{:,.0f}".format(car.display_price_rub).replace(',', ' ') }} ₽
+              {% else %}
+              —
+              {% endif %}
+            </div>
+            {% if car.price_note %}
+            <div class="price-note">{{ car.price_note }}</div>
+            {% endif %}
           </div>
         </div>
       </a>

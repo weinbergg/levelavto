@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import time
+from datetime import datetime
 from typing import Any, Iterable
 
 from backend.app.db import SessionLocal
@@ -58,6 +59,16 @@ def _update_total_step(steps: list[dict], total_rub: float) -> None:
             step["value"] = float(total_rub)
 
 
+def _upsert_breakdown_version(steps: list[dict], title: str, version: str | None) -> None:
+    if not title or not version:
+        return
+    for step in steps:
+        if str(step.get("title") or "") == title:
+            step["version"] = version
+            return
+    steps.append({"title": title, "amount_rub": 0, "version": version})
+
+
 def recompute_total_from_breakdown(steps: list[dict], eur_rate: float, usd_rate: float) -> float | None:
     sum_eur = 0.0
     sum_usd = 0.0
@@ -100,6 +111,7 @@ def main() -> None:
         rates = svc.get_fx_rates(allow_fetch=True) or {}
         eur_rate = float(rates.get("EUR") or 0)
         usd_rate = float(rates.get("USD") or 0)
+        fx_signature = svc._fx_signature({"EUR": eur_rate, "USD": usd_rate})
 
         if eur_rate <= 0 or usd_rate <= 0:
             raise SystemExit("EUR/USD rates missing")
@@ -142,6 +154,8 @@ def main() -> None:
                     price_rub = float(car.price) * eur_rate
                 elif car.currency == "USD" and car.price is not None:
                     price_rub = float(car.price) * usd_rate
+                elif car.currency in {"RUB", "₽"} and car.price is not None:
+                    price_rub = float(car.price)
 
                 if total_rub is None and price_rub is None:
                     continue
@@ -150,6 +164,8 @@ def main() -> None:
                     total_rub = ceil_to_step(total_rub, get_round_step_rub())
                     _update_rate_steps(steps, eur_rate, usd_rate)
                     _update_total_step(steps, total_rub)
+                if steps and fx_signature:
+                    _upsert_breakdown_version(steps, "__fx_signature", fx_signature)
 
                 updates.append(
                     {
@@ -157,6 +173,7 @@ def main() -> None:
                         "price_rub_cached": price_rub if price_rub is not None else car.price_rub_cached,
                         "total_price_rub_cached": total_rub if total_rub is not None else car.total_price_rub_cached,
                         "calc_breakdown_json": steps if steps else car.calc_breakdown_json,
+                        "calc_updated_at": datetime.utcnow(),
                     }
                 )
             if updates and not args.dry_run:
