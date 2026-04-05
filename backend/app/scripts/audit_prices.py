@@ -62,6 +62,8 @@ def _run_base_counts(db, where: str, params: dict[str, Any]) -> dict[str, int]:
     def one(sql: str) -> int:
         return int(db.execute(text(sql), params).scalar() or 0)
 
+    breakdown_array_guard = "jsonb_typeof(calc_breakdown_json::jsonb) = 'array'"
+
     return {
         "total_available": one(f"SELECT count(*) FROM cars {where}"),
         "missing_total": one(f"SELECT count(*) FROM cars {where} AND total_price_rub_cached IS NULL"),
@@ -69,15 +71,21 @@ def _run_base_counts(db, where: str, params: dict[str, Any]) -> dict[str, int]:
         "missing_total_in_breakdown": one(
             "SELECT count(*) FROM cars "
             + where
-            + " AND calc_breakdown_json IS NOT NULL AND NOT EXISTS ("
+            + " AND calc_breakdown_json IS NOT NULL AND ("
+            + f"NOT ({breakdown_array_guard}) "
+            + "OR ("
+            + f"({breakdown_array_guard}) AND NOT EXISTS ("
             + "SELECT 1 FROM jsonb_array_elements(calc_breakdown_json::jsonb) e "
             + "WHERE e->>'title'='Итого (RUB)'"
+            + ")"
+            + ")"
             + ")"
         ),
         "cached_vs_breakdown_mismatch": one(
             "SELECT count(*) FROM cars "
             + where
             + " AND total_price_rub_cached IS NOT NULL AND calc_breakdown_json IS NOT NULL "
+            + f"AND ({breakdown_array_guard}) "
             + "AND EXISTS ("
             + "SELECT 1 FROM jsonb_array_elements(calc_breakdown_json::jsonb) e "
             + "WHERE e->>'title'='Итого (RUB)' "

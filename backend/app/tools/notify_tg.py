@@ -6,6 +6,8 @@ import sys
 import time
 import requests
 
+from backend.app.utils.telegram import telegram_enabled
+
 
 def load_result(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
@@ -51,6 +53,9 @@ def send_tg(msg: str) -> None:
     chat_id = os.getenv("TELEGRAM_ADMIN_CHAT_ID") or os.getenv("TELEGRAM_ALLOWED_IDS", "").split(",")[0]
     if dry:
         print("[dry-run tg]\n", msg)
+        return
+    if not telegram_enabled():
+        print("telegram disabled by TELEGRAM_ENABLED", file=sys.stderr)
         return
     if not token or not chat_id:
         print("TELEGRAM_BOT_TOKEN or CHAT_ID not set", file=sys.stderr)
