@@ -35,4 +35,6 @@ def test_css_has_model_accordion_styles():
     assert ".model-accordion__model.is-active" in css
     assert ".model-accordion__actions" in css
     assert ".model-accordion__apply" in css
+    assert "position: sticky;" in css
+    assert "width: 100%;" in css
     assert "font-size: 15px;" in css
