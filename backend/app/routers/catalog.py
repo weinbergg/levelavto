@@ -265,7 +265,13 @@ def _bypass_price_sensitive_cache(
 
 
 def _sort_by_label(items: list[dict]) -> list[dict]:
-    return sorted(items, key=lambda x: (x.get("label") or x.get("value") or "").strip().casefold())
+    return sorted(
+        items,
+        key=lambda x: (
+            int(x.get("sort_order", 999)),
+            (x.get("label") or x.get("value") or "").strip().casefold(),
+        ),
+    )
 
 
 def _sort_numeric_strings(values: List[str]) -> List[str]:

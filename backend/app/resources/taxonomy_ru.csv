@@ -29,15 +29,16 @@ color,gold,Золотистый,gold; golden; gold metallic
 drivetrain,fwd,Передний,FWD; front; Front wheel drive; Vorderrad
 drivetrain,rwd,Задний,RWD; rear; Rear wheel drive; Hinterrad
 drivetrain,awd,Полный,AWD; 4WD; 4x4; all; Allrad; quattro; xDrive; 4MATIC
-fuel,petrol,Бензин,Petrol; Benzin; Gasoline
-fuel,diesel,Дизель,Diesel
-fuel,hybrid,Гибрид,Hybrid; HEV; Vollhybrid
-fuel,phev,Гибрид (PHEV),Plug-in hybrid; PHEV; Plug-in-Hybrid
-fuel,electric,Электро,Electric; EV; Elektro; BEV
-fuel,lpg,Газ,LPG; propane; propan; propan-butane; propane-butane
-fuel,cng,Метан/CNG,CNG; Compressed Natural Gas; Erdgas; Methane; Natural Gas; Metano
-fuel,ethanol,Этанол (E85/FFV),Ethanol; E85; FFV; FlexFuel; Flex Fuel; Bioethanol
-fuel,hydrogen,Водород,Hydrogen; H2; Fuel Cell
-fuel,other,Другое,other; others
+fuel,petrol,Бензин,Petrol; Benzin; Gasoline; Benzina; бензин
+fuel,diesel,Дизель,Diesel; дизель; biodiesel
+fuel,electric,Электро,Electric; EV; Elektro; BEV; электро
+fuel,ethanol,Ethanol (FFV, E85 etc.),Ethanol; E85; FFV; FlexFuel; Flex Fuel; Bioethanol; этанол
+fuel,hybrid_diesel,Гибрид (дизельный / электрический),hybrid (diesel/electric); дизель + электро
+fuel,hybrid,Гибрид (бензиновый / электрический),Hybrid; HEV; Vollhybrid; hybrid (petrol/electric); бензин + электро
+fuel,hydrogen,Водород,Hydrogen; H2; Fuel Cell; водород
+fuel,lpg,Автомобильный газ (LPG),LPG; propane; propan; propan-butane; propane-butane; пропан-бутан
+fuel,cng,Природный газ (КПГ),CNG; Compressed Natural Gas; Erdgas; Methane; Natural Gas; Metano; природный газ; метан
+fuel,other,Другой,other; others; другое
+fuel,phev,Подключаемый гибрид,Plug-in hybrid; PHEV; Plug-in-Hybrid; подключаемый гибрид
 transmission,automatic,Автомат,Automatic; Auto; AT; АКП; автомат; Tiptronic; DSG; CVT; вариатор; робот
 transmission,manual,Механика,Manual; MT; механика; мех; Schalt; Handschalt; Schaltgetriebe

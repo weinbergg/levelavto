@@ -191,6 +191,11 @@ def test_taxonomy_contains_extra_body_and_interior_translations():
     assert "_INTERIOR_MATERIAL_LABELS" in utils
     assert "build_interior_trim_options" in utils
     assert 'return "trim:" + "|".join(parts)' in utils
+    assert "fuel,hybrid_diesel,Гибрид (дизельный / электрический)" in taxonomy
+    assert "fuel,phev,Подключаемый гибрид" in taxonomy
+    assert "fuel,cng,Природный газ (КПГ)" in taxonomy
+    assert 'return "hybrid_diesel"' in utils
+    assert 'return "phev"' in utils
 
 
 def test_pages_home_uses_recommended_and_media_cache_helpers():
@@ -257,6 +262,20 @@ def test_model_filters_normalize_whitespace_and_merge_overlapping_regions():
     assert ".multi-select-menu__options" in css
     assert "grid-template-columns: 1fr;" in css
     assert "white-space: normal;" in css
+
+
+def test_engine_type_facets_use_raw_fuel_source_and_custom_filtering():
+    service = _read("app/services/cars_service.py")
+    catalog = _read("app/routers/catalog.py")
+    assert "def _fuel_source_expr(self):" in service
+    assert 'func.jsonb_extract_path_text(payload_json, "full_fuel_type")' in service
+    assert 'func.jsonb_extract_path_text(payload_json, "envkv_engine_type")' in service
+    assert 'func.jsonb_extract_path_text(payload_json, "envkv_consumption_fuel")' in service
+    assert "def _fuel_filter_clause(self, raw_value: str):" in service
+    assert 'if key == "hybrid_diesel":' in service
+    assert 'if key == "phev":' in service
+    assert 'if field in {"color_group", "engine_type"}:' in service
+    assert 'int(x.get("sort_order", 999))' in catalog
 
 
 def test_card_and_detail_templates_render_variant_subtitles():

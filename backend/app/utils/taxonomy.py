@@ -573,7 +573,63 @@ def build_interior_options(values: List[Any], kind: str) -> List[Dict[str, str]]
 
 
 def normalize_fuel(val: Optional[str]) -> Optional[str]:
-    return _normalize_alias("fuel", val)
+    if not val:
+        return None
+    raw = str(val).strip().lower()
+    if not raw:
+        return None
+    compact = re.sub(r"\s+", " ", raw)
+    if not re.search(r"[a-zа-я]", compact, re.IGNORECASE):
+        return None
+    if any(token in compact for token in _FUEL_GARBAGE_KEYWORDS) and not any(
+        token in compact for token in _FUEL_FREE_TEXT_KEYWORDS
+    ):
+        return None
+    if (
+        "plug-in hybrid" in compact
+        or "plug in hybrid" in compact
+        or "plugin hybrid" in compact
+        or "phev" in compact
+        or "подключаем" in compact
+    ):
+        return "phev"
+    if (
+        "hybrid (diesel/electric)" in compact
+        or "дизель + электро" in compact
+        or (("hybrid" in compact or "гибрид" in compact) and ("diesel" in compact or "дизель" in compact))
+    ):
+        return "hybrid_diesel"
+    if (
+        "hybrid" in compact
+        or "гибрид" in compact
+        or "бензин + электро" in compact
+        or "hev" in compact
+        or "vollhybrid" in compact
+    ):
+        return "hybrid"
+    if any(token in compact for token in ("hydrogen", "fuel cell", "водород")) or re.search(r"\bh2\b", compact):
+        return "hydrogen"
+    if any(token in compact for token in ("ethanol", "e85", "ffv", "flexfuel", "flex fuel", "bioethanol", "этанол")):
+        return "ethanol"
+    if any(
+        token in compact
+        for token in ("natural gas", "cng", "lng", "methane", "metano", "erdgas", "природный газ", "метан")
+    ):
+        return "cng"
+    if any(token in compact for token in ("lpg", "propane", "propan", "пропан")):
+        return "lpg"
+    if any(token in compact for token in ("electric", "elektro", "электро")) or compact in {"ev", "bev"}:
+        return "electric"
+    if any(token in compact for token in ("diesel", "дизель")):
+        return "diesel"
+    if any(token in compact for token in ("petrol", "gasoline", "benzin", "benzina", "бензин")):
+        return "petrol"
+    if compact.startswith("other") or compact.startswith("дру"):
+        return "other"
+    normalized = _normalize_alias("fuel", compact)
+    if normalized == compact:
+        return None
+    return normalized
 
 
 _FUEL_FREE_TEXT_KEYWORDS = (
@@ -635,7 +691,7 @@ def is_plausible_fuel_value(value: Optional[str]) -> bool:
     if not raw:
         return False
     normalized = normalize_fuel(raw)
-    if normalized and normalized in _ALIASES.get("fuel", {}):
+    if normalized:
         return True
     low = raw.lower()
     if not re.search(r"[a-zа-я]", low, re.IGNORECASE):
@@ -911,26 +967,35 @@ def build_labeled_options(values: List[Any], field: str) -> List[Dict[str, str]]
 
 
 def build_engine_type_options(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    order = {
+        "petrol": 10,
+        "diesel": 20,
+        "electric": 30,
+        "ethanol": 40,
+        "hybrid_diesel": 50,
+        "hybrid": 60,
+        "hydrogen": 70,
+        "lpg": 80,
+        "cng": 90,
+        "other": 100,
+        "phev": 110,
+    }
     agg: Dict[str, Dict[str, Any]] = {}
     for row in rows or []:
         raw = str((row or {}).get("value") or "").strip()
         if not raw:
             continue
         normalized = normalize_fuel(raw)
-        if normalized and normalized in _ALIASES.get("fuel", {}):
-            value = normalized
-        elif is_plausible_fuel_value(raw):
-            value = raw.strip().lower()
-        else:
+        if not normalized:
             continue
-        if not re.search(r"[a-zа-я]", value, re.IGNORECASE):
-            continue
+        value = normalized
         entry = agg.get(value)
         if entry is None:
             entry = {
                 "value": value,
                 "label": ru_fuel(value) or translate_payload_value("engine_type", raw) or raw,
                 "count": 0,
+                "sort_order": order.get(value, 999),
             }
             agg[value] = entry
         entry["count"] += int((row or {}).get("count") or 0)

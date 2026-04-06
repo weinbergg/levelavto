@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import select, func, and_, or_, case, cast, String, text, literal
+from sqlalchemy import select, func, and_, or_, case, cast, String, text, literal, not_
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.dialects.postgresql import JSONB
 import logging
@@ -144,6 +144,79 @@ class CarsService:
                 "g",
             )
         )
+
+    def _fuel_source_expr(self):
+        payload_json = cast(Car.source_payload, JSONB)
+        return func.coalesce(
+            func.nullif(func.jsonb_extract_path_text(payload_json, "full_fuel_type"), ""),
+            func.nullif(func.jsonb_extract_path_text(payload_json, "envkv_engine_type"), ""),
+            func.nullif(func.jsonb_extract_path_text(payload_json, "envkv_consumption_fuel"), ""),
+            func.nullif(func.jsonb_extract_path_text(payload_json, "fuel_raw"), ""),
+            func.nullif(func.jsonb_extract_path_text(payload_json, "engine_raw"), ""),
+            func.nullif(Car.engine_type, ""),
+        )
+
+    def _fuel_search_expr(self):
+        return func.lower(func.coalesce(self._fuel_source_expr(), ""))
+
+    def _fuel_like_any(self, expr, terms: List[str]):
+        return or_(*[expr.like(f"%{term}%") for term in terms if term])
+
+    def _fuel_filter_clause(self, raw_value: str):
+        key = normalize_fuel(raw_value) or str(raw_value or "").strip().lower()
+        fuel_expr = self._fuel_search_expr()
+        if key == "petrol":
+            return and_(
+                self._fuel_like_any(fuel_expr, ["petrol", "gasoline", "benzin", "benzina", "бензин"]),
+                not_(self._fuel_like_any(fuel_expr, ["hybrid", "гибрид", "plug-in", "phev", "electric", "электро"])),
+            )
+        if key == "diesel":
+            return and_(
+                self._fuel_like_any(fuel_expr, ["diesel", "дизель"]),
+                not_(self._fuel_like_any(fuel_expr, ["hybrid", "гибрид", "plug-in", "phev", "electric", "электро"])),
+            )
+        if key == "electric":
+            return and_(
+                self._fuel_like_any(fuel_expr, ["electric", "elektro", "электро"]),
+                not_(self._fuel_like_any(fuel_expr, ["hybrid", "гибрид", "plug-in", "phev"])),
+            )
+        if key == "ethanol":
+            return self._fuel_like_any(fuel_expr, ["ethanol", "e85", "ffv", "flexfuel", "flex fuel", "этанол"])
+        if key == "hybrid_diesel":
+            return or_(
+                self._fuel_like_any(fuel_expr, ["hybrid (diesel/electric)", "дизель + электро"]),
+                and_(
+                    self._fuel_like_any(fuel_expr, ["hybrid", "гибрид"]),
+                    self._fuel_like_any(fuel_expr, ["diesel", "дизель"]),
+                    not_(self._fuel_like_any(fuel_expr, ["plug-in", "phev"])),
+                ),
+            )
+        if key == "hybrid":
+            return or_(
+                fuel_expr == "hybrid",
+                self._fuel_like_any(fuel_expr, ["hybrid (petrol/electric)", "бензин + электро", "vollhybrid"]),
+                and_(
+                    self._fuel_like_any(fuel_expr, ["hybrid", "гибрид"]),
+                    not_(self._fuel_like_any(fuel_expr, ["diesel", "дизель", "plug-in", "phev"])),
+                ),
+            )
+        if key == "hydrogen":
+            return self._fuel_like_any(fuel_expr, ["hydrogen", "fuel cell", "водород"])
+        if key == "lpg":
+            return self._fuel_like_any(fuel_expr, ["lpg", "propane", "propan", "пропан"])
+        if key == "cng":
+            return self._fuel_like_any(
+                fuel_expr,
+                ["natural gas", "cng", "methane", "metano", "erdgas", "природный газ", "метан"],
+            )
+        if key == "phev":
+            return self._fuel_like_any(fuel_expr, ["plug-in hybrid", "plug in hybrid", "plugin hybrid", "phev", "подключаем"])
+        if key == "other":
+            return or_(fuel_expr == "other", fuel_expr.like("other,%"), fuel_expr.like("другое%"))
+        aliases = fuel_aliases(raw_value)
+        if aliases:
+            return or_(*[fuel_expr.like(f"%{alias.lower()}%") for alias in aliases])
+        return fuel_expr == str(raw_value or "").strip().lower()
 
     EU_COUNTRIES = {
         "DE", "AT", "FR", "IT", "ES", "NL", "BE", "PL", "CZ", "SE", "FI",
@@ -386,7 +459,7 @@ class CarsService:
             "model": Car.model,
             "color": Car.color,
             "color_group": func.coalesce(Car.color_group, literal("other")),
-            "engine_type": Car.engine_type,
+            "engine_type": self._fuel_source_expr(),
             "transmission": Car.transmission,
             "body_type": Car.body_type,
             "drive_type": Car.drive_type,
@@ -464,7 +537,7 @@ class CarsService:
             mv = model_lookup_key(model)
             if mv:
                 conditions.append(self._normalized_model_expr() == mv)
-        if field not in ("region", "country", "brand", "model"):
+        if field not in ("region", "country", "brand", "model", "engine_type"):
             val = filters.get(field)
             if val:
                 conditions.append(getattr(Car, field) == val)
@@ -493,7 +566,7 @@ class CarsService:
         return out
 
     def facet_counts(self, *, field: str, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
-        if field == "color_group":
+        if field in {"color_group", "engine_type"}:
             return self._facet_counts_from_cars(field=field, filters=filters)
         table_map = {
             "region": ("car_counts_core", "region", {"region"}),
@@ -544,7 +617,7 @@ class CarsService:
                 continue
             if key in params:
                 where_clauses.append(f"{key} = :{key}")
-        if field not in ("region", "country", "brand", "model"):
+        if field not in ("region", "country", "brand", "model", "engine_type"):
             if field in params:
                 where_clauses.append(f"{col} = :{field}")
 
@@ -1063,14 +1136,11 @@ class CarsService:
             if body_conditions:
                 conditions.append(or_(*body_conditions))
         if engine_type and "engine_type" not in exclude:
-            engine_expr = func.lower(func.coalesce(Car.engine_type, ""))
             engine_conditions = []
             for raw_engine in split_csv_values(engine_type):
-                aliases = fuel_aliases(raw_engine)
-                if aliases:
-                    engine_conditions.append(or_(*[engine_expr.like(f"%{alias.lower()}%") for alias in aliases]))
-                else:
-                    engine_conditions.append(engine_expr == raw_engine.lower())
+                clause = self._fuel_filter_clause(raw_engine)
+                if clause is not None:
+                    engine_conditions.append(clause)
             if engine_conditions:
                 conditions.append(or_(*engine_conditions))
         if transmission and "transmission" not in exclude:
@@ -2370,7 +2440,7 @@ class CarsService:
             "brand": Car.brand,
             "country": func.upper(Car.country),
             "body_type": Car.body_type,
-            "engine_type": Car.engine_type,
+            "engine_type": self._fuel_source_expr(),
             "transmission": Car.transmission,
             "drive_type": Car.drive_type,
             "generation": Car.generation,
