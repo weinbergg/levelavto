@@ -98,7 +98,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
     assert '/static/js/app.js?v=96' in template
-    assert '/static/css/styles.css?v=57' in template
+    assert '/static/css/styles.css?v=58' in template
 
 
 def test_search_page_passes_payload_deferred_flag():
@@ -165,6 +165,10 @@ def test_model_group_summary_has_visible_selected_states():
     assert ".advanced-lines .search-row select.model-select-native" in css
     assert "display: none !important;" in css
     assert ".model-accordion__item.is-active" in css
+    assert ".filters-primary-grid > .field:has(.model-accordion__root[open])" in css
+    assert ".filters-primary-grid > .field:has(.multi-select-menu__root[open])" in css
+    assert "scroll-padding-bottom: 88px;" in css
+    assert ".multi-select-menu__option" in css
 
 
 def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():

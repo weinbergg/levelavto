@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Car, CarSpecReference, Source
-from ..services.cars_service import normalize_brand
+from ..services.cars_service import CarsService, normalize_brand
 from ..utils.spec_inference import (
     build_reference_signature,
     choose_reference_consensus,
@@ -26,6 +26,14 @@ from ..utils.spec_inference import (
 class CarSpecInferenceService:
     def __init__(self, db: Session) -> None:
         self.db = db
+        self.cars_service = CarsService(db)
+
+    def _canonical_model(self, brand: Any, model: Any) -> str:
+        brand_norm = normalize_brand(brand)
+        if not brand_norm:
+            return str(model or "").strip()
+        donors = self.cars_service._eu_model_donors(brand_norm)
+        return self.cars_service._canonical_model_label(brand_norm, str(model or ""), donors=donors)
 
     def refresh_reference(
         self,
@@ -239,7 +247,7 @@ class CarSpecInferenceService:
                 }
         sig = build_reference_signature(
             brand=normalize_brand(car.brand),
-            model=car.model,
+            model=self._canonical_model(car.brand, car.model),
             variant=car.variant,
             engine_type=car.engine_type,
             body_type=car.body_type,
@@ -452,7 +460,7 @@ class CarSpecInferenceService:
             return None
         signature = build_reference_signature(
             brand=normalize_brand(car.brand),
-            model=car.model,
+            model=self._canonical_model(car.brand, car.model),
             variant=car.variant,
             engine_type=car.engine_type,
             body_type=car.body_type,

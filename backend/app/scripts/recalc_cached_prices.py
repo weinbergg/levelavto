@@ -1,5 +1,4 @@
 import argparse
-from datetime import datetime
 
 from backend.app.db import SessionLocal
 from backend.app.models import Car
@@ -53,8 +52,6 @@ def main() -> None:
                         continue
                     rub = ceil_to_step(rub, 10000)
                     car.price_rub_cached = rub
-                    car.total_price_rub_cached = rub
-                    car.calc_updated_at = datetime.utcnow()
                     updated += 1
                 except Exception:
                     errors += 1

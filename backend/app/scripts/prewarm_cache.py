@@ -99,8 +99,10 @@ def main() -> None:
     include_brand_counts = os.getenv("PREWARM_INCLUDE_BRAND_COUNTS", "1") != "0"
     include_country_sweep = os.getenv("PREWARM_COUNTRY_SWEEP", "0") == "1"
     list_sort = os.getenv("PREWARM_LIST_SORT", "price_asc")
+    list_sorts_raw = os.getenv("PREWARM_LIST_SORTS", "").strip()
     list_page_size = int(os.getenv("PREWARM_LIST_PAGE_SIZE", "12") or 12)
     eu_country = os.getenv("PREWARM_EU_COUNTRY", "DE")
+    brand_regions_raw = os.getenv("PREWARM_BRAND_REGIONS", "EU")
     default_hot_brands = ",".join(
         [
             "BMW",
@@ -142,6 +144,14 @@ def main() -> None:
         hot_brands_raw = default_hot_brands
     country_sweep_raw = os.getenv("PREWARM_COUNTRIES", "AT,NL,BE,FR,IT,ES")
     country_sweep = [c.strip().upper() for c in country_sweep_raw.split(",") if c.strip()]
+    list_sorts = [s.strip() for s in list_sorts_raw.split(",") if s.strip()] or [list_sort]
+    brand_regions = []
+    for item in brand_regions_raw.split(","):
+        region = item.strip().upper()
+        if region and region not in brand_regions:
+            brand_regions.append(region)
+    if not brand_regions:
+        brand_regions = ["EU"]
     hot_brands = []
     for raw in hot_brands_raw.split(","):
         b = normalize_brand(raw.strip())
@@ -171,7 +181,15 @@ def main() -> None:
             key, ms = _prewarm_base(db, params)
             print(f"[prewarm] filter_ctx_base key={key} ms={ms:.2f}")
         priority_countries = [eu_country]
-        brand_tasks = [{"region": "EU", "country": eu_country, "brand": b} for b in hot_brands]
+        brand_tasks: List[Dict[str, Any]] = []
+        for region_name in brand_regions:
+            for brand in hot_brands:
+                task: Dict[str, Any] = {"brand": brand}
+                if region_name in {"EU", "KR"}:
+                    task["region"] = region_name
+                if region_name == "EU":
+                    task["country"] = eu_country
+                brand_tasks.append(task)
         if include_brand_ctx:
             for params in brand_tasks:
                 if _should_stop(started, max_sec):
@@ -179,7 +197,11 @@ def main() -> None:
                     return
                 key, ms = _prewarm_brand(db, params)
                 print(f"[prewarm] filter_ctx_brand key={key} ms={ms:.2f}")
-        model_tasks = [{"region": "EU", "country": eu_country, "brand": "BMW", "model": "X5"}]
+        model_tasks = [
+            {"region": "EU", "country": eu_country, "brand": "BMW", "model": "X5"},
+            {"region": "KR", "brand": "BMW", "model": "X5"},
+            {"brand": "BMW", "model": "X5"},
+        ]
         if include_model_ctx:
             for params in model_tasks:
                 if _should_stop(started, max_sec):
@@ -221,24 +243,7 @@ def main() -> None:
             print(f"[prewarm] cars_count key={cache_key} value={count}")
 
         def _prewarm_list(params: Dict[str, Any]) -> None:
-            _call_route_with_defaults(
-                list_cars,
-                request=None,
-                db=db,
-                region=params.get("region"),
-                country=params.get("country"),
-                brand=params.get("brand"),
-                sort=params.get("sort"),
-                page=1,
-                page_size=int(params.get("page_size") or 12),
-            )
-
-        # Priority: warm exactly the brand pages that users open first.
-        if include_brand_lists:
-            for params in brand_tasks:
-                if _should_stop(started, max_sec):
-                    print("[prewarm] stop by PREWARM_MAX_SEC (brand lists)")
-                    break
+            for sort_name in list_sorts:
                 _call_route_with_defaults(
                     list_cars,
                     request=None,
@@ -246,17 +251,27 @@ def main() -> None:
                     region=params.get("region"),
                     country=params.get("country"),
                     brand=params.get("brand"),
-                    sort=list_sort,
+                    sort=sort_name,
                     page=1,
-                    page_size=list_page_size,
+                    page_size=int(params.get("page_size") or 12),
                 )
                 print(
-                    f"[prewarm] cars_list brand={params.get('brand')} region={params.get('region')} "
-                    f"country={params.get('country')} sort={list_sort} size={list_page_size}"
+                    f"[prewarm] cars_list region={params.get('region')} country={params.get('country')} "
+                    f"brand={params.get('brand')} sort={sort_name} size={params.get('page_size') or 12}"
                 )
+
+        # Priority: warm exactly the brand pages that users open first.
+        if include_brand_lists:
+            for params in brand_tasks:
+                if _should_stop(started, max_sec):
+                    print("[prewarm] stop by PREWARM_MAX_SEC (brand lists)")
+                    break
+                params["page_size"] = list_page_size
+                _prewarm_list(params)
 
         # Secondary: broad generic pages (can be disabled by PREWARM_MAX_SEC timeout).
         list_tasks = [
+            {},
             {"region": "EU"},
             {"region": "KR"},
             {"region": "EU", "country": eu_country},
@@ -265,10 +280,8 @@ def main() -> None:
             if _should_stop(started, max_sec):
                 print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
                 return
-            params["sort"] = list_sort
             params["page_size"] = list_page_size
             _prewarm_list(params)
-            print(f"[prewarm] cars_list region={params.get('region')} country={params.get('country')}")
     print(f"[prewarm] done in {(time.perf_counter()-started)*1000:.2f} ms")
 
 

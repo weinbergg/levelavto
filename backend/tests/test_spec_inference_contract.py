@@ -23,6 +23,7 @@ def test_calc_and_import_paths_use_inferred_specs_layer():
 
 def test_pipeline_and_recalc_support_inferred_specs_refresh():
     pipeline = (ROOT.parents[0] / "scripts" / "mobilede_daily_pipeline.sh").read_text(encoding="utf-8")
+    kr_pipeline = (ROOT.parents[0] / "scripts" / "kr_daily_pipeline.sh").read_text(encoding="utf-8")
     recalc = _read("app/scripts/recalc_calc_cache.py")
     service = _read("app/services/car_spec_inference_service.py")
     util = _read("app/utils/spec_inference.py")
@@ -40,6 +41,10 @@ def test_pipeline_and_recalc_support_inferred_specs_refresh():
     assert "power_matched" in service
     assert 'region_scope="EU"' in service
     assert "eu_cross_region" in service
+    assert 'echo "[kr_pipeline] step=recalc_inferred_specs"' in kr_pipeline
+    assert 'echo "[kr_pipeline] step=recalc_recoverable_fallbacks"' in kr_pipeline
+    assert "python -m backend.app.scripts.recalc_calc_cache" in kr_pipeline
+    assert "python -m backend.app.scripts.recalc_cached_prices" not in kr_pipeline
 
 
 def test_che168_import_postprocesses_calc_and_listing_extracts_core_specs():
@@ -54,3 +59,11 @@ def test_che168_import_postprocesses_calc_and_listing_extracts_core_specs():
     assert '"transmission": self._transmission_from_cn(summary)' in parser
     assert '"drive_type": self._drive_from_cn(summary)' in parser
     assert '"list_engine_cc": engine_cc' in parser
+
+
+def test_spec_inference_uses_canonical_models_for_cross_region_matching():
+    service = _read("app/services/car_spec_inference_service.py")
+    assert "self.cars_service = CarsService(db)" in service
+    assert "def _canonical_model(self, brand: Any, model: Any) -> str:" in service
+    assert "donors = self.cars_service._eu_model_donors(brand_norm)" in service
+    assert 'model=self._canonical_model(car.brand, car.model)' in service

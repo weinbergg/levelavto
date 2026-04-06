@@ -1539,6 +1539,9 @@ body.filters-open {
   gap: 8px;
   min-width: 0;
   align-content: start;
+  position: relative;
+  overflow: visible;
+  z-index: 1;
 }
 .filters-primary-grid label {
   line-height: 1.2;
@@ -1864,6 +1867,9 @@ body.filters-open {
   display: grid;
   gap: 6px;
   min-width: 0;
+  position: relative;
+  overflow: visible;
+  z-index: 1;
 }
 .advanced-lines .search-row,
 .advanced-lines .search-row .field,
@@ -1889,6 +1895,18 @@ body.filters-open {
 }
 .advanced-lines .model-accordion {
   display: block;
+}
+.filters-primary-grid > .field:has(.model-accordion__root[open]),
+.filters-primary-grid > label:has(.model-accordion__root[open]),
+.filters-primary-grid > .field:has(.multi-select-menu__root[open]),
+.filters-primary-grid > label:has(.multi-select-menu__root[open]),
+.advanced-grid > .field:has(.model-accordion__root[open]),
+.advanced-grid > label:has(.model-accordion__root[open]),
+.advanced-grid > .field:has(.multi-select-menu__root[open]),
+.advanced-grid > label:has(.multi-select-menu__root[open]),
+.search-row .field:has(.model-accordion__root[open]),
+.search-row .field:has(.multi-select-menu__root[open]) {
+  z-index: 140;
 }
 .advanced-search #advanced-base,
 .advanced-search #advanced-tech,
@@ -2078,12 +2096,15 @@ body.filters-open {
   right: 0;
   max-height: min(62vh, 440px);
   overflow: auto;
-  padding: 8px 8px 12px;
+  padding: 8px 8px 88px;
   border: 1px solid var(--border-1);
   border-radius: 12px;
   background: #111725;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
   z-index: 180;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scroll-padding-bottom: 88px;
 }
 .model-accordion__root[open] .model-accordion__body {
   display: block;
@@ -2151,6 +2172,9 @@ body.filters-open {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+  align-items: flex-start;
+  position: relative;
+  z-index: 1;
 }
 .model-accordion__clear {
   border: 1px dashed var(--border-1);
@@ -2164,10 +2188,10 @@ body.filters-open {
 .model-accordion__actions {
   display: flex;
   position: sticky;
-  bottom: -8px;
+  bottom: 0;
   justify-content: stretch;
-  margin: 14px -8px -8px;
-  padding: 14px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  margin: 16px -8px 0;
+  padding: 14px 8px calc(10px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(180deg, rgba(17, 23, 37, 0) 0%, rgba(17, 23, 37, 0.96) 28%, #111725 62%);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -2228,7 +2252,7 @@ body.filters-open {
 }
 .multi-select-menu__root > summary {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   min-height: 46px;
   padding: 10px 12px;
   border: 1px solid var(--border-1);
@@ -2239,9 +2263,10 @@ body.filters-open {
   font-size: 15px;
   color: var(--text-1);
   list-style: none;
-  white-space: nowrap;
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
+  line-height: 1.25;
 }
 .multi-select-menu__root[open] > summary {
   border-color: rgba(255, 255, 255, 0.22);
@@ -2257,12 +2282,15 @@ body.filters-open {
   right: 0;
   max-height: min(62vh, 420px);
   overflow: auto;
-  padding: 8px 8px 12px;
+  padding: 8px 8px 88px;
   border: 1px solid var(--border-1);
   border-radius: 12px;
   background: #111725;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
   z-index: 180;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scroll-padding-bottom: 88px;
 }
 .multi-select-menu__root[open] .multi-select-menu__body {
   display: block;
@@ -2283,6 +2311,7 @@ body.filters-open {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 10px;
+  align-items: flex-start;
 }
 .multi-select-menu__option {
   border: 1px solid var(--border-1);
@@ -2293,6 +2322,9 @@ body.filters-open {
   font-size: 15px;
   cursor: pointer;
   text-align: left;
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.25;
 }
 .multi-select-menu__option.is-active {
   background: rgba(255, 98, 79, 0.2);
@@ -2301,10 +2333,10 @@ body.filters-open {
 .multi-select-menu__actions {
   display: flex;
   position: sticky;
-  bottom: -8px;
+  bottom: 0;
   justify-content: stretch;
-  margin: 14px -8px -8px;
-  padding: 14px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  margin: 16px -8px 0;
+  padding: 14px 8px calc(10px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(180deg, rgba(17, 23, 37, 0) 0%, rgba(17, 23, 37, 0.96) 28%, #111725 62%);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
