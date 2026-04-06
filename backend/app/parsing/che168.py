@@ -62,8 +62,69 @@ class Che168Parser(BaseParser):
         "MG": "MG",
     }
 
+    MODEL_BRAND_MAP: Dict[str, str] = {
+        "RAV4荣放": "Toyota",
+        "荣放": "Toyota",
+        "汉兰达": "Toyota",
+        "普拉多": "Toyota",
+        "兰德酷路泽": "Toyota",
+        "陆地巡洋舰": "Toyota",
+        "卡罗拉": "Toyota",
+        "凯美瑞": "Toyota",
+        "埃尔法": "Toyota",
+        "高尔夫": "Volkswagen",
+        "高尔夫·嘉旅": "Volkswagen",
+        "探岳": "Volkswagen",
+        "途观": "Volkswagen",
+        "途锐": "Volkswagen",
+        "迈腾": "Volkswagen",
+        "帕萨特": "Volkswagen",
+        "探歌": "Volkswagen",
+        "英菲尼迪Q50L": "Infiniti",
+        "Q50L": "Infiniti",
+        "AION S": "Aion",
+        "迈凯伦GT": "McLaren",
+        "君威": "Buick",
+        "海狮05": "BYD",
+        "宋MAX": "BYD",
+        "哈弗H9": "Haval",
+        "乐道L60": "Onvo",
+        "瑞风M4": "JAC",
+        "轩逸": "Nissan",
+        "添越": "Bentley",
+        "欧陆": "Bentley",
+        "飞驰": "Bentley",
+        "帝豪": "Geely",
+        "豪越": "Geely",
+        "远景": "Geely",
+        "星越": "Geely",
+        "博越": "Geely",
+        "红旗H9": "Hongqi",
+        "红旗H5": "Hongqi",
+        "哈弗H2": "Haval",
+        "哈弗H6": "Haval",
+        "哈弗大狗": "Haval",
+        "Model 3": "Tesla",
+        "Model Y": "Tesla",
+        "Model S": "Tesla",
+        "Model X": "Tesla",
+        "Stelvio": "Alfa Romeo",
+        "斯坦维": "Alfa Romeo",
+        "Giulia": "Alfa Romeo",
+        "V级": "Mercedes-Benz",
+        "威霆": "Mercedes-Benz",
+        "威然": "Volkswagen",
+        "途昂": "Volkswagen",
+        "Q5L": "Audi",
+        "A6L": "Audi",
+        "A4L": "Audi",
+        "X5": "BMW",
+        "X7": "BMW",
+    }
+
     MODEL_HINT_MAP: Dict[str, str] = {
         "添越": "Bentayga",
+        "V级": "V-Class",
         "卡宴": "Cayenne",
         "揽胜运动版": "Range Rover Sport",
         "揽胜极光": "Range Rover Evoque",
@@ -225,12 +286,22 @@ class Che168Parser(BaseParser):
 
     def _translate_brand(self, raw: Optional[str]) -> Optional[str]:
         text = str(raw or "").strip()
+        text = re.sub(r"^(二手|认证二手车|官方认证)\s*", "", text)
         if not text:
             return None
         for key, value in sorted(self.BRAND_NAME_MAP.items(), key=lambda item: len(item[0]), reverse=True):
             if text.startswith(key) or text == key:
                 return value
         return text
+
+    def _brand_from_model_hint(self, raw: Optional[str]) -> Optional[str]:
+        text = str(raw or "").strip()
+        if not text:
+            return None
+        for key, value in sorted(self.MODEL_BRAND_MAP.items(), key=lambda item: len(item[0]), reverse=True):
+            if key in text:
+                return value
+        return None
 
     def _translate_model_hint(self, raw: Optional[str]) -> Optional[str]:
         text = str(raw or "").strip()
@@ -398,8 +469,8 @@ class Che168Parser(BaseParser):
             if title.startswith(key):
                 brand = value
                 break
-        if brand and title.startswith(next(k for k, v in self.BRAND_NAME_MAP.items() if v == brand or title.startswith(k))):
-            pass
+        if not brand:
+            brand = self._brand_from_model_hint(title)
         year = reg_year
         mileage = self._parse_mileage_km(card.get("milage") or summary)
         listing_date = self._parse_iso_dt(card.get("publicdate"))
@@ -451,7 +522,12 @@ class Che168Parser(BaseParser):
 
         title = self._clean_title(box.select_one(".car-brand-name").get_text(" ", strip=True) if box and box.select_one(".car-brand-name") else (fallback or {}).get("variant"))
         brand_cn = breadcrumb.get("brand_cn")
-        brand = self._translate_brand(brand_cn) or (fallback or {}).get("brand")
+        brand = (
+            self._translate_brand(brand_cn)
+            or self._brand_from_model_hint(breadcrumb.get("model_cn"))
+            or self._brand_from_model_hint(title)
+            or (fallback or {}).get("brand")
+        )
 
         model_hint = (
             self._translate_model_hint(breadcrumb.get("model_cn"))

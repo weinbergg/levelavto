@@ -280,7 +280,8 @@ def test_templates_hide_placeholder_max_and_support_thumb_macro_for_autoimg():
     assert "page_max in ['https://max.ru', 'https://max.ru/'" in base_template
     assert "{% if page_max %}" in base_template
     assert "{% if page_max %}" in home_template
-    assert "{% set max_link_raw = (contact_max or content.get('contact_max') or '')|trim %}" in detail_template
+    assert "https://max.ru/u/f9LHodD0cOJOSiOGTyXgt5mtXe_iohF6yKe5cDbjGqNeUpq31QbnCHYfAO8" in base_template
+    assert "https://max.ru/u/f9LHodD0cOJOSiOGTyXgt5mtXe_iohF6yKe5cDbjGqNeUpq31QbnCHYfAO8" in detail_template
     assert "autoimg.cn" in thumbs_macro
     assert "shouldProxyThumbSource" in script
     assert "autoimg.cn" in script

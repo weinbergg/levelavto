@@ -21,7 +21,7 @@
     {% else %}
       {% set tg_link = '' %}
     {% endif %}
-    {% set max_link_raw = (contact_max or content.get('contact_max') or '')|trim %}
+    {% set max_link_raw = (contact_max or content.get('contact_max') or 'https://max.ru/u/f9LHodD0cOJOSiOGTyXgt5mtXe_iohF6yKe5cDbjGqNeUpq31QbnCHYfAO8')|trim %}
     {% if max_link_raw.startswith('http://') or max_link_raw.startswith('https://') %}
       {% set max_link = max_link_raw %}
     {% elif max_link_raw.startswith('max.ru/') %}
