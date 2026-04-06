@@ -40,3 +40,17 @@ def test_pipeline_and_recalc_support_inferred_specs_refresh():
     assert "power_matched" in service
     assert 'region_scope="EU"' in service
     assert "eu_cross_region" in service
+
+
+def test_che168_import_postprocesses_calc_and_listing_extracts_core_specs():
+    runner = _read("app/services/parser_runner.py")
+    parser = _read("app/parsing/che168.py")
+    assert 'if site_cfg.key == "che168" and seen_all:' in runner
+    assert "self._postprocess_che168_import(db, source, seen_all)" in runner
+    assert "svc.ensure_calc_cache(car, force=True)" in runner
+    assert '[parser] postprocess source=che168 checked=' in runner
+    assert "engine_cc = infer_engine_cc_from_text(title, summary)" in parser
+    assert '"engine_type": self._fuel_from_cn(title, summary)' in parser
+    assert '"transmission": self._transmission_from_cn(summary)' in parser
+    assert '"drive_type": self._drive_from_cn(summary)' in parser
+    assert '"list_engine_cc": engine_cc' in parser

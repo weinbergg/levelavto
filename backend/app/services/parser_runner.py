@@ -14,6 +14,8 @@ from ..parsing.mobile_de import MobileDeParser
 from ..parsing.encar_carapis import EncarCarapisParser
 from ..parsing.emavto_klg import EmAvtoKlgParser
 from ..parsing.che168 import Che168Parser
+from ..models import Car
+from .cars_service import CarsService
 from .parsing_data_service import ParsingDataService
 
 
@@ -229,6 +231,8 @@ class ParserRunner:
                     f"{site_cfg.key}.last_incremental_run_at", str(
                         parser.progress["last_incremental_run_at"])
                 )
+        if site_cfg.key == "che168" and seen_all:
+            self._postprocess_che168_import(db, source, seen_all)
         deactivated = data_service.deactivate_missing(source, seen_all)
         prs = ParserRunSource(
             parser_run_id=run.id,
@@ -249,6 +253,38 @@ class ParserRunner:
             "updated": updated,
             "deactivated": deactivated,
         }
+
+    def _postprocess_che168_import(
+        self,
+        db: Session,
+        source: Source,
+        external_ids: List[str],
+    ) -> None:
+        ext_ids = [str(value).strip() for value in external_ids if str(value or "").strip()]
+        if not ext_ids:
+            return
+        svc = CarsService(db)
+        cars = (
+            db.query(Car)
+            .filter(Car.source_id == source.id, Car.external_id.in_(ext_ids))
+            .all()
+        )
+        if not cars:
+            return
+        refreshed = 0
+        for car in cars:
+            try:
+                before_total = car.total_price_rub_cached
+                before_calc = car.calc_updated_at
+                svc.ensure_calc_cache(car, force=True)
+                if car.total_price_rub_cached != before_total or car.calc_updated_at != before_calc:
+                    refreshed += 1
+            except Exception:
+                db.rollback()
+        print(
+            f"[parser] postprocess source=che168 checked={len(cars)} refreshed={refreshed}",
+            flush=True,
+        )
 
     def _ensure_source_id(self, db: Session, site_cfg: SiteConfig) -> int:
         # helper to get or create source to be able to record a failed row

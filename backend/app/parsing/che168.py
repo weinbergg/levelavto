@@ -474,6 +474,9 @@ class Che168Parser(BaseParser):
         year = reg_year
         mileage = self._parse_mileage_km(card.get("milage") or summary)
         listing_date = self._parse_iso_dt(card.get("publicdate"))
+        engine_cc = infer_engine_cc_from_text(title, summary)
+        power_hp = self._power_hp_from_text(title, summary)
+        power_kw = round(power_hp / 1.35962, 2) if power_hp else None
         return {
             "external_id": str(card.get("infoid") or "").strip(),
             "brand": brand,
@@ -485,12 +488,22 @@ class Che168Parser(BaseParser):
             "mileage": mileage,
             "price": self._parse_price_cny(card.get("price") or (card.select_one(".pirce") and card.select_one(".pirce").get_text(" ", strip=True))),
             "currency": self.config.defaults.get("currency", "CNY"),
+            "body_type": self._body_type_from_cn(summary),
+            "engine_type": self._fuel_from_cn(title, summary),
+            "engine_cc": engine_cc,
+            "power_hp": power_hp,
+            "power_kw": power_kw,
+            "transmission": self._transmission_from_cn(summary),
+            "drive_type": self._drive_from_cn(summary),
+            "color": self._color_from_cn(summary),
             "source_url": self._make_full_url(link_el.get("href") if link_el else None),
             "thumbnail_url": self._normalize_image_url(thumb),
             "listing_date": listing_date,
             "source_payload": {
                 "title": title,
                 "summary": summary,
+                "list_engine_cc": engine_cc,
+                "list_power_hp": power_hp,
                 "price_wan": str(card.get("price") or "").strip() or None,
                 "milage_wan_km": str(card.get("milage") or "").strip() or None,
                 "regdate": str(card.get("regdate") or "").strip() or None,
