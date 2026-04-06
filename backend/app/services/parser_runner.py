@@ -13,6 +13,7 @@ from ..parsing.base import CarParsed
 from ..parsing.mobile_de import MobileDeParser
 from ..parsing.encar_carapis import EncarCarapisParser
 from ..parsing.emavto_klg import EmAvtoKlgParser
+from ..parsing.che168 import Che168Parser
 from .parsing_data_service import ParsingDataService
 
 
@@ -31,6 +32,7 @@ PARSER_CLASSES: Dict[str, Type] = {
     "mobile_de": MobileDeParser,
     "encar": EncarCarapisParser,
     "emavto_klg": EmAvtoKlgParser,
+    "che168": Che168Parser,
 }
 
 

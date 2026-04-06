@@ -106,6 +106,11 @@
     return pathname === '/thumb' || pathname.endsWith('/thumb')
   }
 
+  function shouldProxyThumbSource(url) {
+    const raw = String(url || '')
+    return raw.includes('img.classistatic.de') || raw.includes('autoimg.cn')
+  }
+
   function normalizeThumbSourceUrl(uRaw) {
     const u = String(uRaw || '').trim()
     if (!u) return '/static/img/no-photo.svg'
@@ -126,8 +131,7 @@
     if (!u || u === '/static/img/no-photo.svg') return '/static/img/no-photo.svg'
     // Local/static files should never go through /thumb proxy.
     if (u.startsWith('/media/') || u.startsWith('/static/')) return u
-    // Proxy is only for classistatic URLs.
-    if (!u.includes('img.classistatic.de')) return u
+    if (!shouldProxyThumbSource(u)) return u
     return `/thumb?u=${encodeURIComponent(u)}&w=${parsed.searchParams.get('w') || '360'}&fmt=${parsed.searchParams.get('fmt') || 'webp'}&rev=${THUMB_REV}`
   }
 
@@ -138,7 +142,7 @@
     if (url.startsWith('/thumb?')) {
       return url.includes('rev=') ? url : `${url}&rev=${THUMB_REV}`
     }
-    if (!url.includes('img.classistatic.de')) return url
+    if (!shouldProxyThumbSource(url)) return url
     return `/thumb?u=${encodeURIComponent(url)}&w=${width}&fmt=webp&rev=${THUMB_REV}`
   }
 

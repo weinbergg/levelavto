@@ -97,7 +97,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=94' in template
+    assert '/static/js/app.js?v=95' in template
     assert '/static/css/styles.css?v=56' in template
 
 
@@ -258,6 +258,39 @@ def test_detail_and_header_contact_actions_use_call_and_messengers():
     assert "display_price_rub" in account_template
     assert "_prepare_favorites" in account_router
     assert ".detail-messenger-link" in css
+
+
+def test_templates_hide_placeholder_max_and_support_thumb_macro_for_autoimg():
+    base_template = _read("app/templates/base.html")
+    home_template = _read("app/templates/home.html")
+    catalog_template = _read("app/templates/catalog.html")
+    detail_template = _read("app/templates/car_detail.html")
+    thumbs_macro = _read("app/templates/_thumbs.html")
+    script = _read("app/static/js/app.js")
+    assert "page_max in ['https://max.ru', 'https://max.ru/'" in base_template
+    assert "{% if page_max %}" in base_template
+    assert "{% if page_max %}" in home_template
+    assert "page_max if page_max is defined" in detail_template
+    assert "autoimg.cn" in thumbs_macro
+    assert "shouldProxyThumbSource" in script
+    assert "autoimg.cn" in script
+
+
+def test_che168_parser_and_offline_tool_are_registered():
+    base_template = _read("app/templates/base.html")
+    detail_template = _read("app/templates/car_detail.html")
+    runner = _read("app/services/parser_runner.py")
+    parser = _read("app/parsing/che168.py")
+    tool = _read("app/tools/che168_offline_parse.py")
+    config = _read("app/parsing/sites_config.yaml")
+    assert '"che168": Che168Parser' in runner
+    assert "class Che168Parser" in parser
+    assert "parse_list_html" in parser
+    assert "parse_detail_html" in parser
+    assert 'currency: "CNY"' in config
+    assert "Offline smoke parser for saved che168 HTML" in tool
+    assert "DEFAULT_LISTING" in tool
+    assert "detail_preview" in tool
     assert "Подбор и поставка автомобилей из Европы и Азии под ключ." in base_template
     assert "варианты из Европы и Азии." in detail_template
 
@@ -301,7 +334,7 @@ def test_catalog_cards_stay_rub_only_and_detail_primary_accepts_thumb_proxy():
     script = _read("app/static/js/app.js")
     pages = _read("app/routers/pages.py")
     assert "{% elif car.price %}" not in catalog_template
-    assert "primary_raw.startswith('/thumb?')" in detail_template
+    assert "thumbs.thumb_src(primary_raw, 960, 5)" in detail_template
     assert "if (!img.dataset.origRetried)" in script
     assert "elif not detail_images:" in pages
 

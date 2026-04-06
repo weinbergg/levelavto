@@ -13,8 +13,33 @@
     {% set page_phone = contact_phone or content_map.get('contact_phone') or '+7 (911) 070-75-00' %}
     {% set page_email = contact_email or content_map.get('contact_email') or 'Level.avto@mail.ru' %}
     {% set page_address = contact_address or content_map.get('contact_address') %}
-    {% set page_tg = contact_tg or content_map.get('contact_tg') or 'https://t.me/levelavto' %}
-    {% set page_max = contact_max or content_map.get('contact_max') or 'https://max.ru/' %}
+    {% set page_tg_raw = (contact_tg or content_map.get('contact_tg') or 'https://t.me/levelavto')|trim %}
+    {% if page_tg_raw.startswith('http://') or page_tg_raw.startswith('https://') %}
+      {% set page_tg = page_tg_raw %}
+    {% elif page_tg_raw.startswith('t.me/') %}
+      {% set page_tg = 'https://' ~ page_tg_raw %}
+    {% elif page_tg_raw.startswith('@') %}
+      {% set page_tg = 'https://t.me/' ~ page_tg_raw[1:] %}
+    {% elif page_tg_raw %}
+      {% set page_tg = 'https://t.me/' ~ page_tg_raw %}
+    {% else %}
+      {% set page_tg = '' %}
+    {% endif %}
+    {% set page_max_raw = (contact_max or content_map.get('contact_max') or '')|trim %}
+    {% if page_max_raw.startswith('http://') or page_max_raw.startswith('https://') %}
+      {% set page_max = page_max_raw %}
+    {% elif page_max_raw.startswith('max.ru/') %}
+      {% set page_max = 'https://' ~ page_max_raw %}
+    {% elif page_max_raw.startswith('@') %}
+      {% set page_max = 'https://max.ru/' ~ page_max_raw[1:] %}
+    {% elif page_max_raw %}
+      {% set page_max = 'https://max.ru/' ~ page_max_raw %}
+    {% else %}
+      {% set page_max = '' %}
+    {% endif %}
+    {% if page_max in ['https://max.ru', 'https://max.ru/', 'http://max.ru', 'http://max.ru/'] %}
+      {% set page_max = '' %}
+    {% endif %}
     {% set page_vk = contact_vk or content_map.get('contact_vk') or 'https://vk.ru/levelavto' %}
     {% set page_avito = contact_avito or content_map.get('contact_avito') or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
     {% set page_autoru = contact_autoru or content_map.get('contact_autoru') or 'https://auto.ru/profile/28529976' %}
@@ -102,9 +127,11 @@
                 <a class="header__messenger" href="{{ page_tg }}" target="_blank" rel="noopener" aria-label="Telegram">
                   <img class="header__messenger-icon" src="/static/img/social/telegram.png" alt="Telegram" />
                 </a>
+                {% if page_max %}
                 <a class="header__messenger" href="{{ page_max }}" target="_blank" rel="noopener" aria-label="MAX">
                   <img class="header__messenger-icon" src="/static/img/social/max.png" alt="MAX" />
                 </a>
+                {% endif %}
               </div>
               <button
                 class="header__burger header__burger--main"
@@ -151,9 +178,11 @@
                 <a class="header__messenger" href="{{ page_tg }}" target="_blank" rel="noopener" aria-label="Telegram">
                   <img class="header__messenger-icon" src="/static/img/social/telegram.png" alt="Telegram" />
                 </a>
+                {% if page_max %}
                 <a class="header__messenger" href="{{ page_max }}" target="_blank" rel="noopener" aria-label="MAX">
                   <img class="header__messenger-icon" src="/static/img/social/max.png" alt="MAX" />
                 </a>
+                {% endif %}
               </div>
             </div>
           </nav>
@@ -181,7 +210,7 @@
           {% if page_address %}<div>{{ page_address }}</div>{% endif %}
           <div class="footer-social">
             <a class="social-link social-link--icon-only" href="{{ page_tg }}" target="_blank" rel="noopener" aria-label="Telegram"><img class="social-link__icon-image" src="/static/img/social/telegram.png" alt="Telegram" /></a>
-            <a class="social-link social-link--icon-only" href="{{ page_max }}" target="_blank" rel="noopener" aria-label="MAX"><img class="social-link__icon-image" src="/static/img/social/max.png" alt="MAX" /></a>
+            {% if page_max %}<a class="social-link social-link--icon-only" href="{{ page_max }}" target="_blank" rel="noopener" aria-label="MAX"><img class="social-link__icon-image" src="/static/img/social/max.png" alt="MAX" /></a>{% endif %}
             <a class="social-link social-link--icon-only" href="{{ page_vk }}" target="_blank" rel="noopener" aria-label="VK"><img class="social-link__icon-image" src="/static/img/social/vk.svg" alt="VK" /></a>
             <a class="social-link social-link--icon-only" href="{{ page_avito }}" target="_blank" rel="noopener" aria-label="Avito"><img class="social-link__icon-image social-link__icon-image--wide social-link__icon-image--mono-text" src="/static/img/social/avito.svg" alt="Avito" /></a>
             <a class="social-link social-link--icon-only" href="{{ page_autoru }}" target="_blank" rel="noopener" aria-label="Auto.ru"><img class="social-link__icon-image social-link__icon-image--wide social-link__icon-image--mono-text" src="/static/img/social/autoru.svg" alt="Auto.ru" /></a>
@@ -194,7 +223,7 @@
     </footer>
     <button id="backToTop" class="back-to-top" type="button" aria-label="Наверх">↑</button>
     <script>window.ENABLE_MODEL_ACCORDION = true;</script>
-    <script src="/static/js/app.js?v=94"></script>
+    <script src="/static/js/app.js?v=95"></script>
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>

@@ -1,4 +1,4 @@
-{% extends "base.html" %} {% block title %}Авто — {{ car.brand }} {{ car.model
+{% extends "base.html" %} {% import "_thumbs.html" as thumbs %} {% block title %}Авто — {{ car.brand }} {{ car.model
 }}{% endblock %} {% block content %}
 <section class="car-detail-page">
   <div class="la-container">
@@ -6,8 +6,8 @@
     <div class="card">Автомобиль не найден.</div>
     {% else %}
     {% set phone = contact_phone or content.get('contact_phone') or '+7 (911) 070-75-00' %}
-    {% set tg_link = contact_tg or content.get('contact_tg') %}
-    {% set max_link = contact_max or content.get('contact_max') %}
+    {% set tg_link = page_tg if page_tg is defined else (contact_tg or content.get('contact_tg')) %}
+    {% set max_link = page_max if page_max is defined else (contact_max or content.get('contact_max')) %}
     <div style="margin-bottom:12px;">
       <a id="back-to-catalog" class="btn btn-ghost btn-small" href="/catalog" style="display:none;">← Назад в каталог</a>
     </div>
@@ -16,23 +16,7 @@
         {% set image_urls = detail_images if detail_images else [] %}
         {% set primary = image_urls[0] if image_urls and image_urls|length > 0 else car.thumbnail_url %}
         {% set primary_raw = (primary or '')|trim %}
-        {% if not primary_raw %}
-          {% set primary_src = '/static/img/no-photo.svg' %}
-        {% elif primary_raw.startswith('/thumb?') %}
-          {% set primary_src = primary_raw %}
-        {% elif 'img.classistatic.de' in primary_raw %}
-          {% set primary_src = "/thumb?u=" ~ (primary_raw | urlencode) ~ "&w=960&fmt=webp&rev=4" %}
-        {% elif primary_raw.startswith('/api/v1/mo-prod/images/') %}
-          {% set primary_src = "/thumb?u=" ~ (("https://img.classistatic.de" ~ primary_raw) | urlencode) ~ "&w=960&fmt=webp&rev=4" %}
-        {% elif primary_raw.startswith('api/v1/mo-prod/images/') %}
-          {% set primary_src = "/thumb?u=" ~ (("https://img.classistatic.de/" ~ primary_raw) | urlencode) ~ "&w=960&fmt=webp&rev=4" %}
-        {% elif primary_raw.startswith('/media/') or primary_raw.startswith('https://') or primary_raw.startswith('http://') %}
-          {% set primary_src = primary_raw %}
-        {% elif primary_raw|length == 36 and primary_raw.count('-') == 4 %}
-          {% set primary_src = "/thumb?u=" ~ (("https://img.classistatic.de/api/v1/mo-prod/images/" ~ primary_raw[:2] ~ "/" ~ primary_raw ~ "?rule=mo-1024.jpg") | urlencode) ~ "&w=960&fmt=webp&rev=4" %}
-        {% else %}
-          {% set primary_src = '/static/img/no-photo.svg' %}
-        {% endif %}
+        {% set primary_src = thumbs.thumb_src(primary_raw, 960, 5) %}
         <div class="detail-hero__main placeholder" data-images='{{ image_urls | tojson }}'>
           {% if primary %}
           <img
@@ -59,21 +43,7 @@
         <div class="detail-hero__thumbs">
           {% for img_url in image_urls %}
           {% set im_raw = (img_url or '')|trim %}
-          {% if not im_raw %}
-            {% set thumb_src = '/static/img/no-photo.svg' %}
-          {% elif 'img.classistatic.de' in im_raw %}
-            {% set thumb_src = "/thumb?u=" ~ (im_raw | urlencode) ~ "&w=240&fmt=webp&rev=4" %}
-          {% elif im_raw.startswith('/api/v1/mo-prod/images/') %}
-            {% set thumb_src = "/thumb?u=" ~ (("https://img.classistatic.de" ~ im_raw) | urlencode) ~ "&w=240&fmt=webp&rev=4" %}
-          {% elif im_raw.startswith('api/v1/mo-prod/images/') %}
-            {% set thumb_src = "/thumb?u=" ~ (("https://img.classistatic.de/" ~ im_raw) | urlencode) ~ "&w=240&fmt=webp&rev=4" %}
-          {% elif im_raw.startswith('/media/') or im_raw.startswith('/thumb?') or im_raw.startswith('https://') or im_raw.startswith('http://') %}
-            {% set thumb_src = im_raw %}
-          {% elif im_raw|length == 36 and im_raw.count('-') == 4 %}
-            {% set thumb_src = "/thumb?u=" ~ (("https://img.classistatic.de/api/v1/mo-prod/images/" ~ im_raw[:2] ~ "/" ~ im_raw ~ "?rule=mo-1024.jpg") | urlencode) ~ "&w=240&fmt=webp&rev=4" %}
-          {% else %}
-            {% set thumb_src = '/static/img/no-photo.svg' %}
-          {% endif %}
+          {% set thumb_src = thumbs.thumb_src(im_raw, 240, 5) %}
           <button
             type="button"
             class="thumb"
@@ -195,7 +165,7 @@
               <div class="thumb-wrap">
                 <img
                   class="thumb"
-                  src="{% if item.thumbnail_url and 'img.classistatic.de' in item.thumbnail_url %}/thumb?u={{ item.thumbnail_url | urlencode }}&w=360&fmt=webp&rev=2{% else %}{{ item.thumbnail_url or '/static/img/no-photo.svg' }}{% endif %}"
+                  src="{{ thumbs.thumb_src(item.thumbnail_url, 360, 5) }}"
                   width="320"
                   height="200"
                   alt=""

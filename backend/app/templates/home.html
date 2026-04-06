@@ -1,4 +1,4 @@
-{% extends "base.html" %} {% block title %}Level Avto — Авто из Европы под
+{% extends "base.html" %} {% import "_thumbs.html" as thumbs %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
 <link rel="stylesheet" href="/static/css/home.css?v=18" />
 {% endblock %} {% block content %}
@@ -286,7 +286,7 @@
           <span class="badge-tag badge-tag--alt">{{ home.recommended.badge_label }}</span>
           <img
             class="thumb"
-            src="{% if car.thumbnail_url and 'img.classistatic.de' in car.thumbnail_url %}/thumb?u={{ car.thumbnail_url | urlencode }}&w=360&fmt=webp&rev=2{% else %}{{ car.thumbnail_url or '/static/img/no-photo.svg' }}{% endif %}"
+            src="{{ thumbs.thumb_src(car.thumbnail_url, 360, 5) }}"
             width="320"
             height="200"
             alt=""
@@ -347,7 +347,7 @@
           <div class="thumb-wrap">
             <img
               class="thumb"
-              src="{% if car.thumbnail_url and 'img.classistatic.de' in car.thumbnail_url %}/thumb?u={{ car.thumbnail_url | urlencode }}&w=360&fmt=webp&rev=2{% else %}{{ car.thumbnail_url or '/static/img/no-photo.svg' }}{% endif %}"
+              src="{{ thumbs.thumb_src(car.thumbnail_url, 360, 5) }}"
               width="320"
               height="200"
               alt=""
@@ -566,13 +566,13 @@
                   {{ home.lead.submit_label }}
                 </button>
                 <div class="lead-messenger-links">
-                  {% if contact_tg or content.get('contact_tg') %}
-                  <a class="lead-messenger-link" href="{{ contact_tg or content.get('contact_tg') }}" target="_blank" rel="noopener" aria-label="Telegram">
+                  {% if page_tg %}
+                  <a class="lead-messenger-link" href="{{ page_tg }}" target="_blank" rel="noopener" aria-label="Telegram">
                     <img class="lead-messenger-link__icon" src="/static/img/social/telegram.png" alt="Telegram" />
                   </a>
                   {% endif %}
-                  {% if contact_max or content.get('contact_max') %}
-                  <a class="lead-messenger-link" href="{{ contact_max or content.get('contact_max') }}" target="_blank" rel="noopener" aria-label="MAX">
+                  {% if page_max %}
+                  <a class="lead-messenger-link" href="{{ page_max }}" target="_blank" rel="noopener" aria-label="MAX">
                     <img class="lead-messenger-link__icon" src="/static/img/social/max.png" alt="MAX" />
                   </a>
                   {% endif %}
@@ -612,11 +612,11 @@
           <h3><a href="tel:{{ phone|replace(' ','') }}">{{ phone }}</a></h3>
           <p class="hero-note">
             {{ home.contacts.callback_label }} ·
-            {% if contact_tg or content.get('contact_tg') %}
-            <a href="{{ contact_tg or content.get('contact_tg') }}" target="_blank" rel="noopener">Telegram</a>
+            {% if page_tg %}
+            <a href="{{ page_tg }}" target="_blank" rel="noopener">Telegram</a>
             {% endif %}
-            {% if contact_max or content.get('contact_max') %}
-            · <a href="{{ contact_max or content.get('contact_max') }}" target="_blank" rel="noopener">MAX</a>
+            {% if page_max %}
+            · <a href="{{ page_max }}" target="_blank" rel="noopener">MAX</a>
             {% endif %}
             {% if contact_wa or content.get('contact_wa') %}
             · <a href="{{ contact_wa or content.get('contact_wa') }}" target="_blank" rel="noopener">WhatsApp</a>
@@ -636,11 +636,11 @@
           <div class="inline-actions" style="margin-top: 10px">
             <a class="btn btn-primary" href="tel:{{ phone|replace(' ','') }}">{{ home.contacts.call_button }}</a>
             <a class="btn btn-secondary" href="mailto:{{ email }}">{{ home.contacts.email_button }}</a>
-            {% if contact_tg or content.get('contact_tg') %}
-            <a class="btn btn-secondary" href="{{ contact_tg or content.get('contact_tg') }}" target="_blank" rel="noopener">Написать в TG</a>
+            {% if page_tg %}
+            <a class="btn btn-secondary" href="{{ page_tg }}" target="_blank" rel="noopener">Написать в TG</a>
             {% endif %}
-            {% if contact_max or content.get('contact_max') %}
-            <a class="btn btn-secondary" href="{{ contact_max or content.get('contact_max') }}" target="_blank" rel="noopener">Написать в MAX</a>
+            {% if page_max %}
+            <a class="btn btn-secondary" href="{{ page_max }}" target="_blank" rel="noopener">Написать в MAX</a>
             {% endif %}
           </div>
         </div>
@@ -662,7 +662,7 @@
           <h2 class="section-title">{{ home.social.title }}</h2>
         </div>
       </div>
-      {% set social_tg = contact_tg or content.get('contact_tg') or 'https://t.me/levelavto' %}
+      {% set social_tg = page_tg or 'https://t.me/levelavto' %}
       {% set social_vk = contact_vk or content.get('contact_vk') or 'https://vk.ru/levelavto' %}
       {% set social_avito = contact_avito or content.get('contact_avito') or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
       {% set social_autoru = contact_autoru or content.get('contact_autoru') or 'https://auto.ru/profile/28529976' %}

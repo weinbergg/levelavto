@@ -144,6 +144,10 @@ def resolve_thumbnail_url(
         picked = pick_classistatic_thumb(normalized)
         return picked or normalized
     remote = (remote_url or "").strip()
+    if remote.startswith("//"):
+        return f"https:{remote}"
+    if remote.startswith("http://"):
+        return remote.replace("http://", "https://", 1)
     if remote:
         return remote
     return None

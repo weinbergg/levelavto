@@ -21,8 +21,10 @@ def _normalize_site_line(line: str) -> str | None:
         return "encar"
     if "emavto" in key or "emavto.ru" in key or "klg.emavto.ru" in key:
         return "emavto_klg"
+    if "che168" in key or "che168.com" in key:
+        return "che168"
     # If exact key is directly known
-    if key in ("mobile_de", "encar", "emavto_klg"):
+    if key in ("mobile_de", "encar", "emavto_klg", "che168"):
         return key
     return None
 
@@ -46,7 +48,7 @@ def read_sites_file() -> List[str]:
                 if keys:
                     return keys
     logger.warning("sites.txt not found; defaulting to all known parsers")
-    return ["mobile_de", "encar", "emavto_klg"]
+    return ["mobile_de", "encar", "emavto_klg", "che168"]
 
 
 def main() -> None:

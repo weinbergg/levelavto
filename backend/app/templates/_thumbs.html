@@ -1,0 +1,30 @@
+{% macro thumb_src(raw_url, width=360, rev=5) -%}
+  {%- set raw = (raw_url or '')|trim -%}
+  {%- if not raw -%}
+    /static/img/no-photo.svg
+  {%- elif raw.startswith('/thumb?') -%}
+    {{ raw }}
+  {%- elif raw.startswith('/media/') or raw.startswith('/static/') -%}
+    {{ raw }}
+  {%- elif raw.startswith('/api/v1/mo-prod/images/') -%}
+    {{ "/thumb?u=" ~ (("https://img.classistatic.de" ~ raw) | urlencode) ~ "&w=" ~ width ~ "&fmt=webp&rev=" ~ rev }}
+  {%- elif raw.startswith('api/v1/mo-prod/images/') -%}
+    {{ "/thumb?u=" ~ (("https://img.classistatic.de/" ~ raw) | urlencode) ~ "&w=" ~ width ~ "&fmt=webp&rev=" ~ rev }}
+  {%- elif raw|length == 36 and raw.count('-') == 4 -%}
+    {{ "/thumb?u=" ~ (("https://img.classistatic.de/api/v1/mo-prod/images/" ~ raw[:2] ~ "/" ~ raw ~ "?rule=mo-1024.jpg") | urlencode) ~ "&w=" ~ width ~ "&fmt=webp&rev=" ~ rev }}
+  {%- else -%}
+    {%- set absolute = raw -%}
+    {%- if raw.startswith('//') -%}
+      {%- set absolute = 'https:' ~ raw -%}
+    {%- elif raw.startswith('http://') -%}
+      {%- set absolute = 'https://' ~ raw[7:] -%}
+    {%- endif -%}
+    {%- if 'img.classistatic.de' in absolute or 'autoimg.cn' in absolute -%}
+      {{ "/thumb?u=" ~ (absolute | urlencode) ~ "&w=" ~ width ~ "&fmt=webp&rev=" ~ rev }}
+    {%- elif absolute.startswith('https://') -%}
+      {{ absolute }}
+    {%- else -%}
+      /static/img/no-photo.svg
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}

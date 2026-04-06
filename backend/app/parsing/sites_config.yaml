@@ -73,3 +73,26 @@ emavto_klg:
     price: "p.car-price"
     link: "a.car-title"
     image: "img"
+
+che168:
+  key: che168
+  name: "Che168"
+  country: "CN"
+  type: "html"
+  enabled: true
+  base_search_url: "https://www.che168.com/china/a0_0msdgscncgpi1lto8cspexx0/"
+  query_params: {}
+  defaults:
+    currency: "CNY"
+    detail_limit: 50
+  pagination:
+    start_page: 1
+    page_param: "page"
+    max_pages: 1
+  selectors:
+    item: "li.cards-li.list-photo-li[infoid]"
+    title: ".card-name"
+    details: ".cards-unit"
+    price: ".pirce"
+    link: "a.carinfo"
+    image: ".img-box img"

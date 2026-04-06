@@ -17,6 +17,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _ALLOWED_HOSTS = {"img.classistatic.de"}
+_ALLOWED_HOST_SUFFIXES = (".autoimg.cn",)
 _LOCK_TTL_SEC = 30
 _CACHE_TTL_SEC = 7 * 24 * 3600
 _NEGATIVE_TTL_NOT_FOUND_SEC = int(os.getenv("THUMB_NEGATIVE_TTL_NOT_FOUND_SEC", "86400"))
@@ -104,7 +105,8 @@ def _normalize_source_url(u: str | None, url: str | None) -> str:
     parsed = urlparse(src)
     if parsed.scheme not in {"http", "https"}:
         raise HTTPException(status_code=400, detail="invalid url scheme")
-    if parsed.hostname not in _ALLOWED_HOSTS:
+    hostname = (parsed.hostname or "").lower()
+    if hostname not in _ALLOWED_HOSTS and not any(hostname.endswith(suffix) for suffix in _ALLOWED_HOST_SUFFIXES):
         raise HTTPException(status_code=400, detail="invalid host")
     return src
 

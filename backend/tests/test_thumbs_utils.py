@@ -25,6 +25,16 @@ def test_normalize_source_url_rejects_host():
         thumbs._normalize_source_url("https://example.com/x.jpg", None)
 
 
+def test_normalize_source_url_accepts_autoimg_hosts():
+    src = "https://2sc2.autoimg.cn/escimg/test.jpg"
+    assert thumbs._normalize_source_url(src, None) == src
+
+
+def test_resolve_thumbnail_url_normalizes_scheme_relative_autoimg():
+    src = "//2sc2.autoimg.cn/escimg/test.jpg"
+    assert thumbs.resolve_thumbnail_url(src) == "https://2sc2.autoimg.cn/escimg/test.jpg"
+
+
 def test_lock_acquire_and_busy(tmp_path, monkeypatch):
     monkeypatch.setenv("THUMB_CACHE_DIR", str(tmp_path))
     src = "https://img.classistatic.de/api/v1/mo-prod/images/aa/aa.jpg?rule=mo-1024.jpg"
