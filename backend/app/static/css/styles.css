@@ -3462,6 +3462,8 @@ input[type="number"]::-webkit-outer-spin-button {
 .detail-state__item {
   display: grid;
   gap: 2px;
+  min-width: 0;
+  align-content: start;
 }
 .detail-state__item .label {
   font-size: 12px;
@@ -3470,6 +3472,9 @@ input[type="number"]::-webkit-outer-spin-button {
 .detail-state__item .value {
   font-size: 14px;
   color: var(--color-text-primary);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .detail-options__chips {
   display: flex;
@@ -3512,6 +3517,49 @@ input[type="number"]::-webkit-outer-spin-button {
 .detail-actions--contact {
   padding-top: 4px;
 }
+.detail-similar {
+  display: grid;
+  gap: 12px;
+  overflow: hidden;
+}
+.detail-similar__header {
+  display: grid;
+  gap: 4px;
+}
+.detail-similar__header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.detail-similar__header .muted {
+  margin: 0;
+  font-size: 13px;
+}
+.detail-similar__track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, 320px);
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.detail-similar__card {
+  grid-template-columns: 1fr;
+  min-height: 298px;
+  scroll-snap-align: start;
+}
+.detail-similar__card .car-card__body {
+  grid-template-columns: 1fr;
+}
+.detail-similar__track::-webkit-scrollbar {
+  height: 8px;
+}
+.detail-similar__track::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
 .detail-actions .cta-lead {
   min-width: 180px;
   min-height: 52px;
@@ -3538,6 +3586,19 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .section-toggle-btn {
   white-space: nowrap;
+}
+.home-more-offers {
+  margin-top: 18px;
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+}
+.home-more-offers__catalog {
+  display: flex;
+  justify-content: center;
+}
+.cards-highlights--expand {
+  width: 100%;
 }
 .detail-origin-link {
   position: fixed;
@@ -3618,6 +3679,9 @@ input[type="number"]::-webkit-outer-spin-button {
   .detail-options {
     content-visibility: auto;
     contain-intrinsic-size: 1px 600px;
+  }
+  .detail-similar__track {
+    grid-auto-columns: minmax(260px, 86vw);
   }
   .detail-actions .cta-lead {
     min-width: 0;

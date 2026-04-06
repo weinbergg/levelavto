@@ -89,8 +89,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=92' in template
-    assert '/static/css/styles.css?v=53' in template
+    assert '/static/js/app.js?v=93' in template
+    assert '/static/css/styles.css?v=55' in template
 
 
 def test_search_page_passes_payload_deferred_flag():
@@ -169,7 +169,7 @@ def test_taxonomy_contains_extra_body_and_interior_translations():
 def test_pages_home_uses_recommended_and_media_cache_helpers():
     router = _read("app/routers/pages.py")
     assert "_get_home_recommended(service, db, reco_cfg, limit=12)" in router
-    assert "_get_home_more_offers(service, db, limit=18)" in router
+    assert "_get_home_more_offers(service, db, limit=12)" in router
     assert "home_media_ctx:v4" in router
     assert 'static" / "home-collage"' in router
     assert "home_recommended:" in router
@@ -183,6 +183,8 @@ def test_home_collage_and_home_content_copy_are_updated():
     home_content = _read("app/utils/home_content.py")
     assert "collage_images[:75]" in template
     assert 'data-expand-toggle="home-more-offers-grid"' in template
+    assert 'data-expand-pages="2"' in template
+    assert 'id="home-more-offers-catalog"' in template
     assert 'id="home-more-offers-grid"' in template
     assert "Показываем только марки, которые есть в каталоге" in home_content
     assert 'href="#cases-collage"' in template

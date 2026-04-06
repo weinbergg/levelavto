@@ -124,13 +124,12 @@
               {% endif %}
             </div>
             <div class="detail-price__meta">
-              {% if gross %}
+              {% if net %}
+              NETTO: {{ '{:,.0f}'.format(net).replace(',', ' ') }} €
+              {% elif gross %}
               BRUTTO: {{ '{:,.0f}'.format(gross).replace(',', ' ') }} €
               {% elif car.price %}
               Цена: {{ '{:,.0f}'.format(car.price).replace(',', ' ') }} {{ car.currency or '' }}
-              {% endif %}
-              {% if net %}
-              <br>NET: {{ '{:,.0f}'.format(net).replace(',', ' ') }} €
               {% endif %}
               {% if vat_pct is not none %}
               <br>НДС: {% if vat_reclaim %}возмещается ({{ vat_pct }}%){% else %}не возмещается{% endif %}
@@ -184,12 +183,65 @@
           {% endif %}
           <button class="btn btn-secondary" id="detail-lead-btn" type="button">Оставить заявку</button>
         </div>
+        {% if similar_offers and similar_offers|length > 0 %}
+        <div class="detail-similar card">
+          <div class="detail-similar__header">
+            <h3>Похожие предложения</h3>
+            <p class="muted">Близкие по модели и характеристикам варианты из Европы и Кореи.</p>
+          </div>
+          <div class="detail-similar__track">
+            {% for item in similar_offers %}
+            <a class="car-card detail-similar__card" href="/car/{{ item.id }}">
+              <div class="thumb-wrap">
+                <img
+                  class="thumb"
+                  src="{% if item.thumbnail_url and 'img.classistatic.de' in item.thumbnail_url %}/thumb?u={{ item.thumbnail_url | urlencode }}&w=360&fmt=webp&rev=2{% else %}{{ item.thumbnail_url or '/static/img/no-photo.svg' }}{% endif %}"
+                  width="320"
+                  height="200"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  referrerpolicy="no-referrer"
+                  onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
+                />
+              </div>
+              <div class="car-card__body">
+                <div>
+                  <div class="car-card__title">{{ item.brand or '' }} {{ item.model or '' }}</div>
+                  {% if item.variant %}
+                  <div class="car-card__subtitle">{{ item.variant }}</div>
+                  {% endif %}
+                  <div class="car-card__meta">
+                    {{ item.year or '' }} · {{ item.display_engine_type or item.engine_type or '' }} · {{ item.display_transmission or item.transmission or '' }}
+                  </div>
+                  <ul class="specs">
+                    <li>Пробег: {{ item.mileage or '—' }}</li>
+                    <li>Кузов: {{ item.display_body_type or item.body_type or '—' }}</li>
+                    <li>Страна: {{ item.display_country_label or item.country or '—' }}</li>
+                  </ul>
+                </div>
+                <div class="car-card__price">
+                  {% if item.display_price_rub %}
+                  <span>{{ '{:,.0f}'.format(item.display_price_rub).replace(',', ' ') }} ₽</span>
+                  {% endif %}
+                  {% if item.price_note %}
+                  <div class="price-note">{{ item.price_note }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
         <div id="detail-lead-form" class="card" style="margin-top:12px; display:none;">
           <form method="post" action="/lead" class="form-grid form-grid--12 lead-form-grid">
             {% set title_line = (car.brand or '') ~ ' ' ~ (car.model or '') ~ (' ' ~ car.year if car.year else '') %}
             {% set price_line = '' %}
             {% if calc and calc.total_rub %}
               {% set price_line = '{:,.0f}'.format(calc.total_rub).replace(",", " ") ~ ' ₽ (итог в РФ)' %}
+            {% elif pricing and pricing.net_eur %}
+              {% set price_line = '{:,.0f}'.format(pricing.net_eur).replace(",", " ") ~ ' € (NETTO)' %}
             {% elif pricing and pricing.gross_eur %}
               {% set price_line = '{:,.0f}'.format(pricing.gross_eur).replace(",", " ") ~ ' € (BRUTTO)' %}
             {% elif car.price %}

@@ -216,6 +216,7 @@ class CarSpecInferenceService:
         need_power = car.power_hp is None and car.power_kw is None
         if not need_engine_cc and not need_power:
             return None
+        target_is_kr = str(car.country or "").upper().startswith("KR")
         target_power_hp = normalized_power_hp(car.power_hp, car.power_kw)
         payload = car.source_payload or {}
         parsed_engine_cc = None
@@ -248,11 +249,15 @@ class CarSpecInferenceService:
         if not sig["brand_norm"] or not sig["model_norm"]:
             return None
 
-        def _query_rows(window: int) -> list[Dict[str, Any]]:
-            query = self.db.query(CarSpecReference).filter(
+        def _query_rows(window: int, *, region_scope: str = "same") -> list[Dict[str, Any]]:
+            query = self.db.query(CarSpecReference).join(
+                Car,
+                Car.id == CarSpecReference.source_car_id,
+            ).filter(
                 CarSpecReference.brand_norm == sig["brand_norm"],
                 CarSpecReference.model_norm == sig["model_norm"],
                 CarSpecReference.source_car_id != car.id,
+                Car.is_available.is_(True),
             )
             if sig["engine_type_norm"]:
                 query = query.filter(CarSpecReference.engine_type_norm == sig["engine_type_norm"])
@@ -262,6 +267,15 @@ class CarSpecInferenceService:
                 query = query.filter(
                     CarSpecReference.year.between(sig["year"] - window, sig["year"] + window)
                 )
+            if region_scope == "same":
+                if target_is_kr:
+                    query = query.filter(Car.country.like("KR%"))
+                else:
+                    query = query.filter(~Car.country.like("KR%"))
+            elif region_scope == "EU":
+                query = query.filter(~Car.country.like("KR%"))
+            elif region_scope == "KR":
+                query = query.filter(Car.country.like("KR%"))
             refs = query.all()
             return [self._reference_row_to_dict(ref) for ref in refs]
 
@@ -382,29 +396,54 @@ class CarSpecInferenceService:
                     return consensus
             return _try_consensus(rows, has_variant_key=False)
 
-        rows = _query_rows(year_window)
+        def _cross_region_wrap(consensus: Optional[Dict[str, Any]], *, rule_prefix: str) -> Optional[Dict[str, Any]]:
+            if not consensus:
+                return None
+            rule = str(consensus.get("rule") or "")
+            return {
+                **consensus,
+                "rule": f"{rule_prefix}_{rule}" if rule else rule_prefix,
+                "confidence": "medium",
+            }
+
+        rows = _query_rows(year_window, region_scope="same")
         consensus = _consensus_from_rows(rows)
         if consensus:
             return consensus
         expanded_year_window = max(year_window, 4)
-        if expanded_year_window == year_window:
+        if expanded_year_window > year_window:
+            rows = _query_rows(expanded_year_window, region_scope="same")
+            consensus = _consensus_from_rows(rows)
+            if consensus:
+                rule = str(consensus.get("rule") or "")
+                if "year_exact" in rule:
+                    rule = rule.replace("year_exact", "year_expanded")
+                elif "year_window" in rule:
+                    rule = rule.replace("year_window", "year_expanded")
+                else:
+                    rule = f"{rule}_year_expanded" if rule else "year_expanded"
+                return {
+                    **consensus,
+                    "confidence": "medium",
+                    "rule": rule,
+                }
+
+        if not target_is_kr:
             return None
-        rows = _query_rows(expanded_year_window)
-        consensus = _consensus_from_rows(rows)
-        if not consensus:
-            return None
-        rule = str(consensus.get("rule") or "")
-        if "year_exact" in rule:
-            rule = rule.replace("year_exact", "year_expanded")
-        elif "year_window" in rule:
-            rule = rule.replace("year_window", "year_expanded")
-        else:
-            rule = f"{rule}_year_expanded" if rule else "year_expanded"
-        return {
-            **consensus,
-            "confidence": "medium",
-            "rule": rule,
-        }
+
+        rows = _query_rows(year_window, region_scope="EU")
+        consensus = _cross_region_wrap(_consensus_from_rows(rows), rule_prefix="eu_cross_region")
+        if consensus:
+            return consensus
+        if expanded_year_window > year_window:
+            rows = _query_rows(expanded_year_window, region_scope="EU")
+            consensus = _cross_region_wrap(
+                _consensus_from_rows(rows),
+                rule_prefix="eu_cross_region_year_expanded",
+            )
+            if consensus:
+                return consensus
+        return None
 
     def _reference_payload_for_car(self, car: Car) -> Optional[Dict[str, Any]]:
         if not car.is_available:

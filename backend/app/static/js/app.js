@@ -3682,8 +3682,34 @@
       const targetId = btn.getAttribute('data-expand-toggle')
       const target = targetId ? document.getElementById(targetId) : null
       if (!target) return
+      const pagedItems = qsa('[data-expand-page]', target)
+      const maxPages = Number(btn.dataset.expandPages || 0)
+      const expandLabel = btn.dataset.expandLabel || 'Показать ещё предложения'
+      const catalogTargetId = btn.dataset.expandCatalogId || ''
+      const catalogTarget = catalogTargetId ? document.getElementById(catalogTargetId) : null
       btn.addEventListener('click', (event) => {
         event.preventDefault()
+        if (maxPages > 0 && pagedItems.length) {
+          const currentPage = Number(btn.dataset.expandCurrentPage || 0)
+          const nextPage = Math.min(currentPage + 1, maxPages)
+          target.hidden = false
+          target.classList.remove('is-collapsed')
+          pagedItems.forEach((item) => {
+            const pageNo = Number(item.getAttribute('data-expand-page') || 0)
+            if (pageNo > 0 && pageNo <= nextPage) {
+              item.hidden = false
+            }
+          })
+          btn.dataset.expandCurrentPage = String(nextPage)
+          btn.setAttribute('aria-expanded', nextPage >= 1 ? 'true' : 'false')
+          if (nextPage >= maxPages) {
+            btn.hidden = true
+            if (catalogTarget) catalogTarget.hidden = false
+          } else {
+            btn.textContent = expandLabel
+          }
+          return
+        }
         const expanded = btn.getAttribute('aria-expanded') === 'true'
         const nextExpanded = !expanded
         btn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false')

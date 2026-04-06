@@ -2645,6 +2645,118 @@ class CarsService:
         )
         return list(self.db.execute(stmt).scalars().all())
 
+    def similar_cars(self, car: Car, *, limit: int = 10) -> List[Car]:
+        brand_keys = [value.lower() for value in brand_variants(car.brand)]
+        model_key = str(car.model or "").strip().lower()
+        generation_key = str(car.generation or "").strip().lower()
+        body_key = normalize_body_type(car.body_type) or str(car.body_type or "").strip().lower()
+        engine_key = normalize_fuel(car.engine_type) or str(car.engine_type or "").strip().lower()
+        if not brand_keys and not model_key:
+            return []
+
+        conditions = [self._available_expr(), Car.id != car.id]
+        if brand_keys:
+            conditions.append(func.lower(func.coalesce(Car.brand, "")).in_(brand_keys))
+        elif model_key:
+            conditions.append(func.lower(func.coalesce(Car.model, "")) == model_key)
+
+        target_reg_year = car.registration_year or car.year
+        target_power_hp = effective_power_hp_value(car)
+        target_engine_cc = effective_engine_cc_value(car)
+        target_mileage = car.mileage
+
+        reg_year_expr = func.coalesce(Car.registration_year, Car.year)
+        power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)
+        engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)
+        price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+
+        model_rank = (
+            case(
+                (func.lower(func.coalesce(Car.model, "")) == model_key, 0),
+                else_=1,
+            )
+            if model_key
+            else literal(1)
+        )
+        generation_rank = (
+            case(
+                (func.lower(func.coalesce(Car.generation, "")) == generation_key, 0),
+                else_=1,
+            )
+            if generation_key
+            else literal(1)
+        )
+        body_rank = (
+            case(
+                (func.lower(func.coalesce(Car.body_type, "")) == body_key, 0),
+                else_=1,
+            )
+            if body_key
+            else literal(1)
+        )
+        engine_rank = (
+            case(
+                (func.lower(func.coalesce(Car.engine_type, "")) == engine_key, 0),
+                else_=1,
+            )
+            if engine_key
+            else literal(1)
+        )
+        country_rank = case(
+            (func.upper(func.coalesce(Car.country, "")) == str(car.country or "").upper(), 0),
+            else_=1,
+        )
+        year_distance = (
+            case((reg_year_expr.is_not(None), func.abs(reg_year_expr - int(target_reg_year))), else_=999)
+            if target_reg_year is not None
+            else literal(999)
+        )
+        power_distance = (
+            case(
+                (power_hp_expr.is_not(None), func.abs(power_hp_expr - float(target_power_hp))),
+                else_=999999,
+            )
+            if target_power_hp is not None
+            else literal(999999)
+        )
+        engine_cc_distance = (
+            case(
+                (engine_cc_expr.is_not(None), func.abs(engine_cc_expr - int(target_engine_cc))),
+                else_=999999,
+            )
+            if target_engine_cc is not None
+            else literal(999999)
+        )
+        mileage_distance = (
+            case(
+                (Car.mileage.is_not(None), func.abs(Car.mileage - int(target_mileage))),
+                else_=999999999,
+            )
+            if target_mileage is not None
+            else literal(999999999)
+        )
+
+        stmt = (
+            select(Car)
+            .where(and_(*conditions))
+            .order_by(
+                model_rank.asc(),
+                generation_rank.asc(),
+                body_rank.asc(),
+                engine_rank.asc(),
+                country_rank.asc(),
+                year_distance.asc(),
+                power_distance.asc(),
+                engine_cc_distance.asc(),
+                mileage_distance.asc(),
+                price_expr.asc().nullslast(),
+                Car.listing_sort_ts.desc().nullslast(),
+                Car.created_at.desc(),
+            )
+            .limit(max(1, min(int(limit or 10), 24)))
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
     def top_models_by_brand(self, max_brands: int = 5, top_n: int = 6) -> Dict[str, List[Dict[str, Any]]]:
         brands = [b["brand"] for b in self.brand_stats()[:max_brands]]
         result: Dict[str, List[Dict[str, Any]]] = {}

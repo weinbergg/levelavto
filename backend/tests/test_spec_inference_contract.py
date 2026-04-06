@@ -38,3 +38,5 @@ def test_pipeline_and_recalc_support_inferred_specs_refresh():
     assert "infer_engine_cc_from_text" in util
     assert "filter_candidates_by_target_power" in util
     assert "power_matched" in service
+    assert 'region_scope="EU"' in service
+    assert "eu_cross_region" in service

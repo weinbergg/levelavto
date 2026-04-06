@@ -1,3 +1,4 @@
+import json
 import time
 import logging
 import re
@@ -146,6 +147,103 @@ def _decorate_showcase_car(car: Car) -> Car:
     return car
 
 
+def _normalize_detail_value(
+    field_key: str,
+    value: Any,
+    *,
+    allow_list: bool = True,
+    max_items: int = 4,
+) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "Да" if value else "Нет"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, dict):
+        return None
+    if isinstance(value, (list, tuple, set)):
+        if not allow_list:
+            return None
+        items: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            normalized = _normalize_detail_value(
+                field_key,
+                item,
+                allow_list=False,
+                max_items=max_items,
+            )
+            if not normalized:
+                continue
+            key = normalized.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append(normalized)
+            if len(items) >= max_items:
+                break
+        return ", ".join(items) if items else None
+    raw = str(value).strip()
+    if not raw or raw.lower() in {"null", "none", "nan", "[]", "{}"}:
+        return None
+    if (raw.startswith("[") and raw.endswith("]")) or (raw.startswith("{") and raw.endswith("}")):
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            parsed = None
+        if parsed is not None:
+            return _normalize_detail_value(
+                field_key,
+                parsed,
+                allow_list=allow_list,
+                max_items=max_items,
+            )
+    compact = re.sub(r"\s+", " ", raw).strip()
+    return translate_payload_value(field_key, compact) or compact
+
+
+def _extract_fuel_consumption(payload: Dict[str, Any]) -> Optional[str]:
+    for field_key in ("envkv_energy_consumption", "fuel_consumption", "envkv_consumption_fuel"):
+        normalized = _normalize_detail_value(field_key, payload.get(field_key), allow_list=False)
+        if not normalized:
+            continue
+        low = normalized.lower()
+        if not re.search(r"\d", normalized):
+            continue
+        if len(normalized) > 96 and normalized.count(",") >= 3:
+            continue
+        if any(token in low for token in ("alarm system", "cruise control", "heated steering", "sound system")):
+            continue
+        return normalized
+    return None
+
+
+def _extract_co2_value(payload: Dict[str, Any]) -> Optional[str]:
+    for field_key in ("envkv_co2_emissions", "co_emission"):
+        normalized = _normalize_detail_value(field_key, payload.get(field_key), allow_list=False)
+        if not normalized:
+            continue
+        if not re.search(r"\d", normalized):
+            continue
+        return normalized
+    return None
+
+
+def _extract_short_class_value(payload: Dict[str, Any], *field_keys: str) -> Optional[str]:
+    for field_key in field_keys:
+        normalized = _normalize_detail_value(field_key, payload.get(field_key), allow_list=False)
+        if not normalized:
+            continue
+        low = normalized.lower()
+        if len(normalized) > 24:
+            continue
+        if "l/100" in low or "internal combustion" in low:
+            continue
+        return normalized
+    return None
+
+
 def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any], limit: int = 12) -> List[Car]:
     cache_key = (
         cfg.get("reg_year_min", 2021),
@@ -181,7 +279,7 @@ def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any]
     return items
 
 
-def _get_home_more_offers(service: CarsService, db: Session, limit: int = 18) -> List[Car]:
+def _get_home_more_offers(service: CarsService, db: Session, limit: int = 12) -> List[Car]:
     cache_key = (limit, _home_dataset_version())
     cached_ids = _HOME_MORE_OFFERS_CACHE.get(cache_key)
     if cached_ids:
@@ -1123,7 +1221,7 @@ def _home_context(
     for car in recommended:
         _decorate_showcase_car(car)
     t0 = time.perf_counter()
-    more_offers = _get_home_more_offers(service, db, limit=18)
+    more_offers = _get_home_more_offers(service, db, limit=12)
     _stage("more_offers_ms", t0)
     for car in more_offers:
         _decorate_showcase_car(car)
@@ -1902,6 +2000,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     options = []
     calc = None
     pricing = None
+    similar_offers: list[Car] = []
     if car:
         calc = service.ensure_calc_cache(car)
         car.engine_cc = effective_engine_cc_value(car)
@@ -1933,33 +2032,51 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         )
         payload = car.source_payload or {}
         pricing = service.price_info(car)
+        similar_offers = service.similar_cars(car, limit=10)
+        for item in similar_offers:
+            _decorate_showcase_car(item)
         raw_description = (getattr(car, "description", None) or payload.get("description") or "").strip()
         car.display_description = raw_description if raw_description else None
 
-        def push(label: str, value: Any, *, as_color: bool = False) -> None:
-            if value is None:
-                return
-            if isinstance(value, str) and not value.strip():
+        def push(
+            label: str,
+            value: Any,
+            *,
+            field_key: Optional[str] = None,
+            as_color: bool = False,
+            allow_list: bool = True,
+        ) -> None:
+            normalized = _normalize_detail_value(
+                field_key or label,
+                value,
+                allow_list=allow_list,
+            )
+            if not normalized:
                 return
             if as_color:
-                details.append({"label": label, "value": translate_payload_value("manufacturer_color", str(value)) or value})
+                details.append(
+                    {
+                        "label": label,
+                        "value": translate_payload_value("manufacturer_color", str(normalized)) or normalized,
+                    }
+                )
                 return
-            details.append({"label": label, "value": translate_payload_value(label, str(value)) or value})
+            details.append({"label": label, "value": normalized})
 
         push("Мест", payload.get("num_seats"))
         push("Дверей", payload.get("doors_count"))
         push("Владельцев", payload.get("owners_count"))
-        push("Экокласс", payload.get("emission_class"))
-        push("Класс CO₂", payload.get("envkv_co2_class") or payload.get("envkv_co2_class_value"))
-        push("Эффективность", payload.get("efficiency_class"))
-        push("Климат", payload.get("climatisation"))
-        push("Интерьер", payload.get("interior_design"))
-        push("Парктроники", payload.get("park_assists"))
-        push("Подушки", payload.get("airbags"))
+        push("Экокласс", payload.get("emission_class"), field_key="emission_class")
+        push("Класс CO₂", _extract_short_class_value(payload, "envkv_co2_class", "envkv_co2_class_value"), field_key="envkv_co2_class", allow_list=False)
+        push("Эффективность", _extract_short_class_value(payload, "efficiency_class"), field_key="efficiency_class", allow_list=False)
+        push("Климат", payload.get("climatisation"), field_key="climatisation", allow_list=False)
+        push("Интерьер", payload.get("interior_design"), field_key="interior_design")
+        push("Парктроники", payload.get("park_assists"), field_key="park_assists")
+        push("Подушки", payload.get("airbags"), field_key="airbags")
         push("Цвет производителя", payload.get("manufacturer_color"), as_color=True)
-        push("Расход топлива", payload.get("envkv_energy_consumption") or payload.get("fuel_consumption"))
-        push("CO₂", payload.get("envkv_co2_emissions") or payload.get("co_emission"))
-        push("Оценка цены", payload.get("price_rating_label"))
+        push("Расход топлива", _extract_fuel_consumption(payload), field_key="fuel_consumption", allow_list=False)
+        push("CO₂", _extract_co2_value(payload), field_key="co_emission", allow_list=False)
+        push("Оценка цены", payload.get("price_rating_label"), field_key="price_rating_label", allow_list=False)
 
         raw_options = payload.get("options")
         raw_features = payload.get("features")
@@ -1995,6 +2112,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             "user": getattr(request.state, "user", None),
             "car_details": details,
             "car_options": options,
+            "similar_offers": similar_offers,
             "calc": calc,
             "pricing": pricing,
             "content": contact_content,
