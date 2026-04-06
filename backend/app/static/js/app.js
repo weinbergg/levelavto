@@ -206,9 +206,15 @@
     if (!img.dataset.fallbackBound) {
       img.dataset.fallbackBound = '1'
       img.onerror = () => {
+        const currentSrc = img.getAttribute('src') || ''
+        const currentThumb = normalizeThumbUrl(img.dataset.thumb || '', { thumb: true })
+        if (!img.dataset.thumbFallbackTried && currentThumb && currentThumb !== '/static/img/no-photo.svg' && currentThumb !== currentSrc) {
+          img.dataset.thumbFallbackTried = '1'
+          img.src = currentThumb
+          return
+        }
         // First failure on proxy thumb can be transient (e.g. lock busy -> 503).
         // Retry once with cache-busting before falling back to static placeholder.
-        const currentSrc = img.getAttribute('src') || ''
         if (!img.dataset.thumbRetried && currentSrc.startsWith('/thumb?')) {
           img.dataset.thumbRetried = '1'
           const retrySrc = `${currentSrc}${currentSrc.includes('?') ? '&' : '?'}rt=${Date.now()}`
@@ -3965,7 +3971,7 @@
     const deduped = []
     const seen = new Set()
     images.forEach((u) => {
-      const normalized = normalizeThumbUrl(u, { thumb: true, width: DETAIL_PRIMARY_WIDTH })
+      const normalized = normalizeThumbUrl(u, { thumb: false })
       if (!normalized || seen.has(normalized)) return
       seen.add(normalized)
       deduped.push(normalized)
@@ -3973,7 +3979,8 @@
     images = deduped
     if (images.length < 2) return
     const isUsable = (src) => Boolean(src && src !== '/static/img/no-photo.svg')
-    let idx = Math.max(0, images.indexOf(img.getAttribute('src')))
+    const currentOrig = normalizeThumbUrl(img.getAttribute('data-orig') || img.getAttribute('src') || '', { thumb: false })
+    let idx = Math.max(0, images.indexOf(currentOrig))
     if (!isUsable(images[idx])) {
       const firstOk = images.findIndex((src) => isUsable(src))
       idx = firstOk >= 0 ? firstOk : 0
@@ -4012,10 +4019,15 @@
       const normalizedIdx = (nextIdx + images.length) % images.length
       if (!isUsable(images[normalizedIdx])) return
       idx = normalizedIdx
+      const nextOrig = images[idx]
+      const nextThumb = normalizeThumbUrl(nextOrig, { thumb: true, width: DETAIL_PRIMARY_WIDTH })
+      img.dataset.orig = nextOrig
+      img.dataset.thumb = nextThumb
       delete img.dataset.thumbRetried
+      delete img.dataset.thumbFallbackTried
       delete img.dataset.fallbackApplied
-      img.src = images[idx]
-      applyThumbFallback(img, { thumbProxy: true })
+      img.src = nextOrig
+      applyThumbFallback(img, { thumbProxy: false })
       syncActive()
     }
     const move = (step) => {
@@ -4040,7 +4052,7 @@
       })
     })
     setImageByIndex(idx)
-    applyThumbFallback(img, { thumbProxy: true })
+    applyThumbFallback(img, { thumbProxy: false })
     refreshGalleryChrome()
     prevBtn?.addEventListener('click', (e) => {
       e.preventDefault()
@@ -4113,7 +4125,7 @@
   function initThumbFallbacks() {
     qsa('img.thumb').forEach((img) => applyThumbFallback(img))
     const primary = qs('#primaryImage')
-    if (primary) applyThumbFallback(primary, { thumbProxy: true })
+    if (primary) applyThumbFallback(primary, { thumbProxy: false })
   }
 
   function initAll() {

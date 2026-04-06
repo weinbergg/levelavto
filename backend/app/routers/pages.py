@@ -2087,7 +2087,15 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             return None
 
         if getattr(car, "images", None):
-            for im in car.images:
+            ordered_images = sorted(
+                list(car.images),
+                key=lambda im: (
+                    0 if getattr(im, "is_primary", False) else 1,
+                    int(getattr(im, "position", 0) or 0),
+                    int(getattr(im, "id", 0) or 0),
+                ),
+            )
+            for im in ordered_images:
                 try:
                     normalized = _normalize_detail_image(getattr(im, "url", None))
                     if normalized:
@@ -2118,6 +2126,19 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
                 seen_images.add(key)
                 deduped_images.append(key)
             detail_images = deduped_images
+            thumbnail_key = _normalize_detail_image(getattr(car, "thumbnail_url", None))
+            indexed_images = list(enumerate(detail_images))
+            detail_images = [
+                url
+                for _, url in sorted(
+                    indexed_images,
+                    key=lambda pair: (
+                        0 if str(pair[1]).startswith("/media/") else 1,
+                        1 if (thumbnail_key and pair[1] == thumbnail_key and len(detail_images) > 1) else 0,
+                        pair[0],
+                    ),
+                )
+            ]
     details = []
     options = []
     calc = None
