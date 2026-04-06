@@ -83,7 +83,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
     assert "window.location.assign(buildCatalogUrl(params))" in script
     assert "if (el.matches?.('[data-line-model], [data-line-variant]')) return false" in script
     assert "function syncCatalogLinesFromState(form)" in script
-    assert "const restoredModels = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)" in script
+    assert "const restoredModelsRaw = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)" in script
     assert "function groupLineSelections(lines = [])" in script
     assert "const initialLines = groupLineSelections(initialParams.getAll('line'))" in script
     assert "fillModels(normalizeBrand(initial.brand || ''), modelSelect, initial.models || initial.model || '')" in script
@@ -97,7 +97,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=95' in template
+    assert '/static/js/app.js?v=96' in template
     assert '/static/css/styles.css?v=57' in template
 
 
@@ -165,6 +165,8 @@ def test_model_group_summary_has_visible_selected_states():
     assert ".advanced-lines .search-row select.model-select-native" in css
     assert "display: none !important;" in css
     assert ".model-accordion__item.is-active" in css
+
+
 def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():
     template = _read("app/templates/catalog.html")
     assert 'data-catalog-line="1"' in template
@@ -194,8 +196,24 @@ def test_taxonomy_contains_extra_body_and_interior_translations():
     assert "fuel,hybrid_diesel,Гибрид (дизельный / электрический)" in taxonomy
     assert "fuel,phev,Подключаемый гибрид" in taxonomy
     assert "fuel,cng,Природный газ (КПГ)" in taxonomy
+    assert 'fuel,ethanol,"Ethanol (FFV, E85 etc.)"' in taxonomy
     assert 'return "hybrid_diesel"' in utils
     assert 'return "phev"' in utils
+
+
+def test_model_filters_use_canonical_labels_with_alias_restore():
+    service = _read("app/services/cars_service.py")
+    router = _read("app/routers/catalog.py")
+    script = _read("app/static/js/app.js")
+    assert "def _canonical_model_label(" in service
+    assert "def _resolve_model_aliases(" in service
+    assert "def _model_filter_clause(" in service
+    assert "if filters.get(\"model\"):" in service
+    assert "clause = self._model_filter_clause(" in service
+    assert "clause = service._model_filter_clause(" in router
+    assert "select.__resolveModelValues = (values = []) => {" in script
+    assert "const restoredModelsRaw = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)" in script
+    assert "const resolvedSelectedValues = typeof modelSelect.__resolveModelValues === 'function'" in script
 
 
 def test_pages_home_uses_recommended_and_media_cache_helpers():
@@ -258,7 +276,7 @@ def test_model_filters_normalize_whitespace_and_merge_overlapping_regions():
     assert "def model_lookup_key(" in service
     assert "func.regexp_replace(" in service
     assert '"aliases": []' in service
-    assert "service._normalized_model_expr() == model_lookup_key(canon.get(\"model\"))" in router
+    assert "clause = service._model_filter_clause(" in router
     assert ".multi-select-menu__options" in css
     assert "grid-template-columns: 1fr;" in css
     assert "white-space: normal;" in css

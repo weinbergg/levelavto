@@ -32,7 +32,7 @@ drivetrain,awd,Полный,AWD; 4WD; 4x4; all; Allrad; quattro; xDrive; 4MATIC
 fuel,petrol,Бензин,Petrol; Benzin; Gasoline; Benzina; бензин
 fuel,diesel,Дизель,Diesel; дизель; biodiesel
 fuel,electric,Электро,Electric; EV; Elektro; BEV; электро
-fuel,ethanol,Ethanol (FFV, E85 etc.),Ethanol; E85; FFV; FlexFuel; Flex Fuel; Bioethanol; этанол
+fuel,ethanol,"Ethanol (FFV, E85 etc.)",Ethanol; E85; FFV; FlexFuel; Flex Fuel; Bioethanol; этанол
 fuel,hybrid_diesel,Гибрид (дизельный / электрический),hybrid (diesel/electric); дизель + электро
 fuel,hybrid,Гибрид (бензиновый / электрический),Hybrid; HEV; Vollhybrid; hybrid (petrol/electric); бензин + электро
 fuel,hydrogen,Водород,Hydrogen; H2; Fuel Cell; водород

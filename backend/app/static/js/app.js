@@ -2143,7 +2143,10 @@
       const payload = await fetchModels({ brand: normBrand, region, country, krType })
       fillModelSelectWithGroups(modelSelect, payload, 'Все')
       const selectedLines = getCatalogSelectedModels(catalogForm, normBrand)
-      const restoredModels = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)
+      const restoredModelsRaw = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)
+      const restoredModels = typeof modelSelect.__resolveModelValues === 'function'
+        ? modelSelect.__resolveModelValues(restoredModelsRaw)
+        : restoredModelsRaw
       if (restoredModels.length > 1) {
         modelSelect.value = ''
         setAccordionSelectedModels(modelSelect, restoredModels)
@@ -2153,8 +2156,12 @@
         setAccordionSelectedModels(modelSelect, [restoredModels[0]])
         clearCatalogModelLineInputs(catalogForm)
       } else if (initialModelRestorePending && initialModelParam) {
-        setSelectValueInsensitive(modelSelect, initialModelParam)
-        setAccordionSelectedModels(modelSelect, [initialModelParam])
+        const restoredInitial = typeof modelSelect.__resolveModelValues === 'function'
+          ? modelSelect.__resolveModelValues([initialModelParam])
+          : [initialModelParam]
+        const initialValue = restoredInitial[0] || initialModelParam
+        setSelectValueInsensitive(modelSelect, initialValue)
+        setAccordionSelectedModels(modelSelect, [initialValue])
       } else {
         setAccordionSelectedModels(modelSelect, [])
       }
@@ -2386,6 +2393,44 @@
     const models = Array.isArray(payload?.models) ? payload.models : []
     const groups = Array.isArray(payload?.model_groups) ? payload.model_groups : []
     const enableAccordion = window.ENABLE_MODEL_ACCORDION === true
+    const modelMeta = new Map()
+    models.forEach((row) => {
+      const value = String(row?.value || row?.model || '').trim()
+      if (!value) return
+      const aliases = Array.from(
+        new Set(
+          (Array.isArray(row?.aliases) ? row.aliases : [])
+            .map((item) => String(item || '').trim())
+            .filter(Boolean)
+            .concat(value),
+        ),
+      )
+      modelMeta.set(value, {
+        value,
+        label: row?.label || value,
+        aliases,
+      })
+    })
+    select.__modelMeta = modelMeta
+    select.__resolveModelValues = (values = []) => {
+      const resolved = []
+      const seen = new Set()
+      ;(Array.isArray(values) ? values : [values]).forEach((item) => {
+        const raw = String(item || '').trim()
+        if (!raw) return
+        let matched = raw
+        for (const [value, meta] of modelMeta.entries()) {
+          if (value === raw || (meta.aliases || []).includes(raw)) {
+            matched = value
+            break
+          }
+        }
+        if (seen.has(matched)) return
+        seen.add(matched)
+        resolved.push(matched)
+      })
+      return resolved
+    }
     select.innerHTML = ''
     const empty = document.createElement('option')
     empty.value = ''
@@ -3446,12 +3491,15 @@
       const krType = regionKrSelect?.value || ''
       const payload = await fetchModels({ brand, region, country, krType })
       fillModelSelectWithGroups(modelSelect, payload, 'Неважно')
+      const resolvedSelectedValues = typeof modelSelect.__resolveModelValues === 'function'
+        ? modelSelect.__resolveModelValues(selectedValues)
+        : selectedValues
       const availableValues = new Set(
         Array.from(modelSelect.options || [])
           .map((opt) => String(opt.value || '').trim())
           .filter(Boolean),
       )
-      const preservedValues = selectedValues.filter((value) => availableValues.has(value))
+      const preservedValues = resolvedSelectedValues.filter((value) => availableValues.has(value))
       if (preservedValues.length > 1) {
         modelSelect.value = ''
         setAccordionSelectedModels(modelSelect, preservedValues)

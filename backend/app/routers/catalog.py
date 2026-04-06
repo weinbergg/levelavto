@@ -6,7 +6,6 @@ from ..db import get_db
 from ..services.cars_service import (
     CarsService,
     normalize_brand,
-    model_lookup_key,
     effective_engine_cc_value,
     effective_power_hp_value,
     effective_power_kw_value,
@@ -1596,7 +1595,14 @@ def filter_ctx_model(
     if canon.get("brand"):
         stmt = stmt.where(Car.brand == normalize_brand(canon.get("brand")).strip())
     if canon.get("model"):
-        stmt = stmt.where(service._normalized_model_expr() == model_lookup_key(canon.get("model")))
+        clause = service._model_filter_clause(
+            region=canon.get("region"),
+            country=canon.get("country"),
+            brand=canon.get("brand"),
+            model=canon.get("model"),
+        )
+        if clause is not None:
+            stmt = stmt.where(clause)
     if canon.get("country"):
         stmt = stmt.where(func.upper(Car.country) == canon.get("country"))
     elif canon.get("region") == "EU":

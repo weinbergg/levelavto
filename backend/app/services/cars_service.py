@@ -9,6 +9,7 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.dialects.postgresql import JSONB
 import logging
 from cachetools import TTLCache
+import unicodedata
 
 logger = logging.getLogger(__name__)
 import re
@@ -67,6 +68,79 @@ def normalize_brand(value: Optional[str]) -> str:
 
 
 _MODEL_WS_RE = re.compile(r"\s+")
+_MODEL_QUOTES_RE = re.compile(r"[\"'`“”‘’]+")
+_MODEL_PARENS_RE = re.compile(r"\([^)]{0,40}\)")
+_MODEL_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+_MODEL_GEN_TOKEN_RE = re.compile(r"^[a-z]{1,3}\d{2,3}[a-z]?$")
+_MODEL_NUMERIC_ORDINAL_RE = re.compile(r"^\d+(?:st|nd|rd|th)$")
+
+_MODEL_NOISE_PREFIXES = (
+    "the all new ",
+    "all new ",
+    "all-new ",
+    "the new ",
+    "new ",
+)
+
+_MODEL_FALLBACK_STOPWORDS = {
+    "gasoline",
+    "petrol",
+    "diesel",
+    "hybrid",
+    "hev",
+    "phev",
+    "electric",
+    "ev",
+    "turbo",
+    "awd",
+    "4wd",
+    "2wd",
+    "fwd",
+    "rwd",
+    "xdrive",
+    "quattro",
+    "gdi",
+    "gde",
+    "gdi",
+    "lpi",
+    "lpg",
+    "signature",
+    "noblesse",
+    "prestige",
+    "premium",
+    "exclusive",
+    "luxury",
+    "special",
+    "edition",
+    "limited",
+    "modern",
+    "smart",
+    "value",
+    "plus",
+    "inspiration",
+    "calligraphy",
+    "manufacturer",
+    "china",
+    "sport",
+    "sports",
+    "sportline",
+    "line",
+    "amg",
+    "seater",
+    "door",
+    "doors",
+}
+
+_MODEL_TOKEN_EQUIVALENTS = {
+    "gt": {"gt", "gran", "turismo"},
+    "gran": {"gran", "gt"},
+    "turismo": {"turismo", "gt"},
+    "coupe": {"coupe"},
+    "cabriolet": {"cabriolet", "convertible"},
+    "convertible": {"convertible", "cabriolet"},
+    "series": {"series", "serie", "seria", "серия", "er"},
+    "class": {"class"},
+}
 
 
 def normalize_model_label(value: Optional[str]) -> str:
@@ -78,6 +152,58 @@ def normalize_model_label(value: Optional[str]) -> str:
 
 def model_lookup_key(value: Optional[str]) -> str:
     return normalize_model_label(value).casefold()
+
+
+def _strip_accents(value: str) -> str:
+    return "".join(
+        ch for ch in unicodedata.normalize("NFKD", value) if not unicodedata.combining(ch)
+    )
+
+
+def _fold_model_text(value: Optional[str]) -> str:
+    text = normalize_model_label(value)
+    if not text:
+        return ""
+    text = text.translate(str.maketrans({"–": "-", "—": "-", "／": "/", "·": " "}))
+    text = _MODEL_QUOTES_RE.sub("", text)
+    text = _MODEL_PARENS_RE.sub(" ", text)
+    text = normalize_model_label(text)
+    return text.strip(" -/.,;")
+
+
+def _model_search_tokens(value: Optional[str]) -> List[str]:
+    text = _strip_accents(_fold_model_text(value)).lower()
+    if not text:
+        return []
+    text = _MODEL_NON_ALNUM_RE.sub(" ", text)
+    return [token for token in text.split() if token]
+
+
+def _dedupe_model_values(values: List[str]) -> List[str]:
+    out: List[str] = []
+    seen = set()
+    for value in values:
+        label = normalize_model_label(value)
+        key = model_lookup_key(label)
+        if not label or key in seen:
+            continue
+        seen.add(key)
+        out.append(label)
+    return out
+
+
+def _starts_with_noise_prefix(value: str) -> str:
+    text = value
+    changed = True
+    while changed:
+        changed = False
+        lower = text.lower()
+        for prefix in _MODEL_NOISE_PREFIXES:
+            if lower.startswith(prefix):
+                text = text[len(prefix):].strip()
+                changed = True
+                break
+    return text
 
 
 def brand_variants(value: Optional[str]) -> List[str]:
@@ -126,9 +252,13 @@ def effective_power_kw_value(record: Any) -> Any:
 
 
 class CarsService:
+    _eu_model_donor_cache: TTLCache = TTLCache(maxsize=256, ttl=600)
+
     def __init__(self, db: Session) -> None:
         self.db = db
         self.logger = logging.getLogger(__name__)
+        self._filtered_models_cache: Dict[tuple, List[Dict[str, Any]]] = {}
+        self._resolved_model_alias_cache: Dict[tuple, List[str]] = {}
 
     def _available_expr(self):
         return Car.is_available.is_(True)
@@ -144,6 +274,215 @@ class CarsService:
                 "g",
             )
         )
+
+    def _eu_model_donors(self, brand: str) -> List[str]:
+        norm_brand = normalize_brand(brand).strip()
+        if not norm_brand or self.db is None:
+            return []
+        cache_key = norm_brand.casefold()
+        cached = self._eu_model_donor_cache.get(cache_key)
+        if cached is not None:
+            return list(cached)
+        rows = self.facet_counts(field="model", filters={"region": "EU", "brand": norm_brand})
+        donors = _dedupe_model_values(
+            [
+                str(row.get("value") or "").strip()
+                for row in rows
+                if str(row.get("value") or "").strip() and str(row.get("value") or "").strip().casefold() != "other"
+            ]
+        )
+        self._eu_model_donor_cache[cache_key] = donors
+        return list(donors)
+
+    def _remove_brand_prefix(self, brand: str, raw_model: str) -> str:
+        text = _starts_with_noise_prefix(_fold_model_text(raw_model))
+        if not text:
+            return ""
+        brand_tokens = _dedupe_model_values(brand_variants(brand) + [brand, brand.replace("-", " ")])
+        for variant in brand_tokens:
+            folded = _fold_model_text(variant)
+            if not folded:
+                continue
+            pattern = re.compile(rf"^{re.escape(folded)}(?:\s+|[-/])", re.IGNORECASE)
+            text = pattern.sub("", text).strip()
+        if brand.casefold() == "mercedes-benz":
+            text = re.sub(r"^benz(?:\s+|[-/])", "", text, flags=re.IGNORECASE).strip()
+        return _starts_with_noise_prefix(text)
+
+    def _model_token_present(self, raw_tokens: List[str], donor_token: str) -> bool:
+        if not donor_token:
+            return False
+        donor = donor_token.lower()
+        variants = set(_MODEL_TOKEN_EQUIVALENTS.get(donor, {donor}))
+        for raw_token in raw_tokens:
+            raw = raw_token.lower()
+            if raw in variants:
+                return True
+            if donor.isdigit() and raw.startswith(donor):
+                return True
+            if re.fullmatch(r"[a-z]+\d+[a-z]*", donor) and raw.startswith(donor):
+                return True
+            if len(donor) >= 3 and raw.startswith(donor):
+                return True
+        return False
+
+    def _match_eu_model_donor(self, raw_model: str, donors: List[str]) -> Optional[str]:
+        raw_tokens = _model_search_tokens(raw_model)
+        if not raw_tokens:
+            return None
+        best_label: Optional[str] = None
+        best_score: tuple[int, int, tuple] | None = None
+        for donor in donors:
+            donor_label = normalize_model_label(donor)
+            if not donor_label:
+                continue
+            donor_tokens = _model_search_tokens(donor_label)
+            if not donor_tokens:
+                continue
+            if not all(self._model_token_present(raw_tokens, token) for token in donor_tokens):
+                continue
+            score = (len(donor_tokens), len("".join(donor_tokens)), self._natural_text_key(donor_label))
+            if best_score is None or score > best_score:
+                best_score = score
+                best_label = donor_label
+        return best_label
+
+    def _fallback_model_label(self, brand: str, raw_model: str) -> str:
+        cleaned = self._remove_brand_prefix(brand, raw_model)
+        tokens = _model_search_tokens(cleaned)
+        if not tokens:
+            return normalize_model_label(raw_model)
+
+        if brand.casefold() == "bmw":
+            for token in tokens:
+                if re.fullmatch(r"[1-8]\d{2}[a-z]{0,2}", token):
+                    return token[:3]
+                if re.fullmatch(r"m\d{1,3}[a-z]?", token):
+                    if len(token) > 1:
+                        return "M" + token[1:]
+                if re.fullmatch(r"ix\d?", token):
+                    if token == "ix":
+                        return "iX"
+                    return "iX" + token[2:]
+                if re.fullmatch(r"i\d", token):
+                    return token
+                if re.fullmatch(r"x\dm?", token):
+                    if token.endswith("m") and len(token) == 3:
+                        return token[:2].upper() + " M"
+                    return token.upper()
+                if re.fullmatch(r"z\d", token):
+                    return token.upper()
+            series_match = re.search(r"\b([1-8])\s*(?:series|serie|seria|серия|er)\b", " ".join(tokens))
+            if series_match:
+                return f"{series_match.group(1)} серия"
+
+        raw_words = _fold_model_text(cleaned).split()
+        keep: List[str] = []
+        for word in raw_words:
+            search_word = _strip_accents(word).lower().strip(" -/.,;")
+            if not search_word:
+                continue
+            if _MODEL_NUMERIC_ORDINAL_RE.fullmatch(search_word):
+                break
+            if _MODEL_GEN_TOKEN_RE.fullmatch(search_word):
+                break
+            if search_word in _MODEL_FALLBACK_STOPWORDS:
+                break
+            if re.fullmatch(r"\d+(?:\.\d+)?", search_word):
+                break
+            keep.append(word)
+            if len(keep) >= 2 and re.search(r"\d", keep[0]):
+                break
+            if len(keep) >= 3:
+                break
+        if keep:
+            return normalize_model_label(" ".join(keep))
+        return normalize_model_label(cleaned or raw_model)
+
+    def _canonical_model_label(self, brand: str, raw_model: str, *, donors: Optional[List[str]] = None) -> str:
+        label = normalize_model_label(raw_model)
+        if not label:
+            return ""
+        donor_list = donors if donors is not None else self._eu_model_donors(brand)
+        matched = self._match_eu_model_donor(raw_model, donor_list)
+        if matched:
+            return matched
+        return self._fallback_model_label(brand, raw_model)
+
+    def _resolve_model_aliases(
+        self,
+        *,
+        region: Optional[str] = None,
+        country: Optional[str] = None,
+        kr_type: Optional[str] = None,
+        brand: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> List[str]:
+        label = normalize_model_label(model)
+        if not label:
+            return []
+        norm_brand = normalize_brand(brand).strip() if brand else ""
+        if not norm_brand or self.db is None:
+            return [label]
+        cache_key = (
+            (region or "").upper(),
+            normalize_country_code(country) if country else "",
+            (kr_type or "").upper(),
+            norm_brand.casefold(),
+            model_lookup_key(label),
+        )
+        cached = self._resolved_model_alias_cache.get(cache_key)
+        if cached is not None:
+            return list(cached)
+        target_key = model_lookup_key(label)
+        try:
+            models = self.models_for_brand_filtered(
+                region=region,
+                country=country,
+                kr_type=kr_type,
+                brand=norm_brand,
+            )
+        except Exception:
+            self.logger.exception("resolve_model_aliases_failed brand=%s model=%s", norm_brand, label)
+            return [label]
+        for item in models:
+            option_keys = [model_lookup_key(item.get("value"))]
+            option_keys.extend(model_lookup_key(alias) for alias in item.get("aliases") or [])
+            if target_key not in option_keys:
+                continue
+            aliases = _dedupe_model_values([*(item.get("aliases") or []), str(item.get("value") or "")])
+            resolved = aliases or [label]
+            self._resolved_model_alias_cache[cache_key] = list(resolved)
+            return resolved
+        self._resolved_model_alias_cache[cache_key] = [label]
+        return [label]
+
+    def _model_filter_clause(
+        self,
+        *,
+        region: Optional[str] = None,
+        country: Optional[str] = None,
+        kr_type: Optional[str] = None,
+        brand: Optional[str] = None,
+        model: Optional[str] = None,
+    ):
+        label = normalize_model_label(model)
+        if not label:
+            return None
+        aliases = self._resolve_model_aliases(
+            region=region,
+            country=country,
+            kr_type=kr_type,
+            brand=brand,
+            model=label,
+        )
+        keys = [model_lookup_key(alias) for alias in aliases if alias]
+        keys = list(dict.fromkeys(key for key in keys if key))
+        if not keys:
+            return self._normalized_model_expr() == model_lookup_key(label)
+        if len(keys) == 1:
+            return self._normalized_model_expr() == keys[0]
+        return self._normalized_model_expr().in_(keys)
 
     def _fuel_source_expr(self):
         payload_json = cast(Car.source_payload, JSONB)
@@ -330,6 +669,8 @@ class CarsService:
         condition: Optional[str],
         kr_type: Optional[str],
     ) -> bool:
+        if model:
+            return False
         if any(
             [
                 lines,
@@ -534,9 +875,15 @@ class CarsService:
                 if variants_lc:
                     conditions.append(func.lower(func.trim(Car.brand)).in_(variants_lc))
         if model:
-            mv = model_lookup_key(model)
-            if mv:
-                conditions.append(self._normalized_model_expr() == mv)
+            clause = self._model_filter_clause(
+                region=region,
+                country=country,
+                kr_type=kr_type,
+                brand=brand,
+                model=model,
+            )
+            if clause is not None:
+                conditions.append(clause)
         if field not in ("region", "country", "brand", "model", "engine_type"):
             val = filters.get(field)
             if val:
@@ -566,6 +913,8 @@ class CarsService:
         return out
 
     def facet_counts(self, *, field: str, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+        if filters.get("model"):
+            return self._facet_counts_from_cars(field=field, filters=filters)
         if field in {"color_group", "engine_type"}:
             return self._facet_counts_from_cars(field=field, filters=filters)
         table_map = {
@@ -923,9 +1272,15 @@ class CarsService:
                 conditions.append(and_(*token_groups))
 
         if model and "model" not in exclude:
-            model_value = model_lookup_key(model)
-            if model_value:
-                conditions.append(self._normalized_model_expr() == model_value)
+            clause = self._model_filter_clause(
+                region=region,
+                country=country,
+                kr_type=kr_type,
+                brand=brand,
+                model=model,
+            )
+            if clause is not None:
+                conditions.append(clause)
 
         payload_json = cast(Car.source_payload, JSONB)
         payload_text = func.lower(cast(Car.source_payload, String))
@@ -2578,6 +2933,16 @@ class CarsService:
         norm_brand = normalize_brand(brand).strip()
         if not norm_brand:
             return []
+        cache_key = (
+            (region or "").upper(),
+            normalize_country_code(country) if country else "",
+            (kr_type or "").upper(),
+            norm_brand.casefold(),
+        )
+        cached = self._filtered_models_cache.get(cache_key)
+        if cached is not None:
+            return [dict(item) for item in cached]
+        donors = self._eu_model_donors(norm_brand)
         filters = {
             "region": region,
             "country": country,
@@ -2592,8 +2957,8 @@ class CarsService:
         buckets: Dict[str, Dict[str, Any]] = {}
         for row in rows:
             raw_value = str(row.get("value") or "").strip()
-            label = normalize_model_label(raw_value)
-            key = model_lookup_key(raw_value)
+            label = self._canonical_model_label(norm_brand, raw_value, donors=donors)
+            key = model_lookup_key(label)
             if not key or not label:
                 continue
             bucket = buckets.get(key)
@@ -2618,7 +2983,9 @@ class CarsService:
                 bucket["value"] = label
                 bucket["label"] = label
         models = list(buckets.values())
-        return sorted(models, key=lambda x: self._natural_text_key(x.get("label") or x.get("value") or ""))
+        models = sorted(models, key=lambda x: self._natural_text_key(x.get("label") or x.get("value") or ""))
+        self._filtered_models_cache[cache_key] = [dict(item) for item in models]
+        return models
 
     def _model_family_key(self, brand: str, model: str) -> str:
         raw = str(model or "").strip()
@@ -2630,6 +2997,12 @@ class CarsService:
         brand_norm = normalize_brand(brand).strip().upper()
         token_up = token.upper()
         if brand_norm == "BMW":
+            folded = _strip_accents(_fold_model_text(raw)).lower()
+            series_match = re.search(r"\b([1-8])\s*(?:series|serie|seria|серия|er)\b", folded)
+            if series_match:
+                return f"{series_match.group(1)}-series"
+            if re.fullmatch(r"[1-8]", token_up):
+                return f"{token_up}-series"
             lead_num = re.match(r"^([1-8])\d{2}", token_up)
             if lead_num:
                 return f"{lead_num.group(1)}-series"
