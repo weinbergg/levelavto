@@ -18,9 +18,15 @@
             {% if not region_value %}
               {% if params.get('country') == 'KR' %}
                 {% set region_value = 'KR' %}
-              {% elif params.get('country') %}
+              {% elif params.get('country') in countries %}
                 {% set region_value = 'EU' %}
               {% endif %}
+            {% endif %}
+            {% for source_key in params.getlist('source') %}
+            <input type="hidden" name="source" value="{{ source_key }}">
+            {% endfor %}
+            {% if params.get('country') and params.get('country') not in countries and params.get('country') != 'KR' %}
+            <input type="hidden" name="country" value="{{ params.get('country') }}">
             {% endif %}
             {% if regions %}
             <label>Регион

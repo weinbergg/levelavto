@@ -170,6 +170,15 @@ def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():
     assert 'data-catalog-line="1"' in template
 
 
+def test_catalog_template_preserves_source_and_non_eu_country_filters():
+    template = _read("app/templates/catalog.html")
+    assert "{% for source_key in params.getlist('source') %}" in template
+    assert '<input type="hidden" name="source" value="{{ source_key }}">' in template
+    assert "params.get('country') not in countries and params.get('country') != 'KR'" in template
+    assert '<input type="hidden" name="country" value="{{ params.get(\'country\') }}">' in template
+    assert "{% elif params.get('country') in countries %}" in template
+
+
 def test_taxonomy_contains_extra_body_and_interior_translations():
     taxonomy = _read("app/resources/taxonomy_ru.csv")
     utils = _read("app/utils/taxonomy.py")
