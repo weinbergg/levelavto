@@ -137,6 +137,16 @@ def test_price_sensitive_catalog_paths_bypass_stale_cache():
     assert "self._refresh_price_sensitive_candidates(" in service
 
 
+def test_similar_cars_avoids_bare_numeric_order_by_constants():
+    service = _read("app/services/cars_service.py")
+    assert "def _sort_const(value: int | float):" in service
+    assert "interprets as select-list ordinals" in service
+    assert "else _sort_const(1)" in service
+    assert "else _sort_const(999)" in service
+    assert "else _sort_const(999999)" in service
+    assert "else _sort_const(999999999)" in service
+
+
 def test_home_search_uses_line_params_and_js_submit():
     script = _read("app/static/js/app.js")
     assert "const getHomeSelectedModels = () =>" in script
@@ -270,7 +280,7 @@ def test_templates_hide_placeholder_max_and_support_thumb_macro_for_autoimg():
     assert "page_max in ['https://max.ru', 'https://max.ru/'" in base_template
     assert "{% if page_max %}" in base_template
     assert "{% if page_max %}" in home_template
-    assert "page_max if page_max is defined" in detail_template
+    assert "{% set max_link_raw = (contact_max or content.get('contact_max') or '')|trim %}" in detail_template
     assert "autoimg.cn" in thumbs_macro
     assert "shouldProxyThumbSource" in script
     assert "autoimg.cn" in script

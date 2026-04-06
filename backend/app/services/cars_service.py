@@ -2663,6 +2663,11 @@ class CarsService:
         if not brand_keys and not model_key:
             return []
 
+        def _sort_const(value: int | float):
+            # Avoid bare numeric ORDER BY items like `ORDER BY 999999`, which PostgreSQL
+            # interprets as select-list ordinals instead of constant expressions.
+            return literal(value) + literal(0)
+
         conditions = [self._available_expr(), Car.id != car.id]
         if brand_keys:
             conditions.append(func.lower(func.coalesce(Car.brand, "")).in_(brand_keys))
@@ -2685,7 +2690,7 @@ class CarsService:
                 else_=1,
             )
             if model_key
-            else literal(1)
+            else _sort_const(1)
         )
         generation_rank = (
             case(
@@ -2693,7 +2698,7 @@ class CarsService:
                 else_=1,
             )
             if generation_key
-            else literal(1)
+            else _sort_const(1)
         )
         body_rank = (
             case(
@@ -2701,7 +2706,7 @@ class CarsService:
                 else_=1,
             )
             if body_key
-            else literal(1)
+            else _sort_const(1)
         )
         engine_rank = (
             case(
@@ -2709,7 +2714,7 @@ class CarsService:
                 else_=1,
             )
             if engine_key
-            else literal(1)
+            else _sort_const(1)
         )
         country_rank = case(
             (func.upper(func.coalesce(Car.country, "")) == str(car.country or "").upper(), 0),
@@ -2718,7 +2723,7 @@ class CarsService:
         year_distance = (
             case((reg_year_expr.is_not(None), func.abs(reg_year_expr - int(target_reg_year))), else_=999)
             if target_reg_year is not None
-            else literal(999)
+            else _sort_const(999)
         )
         power_distance = (
             case(
@@ -2726,7 +2731,7 @@ class CarsService:
                 else_=999999,
             )
             if target_power_hp is not None
-            else literal(999999)
+            else _sort_const(999999)
         )
         engine_cc_distance = (
             case(
@@ -2734,7 +2739,7 @@ class CarsService:
                 else_=999999,
             )
             if target_engine_cc is not None
-            else literal(999999)
+            else _sort_const(999999)
         )
         mileage_distance = (
             case(
@@ -2742,7 +2747,7 @@ class CarsService:
                 else_=999999999,
             )
             if target_mileage is not None
-            else literal(999999999)
+            else _sort_const(999999999)
         )
 
         stmt = (
