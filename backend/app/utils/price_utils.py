@@ -4,6 +4,7 @@ from typing import Optional
 
 PRICE_NOTE_WITHOUT_UTIL = "*Без учета утилизационного сбора РФ"
 PRICE_NOTE_EUROPE = "Цена в Европе"
+PRICE_NOTE_CHINA = "Цена в Китае"
 PRICE_NOTE_MOSCOW = "Цена в Москве"
 
 
@@ -61,9 +62,13 @@ def price_without_util_note(
             return PRICE_NOTE_WITHOUT_UTIL
         return PRICE_NOTE_MOSCOW
     if has_without_util_marker:
+        if c == "CN":
+            return PRICE_NOTE_CHINA
         return PRICE_NOTE_EUROPE
     if total_price_rub_cached is not None:
         return PRICE_NOTE_MOSCOW
+    if c == "CN":
+        return PRICE_NOTE_CHINA
     if reg == "EU":
         return PRICE_NOTE_EUROPE
     if not reg and c and c != "RU" and not c.startswith("KR"):

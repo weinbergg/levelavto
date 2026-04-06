@@ -69,9 +69,10 @@ def _upsert_breakdown_version(steps: list[dict], title: str, version: str | None
     steps.append({"title": title, "amount_rub": 0, "version": version})
 
 
-def recompute_total_from_breakdown(steps: list[dict], eur_rate: float, usd_rate: float) -> float | None:
+def recompute_total_from_breakdown(steps: list[dict], eur_rate: float, usd_rate: float, cny_rate: float) -> float | None:
     sum_eur = 0.0
     sum_usd = 0.0
+    sum_cny = 0.0
     sum_rub = 0.0
     has_any = False
     for step in steps:
@@ -88,12 +89,15 @@ def recompute_total_from_breakdown(steps: list[dict], eur_rate: float, usd_rate:
         elif cur == "USD":
             sum_usd += val
             has_any = True
+        elif cur == "CNY":
+            sum_cny += val
+            has_any = True
         elif cur == "RUB":
             sum_rub += val
             has_any = True
     if not has_any:
         return None
-    return float(sum_rub + sum_eur * eur_rate + sum_usd * usd_rate)
+    return float(sum_rub + sum_eur * eur_rate + sum_usd * usd_rate + sum_cny * cny_rate)
 
 
 def main() -> None:
@@ -111,10 +115,11 @@ def main() -> None:
         rates = svc.get_fx_rates(allow_fetch=True) or {}
         eur_rate = float(rates.get("EUR") or 0)
         usd_rate = float(rates.get("USD") or 0)
-        fx_signature = svc._fx_signature({"EUR": eur_rate, "USD": usd_rate})
+        cny_rate = float(rates.get("CNY") or 0)
+        fx_signature = svc._fx_signature({"EUR": eur_rate, "USD": usd_rate, "CNY": cny_rate})
 
-        if eur_rate <= 0 or usd_rate <= 0:
-            raise SystemExit("EUR/USD rates missing")
+        if eur_rate <= 0 or usd_rate <= 0 or cny_rate <= 0:
+            raise SystemExit("EUR/USD/CNY rates missing")
 
         query = db.query(Car).filter(Car.is_available.is_(True))
         if args.country:
@@ -147,13 +152,15 @@ def main() -> None:
                 last_id = car.id
                 total_checked += 1
                 steps = _iter_steps(car.calc_breakdown_json)
-                total_rub = recompute_total_from_breakdown(steps, eur_rate, usd_rate)
+                total_rub = recompute_total_from_breakdown(steps, eur_rate, usd_rate, cny_rate)
 
                 price_rub = None
                 if car.currency == "EUR" and car.price is not None:
                     price_rub = float(car.price) * eur_rate
                 elif car.currency == "USD" and car.price is not None:
                     price_rub = float(car.price) * usd_rate
+                elif car.currency == "CNY" and car.price is not None:
+                    price_rub = float(car.price) * cny_rate
                 elif car.currency in {"RUB", "₽"} and car.price is not None:
                     price_rub = float(car.price)
 
@@ -182,7 +189,7 @@ def main() -> None:
                 total_updated += len(updates)
             if args.sleep:
                 time.sleep(args.sleep)
-        summary = f"fx_update checked={total_checked} updated={total_updated} eur={eur_rate} usd={usd_rate}"
+        summary = f"fx_update checked={total_checked} updated={total_updated} eur={eur_rate} usd={usd_rate} cny={cny_rate}"
         print(summary)
         if args.telegram and telegram_enabled():
             token = os.getenv("TELEGRAM_BOT_TOKEN")

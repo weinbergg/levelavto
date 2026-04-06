@@ -690,6 +690,7 @@ def list_cars(
     fx_rates = service.get_fx_rates() or {}
     fx_eur = float(fx_rates.get("EUR") or 0)
     fx_usd = float(fx_rates.get("USD") or 0)
+    fx_cny = float(fx_rates.get("CNY") or 0)
     eu_sources = set(service._source_ids_for_europe())
     kr_sources = set(service._source_ids_for_hints(service.KOREA_SOURCE_HINTS))
     eu_countries = set(service.EU_COUNTRIES)
@@ -706,7 +707,7 @@ def list_cars(
         elif country_norm in eu_countries or source_id in eu_sources:
             region_val = "EU"
         else:
-            region_val = "EU" if country_norm else None
+            region_val = country_norm or None
         img_count = image_counts.get(c.get("id"), 0)
         raw_thumb = _normalize_thumb(c.get("thumbnail_url")) or image_first.get(c.get("id"))
         thumb_url = resolve_thumbnail_url(raw_thumb, c.get("thumbnail_local_path"))
@@ -727,6 +728,8 @@ def list_cars(
                 display_rub = display_price_rub(None, float(c.get("price")) * fx_eur, allow_price_fallback=True)
             elif cur == "USD" and fx_usd > 0:
                 display_rub = display_price_rub(None, float(c.get("price")) * fx_usd, allow_price_fallback=True)
+            elif cur == "CNY" and fx_cny > 0:
+                display_rub = display_price_rub(None, float(c.get("price")) * fx_cny, allow_price_fallback=True)
             elif cur in {"RUB", "₽"}:
                 display_rub = display_price_rub(None, float(c.get("price")), allow_price_fallback=True)
         effective_engine_cc = effective_engine_cc_value(c)

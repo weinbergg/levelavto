@@ -15,6 +15,7 @@ from ..utils.registration_defaults import apply_missing_registration_fallback
 def compute_car_hash(payload: Dict[str, Any]) -> str:
     # Keep only stable fields for change detection
     parts = [
+        payload.get("country") or "",
         payload.get("brand") or "",
         payload.get("model") or "",
         payload.get("variant") or "",
@@ -43,6 +44,19 @@ class ParsingDataService:
         existing = self.db.execute(select(Source).where(
             Source.key == key)).scalar_one_or_none()
         if existing:
+            changed = False
+            if existing.name != name:
+                existing.name = name
+                changed = True
+            if existing.country != country:
+                existing.country = country
+                changed = True
+            if existing.base_url != base_url:
+                existing.base_url = base_url
+                changed = True
+            if changed:
+                self.db.commit()
+                self.db.refresh(existing)
             return existing
         source = Source(key=key, name=name, base_url=base_url, country=country)
         self.db.add(source)
@@ -141,6 +155,9 @@ class ParsingDataService:
                         updated += 1
                     if getattr(existing, "description", None) != payload.get("description"):
                         existing.description = payload.get("description")
+                        updated += 1
+                    if payload.get("country") and getattr(existing, "country", None) != payload.get("country"):
+                        existing.country = payload.get("country")
                         updated += 1
                     if existing.price_rub_cached is None and payload.get("price_rub_cached") is not None:
                         existing.price_rub_cached = payload["price_rub_cached"]

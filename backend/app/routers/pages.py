@@ -1704,6 +1704,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     fx_rates = service.get_fx_rates() or {}
     fx_eur = float(fx_rates.get("EUR") or 0)
     fx_usd = float(fx_rates.get("USD") or 0)
+    fx_cny = float(fx_rates.get("CNY") or 0)
     try:
         source_list = qp.getlist("source") if hasattr(qp, "getlist") else []
         source_value: Optional[str | List[str]] = source_list if source_list else params.get("source")
@@ -1783,6 +1784,8 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                             c["display_price_rub"] = display_price_rub(None, raw_price * fx_eur, allow_price_fallback=True)
                         elif cur == "USD" and fx_usd > 0:
                             c["display_price_rub"] = display_price_rub(None, raw_price * fx_usd, allow_price_fallback=True)
+                        elif cur == "CNY" and fx_cny > 0:
+                            c["display_price_rub"] = display_price_rub(None, raw_price * fx_cny, allow_price_fallback=True)
                         elif cur in {"RUB", "₽"}:
                             c["display_price_rub"] = display_price_rub(None, raw_price, allow_price_fallback=True)
                 c["price_note"] = price_without_util_note(

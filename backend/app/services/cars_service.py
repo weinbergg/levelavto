@@ -574,23 +574,35 @@ class CarsService:
         fx_add_rub = float(os.environ.get("FX_ADD_RUB", "1.0"))
         eur_env = float(os.environ.get("EURO_RATE", "95.0")) + fx_add_rub
         usd_env = float(os.environ.get("USD_RATE", "85.0")) + fx_add_rub
-        eur, usd = eur_env, usd_env
+        cny_env = float(os.environ.get("CNY_RATE", "12.0")) + fx_add_rub
+        eur, usd, cny = eur_env, usd_env, cny_env
         cached = self._fx_cache
+
+        def _rate(data: dict, code: str, default: float) -> float:
+            try:
+                row = data["Valute"][code]
+                value = float(row["Value"])
+                nominal = float(row.get("Nominal") or 1.0) or 1.0
+                return (value / nominal) + fx_add_rub
+            except Exception:
+                return default
+
         try:
             res = requests.get(
                 "https://www.cbr-xml-daily.ru/daily_json.js",
                 timeout=(0.3, 0.7),
             )
             data = res.json()
-            eur = float(data["Valute"]["EUR"]["Value"]) + fx_add_rub
-            usd = float(data["Valute"]["USD"]["Value"]) + fx_add_rub
-            self._fx_cache = {"EUR": eur, "USD": usd, "RUB": 1.0}
+            eur = _rate(data, "EUR", eur_env)
+            usd = _rate(data, "USD", usd_env)
+            cny = _rate(data, "CNY", cny_env)
+            self._fx_cache = {"EUR": eur, "USD": usd, "CNY": cny, "RUB": 1.0}
             self._fx_cache_ts = now
             return self._fx_cache
         except Exception:
             if cached:
                 return cached
-            return {}
+            return {"EUR": eur_env, "USD": usd_env, "CNY": cny_env, "RUB": 1.0}
 
     def _build_list_conditions(
         self,
@@ -1918,6 +1930,7 @@ class CarsService:
             fx_local = self.get_fx_rates() or {}
             eur = fx_local.get("EUR") or eur_rate or 95.0
             usd = fx_local.get("USD") or usd_rate or 85.0
+            cny = fx_local.get("CNY") or 12.0
             total = None
             cur_local = str(car.currency or "EUR").strip().upper()
             if car.price is not None:
@@ -1925,6 +1938,8 @@ class CarsService:
                     total = float(car.price) * float(eur)
                 elif cur_local == "USD":
                     total = float(car.price) * float(usd)
+                elif cur_local == "CNY":
+                    total = float(car.price) * float(cny)
                 elif cur_local in ("RUB", "₽"):
                     total = float(car.price)
             elif car.price_rub_cached is not None:
@@ -2006,7 +2021,8 @@ class CarsService:
         fx = self.get_fx_rates() or {}
         eur_rate = fx.get("EUR") or cfg.payload.get("meta", {}).get("eur_rate_default") or 95.0
         usd_rate = fx.get("USD") or cfg.payload.get("meta", {}).get("usd_rate_default") or 85.0
-        fx_signature = self._fx_signature({"EUR": eur_rate, "USD": usd_rate})
+        cny_rate = fx.get("CNY") or 12.0
+        fx_signature = self._fx_signature({"EUR": eur_rate, "USD": usd_rate, "CNY": cny_rate})
         effective_engine_cc = effective_engine_cc_value(car)
         effective_power_hp = effective_power_hp_value(car)
         effective_power_kw = effective_power_kw_value(car)
@@ -2040,6 +2056,9 @@ class CarsService:
         elif cur == "USD":
             if eur_rate and usd_rate:
                 price_net_eur = float(used_price) * (float(usd_rate) / float(eur_rate))
+        elif cur == "CNY":
+            if eur_rate and cny_rate:
+                price_net_eur = float(used_price) * (float(cny_rate) / float(eur_rate))
         if price_net_eur is None:
             return _fallback_total("no_price_net_eur")
         if (

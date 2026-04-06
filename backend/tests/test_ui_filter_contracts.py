@@ -287,6 +287,25 @@ def test_templates_hide_placeholder_max_and_support_thumb_macro_for_autoimg():
     assert "autoimg.cn" in script
 
 
+def test_che168_supports_cny_and_china_country_label():
+    country_map = _read("app/utils/country_map.py")
+    parsing_service = _read("app/services/parsing_data_service.py")
+    catalog_router = _read("app/routers/catalog.py")
+    pages_router = _read("app/routers/pages.py")
+    price_utils = _read("app/utils/price_utils.py")
+    fx_script = _read("app/scripts/update_fx_prices.py")
+    cars_service = _read("app/services/cars_service.py")
+    assert '"CN": "Китай"' in country_map
+    assert 'if lower == "che168" or "che168" in lower:' in country_map
+    assert 'payload.get("country") or ""' in parsing_service
+    assert 'payload.get("country") and getattr(existing, "country", None) != payload.get("country")' in parsing_service
+    assert '"CNY": cny' in cars_service
+    assert 'elif cur == "CNY" and fx_cny > 0:' in catalog_router
+    assert 'elif cur == "CNY" and fx_cny > 0:' in pages_router
+    assert 'PRICE_NOTE_CHINA = "Цена в Китае"' in price_utils
+    assert 'elif car.currency == "CNY" and car.price is not None:' in fx_script
+
+
 def test_che168_parser_and_offline_tool_are_registered():
     base_template = _read("app/templates/base.html")
     detail_template = _read("app/templates/car_detail.html")

@@ -43,6 +43,7 @@ COUNTRY_LABELS_RU = {
     "AE": "ОАЭ",
     "AL": "Албания",
     "JP": "Япония",
+    "CN": "Китай",
     "MK": "Северная Македония",
     "RS": "Сербия",
     "TR": "Турция",
@@ -91,6 +92,8 @@ def resolve_display_country(car, source_key: str | None = None) -> Tuple[Optiona
         lower = key.lower()
         if any(hint in lower for hint in _KOREA_SOURCE_HINTS):
             return "KR", country_label_ru("KR")
+        if lower == "che168" or "che168" in lower:
+            return "CN", country_label_ru("CN")
     raw_code = (
         getattr(car, "country", None)
         or getattr(car, "seller_country_code", None)
