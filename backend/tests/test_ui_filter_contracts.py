@@ -21,9 +21,14 @@ def test_search_template_has_air_suspension_guard():
 
 def test_search_template_keeps_core_selects_clickable():
     template = _read("app/templates/search.html")
-    assert '<select name="transmission">' in template
-    assert '<select name="drive_type">' in template
-    assert '<select name="engine_type">' in template
+    assert 'data-multi-source-select="body_type"' in template
+    assert 'data-multi-source-select="engine_type"' in template
+    assert 'data-multi-source-select="transmission"' in template
+    assert 'data-multi-source-select="drive_type"' in template
+    assert '<input type="hidden" name="body_type"' in template
+    assert '<input type="hidden" name="engine_type"' in template
+    assert '<input type="hidden" name="transmission"' in template
+    assert '<input type="hidden" name="drive_type"' in template
     assert 'name="interior_color"' in template
     assert 'name="interior_material"' in template
     assert "payload_deferred or (interior_color_options_eu" in template
@@ -39,6 +44,9 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "removeSelectedColor" in script
     assert "bindChoiceChips" in script
     assert "syncChoiceChips" in script
+    assert "bindMultiSelectMenus" in script
+    assert "syncMultiSelectMenus" in script
+    assert 'className = \'multi-select-menu__apply\'' in script or 'className = "multi-select-menu__apply"' in script
     assert "select.disabled = normalizedItems.length === 0" in script or "select.disabled = deduped.length === 0" in script
     assert "bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))" in script
     assert "const priceMain = card.querySelector('.price-main')" in script
@@ -89,8 +97,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=93' in template
-    assert '/static/css/styles.css?v=55' in template
+    assert '/static/js/app.js?v=94' in template
+    assert '/static/css/styles.css?v=56' in template
 
 
 def test_search_page_passes_payload_deferred_flag():
@@ -187,6 +195,7 @@ def test_home_collage_and_home_content_copy_are_updated():
     assert 'id="home-more-offers-catalog"' in template
     assert 'id="home-more-offers-grid"' in template
     assert "Показываем только марки, которые есть в каталоге" in home_content
+    assert "Возим проверенные авто из Европы, Азии и РФ." in home_content
     assert 'href="#cases-collage"' in template
     assert 'id="cases-collage"' in template
 
@@ -249,6 +258,8 @@ def test_detail_and_header_contact_actions_use_call_and_messengers():
     assert "display_price_rub" in account_template
     assert "_prepare_favorites" in account_router
     assert ".detail-messenger-link" in css
+    assert "Подбор и поставка автомобилей из Европы и Азии под ключ." in base_template
+    assert "варианты из Европы и Азии." in detail_template
 
 
 def test_catalog_and_search_color_filters_use_non_label_wrapper():

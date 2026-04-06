@@ -204,8 +204,72 @@ def _normalize_detail_value(
 
 
 def _extract_fuel_consumption(payload: Dict[str, Any]) -> Optional[str]:
+    def _collect_strings(value: Any, *, limit: int = 8) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, dict):
+            return []
+        if isinstance(value, (list, tuple, set)):
+            out: list[str] = []
+            for item in value:
+                out.extend(_collect_strings(item, limit=limit))
+                if len(out) >= limit:
+                    break
+            return out[:limit]
+        raw = str(value).strip()
+        if not raw or raw.lower() in {"null", "none", "nan", "[]", "{}"}:
+            return []
+        if (raw.startswith("[") and raw.endswith("]")) or (raw.startswith("{") and raw.endswith("}")):
+            try:
+                parsed = json.loads(raw)
+            except Exception:
+                parsed = None
+            if parsed is not None:
+                return _collect_strings(parsed, limit=limit)
+        return [re.sub(r"\s+", " ", raw).strip()]
+
+    def _is_fuel_measurement(text: str) -> bool:
+        low = text.lower()
+        return bool(
+            re.search(r"\d+(?:[.,]\d+)?\s*(l|kwh|kw/h|kg)\s*/\s*100\s*km", low)
+            or re.search(r"\d+(?:[.,]\d+)?\s*mpg", low)
+            or re.search(r"\d+(?:[.,]\d+)?\s*g/km", low)
+        )
+
+    def _looks_like_feature_dump(text: str) -> bool:
+        low = text.lower()
+        return any(
+            token in low
+            for token in (
+                "alarm system",
+                "cruise control",
+                "heated steering",
+                "sound system",
+                "touchscreen",
+                "summer tyres",
+                "rear wheel drive",
+                "paddle shifters",
+            )
+        )
+
     for field_key in ("envkv_energy_consumption", "fuel_consumption", "envkv_consumption_fuel"):
-        normalized = _normalize_detail_value(field_key, payload.get(field_key), allow_list=False)
+        raw_value = payload.get(field_key)
+        strings = _collect_strings(raw_value)
+        measurements: list[str] = []
+        seen: set[str] = set()
+        for item in strings:
+            if not _is_fuel_measurement(item):
+                continue
+            key = item.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            measurements.append(item)
+            if len(measurements) >= 4:
+                break
+        if measurements:
+            return ", ".join(measurements)
+        normalized = _normalize_detail_value(field_key, raw_value, allow_list=False)
         if not normalized:
             continue
         low = normalized.lower()
@@ -213,10 +277,68 @@ def _extract_fuel_consumption(payload: Dict[str, Any]) -> Optional[str]:
             continue
         if len(normalized) > 96 and normalized.count(",") >= 3:
             continue
-        if any(token in low for token in ("alarm system", "cruise control", "heated steering", "sound system")):
+        if _looks_like_feature_dump(low):
             continue
         return normalized
     return None
+
+
+def _sanitize_detail_description(value: Any) -> Optional[str]:
+    def _collect_strings(raw_value: Any, *, limit: int = 10) -> list[str]:
+        if raw_value is None:
+            return []
+        if isinstance(raw_value, dict):
+            return []
+        if isinstance(raw_value, (list, tuple, set)):
+            out: list[str] = []
+            for item in raw_value:
+                out.extend(_collect_strings(item, limit=limit))
+                if len(out) >= limit:
+                    break
+            return out[:limit]
+        raw = str(raw_value).strip()
+        if not raw or raw.lower() in {"null", "none", "nan", "[]", "{}"}:
+            return []
+        if (raw.startswith("[") and raw.endswith("]")) or (raw.startswith("{") and raw.endswith("}")):
+            try:
+                parsed = json.loads(raw)
+            except Exception:
+                parsed = None
+            if parsed is not None:
+                return _collect_strings(parsed, limit=limit)
+        return [re.sub(r"\s+", " ", raw).strip()]
+
+    def _is_measurement(text: str) -> bool:
+        low = text.lower()
+        return bool(
+            re.search(r"\d+(?:[.,]\d+)?\s*(l|kwh|kw/h|kg)\s*/\s*100\s*km", low)
+            or re.search(r"\d+(?:[.,]\d+)?\s*mpg", low)
+        )
+
+    def _is_feature_dump(text: str) -> bool:
+        low = text.lower()
+        feature_tokens = (
+            "alarm system",
+            "cruise control",
+            "heated steering",
+            "sound system",
+            "touchscreen",
+            "dynamic chassis",
+            "full service history",
+            "rain sensor",
+            "navigation system",
+        )
+        return any(token in low for token in feature_tokens)
+
+    strings = _collect_strings(value)
+    if not strings:
+        return None
+    if strings and all(_is_measurement(item) for item in strings):
+        return ", ".join(strings[:4])
+    if len(strings) >= 4 and sum(1 for item in strings if _is_feature_dump(item)) >= max(2, len(strings) // 2):
+        return None
+    text = "\n".join(strings[:6]).strip()
+    return text or None
 
 
 def _extract_co2_value(payload: Dict[str, Any]) -> Optional[str]:
@@ -2036,7 +2158,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         for item in similar_offers:
             _decorate_showcase_car(item)
         raw_description = (getattr(car, "description", None) or payload.get("description") or "").strip()
-        car.display_description = raw_description if raw_description else None
+        car.display_description = _sanitize_detail_description(raw_description)
 
         def push(
             label: str,

@@ -36,6 +36,13 @@ run_web_python() {
   fi
 }
 
+send_job_notify() {
+  if [[ "${TELEGRAM_ENABLED:-1}" == "0" ]]; then
+    return 0
+  fi
+  run_web_python -m backend.app.tools.notify_tg --job emavto --result "$RESULT_FILE" || true
+}
+
 if [[ -f "${EMAVTO_STOP_FILE:-/tmp/emavto_stop}" ]]; then
   rm -f "${EMAVTO_STOP_FILE:-/tmp/emavto_stop}"
 fi
@@ -59,7 +66,7 @@ cat >"$RESULT_FILE" <<EOF
 }
 EOF
 
-run_web_python -m backend.app.tools.notify_tg --job emavto --result "$RESULT_FILE" || true
+send_job_notify
 
 {
   echo "[emavto] start ${START_TS}"
@@ -89,6 +96,6 @@ cat >"$RESULT_FILE" <<EOF
 }
 EOF
 
-run_web_python -m backend.app.tools.notify_tg --job emavto --result "$RESULT_FILE" || true
+send_job_notify
 
 echo "[emavto] done status=${STATUS} duration=${DUR}s"

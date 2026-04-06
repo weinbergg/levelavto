@@ -368,6 +368,7 @@
     })
     syncColorChips(form)
     syncChoiceChips(form)
+    syncMultiSelectMenus(form)
     syncRegMonthState(form)
   }
 
@@ -535,6 +536,7 @@
     })
     syncColorChips(form)
     syncChoiceChips(form)
+    syncMultiSelectMenus(form)
     syncRegMonthState(form)
   }
 
@@ -763,6 +765,190 @@
     syncChoiceChips(scope, inputName)
   }
 
+  function getMultiSelectSource(scope, inputName) {
+    if (!scope || !inputName) return null
+    return qs(`[data-multi-source-select="${inputName}"]`, scope)
+  }
+
+  function getMultiSelectItems(select) {
+    if (!select) return []
+    return Array.from(select.options || [])
+      .filter((opt) => String(opt.value || '').trim())
+      .map((opt) => ({
+        value: String(opt.value || '').trim(),
+        label: String(opt.textContent || opt.value || '').trim(),
+      }))
+  }
+
+  function findMultiSelectLabel(scope, inputName, value) {
+    if (!scope || !inputName || !value) return value
+    const select = getMultiSelectSource(scope, inputName)
+    if (!select) return value
+    const match = Array.from(select.options || []).find((opt) => String(opt.value || '') === String(value || ''))
+    return match ? String(match.textContent || match.value || '').trim() : value
+  }
+
+  function bindMultiSelectMenus(scope, onChange, inputName = '') {
+    if (!scope) return
+    const selects = inputName
+      ? qsa(`[data-multi-source-select="${inputName}"]`, scope)
+      : qsa('[data-multi-source-select]', scope)
+    selects.forEach((select) => {
+      const name = select.dataset.multiSourceSelect || ''
+      const input = name ? qs(`input[name="${name}"]`, scope) : null
+      if (!name || !input) return
+      const host = select.closest('.field, label, .search-row')
+      if (!host) return
+      let container = host.querySelector(`[data-multi-menu-for="${name}"]`)
+      if (!container) {
+        container = document.createElement('div')
+        container.className = 'multi-select-menu'
+        container.dataset.multiMenuFor = name
+        host.appendChild(container)
+      }
+      host.classList.add('has-multi-select-menu')
+      select.hidden = true
+      select.setAttribute('aria-hidden', 'true')
+      select.style.setProperty('display', 'none', 'important')
+
+      if (!container.__built) {
+        const root = document.createElement('details')
+        root.className = 'multi-select-menu__root'
+        const summary = document.createElement('summary')
+        summary.className = 'multi-select-menu__summary'
+        root.appendChild(summary)
+        const body = document.createElement('div')
+        body.className = 'multi-select-menu__body'
+        const clearBtn = document.createElement('button')
+        clearBtn.type = 'button'
+        clearBtn.className = 'multi-select-menu__clear'
+        const optionsWrap = document.createElement('div')
+        optionsWrap.className = 'multi-select-menu__options'
+        const actions = document.createElement('div')
+        actions.className = 'multi-select-menu__actions'
+        const applyBtn = document.createElement('button')
+        applyBtn.type = 'button'
+        applyBtn.className = 'multi-select-menu__apply'
+        applyBtn.textContent = 'Применить'
+        actions.appendChild(applyBtn)
+        body.appendChild(clearBtn)
+        body.appendChild(optionsWrap)
+        body.appendChild(actions)
+        root.appendChild(body)
+        container.appendChild(root)
+        container.__built = true
+        container.__root = root
+        container.__summary = summary
+        container.__clearBtn = clearBtn
+        container.__optionsWrap = optionsWrap
+        container.__applyBtn = applyBtn
+        container.__draft = new Set(parseSelectedCsvValues(input))
+
+        const syncState = () => {
+          const items = getMultiSelectItems(select)
+          const allowed = new Set(items.map((item) => item.value))
+          const committedValues = parseSelectedCsvValues(input).filter((value) => allowed.has(value))
+          if (committedValues.join(',') !== String(input.value || '')) {
+            setSelectedCsvValues(input, committedValues)
+          }
+          container.__draft = new Set(Array.from(container.__draft || []).filter((value) => allowed.has(value)))
+          const selectedSet = root.open ? container.__draft : new Set(committedValues)
+          const labelMap = new Map(items.map((item) => [item.value, item.label]))
+          const placeholder = select.dataset.multiPlaceholder || 'Неважно'
+          const selectedLabels = Array.from(selectedSet)
+            .map((value) => labelMap.get(value) || value)
+            .filter(Boolean)
+          if (!selectedLabels.length) {
+            summary.textContent = placeholder
+          } else if (selectedLabels.length === 1) {
+            summary.textContent = selectedLabels[0]
+          } else if (selectedLabels.length === 2) {
+            summary.textContent = selectedLabels.join(', ')
+          } else {
+            summary.textContent = `Выбрано: ${selectedLabels.length}`
+          }
+          clearBtn.textContent = placeholder
+          optionsWrap.replaceChildren()
+          items.forEach((item) => {
+            const btn = document.createElement('button')
+            btn.type = 'button'
+            btn.className = 'multi-select-menu__option'
+            btn.dataset.multiValue = item.value
+            btn.textContent = item.label
+            btn.classList.toggle('is-active', selectedSet.has(item.value))
+            btn.addEventListener('mousedown', (event) => {
+              event.preventDefault()
+            })
+            btn.addEventListener('click', (event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              if (container.__draft.has(item.value)) {
+                container.__draft.delete(item.value)
+              } else {
+                container.__draft.add(item.value)
+              }
+              syncState()
+            })
+            optionsWrap.appendChild(btn)
+          })
+          container.classList.toggle('is-hidden', items.length === 0)
+        }
+
+        clearBtn.addEventListener('mousedown', (event) => {
+          event.preventDefault()
+        })
+        clearBtn.addEventListener('click', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          container.__draft = new Set()
+          syncState()
+        })
+        applyBtn.addEventListener('mousedown', (event) => {
+          event.preventDefault()
+        })
+        applyBtn.addEventListener('click', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          const nextValues = Array.from(container.__draft)
+          setSelectedCsvValues(input, nextValues)
+          select.value = nextValues.length === 1 ? nextValues[0] : ''
+          root.open = false
+          syncState()
+          if (typeof onChange === 'function') onChange()
+        })
+        root.addEventListener('toggle', () => {
+          container.__draft = new Set(parseSelectedCsvValues(input))
+          syncState()
+        })
+        if (!container.dataset.outsideBound) {
+          document.addEventListener('click', (event) => {
+            if (!container.contains(event.target)) {
+              root.open = false
+            }
+          })
+          container.dataset.outsideBound = '1'
+        }
+        select.__multiMenuSync = syncState
+      }
+
+      if (typeof select.__multiMenuSync === 'function') {
+        select.__multiMenuSync()
+      }
+    })
+  }
+
+  function syncMultiSelectMenus(scope, inputName = '') {
+    if (!scope) return
+    const selects = inputName
+      ? qsa(`[data-multi-source-select="${inputName}"]`, scope)
+      : qsa('[data-multi-source-select]', scope)
+    selects.forEach((select) => {
+      if (typeof select.__multiMenuSync === 'function') {
+        select.__multiMenuSync()
+      }
+    })
+  }
+
   function syncRegMonthState(scope) {
     if (!scope) return
     const pairs = [
@@ -927,6 +1113,10 @@
       sort: null,
     }
     const selectLabel = (name, value) => {
+      const multiSource = getMultiSelectSource(form, name)
+      if (multiSource && value) {
+        return findMultiSelectLabel(form, name, value)
+      }
       const el = form.elements[name]
       if (!el || !value || el.tagName !== 'SELECT') return value
       const opt = Array.from(el.options || []).find((o) => o.value === value)
@@ -965,7 +1155,19 @@
         const n = Number(value)
         displayValue = Number.isFinite(n) ? `${n.toLocaleString('ru-RU')} км` : value
       }
-      if (['engine_type', 'transmission', 'drive_type', 'body_type', 'condition'].includes(key)) {
+      if (['body_type', 'engine_type', 'transmission', 'drive_type'].includes(key)) {
+        parseSelectedCsvValues(value).forEach((itemValue) => {
+          chips.push({
+            key,
+            label,
+            value: selectLabel(key, itemValue),
+            removeChoice: itemValue,
+            removeChoiceInput: key,
+          })
+        })
+        return
+      }
+      if (['condition'].includes(key)) {
         displayValue = selectLabel(key, value)
       }
       if (key === 'vat_reclaimable') {
@@ -1115,6 +1317,10 @@
         if (toClear.includes('interior_design')) syncChoiceChips(form, 'interior_design')
         if (toClear.includes('interior_color')) syncChoiceChips(form, 'interior_color')
         if (toClear.includes('interior_material')) syncChoiceChips(form, 'interior_material')
+        if (toClear.includes('body_type')) syncMultiSelectMenus(form, 'body_type')
+        if (toClear.includes('engine_type')) syncMultiSelectMenus(form, 'engine_type')
+        if (toClear.includes('transmission')) syncMultiSelectMenus(form, 'transmission')
+        if (toClear.includes('drive_type')) syncMultiSelectMenus(form, 'drive_type')
         updateCatalogUrlFromParams(collectParams(1))
         loadCars(1, { scrollToTop: true })
       })
@@ -1210,6 +1416,8 @@
       form?.reset()
       clearCatalogModelLineInputs(form)
       syncColorChips(form)
+      syncChoiceChips(form)
+      syncMultiSelectMenus(form)
       syncRegMonthState(form)
       bindOtherColorsToggle(form)
       const modelSelect = qs('#model-select')
@@ -1693,9 +1901,9 @@
         setSelectOptions(qs('#brand'), data.brands || [], { emptyLabel: 'Все', labelKey: 'label', valueKey: 'value' })
         normalizeBrandOptions(qs('#brand'))
         setSelectOptions(qs('#body_type'), data.body_types || [], { emptyLabel: 'Любой' })
-        setSelectOptions(qs('[name="engine_type"]'), data.engine_types || [], { emptyLabel: 'Любое' })
-        setSelectOptions(qs('[name="transmission"]'), data.transmissions || [], { emptyLabel: 'Любая' })
-        setSelectOptions(qs('[name="drive_type"]'), data.drive_types || [], { emptyLabel: 'Любой' })
+        setSelectOptions(qs('[data-multi-source-select="engine_type"]', filtersForm), data.engine_types || [], { emptyLabel: 'Любое' })
+        setSelectOptions(qs('[data-multi-source-select="transmission"]', filtersForm), data.transmissions || [], { emptyLabel: 'Любая' })
+        setSelectOptions(qs('[data-multi-source-select="drive_type"]', filtersForm), data.drive_types || [], { emptyLabel: 'Любой' })
         syncChoiceInputOptions(filtersForm, 'interior_color', data.interior_color_options || [])
         syncChoiceInputOptions(filtersForm, 'interior_material', data.interior_material_options || [])
         setSelectOptions(qs('#reg-year-min'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
@@ -1720,9 +1928,11 @@
         filtersForm.dataset.baseHydrated = '1'
         bindColorChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
         bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
+        bindMultiSelectMenus(filtersForm, () => loadCars(1, { scrollToTop: true }))
         bindOtherColorsToggle(filtersForm)
         syncColorChips(filtersForm)
         syncChoiceChips(filtersForm)
+        syncMultiSelectMenus(filtersForm)
       } catch (e) {
         console.warn('filters base', e)
       }
@@ -1769,6 +1979,8 @@
       clearCatalogModelLineInputs(form)
       if (modelSelect) setAccordionSelectedModels(modelSelect, [])
       syncColorChips(form)
+      syncChoiceChips(form)
+      syncMultiSelectMenus(form)
       syncRegMonthState(form)
       bindOtherColorsToggle(form)
       bindRegionSelect(form)
@@ -1793,8 +2005,10 @@
     if (filtersForm) {
       bindColorChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
       bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))
+      bindMultiSelectMenus(filtersForm, () => loadCars(1, { scrollToTop: true }))
       bindOtherColorsToggle(filtersForm)
       syncChoiceChips(filtersForm)
+      syncMultiSelectMenus(filtersForm)
       bindRegMonthState(filtersForm)
       bindRegionSelect(filtersForm)
       const ctrls = qsa('input, select', filtersForm)
@@ -2945,11 +3159,11 @@
     const applyBasicOptions = (data) => {
       if (!data) return
       setSelectOptions(regionEuSelect, Array.isArray(data.countries) ? data.countries : [], { emptyLabel: 'Все страны' })
-      setSelectOptions(qs('select[name="body_type"]', form), Array.isArray(data.body_types) ? data.body_types : [], { emptyLabel: 'Любой' })
+      setSelectOptions(qs('[data-multi-source-select="body_type"]', form), Array.isArray(data.body_types) ? data.body_types : [], { emptyLabel: 'Любой' })
       setSelectOptions(qs('select[name="generation"]', form), Array.isArray(data.generations) ? data.generations : [], { emptyLabel: 'Любое' })
-      setSelectOptions(qs('select[name="engine_type"]', form), Array.isArray(data.engine_types) ? data.engine_types : [], { emptyLabel: 'Любое' })
-      setSelectOptions(qs('select[name="transmission"]', form), Array.isArray(data.transmissions) ? data.transmissions : [], { emptyLabel: 'Любая' })
-      setSelectOptions(qs('select[name="drive_type"]', form), Array.isArray(data.drive_types) ? data.drive_types : [], { emptyLabel: 'Любой' })
+      setSelectOptions(qs('[data-multi-source-select="engine_type"]', form), Array.isArray(data.engine_types) ? data.engine_types : [], { emptyLabel: 'Любое' })
+      setSelectOptions(qs('[data-multi-source-select="transmission"]', form), Array.isArray(data.transmissions) ? data.transmissions : [], { emptyLabel: 'Любая' })
+      setSelectOptions(qs('[data-multi-source-select="drive_type"]', form), Array.isArray(data.drive_types) ? data.drive_types : [], { emptyLabel: 'Любой' })
       if (Array.isArray(data.reg_years) && data.reg_years.length) {
         setSelectOptions(qs('#reg-year-min', form), data.reg_years, { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         setSelectOptions(qs('#reg-year-max', form), data.reg_years, { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
@@ -2985,9 +3199,14 @@
         scheduleCount()
         scheduleOptionsRefresh()
       })
+      bindMultiSelectMenus(form, () => {
+        scheduleCount()
+        scheduleOptionsRefresh()
+      })
       bindOtherColorsToggle(form)
       syncColorChips(form)
       syncChoiceChips(form)
+      syncMultiSelectMenus(form)
       syncAdvancedGenerationVisibility()
     }
 
@@ -3114,7 +3333,12 @@
         scheduleCount()
         scheduleOptionsRefresh()
       })
+      bindMultiSelectMenus(form, () => {
+        scheduleCount()
+        scheduleOptionsRefresh()
+      })
       syncChoiceChips(form)
+      syncMultiSelectMenus(form)
     }
 
     const updateRegionSub = () => {

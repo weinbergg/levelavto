@@ -576,6 +576,75 @@ def normalize_fuel(val: Optional[str]) -> Optional[str]:
     return _normalize_alias("fuel", val)
 
 
+_FUEL_FREE_TEXT_KEYWORDS = (
+    "petrol",
+    "gasoline",
+    "benzin",
+    "diesel",
+    "hybrid",
+    "plug-in",
+    "plugin",
+    "phev",
+    "electric",
+    "elektro",
+    "ev",
+    "bev",
+    "gas",
+    "lpg",
+    "cng",
+    "lng",
+    "methane",
+    "metano",
+    "ethanol",
+    "e85",
+    "ffv",
+    "flexfuel",
+    "flex fuel",
+    "hydrogen",
+    "fuel cell",
+    "водород",
+    "бензин",
+    "дизель",
+    "гибрид",
+    "электро",
+    "газ",
+    "метан",
+    "этанол",
+)
+
+_FUEL_GARBAGE_KEYWORDS = (
+    "co2",
+    "emission",
+    "combined",
+    "city",
+    "country road",
+    "motorway",
+    "alarm",
+    "cruise",
+    "heated steering",
+    "summer tyres",
+    "touchscreen",
+    "sound system",
+    "parking",
+    "camera",
+)
+
+
+def is_plausible_fuel_value(value: Optional[str]) -> bool:
+    raw = str(value or "").strip()
+    if not raw:
+        return False
+    normalized = normalize_fuel(raw)
+    if normalized and normalized in _ALIASES.get("fuel", {}):
+        return True
+    low = raw.lower()
+    if not re.search(r"[a-zа-я]", low, re.IGNORECASE):
+        return False
+    if any(token in low for token in _FUEL_GARBAGE_KEYWORDS):
+        return False
+    return any(token in low for token in _FUEL_FREE_TEXT_KEYWORDS)
+
+
 _FREE_TEXT_EXACT = {
     "a/c (man.)": "кондиционер",
     "air conditioner": "кондиционер",
@@ -848,15 +917,21 @@ def build_engine_type_options(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]
         if not raw:
             continue
         normalized = normalize_fuel(raw)
-        if not normalized or not re.search(r"[a-zа-я]", normalized, re.IGNORECASE):
+        if normalized and normalized in _ALIASES.get("fuel", {}):
+            value = normalized
+        elif is_plausible_fuel_value(raw):
+            value = raw.strip().lower()
+        else:
             continue
-        entry = agg.get(normalized)
+        if not re.search(r"[a-zа-я]", value, re.IGNORECASE):
+            continue
+        entry = agg.get(value)
         if entry is None:
             entry = {
-                "value": normalized,
-                "label": ru_fuel(normalized) or translate_payload_value("engine_type", raw) or raw,
+                "value": value,
+                "label": ru_fuel(value) or translate_payload_value("engine_type", raw) or raw,
                 "count": 0,
             }
-            agg[normalized] = entry
+            agg[value] = entry
         entry["count"] += int((row or {}).get("count") or 0)
     return list(agg.values())

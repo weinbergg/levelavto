@@ -30,6 +30,7 @@ from ..utils.taxonomy import (
     ru_color,
     ru_fuel,
     ru_transmission,
+    build_engine_type_options,
     color_aliases,
     fuel_aliases,
     color_hex,
@@ -1013,22 +1014,37 @@ class CarsService:
                 conditions.append(reg_year_expr <= reg_year_max)
 
         if body_type and "body_type" not in exclude:
-            aliases = body_aliases(body_type)
             body_expr = func.lower(func.trim(Car.body_type))
-            if aliases:
-                conditions.append(or_(*[body_expr == alias.lower() for alias in aliases]))
-            else:
-                conditions.append(body_expr == body_type.lower())
+            body_conditions = []
+            for raw_body in split_csv_values(body_type):
+                aliases = body_aliases(raw_body)
+                if aliases:
+                    body_conditions.append(or_(*[body_expr == alias.lower() for alias in aliases]))
+                else:
+                    body_conditions.append(body_expr == raw_body.lower())
+            if body_conditions:
+                conditions.append(or_(*body_conditions))
         if engine_type and "engine_type" not in exclude:
-            aliases = fuel_aliases(engine_type)
-            if aliases:
-                conditions.append(or_(*[func.lower(Car.engine_type).like(f"%{alias}%") for alias in aliases]))
-            else:
-                conditions.append(func.lower(Car.engine_type) == engine_type.lower())
+            engine_expr = func.lower(func.coalesce(Car.engine_type, ""))
+            engine_conditions = []
+            for raw_engine in split_csv_values(engine_type):
+                aliases = fuel_aliases(raw_engine)
+                if aliases:
+                    engine_conditions.append(or_(*[engine_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+                else:
+                    engine_conditions.append(engine_expr == raw_engine.lower())
+            if engine_conditions:
+                conditions.append(or_(*engine_conditions))
         if transmission and "transmission" not in exclude:
-            conditions.append(func.lower(Car.transmission) == transmission.lower())
+            transmission_expr = func.lower(func.trim(Car.transmission))
+            transmission_values = [value.lower() for value in split_csv_values(transmission)]
+            if transmission_values:
+                conditions.append(or_(*[transmission_expr == value for value in transmission_values]))
         if drive_type and "drive_type" not in exclude:
-            conditions.append(func.lower(Car.drive_type) == drive_type.lower())
+            drive_expr = func.lower(func.trim(Car.drive_type))
+            drive_values = [value.lower() for value in split_csv_values(drive_type)]
+            if drive_values:
+                conditions.append(or_(*[drive_expr == value for value in drive_values]))
         if power_hp_min is not None and "power_hp_min" not in exclude:
             conditions.append(Car.power_hp >= power_hp_min)
         if power_hp_max is not None and "power_hp_max" not in exclude:
@@ -2150,17 +2166,10 @@ class CarsService:
 
     def engine_types(self) -> List[Dict[str, Any]]:
         rows = self.facet_counts(field="engine_type", filters={})
-        agg: Dict[str, Dict[str, Any]] = {}
-        for row in rows:
-            val = row.get("value")
-            if not val:
-                continue
-            norm = normalize_fuel(val) or val.strip().lower()
-            label = ru_fuel(val) or ru_fuel(norm) or val
-            if norm not in agg:
-                agg[norm] = {"value": norm, "label": label, "count": 0}
-            agg[norm]["count"] += int(row.get("count") or 0)
-        return sorted(agg.values(), key=lambda x: x["count"], reverse=True)
+        return sorted(
+            build_engine_type_options(rows),
+            key=lambda item: (-int(item.get("count") or 0), str(item.get("label") or item.get("value") or "").casefold()),
+        )
 
     def payload_values(
         self,

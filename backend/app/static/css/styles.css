@@ -2209,6 +2209,118 @@ body.filters-open {
   border-style: dashed;
 }
 
+.multi-select-menu {
+  margin-top: 0;
+  width: 100%;
+  background: transparent;
+  padding: 0;
+  border: 0;
+}
+.has-multi-select-menu {
+  position: relative;
+}
+.has-multi-select-menu .multi-select-menu {
+  position: relative;
+  z-index: 50;
+}
+.multi-select-menu.is-hidden {
+  display: none;
+}
+.multi-select-menu__root > summary {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--text-1);
+  list-style: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.multi-select-menu__root[open] > summary {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.multi-select-menu__root > summary::-webkit-details-marker {
+  display: none;
+}
+.multi-select-menu__body {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  max-height: min(62vh, 420px);
+  overflow: auto;
+  padding: 8px 8px 12px;
+  border: 1px solid var(--border-1);
+  border-radius: 12px;
+  background: #111725;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
+  z-index: 180;
+}
+.multi-select-menu__root[open] .multi-select-menu__body {
+  display: block;
+}
+.multi-select-menu__clear {
+  border: 1px dashed var(--border-1);
+  background: var(--bg-interactive);
+  color: var(--text-1);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 15px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+.multi-select-menu__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.multi-select-menu__option {
+  border: 1px solid var(--border-1);
+  background: var(--bg-interactive);
+  color: inherit;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 15px;
+  cursor: pointer;
+  text-align: left;
+}
+.multi-select-menu__option.is-active {
+  background: rgba(255, 98, 79, 0.2);
+  border-color: rgba(255, 98, 79, 0.8);
+}
+.multi-select-menu__actions {
+  display: flex;
+  position: sticky;
+  bottom: -8px;
+  justify-content: stretch;
+  margin: 14px -8px -8px;
+  padding: 14px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(17, 23, 37, 0) 0%, rgba(17, 23, 37, 0.96) 28%, #111725 62%);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.multi-select-menu__apply {
+  border: 1px solid rgba(255, 98, 79, 0.8);
+  background: rgba(255, 98, 79, 0.2);
+  color: #fff;
+  border-radius: 999px;
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 input[type="number"] {
   -moz-appearance: textfield;
 }
@@ -3603,8 +3715,8 @@ input[type="number"]::-webkit-outer-spin-button {
 .detail-origin-link {
   position: fixed;
   right: 20px;
-  bottom: 24px;
-  z-index: 35;
+  bottom: 78px;
+  z-index: 39;
   margin: 0;
   display: block;
   pointer-events: none;
@@ -3636,7 +3748,7 @@ input[type="number"]::-webkit-outer-spin-button {
   }
   .detail-origin-link {
     right: 12px;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
   }
   .detail-origin-link .btn {
     font-size: 11px;

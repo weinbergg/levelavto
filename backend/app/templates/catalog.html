@@ -92,8 +92,9 @@
                 <input type="number" name="mileage_max" inputmode="numeric" min="0" step="1" value="{{ params.get('mileage_max','') }}" placeholder="до">
               </label>
             </div>
-            <label>Кузов
-              <select name="body_type" id="body_type">
+            <label class="field field--multi-select">Кузов
+              <input type="hidden" name="body_type" value="{{ params.get('body_type','') }}">
+              <select id="body_type" data-multi-source-select="body_type" data-multi-placeholder="Любой">
                 <option value="">Любой</option>
                 {% for t in body_types %}
                 <option value="{{ t.value }}" {% if params.get('body_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
@@ -186,24 +187,27 @@
                 </div>
               </label>
             </div>
-            <label>Топливо
-              <select name="engine_type">
+            <label class="field field--multi-select">Топливо
+              <input type="hidden" name="engine_type" value="{{ params.get('engine_type','') }}">
+              <select id="engine_type_select" data-multi-source-select="engine_type" data-multi-placeholder="Любое">
                 <option value="">Любое</option>
                 {% for t in engine_types %}
                 <option value="{{ t.value }}" {% if params.get('engine_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
                 {% endfor %}
               </select>
             </label>
-            <label>Трансмиссия
-              <select name="transmission">
+            <label class="field field--multi-select">Трансмиссия
+              <input type="hidden" name="transmission" value="{{ params.get('transmission','') }}">
+              <select id="transmission_select" data-multi-source-select="transmission" data-multi-placeholder="Любая">
                 <option value="">Любая</option>
                 {% for t in transmissions %}
                 <option value="{{ t.value }}" {% if params.get('transmission') == t.value %}selected{% endif %}>{{ t.label }}</option>
                 {% endfor %}
               </select>
             </label>
-            <label>Привод
-              <select name="drive_type">
+            <label class="field field--multi-select">Привод
+              <input type="hidden" name="drive_type" value="{{ params.get('drive_type','') }}">
+              <select id="drive_type_select" data-multi-source-select="drive_type" data-multi-placeholder="Любой">
                 <option value="">Любой</option>
                 {% for t in drive_types %}
                 <option value="{{ t.value }}" {% if params.get('drive_type') == t.value %}selected{% endif %}>{{ t.label }}</option>

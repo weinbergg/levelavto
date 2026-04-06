@@ -2,3 +2,5 @@
 5 9 * * * cd /opt/levelavto && TELEGRAM_ENABLED=0 /bin/bash scripts/fx_daily_update.sh >> /var/log/fx_daily_update.log 2>&1
 # Main daily import / deactivation / recalc pipeline.
 15 9 * * * cd /opt/levelavto && TELEGRAM_ENABLED=0 MOBILEDE_STRICT_DEACTIVATION_GUARD=1 /bin/bash scripts/mobilede_daily_pipeline.sh >> /var/log/mobilede_daily.log 2>&1
+# Korea daily parsing + EU-donor inference + price recalc.
+30 11 * * * cd /opt/levelavto && TELEGRAM_ENABLED=0 /bin/bash scripts/kr_daily_pipeline.sh >> /var/log/kr_daily.log 2>&1
