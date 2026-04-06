@@ -1,13 +1,41 @@
-{% extends "base.html" %} {% import "_thumbs.html" as thumbs %} {% block title %}Авто — {{ car.brand }} {{ car.model
-}}{% endblock %} {% block content %}
+{% extends "base.html" %}
+{% import "_thumbs.html" as thumbs %}
+{% block title %}Авто — {{ car.brand if car else '' }} {{ car.model if car else '' }}
+{% endblock %}
+{% block content %}
 <section class="car-detail-page">
   <div class="la-container">
     {% if not car %}
     <div class="card">Автомобиль не найден.</div>
     {% else %}
     {% set phone = contact_phone or content.get('contact_phone') or '+7 (911) 070-75-00' %}
-    {% set tg_link = page_tg if page_tg is defined else (contact_tg or content.get('contact_tg')) %}
-    {% set max_link = page_max if page_max is defined else (contact_max or content.get('contact_max')) %}
+    {% set tg_link_raw = (contact_tg or content.get('contact_tg') or '')|trim %}
+    {% if tg_link_raw.startswith('http://') or tg_link_raw.startswith('https://') %}
+      {% set tg_link = tg_link_raw %}
+    {% elif tg_link_raw.startswith('t.me/') %}
+      {% set tg_link = 'https://' ~ tg_link_raw %}
+    {% elif tg_link_raw.startswith('@') %}
+      {% set tg_link = 'https://t.me/' ~ tg_link_raw[1:] %}
+    {% elif tg_link_raw %}
+      {% set tg_link = 'https://t.me/' ~ tg_link_raw %}
+    {% else %}
+      {% set tg_link = '' %}
+    {% endif %}
+    {% set max_link_raw = (contact_max or content.get('contact_max') or '')|trim %}
+    {% if max_link_raw.startswith('http://') or max_link_raw.startswith('https://') %}
+      {% set max_link = max_link_raw %}
+    {% elif max_link_raw.startswith('max.ru/') %}
+      {% set max_link = 'https://' ~ max_link_raw %}
+    {% elif max_link_raw.startswith('@') %}
+      {% set max_link = 'https://max.ru/' ~ max_link_raw[1:] %}
+    {% elif max_link_raw %}
+      {% set max_link = 'https://max.ru/' ~ max_link_raw %}
+    {% else %}
+      {% set max_link = '' %}
+    {% endif %}
+    {% if max_link in ['https://max.ru', 'https://max.ru/', 'http://max.ru', 'http://max.ru/'] %}
+      {% set max_link = '' %}
+    {% endif %}
     <div style="margin-bottom:12px;">
       <a id="back-to-catalog" class="btn btn-ghost btn-small" href="/catalog" style="display:none;">← Назад в каталог</a>
     </div>
