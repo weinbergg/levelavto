@@ -98,7 +98,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
     assert '/static/js/app.js?v=95' in template
-    assert '/static/css/styles.css?v=56' in template
+    assert '/static/css/styles.css?v=57' in template
 
 
 def test_search_page_passes_payload_deferred_flag():
@@ -243,6 +243,20 @@ def test_recommended_auto_uses_reg_year_and_effective_specs_limits():
     assert "body_type: str | None = None" in service
     assert "power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)" in service
     assert "engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)" in service
+
+
+def test_model_filters_normalize_whitespace_and_merge_overlapping_regions():
+    service = _read("app/services/cars_service.py")
+    router = _read("app/routers/catalog.py")
+    css = _read("app/static/css/styles.css")
+    assert "def normalize_model_label(" in service
+    assert "def model_lookup_key(" in service
+    assert "func.regexp_replace(" in service
+    assert '"aliases": []' in service
+    assert "service._normalized_model_expr() == model_lookup_key(canon.get(\"model\"))" in router
+    assert ".multi-select-menu__options" in css
+    assert "grid-template-columns: 1fr;" in css
+    assert "white-space: normal;" in css
 
 
 def test_card_and_detail_templates_render_variant_subtitles():

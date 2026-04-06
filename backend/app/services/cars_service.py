@@ -66,6 +66,20 @@ def normalize_brand(value: Optional[str]) -> str:
     return BRAND_ALIASES.get(raw.lower(), raw)
 
 
+_MODEL_WS_RE = re.compile(r"\s+")
+
+
+def normalize_model_label(value: Optional[str]) -> str:
+    raw = str(value or "").replace("\xa0", " ").strip()
+    if not raw:
+        return ""
+    return _MODEL_WS_RE.sub(" ", raw)
+
+
+def model_lookup_key(value: Optional[str]) -> str:
+    return normalize_model_label(value).casefold()
+
+
 def brand_variants(value: Optional[str]) -> List[str]:
     norm = normalize_brand(value)
     if not norm:
@@ -118,6 +132,18 @@ class CarsService:
 
     def _available_expr(self):
         return Car.is_available.is_(True)
+
+    def _normalized_model_expr(self):
+        # Keep normalization conservative: collapse whitespace/case only, so
+        # identical EU/KR models merge without accidentally collapsing variants.
+        return func.lower(
+            func.regexp_replace(
+                func.trim(func.coalesce(Car.model, "")),
+                r"\s+",
+                " ",
+                "g",
+            )
+        )
 
     EU_COUNTRIES = {
         "DE", "AT", "FR", "IT", "ES", "NL", "BE", "PL", "CZ", "SE", "FI",
@@ -435,9 +461,9 @@ class CarsService:
                 if variants_lc:
                     conditions.append(func.lower(func.trim(Car.brand)).in_(variants_lc))
         if model:
-            mv = str(model).strip()
+            mv = model_lookup_key(model)
             if mv:
-                conditions.append(Car.model == mv)
+                conditions.append(self._normalized_model_expr() == mv)
         if field not in ("region", "country", "brand", "model"):
             val = filters.get(field)
             if val:
@@ -824,9 +850,9 @@ class CarsService:
                 conditions.append(and_(*token_groups))
 
         if model and "model" not in exclude:
-            model_value = model.strip()
+            model_value = model_lookup_key(model)
             if model_value:
-                conditions.append(Car.model == model_value)
+                conditions.append(self._normalized_model_expr() == model_value)
 
         payload_json = cast(Car.source_payload, JSONB)
         payload_text = func.lower(cast(Car.source_payload, String))
@@ -2493,12 +2519,36 @@ class CarsService:
             rows = self._facet_counts_from_cars(field="model", filters=filters)
         else:
             rows = self.facet_counts(field="model", filters=filters)
-        models = [
-            {"value": r["value"], "label": r["value"], "count": int(r.get("count", 0))}
-            for r in rows
-            if r.get("value")
-        ]
-        return sorted(models, key=lambda x: (x.get("label") or x.get("value") or "").strip().casefold())
+        buckets: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            raw_value = str(row.get("value") or "").strip()
+            label = normalize_model_label(raw_value)
+            key = model_lookup_key(raw_value)
+            if not key or not label:
+                continue
+            bucket = buckets.get(key)
+            if bucket is None:
+                bucket = {
+                    "value": label,
+                    "label": label,
+                    "count": 0,
+                    "aliases": [],
+                }
+                buckets[key] = bucket
+            bucket["count"] += int(row.get("count", 0) or 0)
+            if raw_value and raw_value not in bucket["aliases"]:
+                bucket["aliases"].append(raw_value)
+            if label and (
+                len(label) < len(str(bucket.get("label") or ""))
+                or (
+                    len(label) == len(str(bucket.get("label") or ""))
+                    and label.casefold() < str(bucket.get("label") or "").casefold()
+                )
+            ):
+                bucket["value"] = label
+                bucket["label"] = label
+        models = list(buckets.values())
+        return sorted(models, key=lambda x: self._natural_text_key(x.get("label") or x.get("value") or ""))
 
     def _model_family_key(self, brand: str, model: str) -> str:
         raw = str(model or "").strip()
