@@ -2130,11 +2130,10 @@ body.filters-open {
   background: #111725;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
   z-index: 180;
-  display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
 }
 .model-accordion__root[open] .model-accordion__body {
-  display: block;
+  display: grid;
 }
 
 .model-accordion__content {

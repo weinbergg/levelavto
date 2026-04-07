@@ -115,7 +115,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
     assert '/static/js/app.js?v=99' in template
-    assert '/static/css/styles.css?v=60' in template
+    assert '/static/css/styles.css?v=61' in template
 
 
 def test_search_page_passes_payload_deferred_flag():
@@ -185,6 +185,8 @@ def test_model_group_summary_has_visible_selected_states():
     assert ".filters-primary-grid > .field:has(.model-accordion__root[open])" in css
     assert ".filters-primary-grid > .field:has(.multi-select-menu__root[open])" in css
     assert ".model-accordion__content" in css
+    assert ".model-accordion__root[open] .model-accordion__body" in css
+    assert "display: grid;" in css
     assert "grid-template-rows: minmax(0, 1fr) auto;" in css
     assert ".multi-select-menu__option" in css
     assert ".advanced-row > .field:has(.multi-select-menu__root[open])" in css
