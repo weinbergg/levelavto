@@ -2590,6 +2590,9 @@
       root.appendChild(rootSummary)
       const rootBody = document.createElement('div')
       rootBody.className = 'model-accordion__body'
+      const contentWrap = document.createElement('div')
+      contentWrap.className = 'model-accordion__content'
+      rootBody.appendChild(contentWrap)
       root.appendChild(rootBody)
       container.appendChild(root)
       if (!container.dataset.outsideBound) {
@@ -2658,7 +2661,7 @@
         draftSelectedModels.clear()
         syncDraftState()
       })
-      rootBody.appendChild(clearBtn)
+      contentWrap.appendChild(clearBtn)
 
       groups.forEach((group) => {
         const groupModels = Array.isArray(group?.models) ? group.models : []
@@ -2680,7 +2683,7 @@
             event.stopPropagation()
             toggleModelSelection(value)
           })
-          rootBody.appendChild(itemBtn)
+          contentWrap.appendChild(itemBtn)
           return
         }
 
@@ -2738,7 +2741,7 @@
           modelsWrap.appendChild(btn)
         })
         details.appendChild(modelsWrap)
-        rootBody.appendChild(details)
+        contentWrap.appendChild(details)
       })
 
       actionsWrap.appendChild(applyBtn)

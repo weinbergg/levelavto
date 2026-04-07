@@ -2124,19 +2124,25 @@ body.filters-open {
   left: 0;
   right: 0;
   max-height: min(62vh, 440px);
-  overflow: auto;
-  padding: 8px 8px 88px;
+  overflow: hidden;
   border: 1px solid var(--border-1);
   border-radius: 12px;
   background: #111725;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
   z-index: 180;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  scroll-padding-bottom: 88px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 .model-accordion__root[open] .model-accordion__body {
   display: block;
+}
+
+.model-accordion__content {
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 8px 14px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .model-accordion__group {
@@ -2216,12 +2222,10 @@ body.filters-open {
 }
 .model-accordion__actions {
   display: flex;
-  position: sticky;
-  bottom: 0;
   justify-content: stretch;
-  margin: 16px -8px 0;
+  margin: 0;
   padding: 14px 8px calc(10px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(180deg, rgba(17, 23, 37, 0) 0%, rgba(17, 23, 37, 0.96) 28%, #111725 62%);
+  background: linear-gradient(180deg, rgba(17, 23, 37, 0.72) 0%, rgba(17, 23, 37, 0.96) 22%, #111725 100%);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 .model-accordion__apply {

@@ -60,6 +60,7 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))" in script
     assert "const priceMain = card.querySelector('.price-main')" in script
     assert "void loadCars(initialPage)" in script
+    assert "contentWrap.className = 'model-accordion__content'" in script or 'contentWrap.className = "model-accordion__content"' in script
 
 
 def test_filter_payload_includes_dynamic_brand_options():
@@ -113,8 +114,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=98' in template
-    assert '/static/css/styles.css?v=59' in template
+    assert '/static/js/app.js?v=99' in template
+    assert '/static/css/styles.css?v=60' in template
 
 
 def test_search_page_passes_payload_deferred_flag():
@@ -183,7 +184,8 @@ def test_model_group_summary_has_visible_selected_states():
     assert ".model-accordion__item.is-active" in css
     assert ".filters-primary-grid > .field:has(.model-accordion__root[open])" in css
     assert ".filters-primary-grid > .field:has(.multi-select-menu__root[open])" in css
-    assert "scroll-padding-bottom: 88px;" in css
+    assert ".model-accordion__content" in css
+    assert "grid-template-rows: minmax(0, 1fr) auto;" in css
     assert ".multi-select-menu__option" in css
     assert ".advanced-row > .field:has(.multi-select-menu__root[open])" in css
     assert ".multi-select-menu--fuel .multi-select-menu__option" in css
@@ -233,17 +235,17 @@ def test_home_content_keeps_cataloge_wordform_stable():
     assert legacy["hero"]["subtitle"] == "Актуальные предложения с ценой под ключ в одном каталоге"
 
 
-def test_home_css_keeps_model_actions_sticky_without_overlay_on_mobile():
+def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
     css = _read("app/static/css/home.css")
     assert "#home-search .model-accordion__actions" in css
-    assert "position: sticky;" in css
-    assert "#home-search .model-accordion__body" in css
-    assert "scroll-padding-bottom: 96px;" in css
+    assert "#home-search .model-accordion__content" in css
+    assert "margin: 0;" in css
+    assert "padding: 14px 10px calc(10px + env(safe-area-inset-bottom, 0px));" in css
 
 
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
-    assert '/static/css/home.css?v=20' in template
+    assert '/static/css/home.css?v=21' in template
 
 
 def test_model_filters_use_canonical_labels_with_alias_restore():
