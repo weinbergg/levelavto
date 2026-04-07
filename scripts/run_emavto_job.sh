@@ -18,9 +18,29 @@ ERR=""
 DOCKER_BIN="${DOCKER_BIN:-/usr/bin/docker}"
 DOCKER_CMD="${DOCKER_CMD:-${DOCKER_BIN} compose}"
 LOCK_DIR="${EMAVTO_LOCK_DIR:-/tmp/emavto_job.lock}"
+WAIT_ON_LOCK="${EMAVTO_WAIT_ON_LOCK:-1}"
+WAIT_TIMEOUT_SEC="${EMAVTO_WAIT_TIMEOUT_SEC:-14400}"
+WAIT_POLL_SEC="${EMAVTO_WAIT_POLL_SEC:-30}"
 
 if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
   echo "[emavto] already running, lock exists at ${LOCK_DIR}"
+  # Nightly KR must not race ahead into inference/recalc while another import
+  # is still holding the emavto lock.
+  if [[ "${WAIT_ON_LOCK}" != "1" ]]; then
+    exit 0
+  fi
+  wait_started_sec=$(date -u +%s)
+  while [[ -d "${LOCK_DIR}" ]]; do
+    now_sec=$(date -u +%s)
+    waited=$((now_sec - wait_started_sec))
+    if (( waited >= WAIT_TIMEOUT_SEC )); then
+      echo "[emavto] wait timeout after ${waited}s for lock ${LOCK_DIR}"
+      exit 1
+    fi
+    echo "[emavto] waiting for active job to finish (${waited}s elapsed)"
+    sleep "${WAIT_POLL_SEC}"
+  done
+  echo "[emavto] previous job finished, continuing without starting a second run"
   exit 0
 fi
 cleanup() {

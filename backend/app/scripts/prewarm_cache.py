@@ -260,16 +260,8 @@ def main() -> None:
                     f"brand={params.get('brand')} sort={sort_name} size={params.get('page_size') or 12}"
                 )
 
-        # Priority: warm exactly the brand pages that users open first.
-        if include_brand_lists:
-            for params in brand_tasks:
-                if _should_stop(started, max_sec):
-                    print("[prewarm] stop by PREWARM_MAX_SEC (brand lists)")
-                    break
-                params["page_size"] = list_page_size
-                _prewarm_list(params)
-
-        # Secondary: broad generic pages (can be disabled by PREWARM_MAX_SEC timeout).
+        # Priority: warm broad generic pages first so the main catalog is hot
+        # even if brand prewarming is cut short by PREWARM_MAX_SEC.
         list_tasks = [
             {},
             {"region": "EU"},
@@ -282,6 +274,13 @@ def main() -> None:
                 return
             params["page_size"] = list_page_size
             _prewarm_list(params)
+        if include_brand_lists:
+            for params in brand_tasks:
+                if _should_stop(started, max_sec):
+                    print("[prewarm] stop by PREWARM_MAX_SEC (brand lists)")
+                    break
+                params["page_size"] = list_page_size
+                _prewarm_list(params)
     print(f"[prewarm] done in {(time.perf_counter()-started)*1000:.2f} ms")
 
 
