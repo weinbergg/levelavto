@@ -1,7 +1,13 @@
+import importlib.util
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
+HOME_CONTENT_PATH = ROOT / "app/utils/home_content.py"
+HOME_CONTENT_SPEC = importlib.util.spec_from_file_location("home_content", HOME_CONTENT_PATH)
+assert HOME_CONTENT_SPEC and HOME_CONTENT_SPEC.loader
+_home_content = importlib.util.module_from_spec(HOME_CONTENT_SPEC)
+HOME_CONTENT_SPEC.loader.exec_module(_home_content)
+build_home_content = _home_content.build_home_content
 
 
 def _read(rel_path: str) -> str:
@@ -217,6 +223,27 @@ def test_taxonomy_contains_extra_body_and_interior_translations():
     assert 'fuel,ethanol,"Ethanol (FFV, E85 etc.)"' in taxonomy
     assert 'return "hybrid_diesel"' in utils
     assert 'return "phev"' in utils
+
+
+def test_home_content_keeps_cataloge_wordform_stable():
+    content = build_home_content({"hero_subtitle": "Актуальные предложения с ценой под ключ в одном каталоге"})
+    assert content["hero"]["subtitle"] == "Актуальные предложения с ценой под ключ в одном каталоге"
+
+    legacy = build_home_content({"hero_subtitle": "Актуальные предложения с ценой под ключ в одном каталог."})
+    assert legacy["hero"]["subtitle"] == "Актуальные предложения с ценой под ключ в одном каталоге"
+
+
+def test_home_css_disables_sticky_model_actions_on_mobile_overlay():
+    css = _read("app/static/css/home.css")
+    assert "#home-search .model-accordion__actions" in css
+    assert "position: static;" in css
+    assert "#home-search .model-accordion__body" in css
+    assert "scroll-padding-bottom: 16px;" in css
+
+
+def test_home_template_bumps_home_css_bundle_version():
+    template = _read("app/templates/home.html")
+    assert '/static/css/home.css?v=19' in template
 
 
 def test_model_filters_use_canonical_labels_with_alias_restore():

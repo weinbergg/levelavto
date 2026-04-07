@@ -243,13 +243,11 @@ def build_home_content(content_map: Dict[str, str]) -> Dict[str, Any]:
     hero_sub_norm = (base.get("hero", {}).get("subtitle") or "").strip().lower()
     if "проверенных европейских" in hero_sub_norm:
         base["hero"]["subtitle"] = DEFAULT_HOME_CONTENT["hero"]["subtitle"]
-    elif "в одном каталог" in hero_sub_norm:
-        base["hero"]["subtitle"] = (
-            str(base["hero"]["subtitle"])
-            .replace("в одном каталог.", "в одном каталоге")
-            .replace("в одном каталог", "в одном каталоге")
-            .rstrip(".")
-        )
+    elif hero_sub_norm.endswith("в одном каталог.") or hero_sub_norm.endswith("в одном каталог"):
+        subtitle = str(base["hero"]["subtitle"]).rstrip(".").rstrip()
+        if subtitle.lower().endswith("в одном каталог"):
+            subtitle = subtitle[: -len("в одном каталог")] + "в одном каталоге"
+        base["hero"]["subtitle"] = subtitle
     cases_title_norm = (base.get("cases", {}).get("title") or "").strip().lower()
     if cases_title_norm.startswith("за 8 лет привезли"):
         base["cases"]["title"] = DEFAULT_HOME_CONTENT["cases"]["title"]
