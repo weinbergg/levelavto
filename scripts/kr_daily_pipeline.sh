@@ -41,15 +41,16 @@ echo "[kr_pipeline] step=cache_maintenance"
 PURGE_SOFT=1 BUMP_DATASET=1 bash scripts/cache_maintenance.sh
 
 echo "[kr_pipeline] step=prewarm"
-PREWARM_MAX_SEC="${KR_PREWARM_MAX_SEC:-1800}" \
-PREWARM_INCLUDE_BRAND_CTX=1 \
-PREWARM_INCLUDE_MODEL_CTX=1 \
-PREWARM_INCLUDE_BRAND_LISTS=1 \
-PREWARM_INCLUDE_BRAND_COUNTS=1 \
-PREWARM_COUNTRY_SWEEP=1 \
-PREWARM_LIST_SORTS="${KR_PREWARM_LIST_SORTS:-price_asc,price_desc}" \
-PREWARM_BRAND_REGIONS="${KR_PREWARM_BRAND_REGIONS:-EU,KR}" \
-PREWARM_EU_COUNTRY="${PREWARM_EU_COUNTRY:-DE}" \
-docker compose exec -T web python -m backend.app.scripts.prewarm_cache || true
+docker compose exec -T web env \
+  PREWARM_MAX_SEC="${KR_PREWARM_MAX_SEC:-1800}" \
+  PREWARM_INCLUDE_BRAND_CTX=1 \
+  PREWARM_INCLUDE_MODEL_CTX=1 \
+  PREWARM_INCLUDE_BRAND_LISTS=1 \
+  PREWARM_INCLUDE_BRAND_COUNTS=1 \
+  PREWARM_COUNTRY_SWEEP=1 \
+  PREWARM_LIST_SORTS="${KR_PREWARM_LIST_SORTS:-price_asc,price_desc}" \
+  PREWARM_BRAND_REGIONS="${KR_PREWARM_BRAND_REGIONS:-EU,KR}" \
+  PREWARM_EU_COUNTRY="${PREWARM_EU_COUNTRY:-DE}" \
+  python -m backend.app.scripts.prewarm_cache || true
 
 echo "[kr_pipeline] done $(date -Iseconds)"

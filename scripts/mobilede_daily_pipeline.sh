@@ -157,13 +157,14 @@ if [ "${MOBILEDE_PRUNE_UNUSED_MEDIA:-1}" = "1" ]; then
 fi
 
 echo "[mobilede_pipeline] step=prewarm"
-PREWARM_MAX_SEC="${PREWARM_MAX_SEC:-900}" \
-PREWARM_INCLUDE_BRAND_CTX=0 \
-PREWARM_INCLUDE_MODEL_CTX=0 \
-PREWARM_INCLUDE_BRAND_LISTS=1 \
-PREWARM_INCLUDE_BRAND_COUNTS=1 \
-PREWARM_COUNTRY_SWEEP=0 \
-PREWARM_EU_COUNTRY="${PREWARM_EU_COUNTRY:-DE}" \
-docker compose exec -T web python -m backend.app.scripts.prewarm_cache || true
+docker compose exec -T web env \
+  PREWARM_MAX_SEC="${PREWARM_MAX_SEC:-900}" \
+  PREWARM_INCLUDE_BRAND_CTX=0 \
+  PREWARM_INCLUDE_MODEL_CTX=0 \
+  PREWARM_INCLUDE_BRAND_LISTS=1 \
+  PREWARM_INCLUDE_BRAND_COUNTS=1 \
+  PREWARM_COUNTRY_SWEEP=0 \
+  PREWARM_EU_COUNTRY="${PREWARM_EU_COUNTRY:-DE}" \
+  python -m backend.app.scripts.prewarm_cache || true
 
 echo "[mobilede_pipeline] done $(date -Iseconds)"
