@@ -36,7 +36,7 @@ fuel,ethanol,"Ethanol (FFV, E85 etc.)",Ethanol; E85; FFV; FlexFuel; Flex Fuel; B
 fuel,hybrid_diesel,Гибрид (дизельный / электрический),hybrid (diesel/electric); дизель + электро
 fuel,hybrid,Гибрид (бензиновый / электрический),Hybrid; HEV; Vollhybrid; hybrid (petrol/electric); бензин + электро
 fuel,hydrogen,Водород,Hydrogen; H2; Fuel Cell; водород
-fuel,lpg,Автомобильный газ (LPG),LPG; propane; propan; propan-butane; propane-butane; пропан-бутан
+fuel,lpg,Автомобильный газ (сжиженный нефтяной газ),LPG; propane; propan; propan-butane; propane-butane; пропан-бутан
 fuel,cng,Природный газ (КПГ),CNG; Compressed Natural Gas; Erdgas; Methane; Natural Gas; Metano; природный газ; метан
 fuel,other,Другой,other; others; другое
 fuel,phev,Подключаемый гибрид,Plug-in hybrid; PHEV; Plug-in-Hybrid; подключаемый гибрид

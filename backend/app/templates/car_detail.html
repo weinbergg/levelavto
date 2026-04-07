@@ -51,6 +51,7 @@
           {% set primary_src = primary_thumb_src %}
         {% endif %}
         <div class="detail-hero__main placeholder" data-images='{{ image_urls | tojson }}'>
+          <button class="fav-btn fav-btn--detail" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>
           {% if primary %}
           <img
             id="primaryImage"
@@ -150,7 +151,6 @@
             {% if car.display_country_label or car.country %}Страна: {{ car.display_country_label or car.country }} · {% endif %} Фото:
             <span id="detailPhotoCount">{{ image_urls|length if image_urls else 0 }}</span>
           </p>
-          <button class="fav-btn" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>
         </div>
         <div class="detail-specs">
           {% if car.mileage %}

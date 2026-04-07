@@ -17,7 +17,7 @@ DEFAULT_HOME_CONTENT: Dict[str, Any] = {
     "hero": {
         "stats_suffix": "авто в наличии",
         "title": "Импорт и подбор автомобилей из Европы и Азии",
-        "subtitle": "Актуальные предложения от мировых площадок с ценой под ключ в одном каталог.",
+        "subtitle": "Актуальные предложения от мировых площадок с ценой под ключ в одном каталоге",
         "note": "Возим проверенные авто из Европы, Азии и РФ. Минимальная предоплата — основная часть по факту поставки.",
         "benefits": [
             "От 10% предоплата",
@@ -243,6 +243,13 @@ def build_home_content(content_map: Dict[str, str]) -> Dict[str, Any]:
     hero_sub_norm = (base.get("hero", {}).get("subtitle") or "").strip().lower()
     if "проверенных европейских" in hero_sub_norm:
         base["hero"]["subtitle"] = DEFAULT_HOME_CONTENT["hero"]["subtitle"]
+    elif "в одном каталог" in hero_sub_norm:
+        base["hero"]["subtitle"] = (
+            str(base["hero"]["subtitle"])
+            .replace("в одном каталог.", "в одном каталоге")
+            .replace("в одном каталог", "в одном каталоге")
+            .rstrip(".")
+        )
     cases_title_norm = (base.get("cases", {}).get("title") or "").strip().lower()
     if cases_title_norm.startswith("за 8 лет привезли"):
         base["cases"]["title"] = DEFAULT_HOME_CONTENT["cases"]["title"]

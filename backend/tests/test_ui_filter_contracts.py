@@ -47,6 +47,9 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "bindMultiSelectMenus" in script
     assert "syncMultiSelectMenus" in script
     assert 'className = \'multi-select-menu__apply\'' in script or 'className = "multi-select-menu__apply"' in script
+    assert "container.classList.toggle('multi-select-menu--fuel', name === 'engine_type')" in script
+    assert "clearBtn.textContent = 'Сбросить выбор'" in script
+    assert "clearBtn.disabled = selectedSet.size === 0" in script
     assert "select.disabled = normalizedItems.length === 0" in script or "select.disabled = deduped.length === 0" in script
     assert "bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))" in script
     assert "const priceMain = card.querySelector('.price-main')" in script
@@ -104,8 +107,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=97' in template
-    assert '/static/css/styles.css?v=58' in template
+    assert '/static/js/app.js?v=98' in template
+    assert '/static/css/styles.css?v=59' in template
 
 
 def test_search_page_passes_payload_deferred_flag():
@@ -176,6 +179,9 @@ def test_model_group_summary_has_visible_selected_states():
     assert ".filters-primary-grid > .field:has(.multi-select-menu__root[open])" in css
     assert "scroll-padding-bottom: 88px;" in css
     assert ".multi-select-menu__option" in css
+    assert ".advanced-row > .field:has(.multi-select-menu__root[open])" in css
+    assert ".multi-select-menu--fuel .multi-select-menu__option" in css
+    assert "grid-template-columns: 18px minmax(0, 1fr);" in css
 
 
 def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():
@@ -207,6 +213,7 @@ def test_taxonomy_contains_extra_body_and_interior_translations():
     assert "fuel,hybrid_diesel,Гибрид (дизельный / электрический)" in taxonomy
     assert "fuel,phev,Подключаемый гибрид" in taxonomy
     assert "fuel,cng,Природный газ (КПГ)" in taxonomy
+    assert "fuel,lpg,Автомобильный газ (сжиженный нефтяной газ)" in taxonomy
     assert 'fuel,ethanol,"Ethanol (FFV, E85 etc.)"' in taxonomy
     assert 'return "hybrid_diesel"' in utils
     assert 'return "phev"' in utils
@@ -323,6 +330,8 @@ def test_card_and_detail_templates_render_variant_subtitles():
     assert '"variant": c.get("variant")' in api_router
     assert ".car-card__subtitle" in css
     assert ".detail-subtitle" in css
+    assert "fav-btn--detail" in detail_template
+    assert ".fav-btn--detail" in css
 
 
 def test_detail_and_header_contact_actions_use_call_and_messengers():

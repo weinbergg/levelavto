@@ -830,6 +830,7 @@
         host.appendChild(container)
       }
       host.classList.add('has-multi-select-menu')
+      container.classList.toggle('multi-select-menu--fuel', name === 'engine_type')
       select.hidden = true
       select.setAttribute('aria-hidden', 'true')
       select.style.setProperty('display', 'none', 'important')
@@ -890,7 +891,8 @@
           } else {
             summary.textContent = `Выбрано: ${selectedLabels.length}`
           }
-          clearBtn.textContent = placeholder
+          clearBtn.textContent = 'Сбросить выбор'
+          clearBtn.disabled = selectedSet.size === 0
           optionsWrap.replaceChildren()
           items.forEach((item) => {
             const btn = document.createElement('button')
@@ -923,6 +925,7 @@
         clearBtn.addEventListener('click', (event) => {
           event.preventDefault()
           event.stopPropagation()
+          if (clearBtn.disabled) return
           container.__draft = new Set()
           syncState()
         })
