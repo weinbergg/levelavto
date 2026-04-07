@@ -233,17 +233,17 @@ def test_home_content_keeps_cataloge_wordform_stable():
     assert legacy["hero"]["subtitle"] == "Актуальные предложения с ценой под ключ в одном каталоге"
 
 
-def test_home_css_disables_sticky_model_actions_on_mobile_overlay():
+def test_home_css_keeps_model_actions_sticky_without_overlay_on_mobile():
     css = _read("app/static/css/home.css")
     assert "#home-search .model-accordion__actions" in css
-    assert "position: static;" in css
+    assert "position: sticky;" in css
     assert "#home-search .model-accordion__body" in css
-    assert "scroll-padding-bottom: 16px;" in css
+    assert "scroll-padding-bottom: 96px;" in css
 
 
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
-    assert '/static/css/home.css?v=19' in template
+    assert '/static/css/home.css?v=20' in template
 
 
 def test_model_filters_use_canonical_labels_with_alias_restore():

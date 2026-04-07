@@ -884,19 +884,21 @@ textarea {
   }
   #home-search .model-accordion__body {
     max-height: min(54vh, 380px);
-    padding: 10px 10px 14px;
-    scroll-padding-bottom: 16px;
+    padding: 10px 10px 96px;
+    scroll-padding-bottom: 96px;
   }
   #home-search .model-accordion__clear,
   #home-search .model-accordion__item {
     width: 100%;
   }
   #home-search .model-accordion__actions {
-    position: static;
-    margin: 12px 0 0;
-    padding: 0;
-    background: transparent;
-    border-top: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 14px -10px -10px;
+    padding: 14px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, rgba(17, 23, 37, 0) 0%, rgba(17, 23, 37, 0.98) 24%, rgba(17, 23, 37, 0.98) 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
   }
   #home-search .model-accordion__apply {
     min-height: 48px;
