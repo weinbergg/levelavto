@@ -1297,16 +1297,18 @@ class CarsService:
             conditions.append(func.jsonb_extract_path_text(payload_json, "climatisation") == climatisation)
         if airbags and "airbags" not in exclude:
             conditions.append(func.jsonb_extract_path_text(payload_json, "airbags") == airbags)
-        interior_fallback_expr = func.lower(
-            func.concat_ws(
-                " ",
-                func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), ""),
-                func.coalesce(Car.description, ""),
-                func.coalesce(func.jsonb_extract_path_text(payload_json, "options"), ""),
-                func.coalesce(func.jsonb_extract_path_text(payload_json, "title"), ""),
-                func.coalesce(func.jsonb_extract_path_text(payload_json, "sub_title"), ""),
-            )
+        interior_payload_expr = func.lower(
+            func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), "")
         )
+        interior_description_expr = func.lower(func.coalesce(Car.description, ""))
+
+        def _interior_alias_clause(aliases: List[str]) -> Any:
+            alias_conditions = []
+            for alias in aliases:
+                like = f"%{alias.lower()}%"
+                alias_conditions.append(interior_payload_expr.like(like))
+                alias_conditions.append(interior_description_expr.like(like))
+            return or_(*alias_conditions) if alias_conditions else None
         if interior_design and "interior_design" not in exclude:
             trim_token_conditions = []
             for trim_value in split_csv_values(interior_design):
@@ -1314,12 +1316,14 @@ class CarsService:
                 trim_conditions = []
                 if trim_material_key:
                     aliases = interior_material_aliases(trim_material_key)
-                    if aliases:
-                        trim_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+                    clause = _interior_alias_clause(aliases)
+                    if clause is not None:
+                        trim_conditions.append(clause)
                 if trim_color_key:
                     aliases = interior_color_aliases(trim_color_key)
-                    if aliases:
-                        trim_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+                    clause = _interior_alias_clause(aliases)
+                    if clause is not None:
+                        trim_conditions.append(clause)
                 if trim_conditions:
                     trim_token_conditions.append(and_(*trim_conditions))
                 else:
@@ -1330,16 +1334,18 @@ class CarsService:
             color_conditions = []
             for color_value in split_csv_values(interior_color):
                 aliases = interior_color_aliases(color_value)
-                if aliases:
-                    color_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+                clause = _interior_alias_clause(aliases)
+                if clause is not None:
+                    color_conditions.append(clause)
             if color_conditions:
                 conditions.append(or_(*color_conditions))
         if interior_material and "interior_material" not in exclude:
             material_conditions = []
             for material_value in split_csv_values(interior_material):
                 aliases = interior_material_aliases(material_value)
-                if aliases:
-                    material_conditions.append(or_(*[interior_fallback_expr.like(f"%{alias.lower()}%") for alias in aliases]))
+                clause = _interior_alias_clause(aliases)
+                if clause is not None:
+                    material_conditions.append(clause)
             if material_conditions:
                 conditions.append(or_(*material_conditions))
         if vat_reclaimable and "vat_reclaimable" not in exclude:
@@ -1656,7 +1662,55 @@ class CarsService:
             or price_max is not None
             or sort in {"price_asc", "price_desc"}
         )
-        if where_expr is not None and price_sensitive:
+        lazy_price_refresh_allowed = (
+            not count_only
+            and page <= 1
+            and page_size <= 40
+            and any([region, country, brand, model])
+            and not any(
+                [
+                    lines,
+                    source_key,
+                    q,
+                    generation,
+                    normalized_color,
+                    body_type,
+                    engine_type,
+                    transmission,
+                    drive_type,
+                    num_seats,
+                    doors_count,
+                    emission_class,
+                    efficiency_class,
+                    climatisation,
+                    airbags,
+                    normalized_interior_design,
+                    normalized_interior_color,
+                    normalized_interior_material,
+                    vat_reclaimable,
+                    air_suspension,
+                    price_rating_label,
+                    owners_count,
+                    power_hp_min is not None,
+                    power_hp_max is not None,
+                    engine_cc_min is not None,
+                    engine_cc_max is not None,
+                    year_min is not None,
+                    year_max is not None,
+                    mileage_min is not None,
+                    mileage_max is not None,
+                    reg_year_min is not None,
+                    reg_month_min is not None,
+                    reg_year_max is not None,
+                    reg_month_max is not None,
+                    condition,
+                    price_min is not None,
+                    price_max is not None,
+                    kr_type,
+                ]
+            )
+        )
+        if where_expr is not None and price_sensitive and lazy_price_refresh_allowed:
             self._refresh_price_sensitive_candidates(
                 where_expr,
                 sort=sort,

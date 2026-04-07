@@ -242,10 +242,15 @@
   function setSelectOptions(select, items, { emptyLabel = 'Все', valueKey = 'value', labelKey = 'label' } = {}) {
     if (!select) return
     const current = select.value
+    const seenValues = new Set()
     const normalizedItems = (items || []).filter((item) => {
       const isObj = item && typeof item === 'object'
       const value = isObj ? (item[valueKey] ?? item.value) : item
-      return value != null && value !== ''
+      if (value == null || value === '') return false
+      const key = String(value)
+      if (seenValues.has(key)) return false
+      seenValues.add(key)
+      return true
     })
     select.innerHTML = ''
     const emptyOpt = document.createElement('option')
@@ -282,8 +287,12 @@
   function renderColorChips(container, colors) {
     if (!container) return
     container.innerHTML = ''
+    const seen = new Set()
     ;(colors || []).forEach((c) => {
       if (!c || !c.value) return
+      const key = String(c.value || '').trim()
+      if (!key || seen.has(key)) return
+      seen.add(key)
       const btn = document.createElement('button')
       btn.type = 'button'
       btn.className = 'color-chip'
@@ -683,8 +692,12 @@
     if (!container) return
     const variant = container.dataset.chipVariant || ''
     container.replaceChildren()
+    const seen = new Set()
     ;(items || []).forEach((item) => {
       if (!item || !item.value) return
+      const key = String(item.value || '').trim()
+      if (!key || seen.has(key)) return
+      seen.add(key)
       const chip = document.createElement('button')
       chip.type = 'button'
       chip.className = 'choice-chip'
@@ -1898,6 +1911,8 @@
 
     const loadCatalogFilterBase = async () => {
       if (!filtersForm) return
+      if (loadCatalogFilterBase.__pending) return loadCatalogFilterBase.__pending
+      loadCatalogFilterBase.__pending = (async () => {
       try {
         const params = new URLSearchParams()
         const region = qs('#region')?.value || selectedFilters.get('region') || ''
@@ -1945,7 +1960,11 @@
         syncMultiSelectMenus(filtersForm)
       } catch (e) {
         console.warn('filters base', e)
+      } finally {
+        loadCatalogFilterBase.__pending = null
       }
+      })()
+      return loadCatalogFilterBase.__pending
     }
 
     const hydrateCatalogFromSSR = () => {
@@ -3196,8 +3215,12 @@
     const rebuildColorChipGroup = (wrap, items) => {
       if (!wrap) return
       wrap.replaceChildren()
+      const seen = new Set()
       ;(items || []).forEach((item) => {
         if (!item || !item.value) return
+        const key = String(item.value || '').trim()
+        if (!key || seen.has(key)) return
+        seen.add(key)
         const chip = document.createElement('button')
         chip.type = 'button'
         chip.className = 'color-chip'

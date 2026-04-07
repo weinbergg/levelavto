@@ -37,6 +37,9 @@ docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
 echo "[kr_pipeline] step=car_counts_refresh"
 docker compose exec -T web python -m backend.app.tools.car_counts_refresh --report
 
+echo "[kr_pipeline] step=cache_maintenance"
+PURGE_SOFT=1 BUMP_DATASET=1 bash scripts/cache_maintenance.sh
+
 echo "[kr_pipeline] step=prewarm"
 PREWARM_MAX_SEC="${KR_PREWARM_MAX_SEC:-1800}" \
 PREWARM_INCLUDE_BRAND_CTX=1 \

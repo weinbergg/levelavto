@@ -68,8 +68,15 @@ def test_filter_payload_includes_dynamic_brand_options():
 def test_cars_count_supports_line_filters():
     router = _read("app/routers/catalog.py")
     assert 'line: Optional[List[str]] = Query(' in router
+    assert 'source: Optional[str | List[str]] = Query(default=None)' in router
+    assert 'interior_design: Optional[str] = Query(default=None)' in router
+    assert 'interior_color: Optional[str] = Query(default=None)' in router
+    assert 'interior_material: Optional[str] = Query(default=None)' in router
     assert '"line": "|".join(line or [])' in router
+    assert '"source": ",".join(source) if isinstance(source, list) else source' in router
     assert "lines=line," in router
+    assert "interior_color=interior_color," in router
+    assert "interior_material=interior_material," in router
 
 
 def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_lines():
@@ -498,14 +505,22 @@ def test_interior_filters_use_derived_text_fallback_from_payload_and_description
     service = _read("app/services/cars_service.py")
     pages = _read("app/routers/pages.py")
     catalog = _read("app/routers/catalog.py")
-    assert 'func.concat_ws(' in service
-    assert 'jsonb_extract_path_text(payload_json, "options")' in service
-    assert 'jsonb_extract_path_text(payload_json, "title")' in service
+    assert 'interior_payload_expr = func.lower(' in service
+    assert 'jsonb_extract_path_text(payload_json, "interior_design")' in service
     assert "func.coalesce(Car.description, \"\")" in service
+    assert "def _interior_alias_clause" in service
     assert "parse_interior_trim_token" in service
     assert "trim_token_conditions" in service
     assert 'field="color_group"' in pages
     assert 'field="color_group"' in catalog
+
+
+def test_price_sorted_cache_can_be_enabled_and_base_selects_dedupe_values():
+    router = _read("app/routers/catalog.py")
+    script = _read("app/static/js/app.js")
+    assert 'os.getenv("CATALOG_PRICE_SORT_CACHE_BYPASS", "0") != "1"' in router
+    assert "const seenValues = new Set()" in script
+    assert "if (loadCatalogFilterBase.__pending) return loadCatalogFilterBase.__pending" in script
 
 
 def test_catalog_and_search_use_separate_interior_color_and_material_filters():

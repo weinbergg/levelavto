@@ -23,4 +23,6 @@ if [ "${TELEGRAM:-0}" = "1" ]; then
 fi
 
 /usr/bin/docker compose exec -T web python -m backend.app.scripts.update_fx_prices "${FX_ARGS[@]}"
+echo "[fx_daily_update] step=cache_maintenance"
+PURGE_SOFT=1 BUMP_DATASET=1 bash scripts/cache_maintenance.sh
 echo "[fx_daily_update] done $(date -Iseconds)"

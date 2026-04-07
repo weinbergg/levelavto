@@ -24,6 +24,7 @@ def test_calc_and_import_paths_use_inferred_specs_layer():
 def test_pipeline_and_recalc_support_inferred_specs_refresh():
     pipeline = (ROOT.parents[0] / "scripts" / "mobilede_daily_pipeline.sh").read_text(encoding="utf-8")
     kr_pipeline = (ROOT.parents[0] / "scripts" / "kr_daily_pipeline.sh").read_text(encoding="utf-8")
+    fx_daily = (ROOT.parents[0] / "scripts" / "fx_daily_update.sh").read_text(encoding="utf-8")
     recalc = _read("app/scripts/recalc_calc_cache.py")
     service = _read("app/services/car_spec_inference_service.py")
     util = _read("app/utils/spec_inference.py")
@@ -43,8 +44,12 @@ def test_pipeline_and_recalc_support_inferred_specs_refresh():
     assert "eu_cross_region" in service
     assert 'echo "[kr_pipeline] step=recalc_inferred_specs"' in kr_pipeline
     assert 'echo "[kr_pipeline] step=recalc_recoverable_fallbacks"' in kr_pipeline
+    assert 'echo "[kr_pipeline] step=cache_maintenance"' in kr_pipeline
+    assert "bash scripts/cache_maintenance.sh" in kr_pipeline
     assert "python -m backend.app.scripts.recalc_calc_cache" in kr_pipeline
     assert "python -m backend.app.scripts.recalc_cached_prices" not in kr_pipeline
+    assert 'echo "[fx_daily_update] step=cache_maintenance"' in fx_daily
+    assert "bash scripts/cache_maintenance.sh" in fx_daily
 
 
 def test_che168_import_postprocesses_calc_and_listing_extracts_core_specs():
