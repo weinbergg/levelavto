@@ -115,7 +115,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
     assert '/static/js/app.js?v=100' in template
-    assert '/static/css/styles.css?v=61' in template
+    assert '/static/css/styles.css?v=62' in template
 
 
 def test_search_page_passes_payload_deferred_flag():

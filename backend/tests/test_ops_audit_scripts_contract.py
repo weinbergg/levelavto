@@ -21,3 +21,10 @@ def test_audit_prices_script_has_ids_and_fix():
     assert "--fix" in content
     assert "price_source_note" in content
 
+
+def test_refresh_emavto_registration_script_has_targeted_repair_flags():
+    content = _read("app/scripts/refresh_emavto_registration.py")
+    assert "--car-id" in content
+    assert "--limit" in content
+    assert '"registration_defaulted"' in content
+    assert "[refresh_emavto_registration]" in content
