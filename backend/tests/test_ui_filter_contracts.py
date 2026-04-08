@@ -91,6 +91,7 @@ def test_cars_count_supports_line_filters():
 
 def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_lines():
     script = _read("app/static/js/app.js")
+    template = _read("app/templates/search.html")
     assert "initials.slice(currentRows.length).forEach((initial) => addRow(initial))" in script
     assert "const models = selectedModels.length ? selectedModels : [modelSelect?.value || '']" in script
     assert "const uniqueBrands = Array.from(new Set(parsedLines.map((item) => item.brand).filter(Boolean)))" in script
@@ -98,7 +99,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
     assert "data-line-state-hidden=\"1\"" in script or "data-line-state-hidden='1'" in script
     assert "appendStateInput('brand', uniqueBrands[0])" in script
     assert "window.location.assign(buildCatalogUrl(params))" in script
-    assert "if (el.matches?.('[data-line-model], [data-line-variant]')) return false" in script
+    assert "if (el.matches?.('[data-line-model]')) return false" in script
     assert "function syncCatalogLinesFromState(form)" in script
     assert "const restoredModelsRaw = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)" in script
     assert "function groupLineSelections(lines = [])" in script
@@ -110,11 +111,13 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
     assert "const currentSelectedModels = getRowEffectiveSelectedModels(row, modelSelect)" in script
     assert "const selectedModels = getRowEffectiveSelectedModels(row, modelSelect)" in script
     assert "scheduleCount()" in script
+    assert "name=\"line_variant\"" not in template
+    assert "<label>Вариант</label>" not in template
 
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=100' in template
+    assert '/static/js/app.js?v=101' in template
     assert '/static/css/styles.css?v=62' in template
 
 

@@ -3448,7 +3448,7 @@
 
     const shouldRefreshOptionsForControl = (el) => {
       if (!el) return false
-      if (el.matches?.('[data-line-model], [data-line-variant]')) return false
+      if (el.matches?.('[data-line-model]')) return false
       return true
     }
 
@@ -3596,7 +3596,6 @@
     const bindRow = (row, initial = {}) => {
       const brandSelect = qs('[data-line-brand]', row)
       const modelSelect = qs('[data-line-model]', row)
-      const variantInput = qs('[data-line-variant]', row)
       const removeBtn = qs('[data-line-remove]', row)
       if (brandSelect) {
         const dynamicBrandOptions = parseOptions(form.dataset.lineBrandOptions || '[]')
@@ -3607,7 +3606,6 @@
         }
         brandSelect.value = normalizeBrand(initial.brand || '')
       }
-      if (variantInput) variantInput.value = initial.variant || ''
       const initialModels = Array.isArray(initial.models)
         ? initial.models
         : (initial.model ? [initial.model] : [])
@@ -3629,14 +3627,11 @@
         row.dataset.initialSelectedModels = '[]'
         scheduleCount()
       })
-      variantInput?.addEventListener('input', scheduleCount)
-      variantInput?.addEventListener('change', scheduleCount)
       removeBtn?.addEventListener('click', () => {
         const rows = qsa('[data-search-row]', rowsWrap)
         if (rows.length <= 1) {
           if (brandSelect) brandSelect.value = ''
           if (modelSelect) modelSelect.value = ''
-          if (variantInput) variantInput.value = ''
           fillModels('', modelSelect, '')
           scheduleCount()
           scheduleOptionsRefresh()
@@ -3678,7 +3673,7 @@
       if (!rows.length) return false
       return rows.some((row) => {
         const controls = qsa('select, input', row)
-        if (controls.length < 3) return false
+        if (controls.length < 2) return false
         if (row.offsetHeight > 24) return true
         return controls.some((el) => {
           const style = window.getComputedStyle(el)
@@ -3711,17 +3706,16 @@
         const brand = normalizeBrand(qs('[data-line-brand]', row)?.value || '')
         const modelSelect = qs('[data-line-model]', row)
         const selectedModels = getRowEffectiveSelectedModels(row, modelSelect)
-        const variant = qs('[data-line-variant]', row)?.value || ''
         const models = selectedModels.length ? selectedModels : [modelSelect?.value || '']
         const normalizedModels = Array.from(new Set(models.map((value) => String(value || '').trim())))
         if (!normalizedModels.some(Boolean)) {
-          if (!brand && !variant) return
-          lines.push([brand, '', variant].map((v) => v.trim()).join('|'))
+          if (!brand) return
+          lines.push([brand, '', ''].join('|'))
           return
         }
         normalizedModels.forEach((model) => {
-          if (!brand && !model && !variant) return
-          lines.push([brand, model, variant].map((v) => v.trim()).join('|'))
+          if (!brand && !model) return
+          lines.push([brand, model, ''].map((v) => v.trim()).join('|'))
         })
       })
       return lines
@@ -3730,7 +3724,7 @@
     const buildParams = (withPaging) => {
       const data = new FormData(form)
       const params = new URLSearchParams()
-      const lineKeys = ['line_brand', 'line_model', 'line_variant']
+      const lineKeys = ['line_brand', 'line_model']
       for (const [k, v] of data.entries()) {
         if (!v) continue
         if (lineKeys.includes(k)) continue
