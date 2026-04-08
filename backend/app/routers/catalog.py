@@ -643,6 +643,10 @@ def list_cars(
         hide_no_local_photo=(strict_photo_mode == "1"),
     )
     t1 = time.perf_counter()
+    try:
+        service.refresh_visible_price_cache(items)
+    except Exception:
+        pass
     if items and not isinstance(items[0], dict):
         items = [dict(row) for row in items]
     image_counts = {}

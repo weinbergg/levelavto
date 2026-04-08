@@ -1340,11 +1340,13 @@ def _home_context(
     t0 = time.perf_counter()
     recommended = _get_home_recommended(service, db, reco_cfg, limit=12)
     _stage("recommended_ms", t0)
+    service.refresh_visible_price_cache(recommended)
     for car in recommended:
         _decorate_showcase_car(car)
     t0 = time.perf_counter()
     more_offers = _get_home_more_offers(service, db, limit=12)
     _stage("more_offers_ms", t0)
+    service.refresh_visible_price_cache(more_offers)
     for car in more_offers:
         _decorate_showcase_car(car)
     t0 = time.perf_counter()
@@ -1765,6 +1767,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
 
         if isinstance(items, list):
             initial_items = items
+            service.refresh_visible_price_cache(initial_items)
             for c in initial_items:
                 if not isinstance(c, dict):
                     continue
@@ -2179,6 +2182,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         payload = car.source_payload or {}
         pricing = service.price_info(car)
         similar_offers = service.similar_cars(car, limit=10)
+        service.refresh_visible_price_cache(similar_offers)
         for item in similar_offers:
             _decorate_showcase_car(item)
         raw_description = (getattr(car, "description", None) or payload.get("description") or "").strip()

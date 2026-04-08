@@ -20,6 +20,7 @@ def test_audit_prices_script_has_ids_and_fix():
     assert "--ids" in content
     assert "--fix" in content
     assert "price_source_note" in content
+    assert "calc_updated" in content
 
 
 def test_refresh_emavto_registration_script_has_targeted_repair_flags():

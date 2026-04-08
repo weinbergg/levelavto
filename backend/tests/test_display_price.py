@@ -129,6 +129,63 @@ def test_light_list_refreshes_stale_card_prices(monkeypatch):
         assert items[0]["calc_breakdown_json"] == [{"title": "calc", "amount_rub": 6_500_000}]
 
 
+def test_refresh_visible_price_cache_updates_visible_foreign_cards_even_when_lazy_disabled(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.add(
+            Car(
+                id=1,
+                source_id=1,
+                external_id="1",
+                country="DE",
+                brand="BMW",
+                model="X5",
+                engine_type="Diesel",
+                engine_cc=2993,
+                power_hp=286,
+                total_price_rub_cached=4_100_000,
+                price_rub_cached=3_700_000,
+                calc_breakdown_json=[{"title": "__without_util_fee", "amount_rub": 0}],
+                calc_updated_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+                is_available=True,
+            )
+        )
+        db.commit()
+        svc = CarsService(db)
+        monkeypatch.setattr(svc, "_load_lazy_recalc_versions", lambda: (False, None, None, None))
+
+        def fake_ensure_calc_cache(car, *, force=False):
+            car.total_price_rub_cached = 6_800_000
+            car.calc_breakdown_json = [{"title": "Итого (RUB)", "amount_rub": 6_800_000}]
+            car.calc_updated_at = datetime.utcnow()
+            db.commit()
+            return {"total_rub": 6_800_000, "breakdown": car.calc_breakdown_json}
+
+        monkeypatch.setattr(svc, "ensure_calc_cache", fake_ensure_calc_cache)
+        rows = [
+            {
+                "id": 1,
+                "country": "DE",
+                "engine_type": "Diesel",
+                "engine_cc": 2993,
+                "power_hp": 286,
+                "total_price_rub_cached": 4_100_000,
+                "price_rub_cached": 3_700_000,
+                "calc_breakdown_json": [{"title": "__without_util_fee", "amount_rub": 0}],
+                "calc_updated_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
+        ]
+
+        refreshed = svc.refresh_visible_price_cache(rows)
+        assert refreshed == 1
+        assert rows[0]["total_price_rub_cached"] == 6_800_000
+        assert rows[0]["calc_breakdown_json"] == [{"title": "Итого (RUB)", "amount_rub": 6_800_000}]
+
+
 def test_needs_recalc_when_fx_signature_changes():
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)

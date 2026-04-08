@@ -95,6 +95,28 @@ def _run_base_counts(db, where: str, params: dict[str, Any]) -> dict[str, int]:
     }
 
 
+def _run_calc_updated_stats(db, where: str, params: dict[str, Any]) -> dict[str, Any]:
+    row = db.execute(
+        text(
+            "SELECT "
+            "count(*) FILTER (WHERE calc_updated_at IS NULL) AS never_calculated, "
+            "count(*) FILTER (WHERE calc_updated_at IS NOT NULL AND calc_updated_at < now() - interval '24 hours') AS older_than_24h, "
+            "count(*) FILTER (WHERE calc_updated_at IS NOT NULL AND calc_updated_at < now() - interval '7 days') AS older_than_7d, "
+            "min(calc_updated_at) AS oldest_calc_updated_at, "
+            "max(calc_updated_at) AS newest_calc_updated_at "
+            f"FROM cars {where}"
+        ),
+        params,
+    ).mappings().one()
+    return {
+        "never_calculated": int(row["never_calculated"] or 0),
+        "older_than_24h": int(row["older_than_24h"] or 0),
+        "older_than_7d": int(row["older_than_7d"] or 0),
+        "oldest_calc_updated_at": row["oldest_calc_updated_at"].isoformat() if row["oldest_calc_updated_at"] else None,
+        "newest_calc_updated_at": row["newest_calc_updated_at"].isoformat() if row["newest_calc_updated_at"] else None,
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Audit prices and calculator cache consistency")
     ap.add_argument("--region", default="EU", help="EU|KR|RU|ALL")
@@ -116,6 +138,7 @@ def main() -> None:
         svc = CarsService(db)
         where, where_params = _build_scope_sql(args.region, args.country)
         counts = _run_base_counts(db, where, where_params)
+        calc_updated = _run_calc_updated_stats(db, where, where_params)
 
         candidate_ids: list[int] = list(requested_ids)
         if args.stride and args.stride > 0:
@@ -191,6 +214,7 @@ def main() -> None:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "scope": {"region": args.region, "country": args.country},
         "counts": counts,
+        "calc_updated": calc_updated,
         "deep_checked": len(deep_rows),
         "deep_mismatches": mismatches,
         "fixed": fixed,

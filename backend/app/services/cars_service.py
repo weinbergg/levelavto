@@ -2049,7 +2049,7 @@ class CarsService:
                 self.logger.exception("api_cars_sql_failed")
         items_t0 = time.perf_counter()
         if light:
-            items = list(self.db.execute(stmt).mappings().all())
+            items = [dict(row) for row in self.db.execute(stmt).mappings().all()]
         else:
             items = list(self.db.execute(stmt).scalars().all())
         # Keep no-photo cards at the end without forcing expensive DB sort for light/price queries.
@@ -2270,6 +2270,104 @@ class CarsService:
             if car is None:
                 continue
             self._merge_light_row_from_car(row, car)
+
+    def _needs_visible_price_refresh(
+        self,
+        record: Any,
+        cfg_version: str | None,
+        customs_version: str | None,
+        fx_signature: str | None,
+    ) -> bool:
+        if self._needs_recalc_for_versions(
+            record,
+            cfg_version,
+            customs_version,
+            fx_signature,
+            lazy_enabled=True,
+        ):
+            return True
+        breakdown = _record_value(record, "calc_breakdown_json") or []
+        has_without_util_marker = any(
+            isinstance(row, dict) and row.get("title") == "__without_util_fee"
+            for row in breakdown
+        )
+        if not has_without_util_marker:
+            return False
+        effective_engine_cc = effective_engine_cc_value(record)
+        effective_power_hp = effective_power_hp_value(record)
+        effective_power_kw = effective_power_kw_value(record)
+        electric = is_bev(
+            effective_engine_cc,
+            float(effective_power_kw) if effective_power_kw is not None else None,
+            float(effective_power_hp) if effective_power_hp is not None else None,
+            _record_value(record, "engine_type"),
+        )
+        if electric:
+            return effective_power_hp is not None or effective_power_kw is not None
+        return effective_engine_cc is not None and (
+            effective_power_hp is not None or effective_power_kw is not None
+        )
+
+    def refresh_visible_price_cache(self, items: List[Any]) -> int:
+        if not items:
+            return 0
+        _, cfg_version, customs_version, fx_signature = self._load_lazy_recalc_versions()
+        candidate_ids: list[int] = []
+        seen_ids: set[int] = set()
+        for item in items:
+            car_id = _record_value(item, "id")
+            if not isinstance(car_id, int) or car_id in seen_ids:
+                continue
+            country = str(_record_value(item, "country") or "").upper()
+            if country == "RU":
+                continue
+            if not self._needs_visible_price_refresh(
+                item,
+                cfg_version,
+                customs_version,
+                fx_signature,
+            ):
+                continue
+            candidate_ids.append(car_id)
+            seen_ids.add(car_id)
+        if not candidate_ids:
+            return 0
+        cars = (
+            self.db.execute(select(Car).where(Car.id.in_(candidate_ids)))
+            .scalars()
+            .all()
+        )
+        cars_by_id = {car.id: car for car in cars}
+        refreshed = 0
+        for car_id in candidate_ids:
+            car = cars_by_id.get(car_id)
+            if car is None:
+                continue
+            try:
+                before_total = car.total_price_rub_cached
+                before_calc = car.calc_updated_at
+                self.ensure_calc_cache(car, force=False)
+                if car.total_price_rub_cached != before_total or car.calc_updated_at != before_calc:
+                    refreshed += 1
+            except Exception:
+                self.logger.exception("visible_price_refresh_failed car=%s", car_id)
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            car_id = item.get("id")
+            if not isinstance(car_id, int):
+                continue
+            car = cars_by_id.get(car_id)
+            if car is None:
+                continue
+            self._merge_light_row_from_car(item, car)
+        if refreshed:
+            self.logger.info(
+                "visible_price_refresh refreshed=%s items=%s",
+                refreshed,
+                len(candidate_ids),
+            )
+        return refreshed
 
     def _refresh_price_sensitive_candidates(
         self,

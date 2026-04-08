@@ -6,6 +6,7 @@ from ..auth import require_user
 from ..db import get_db
 from ..models import User
 from ..services.auth_service import AuthService
+from ..services.cars_service import CarsService
 from ..services.favorites_service import FavoritesService
 from ..utils.country_map import resolve_display_country
 from ..utils.localization import display_body, display_color
@@ -17,7 +18,8 @@ from ..utils.thumbs import resolve_thumbnail_url
 router = APIRouter()
 
 
-def _prepare_favorites(favorites: list) -> list:
+def _prepare_favorites(service: CarsService, favorites: list) -> list:
+    service.refresh_visible_price_cache(favorites)
     for car in favorites:
         code, label = resolve_display_country(car)
         car.display_country_code = code
@@ -58,7 +60,8 @@ def _prepare_favorites(favorites: list) -> list:
 @router.get("/account")
 def account_page(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
     templates = request.app.state.templates
-    favs = _prepare_favorites(FavoritesService(db).list_cars(user))
+    service = CarsService(db)
+    favs = _prepare_favorites(service, FavoritesService(db).list_cars(user))
     return templates.TemplateResponse("account/index.html", {"request": request, "user": user, "status": None, "favorites": favs})
 
 
@@ -74,7 +77,8 @@ def update_profile(
     db.add(user)
     db.commit()
     status = {"success": True, "message": "Профиль обновлён"}
-    favs = _prepare_favorites(FavoritesService(db).list_cars(user))
+    service = CarsService(db)
+    favs = _prepare_favorites(service, FavoritesService(db).list_cars(user))
     return templates.TemplateResponse("account/index.html", {"request": request, "user": user, "status": status, "favorites": favs})
 
 
@@ -99,6 +103,6 @@ def update_password(
     db.add(user)
     db.commit()
     status = {"success": True, "message": "Пароль обновлён"}
-    favs = _prepare_favorites(FavoritesService(db).list_cars(user))
+    service = CarsService(db)
+    favs = _prepare_favorites(service, FavoritesService(db).list_cars(user))
     return templates.TemplateResponse("account/index.html", {"request": request, "user": user, "status": status, "favorites": favs})
-
