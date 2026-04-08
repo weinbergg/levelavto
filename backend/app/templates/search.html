@@ -184,19 +184,14 @@
               </label>
             </div>
 
-            <div class="advanced-row advanced-row--two">
-              <label class="field{% if not generations %} is-hidden{% endif %}">Поколение
-                <select name="generation" {% if not generations %}disabled{% endif %}>
-                  <option value="">Любое</option>
-                  {% for g in generations %}
-                  <option value="{{ g }}" {% if params.get('generation') == g %}selected{% endif %}>{{ g }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label class="field">Поиск по ключевым словам
-                <input type="text" name="q" value="{{ params.get('q','') }}" placeholder="Например: дизель, 4x4, панорама">
-              </label>
-            </div>
+            <label class="field{% if not generations %} is-hidden{% endif %}">Поколение
+              <select name="generation" {% if not generations %}disabled{% endif %}>
+                <option value="">Любое</option>
+                {% for g in generations %}
+                <option value="{{ g }}" {% if params.get('generation') == g %}selected{% endif %}>{{ g }}</option>
+                {% endfor %}
+              </select>
+            </label>
           </div>
         </div>
       </section>

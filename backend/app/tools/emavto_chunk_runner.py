@@ -14,6 +14,13 @@ from ..models import Car
 from sqlalchemy import select
 
 
+def needs_detail_refresh(car: Car) -> bool:
+    if car.registration_year is None or car.registration_month is None:
+        return True
+    payload = car.source_payload if isinstance(car.source_payload, dict) else {}
+    return payload.get("registration_defaulted") is True
+
+
 def run_chunk(
     parser: EmAvtoKlgParser,
     ds: ParsingDataService,
@@ -74,7 +81,7 @@ def run_chunk(
             if not ext_id:
                 continue
             car = existing.get(ext_id)
-            if car and same_basic(car, task):
+            if car and same_basic(car, task) and not needs_detail_refresh(car):
                 unchanged_ids.append(ext_id)
                 continue
             tasks_to_detail.append(task)

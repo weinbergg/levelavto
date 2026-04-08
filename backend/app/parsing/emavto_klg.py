@@ -24,6 +24,21 @@ class EmAvtoKlgParser(BaseParser):
 
     DETAILS_SEP_RE = re.compile(r"[·•|\u00b7]")
     DIGITS_RE = re.compile(r"\d+")
+    REGISTRATION_LABELS = ["Дата постановки на учет", "Дата постановки на учёт"]
+    MONTHS_RU = {
+        "январь": 1,
+        "февраль": 2,
+        "март": 3,
+        "апрель": 4,
+        "май": 5,
+        "июнь": 6,
+        "июль": 7,
+        "август": 8,
+        "сентябрь": 9,
+        "октябрь": 10,
+        "ноябрь": 11,
+        "декабрь": 12,
+    }
     LABELS = {
         "body_type": ["Кузов", "Тип кузова"],
         "transmission": ["КПП", "Коробка", "Коробка передач", "Трансмиссия"],
@@ -149,6 +164,8 @@ class EmAvtoKlgParser(BaseParser):
                     brand=task["brand"],
                     model=task["model"],
                     year=task["year"],
+                    registration_year=detail.get("registration_year"),
+                    registration_month=detail.get("registration_month"),
                     mileage=task["mileage"],
                     price=task["price"],
                     currency=self.config.defaults.get("currency"),
@@ -161,6 +178,7 @@ class EmAvtoKlgParser(BaseParser):
                     source_url=task["source_url"],
                     thumbnail_url=detail.get(
                         "thumbnail") or task["thumbnail_url"],
+                    source_payload=detail.get("source_payload"),
                     images=detail.get("images"),
                 )
                 results.append(car)
@@ -244,6 +262,8 @@ class EmAvtoKlgParser(BaseParser):
                 brand=task["brand"],
                 model=task["model"],
                 year=task["year"],
+                registration_year=detail.get("registration_year"),
+                registration_month=detail.get("registration_month"),
                 mileage=task["mileage"],
                 price=task["price"],
                 currency=self.config.defaults.get("currency"),
@@ -255,6 +275,7 @@ class EmAvtoKlgParser(BaseParser):
                 vin=detail.get("vin"),
                 source_url=task["source_url"],
                 thumbnail_url=detail.get("thumbnail") or task["thumbnail_url"],
+                source_payload=detail.get("source_payload"),
                 images=detail.get("images"),
             )
             results.append(car)
@@ -523,15 +544,24 @@ class EmAvtoKlgParser(BaseParser):
             soup, self.LABELS["color"]) or self._extract_by_regex(page_text, self.LABELS["color"])
         vin_raw = from_pairs(self.LABELS["vin"]) or self._extract_label_value(
             soup, self.LABELS["vin"]) or self._extract_by_regex(page_text, self.LABELS["vin"])
+        reg_year, reg_month, reg_raw = self._extract_registration(
+            soup, pairs, page_text)
 
         out["body_type"] = self._normalize_body(body_raw)
         out["transmission"] = self._normalize_transmission(trans_raw)
         out["drive_type"] = self._normalize_drive(drive_raw)
         out["color"] = color_raw.strip().capitalize() if color_raw else None
+        out["registration_year"] = reg_year
+        out["registration_month"] = reg_month
         if vin_raw:
             vin_clean = re.sub(r"\s+", "", vin_raw)
             if 11 <= len(vin_clean) <= 20:
                 out["vin"] = vin_clean.upper()
+        if reg_raw:
+            out["source_payload"] = {
+                "registration_raw": reg_raw,
+                "registration_source": "emavto_detail",
+            }
 
         # images: prefer gallery; fallback to first images on page
         imgs = []
@@ -594,6 +624,76 @@ class EmAvtoKlgParser(BaseParser):
             else:
                 fuel = part.strip().capitalize()
         return mileage, year, fuel
+
+    def _extract_registration(
+        self,
+        soup: BeautifulSoup,
+        pairs: Dict[str, str],
+        page_text: str,
+    ) -> Tuple[Optional[int], Optional[int], Optional[str]]:
+        root = soup.select_one("main.car-details")
+        reg_raw = None
+        if root:
+            reg_raw = (
+                root.get("data-reg-date")
+                or root.get("data-registration-date")
+                or root.get("data-first-registration")
+            )
+        if not reg_raw:
+            for lbl, val in pairs.items():
+                if any(key.lower() in lbl for key in self.REGISTRATION_LABELS):
+                    reg_raw = val
+                    break
+        if not reg_raw:
+            reg_raw = self._extract_label_value(soup, self.REGISTRATION_LABELS)
+        if not reg_raw:
+            reg_raw = self._extract_registration_from_text(page_text)
+        reg_year, reg_month = self._parse_registration_value(reg_raw)
+        return reg_year, reg_month, reg_raw
+
+    def _extract_registration_from_text(self, text: str) -> Optional[str]:
+        if not text:
+            return None
+        patterns = [
+            re.compile(
+                r"(?:Дата постановки на учет|Дата постановки на уч[её]т)\s*[:\-]?\s*((?:19|20)\d{2}[-/.]\d{1,2}(?:[-/.]\d{1,2})?)",
+                re.IGNORECASE,
+            ),
+            re.compile(
+                r"(?:Дата постановки на учет|Дата постановки на уч[её]т)\s*[:\-]?\s*(\d{1,2}\s+[А-Яа-яё]+\s+(?:19|20)\d{2}\s*г?\.?)",
+                re.IGNORECASE,
+            ),
+        ]
+        for pattern in patterns:
+            match = pattern.search(text)
+            if match:
+                return match.group(1).strip()
+        return None
+
+    def _parse_registration_value(self, raw: Optional[str]) -> Tuple[Optional[int], Optional[int]]:
+        if not raw:
+            return None, None
+        text = re.sub(r"\s+", " ", raw.replace("\xa0", " ")).strip().lower()
+        if not text:
+            return None, None
+        iso_match = re.search(
+            r"\b((?:19|20)\d{2})[-/.](\d{1,2})(?:[-/.](\d{1,2}))?(?:\s+\d{2}:\d{2}:\d{2})?\b",
+            text,
+        )
+        if iso_match:
+            year = int(iso_match.group(1))
+            month = int(iso_match.group(2))
+            if 1 <= month <= 12:
+                return year, month
+        year_match = re.search(r"\b((?:19|20)\d{2})\b", text)
+        month = None
+        for label, value in self.MONTHS_RU.items():
+            if label in text:
+                month = value
+                break
+        if year_match:
+            return int(year_match.group(1)), month
+        return None, None
 
     def _split_brand_model(self, title: str) -> Tuple[Optional[str], Optional[str]]:
         clean = re.sub(r"^\[[^\]]+\]\s*", "", title).strip()

@@ -114,7 +114,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=99' in template
+    assert '/static/js/app.js?v=100' in template
     assert '/static/css/styles.css?v=61' in template
 
 
@@ -248,6 +248,37 @@ def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
     assert '/static/css/home.css?v=21' in template
+
+
+def test_text_query_inputs_removed_from_home_search_and_catalog_filters():
+    home = _read("app/templates/home.html")
+    search = _read("app/templates/search.html")
+    catalog = _read("app/templates/catalog.html")
+    script = _read("app/static/js/app.js")
+    assert 'name="q"' not in home
+    assert 'name="q"' not in search
+    assert 'name="q"' not in catalog
+    assert "q: 'Поиск'" not in script
+
+
+def test_emavto_registration_recovery_and_stale_lock_contracts():
+    parser = _read("app/parsing/emavto_klg.py")
+    runner = _read("app/tools/emavto_chunk_runner.py")
+    wrapper = (ROOT.parents[0] / "scripts" / "run_emavto_job.sh").read_text(encoding="utf-8")
+    assert 'REGISTRATION_LABELS = ["Дата постановки на учет", "Дата постановки на учёт"]' in parser
+    assert "def _extract_registration(" in parser
+    assert "def _parse_registration_value(self, raw: Optional[str])" in parser
+    assert 'root.get("data-reg-date")' in parser
+    assert "registration_year=detail.get(\"registration_year\")" in parser
+    assert "registration_month=detail.get(\"registration_month\")" in parser
+    assert 'out["source_payload"] = {' in parser
+    assert '"registration_source": "emavto_detail"' in parser
+    assert "def needs_detail_refresh(car: Car) -> bool:" in runner
+    assert 'payload.get("registration_defaulted") is True' in runner
+    assert "same_basic(car, task) and not needs_detail_refresh(car)" in runner
+    assert 'PID_FILE="${LOCK_DIR}/pid"' in wrapper
+    assert 'echo "[emavto] clearing stale lock at ${LOCK_DIR}"' in wrapper
+    assert "printf '%s\\n' \"$$\" > \"${PID_FILE}\"" in wrapper
 
 
 def test_model_filters_use_canonical_labels_with_alias_restore():

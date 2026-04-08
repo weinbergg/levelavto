@@ -1125,7 +1125,6 @@
       vat_reclaimable: 'НДС',
       price_rating_label: 'Оценка цены',
       color: 'Цвет',
-      q: 'Поиск',
       region: null,
       kr_type: null,
       interior_color: 'Цвет салона',
@@ -3002,11 +3001,6 @@
       if (!countEl) return
       clearTimeout(debounce)
       debounce = setTimeout(async () => {
-        const queryValue = String(form.elements['q']?.value || '').trim()
-        if (queryValue.length >= 2) {
-          updateAdvancedLink()
-          return
-        }
         pendingController?.abort()
         pendingController = new AbortController()
         try {
