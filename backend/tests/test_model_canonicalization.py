@@ -1,3 +1,7 @@
+import pytest
+
+pytest.importorskip("sqlalchemy")
+
 from backend.app.services.cars_service import CarsService
 
 
@@ -23,6 +27,13 @@ def test_canonical_model_label_has_short_safe_fallback_without_donors():
     service = CarsService(db=None)  # type: ignore[arg-type]
     assert service._canonical_model_label("Genesis", "GV80 2.5 T Gasoline AWD", donors=[]) == "GV80"
     assert service._canonical_model_label("Hyundai", "The New Granger IG 2.5", donors=[]) == "Granger"
+
+
+def test_canonical_model_label_merges_porsche_i_typos_into_eu_models():
+    service = CarsService(db=None)  # type: ignore[arg-type]
+    donors = ["Taycan", "Cayman", "Cayenne"]
+    assert service._canonical_model_label("Porsche", "Taican Turbo S", donors=donors) == "Taycan"
+    assert service._canonical_model_label("Porsche", "Caiman 718 GTS", donors=donors) == "Cayman"
 
 
 def test_model_grouping_bmw_normalizes_series_family_labels():

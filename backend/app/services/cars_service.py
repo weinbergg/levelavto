@@ -143,6 +143,11 @@ _MODEL_TOKEN_EQUIVALENTS = {
 }
 
 _MODEL_OPTIONAL_TAIL_TOKENS = {"series", "class"}
+_PORSCHE_MODEL_ALIASES = {
+    "taican": "Taycan",
+    "taykan": "Taycan",
+    "caiman": "Cayman",
+}
 
 
 def normalize_model_label(value: Optional[str]) -> str:
@@ -309,6 +314,29 @@ class CarsService:
             )
         )
 
+    def _brand_model_alias_label(
+        self,
+        brand: str,
+        raw_model: str,
+        *,
+        donors: Optional[List[str]] = None,
+    ) -> str:
+        norm_brand = normalize_brand(brand).strip().upper()
+        if norm_brand != "PORSCHE":
+            return ""
+        donor_list = donors if donors is not None else []
+        donor_map = {
+            model_lookup_key(donor): normalize_model_label(donor)
+            for donor in donor_list
+            if normalize_model_label(donor)
+        }
+        for token in _model_search_tokens(raw_model):
+            canonical = _PORSCHE_MODEL_ALIASES.get(token.lower())
+            if not canonical:
+                continue
+            return donor_map.get(model_lookup_key(canonical), canonical)
+        return ""
+
     def _eu_model_donors(self, brand: str) -> List[str]:
         norm_brand = normalize_brand(brand).strip()
         if not norm_brand or self.db is None:
@@ -457,6 +485,9 @@ class CarsService:
         if not label:
             return ""
         donor_list = donors if donors is not None else self._eu_model_donors(brand)
+        alias_label = self._brand_model_alias_label(brand, raw_model, donors=donor_list)
+        if alias_label:
+            return alias_label
         matched = self._match_eu_model_donor(raw_model, donor_list)
         if matched:
             return matched
@@ -3618,7 +3649,9 @@ class CarsService:
         mileage_max: Optional[int] = None,
         kr_type: Optional[str] = None,
         reg_year_min: Optional[int] = None,
+        reg_month_min: Optional[int] = None,
         reg_year_max: Optional[int] = None,
+        reg_month_max: Optional[int] = None,
         body_type: Optional[str] = None,
         engine_type: Optional[str] = None,
         transmission: Optional[str] = None,
@@ -3665,7 +3698,9 @@ class CarsService:
             mileage_max=mileage_max,
             kr_type=kr_type,
             reg_year_min=reg_year_min,
+            reg_month_min=reg_month_min,
             reg_year_max=reg_year_max,
+            reg_month_max=reg_month_max,
             body_type=body_type,
             engine_type=engine_type,
             transmission=transmission,

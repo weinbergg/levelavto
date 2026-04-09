@@ -258,6 +258,7 @@ def test_home_template_places_partners_block_after_search():
     assert 'class="la-container hero-search"' in template
     assert 'class="la-container hero-partners" id="home-partners"' in template
     assert template.index('class="la-container hero-search"') < template.index('class="la-container hero-partners" id="home-partners"')
+    assert "{{ home.hero.why_title }}" not in template
 
 
 def test_home_css_uses_full_width_partners_block():
@@ -343,6 +344,8 @@ def test_model_filters_use_canonical_labels_with_alias_restore():
     router = _read("app/routers/catalog.py")
     script = _read("app/static/js/app.js")
     assert "def _canonical_model_label(" in service
+    assert "_PORSCHE_MODEL_ALIASES" in service
+    assert "def _brand_model_alias_label(" in service
     assert "def _resolve_model_aliases(" in service
     assert "def _model_filter_clause(" in service
     assert "if filters.get(\"model\"):" in service
@@ -351,6 +354,20 @@ def test_model_filters_use_canonical_labels_with_alias_restore():
     assert "select.__resolveModelValues = (values = []) => {" in script
     assert "const restoredModelsRaw = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)" in script
     assert "const resolvedSelectedValues = typeof modelSelect.__resolveModelValues === 'function'" in script
+
+
+def test_cars_count_route_tracks_registration_month_filters():
+    router = _read("app/routers/catalog.py")
+    service = _read("app/services/cars_service.py")
+    assert '@router.get("/cars_count")' in router
+    assert "reg_month_min: Optional[int] = Query(default=None)" in router
+    assert "reg_month_max: Optional[int] = Query(default=None)" in router
+    assert '"reg_month_min": reg_month_min' in router
+    assert '"reg_month_max": reg_month_max' in router
+    assert "reg_month_min=reg_month_min," in router
+    assert "reg_month_max=reg_month_max," in router
+    assert "reg_month_min: Optional[int] = None," in service
+    assert "reg_month_max: Optional[int] = None," in service
 
 
 def test_pages_home_uses_recommended_and_media_cache_helpers():

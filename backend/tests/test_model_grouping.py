@@ -1,3 +1,7 @@
+import pytest
+
+pytest.importorskip("sqlalchemy")
+
 from backend.app.services.cars_service import CarsService
 
 
