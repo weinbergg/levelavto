@@ -265,6 +265,38 @@ class CarsService:
     def _available_expr(self):
         return Car.is_available.is_(True)
 
+    @staticmethod
+    def _registration_defaulted_expr():
+        payload_json = cast(Car.source_payload, JSONB)
+        return (
+            func.coalesce(
+                func.jsonb_extract_path_text(payload_json, "registration_defaulted"),
+                "false",
+            )
+            == "true"
+        )
+
+    @classmethod
+    def _effective_registration_year_expr(cls):
+        return case(
+            (cls._registration_defaulted_expr(), Car.year),
+            else_=func.coalesce(Car.registration_year, Car.year),
+        )
+
+    @classmethod
+    def _effective_registration_month_floor_expr(cls):
+        return case(
+            (cls._registration_defaulted_expr(), 12),
+            else_=func.coalesce(Car.registration_month, 12),
+        )
+
+    @classmethod
+    def _effective_registration_month_ceil_expr(cls):
+        return case(
+            (cls._registration_defaulted_expr(), 1),
+            else_=func.coalesce(Car.registration_month, 1),
+        )
+
     def _normalized_model_expr(self):
         # Keep normalization conservative: collapse whitespace/case only, so
         # identical EU/KR models merge without accidentally collapsing variants.
@@ -1474,9 +1506,9 @@ class CarsService:
         if mileage_max is not None and "mileage_max" not in exclude:
             conditions.append(Car.mileage <= mileage_max)
 
-        reg_year_expr = func.coalesce(Car.registration_year, Car.year)
-        reg_month_floor_expr = func.coalesce(Car.registration_month, 12)
-        reg_month_ceil_expr = func.coalesce(Car.registration_month, 1)
+        reg_year_expr = self._effective_registration_year_expr()
+        reg_month_floor_expr = self._effective_registration_month_floor_expr()
+        reg_month_ceil_expr = self._effective_registration_month_ceil_expr()
 
         if reg_year_min is not None and "reg_year_min" not in exclude:
             if reg_month_min is not None and "reg_month_min" not in exclude:
@@ -3295,8 +3327,8 @@ class CarsService:
         conditions = [self._available_expr()]
         now_year = func.extract("year", func.now())
         now_month = func.extract("month", func.now())
-        reg_year_expr = func.coalesce(Car.registration_year, Car.year)
-        reg_month_expr = func.coalesce(Car.registration_month, 1)
+        reg_year_expr = self._effective_registration_year_expr()
+        reg_month_expr = self._effective_registration_month_ceil_expr()
         power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)
         engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)
         price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
@@ -3364,7 +3396,7 @@ class CarsService:
         target_engine_cc = effective_engine_cc_value(car)
         target_mileage = car.mileage
 
-        reg_year_expr = func.coalesce(Car.registration_year, Car.year)
+        reg_year_expr = self._effective_registration_year_expr()
         power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)
         engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)
         price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)

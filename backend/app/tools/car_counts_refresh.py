@@ -87,7 +87,7 @@ def refresh_counts(db: Session) -> int:
         else_=func.upper(Car.country),
     )
 
-    reg_year_expr = func.coalesce(Car.registration_year, Car.year).cast(Integer)
+    reg_year_expr = CarsService._effective_registration_year_expr().cast(Integer)
     price_bucket = _price_bucket_expr()
     mileage_bucket = _mileage_bucket_expr()
     color_expr = func.lower(func.trim(Car.color))

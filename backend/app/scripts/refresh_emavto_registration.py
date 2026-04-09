@@ -46,7 +46,7 @@ def _merge_source_payload(existing_payload: object, parsed_payload: object) -> d
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--car-id", type=int, action="append", default=[], help="Local car.id to refresh")
-    ap.add_argument("--limit", type=int, default=200, help="How many defaulted KR cars to refresh")
+    ap.add_argument("--limit", type=int, default=200, help="How many KR cars to refresh")
     ap.add_argument("--batch", type=int, default=20, help="Detail fetch batch size")
     ap.add_argument("--max-runtime-sec", type=int, default=2400, help="Overall runtime budget")
     ap.add_argument("--dry-run", action="store_true")
@@ -75,7 +75,11 @@ def main() -> None:
                 )
                 == "true"
             )
-            base = base.filter(defaulted_expr)
+            base = base.filter(
+                defaulted_expr
+                | Car.registration_year.is_(None)
+                | Car.registration_month.is_(None)
+            )
 
         cars = base.order_by(Car.id.asc()).limit(max(1, int(args.limit))).all()
         print(
@@ -106,7 +110,6 @@ def main() -> None:
             parsed_by_external_id = {
                 item.external_id: item
                 for item in parsed_items
-                if item.registration_year is not None and item.registration_month is not None
             }
 
             payloads = []

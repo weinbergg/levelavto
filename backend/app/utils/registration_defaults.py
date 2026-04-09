@@ -28,29 +28,36 @@ def get_missing_registration_default() -> Tuple[int, int]:
     return year, month
 
 
-def apply_missing_registration_fallback(payload: MutableMapping[str, Any]) -> bool:
+def apply_missing_registration_fallback(
+    payload: MutableMapping[str, Any],
+    *,
+    persist_fields: bool = True,
+) -> bool:
     fallback_year, fallback_month = get_missing_registration_default()
-    changed = False
 
     reg_year = payload.get("registration_year")
     reg_month = payload.get("registration_month")
+    missing_year = reg_year in (None, "", 0)
+    missing_month = reg_month in (None, "", 0)
 
-    if reg_year in (None, "", 0):
+    if persist_fields and missing_year:
         payload["registration_year"] = fallback_year
-        changed = True
-    if reg_month in (None, "", 0):
+    if persist_fields and missing_month:
         payload["registration_month"] = fallback_month
-        changed = True
 
-    if changed:
+    if missing_year or missing_month:
         raw_source_payload = payload.get("source_payload")
         if isinstance(raw_source_payload, dict):
             source_payload = dict(raw_source_payload)
         else:
             source_payload = {}
         source_payload["registration_defaulted"] = True
-        source_payload["registration_default_year"] = int(payload["registration_year"])
-        source_payload["registration_default_month"] = int(payload["registration_month"])
+        source_payload["registration_default_year"] = int(
+            payload.get("registration_year") or fallback_year
+        )
+        source_payload["registration_default_month"] = int(
+            payload.get("registration_month") or fallback_month
+        )
         payload["source_payload"] = source_payload
 
-    return changed
+    return missing_year or missing_month

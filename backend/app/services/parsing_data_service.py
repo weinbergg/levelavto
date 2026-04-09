@@ -99,7 +99,9 @@ class ParsingDataService:
                 if ts is None:
                     ts = now
                 payload["listing_date"] = ts
-            apply_missing_registration_fallback(payload)
+            # Keep calc fallback metadata, but do not persist fake registration dates
+            # into the main columns: catalog filters must continue to fall back to car.year.
+            apply_missing_registration_fallback(payload, persist_fields=False)
             rub = to_rub(payload.get("price"), payload.get("currency"), rates)
             if rub is not None:
                 payload["price_rub_cached"] = round(rub, 2)

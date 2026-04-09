@@ -660,6 +660,14 @@ class EmAvtoKlgParser(BaseParser):
                 re.IGNORECASE,
             ),
             re.compile(
+                r"(?:Дата постановки на учет|Дата постановки на уч[её]т)\s*[:\-]?\s*(\d{1,2}[-/.]\d{1,2}[-/.](?:19|20)\d{2})",
+                re.IGNORECASE,
+            ),
+            re.compile(
+                r"(?:Дата постановки на учет|Дата постановки на уч[её]т)\s*[:\-]?\s*(\d{1,2}[-/.](?:19|20)\d{2})",
+                re.IGNORECASE,
+            ),
+            re.compile(
                 r"(?:Дата постановки на учет|Дата постановки на уч[её]т)\s*[:\-]?\s*(\d{1,2}\s+[А-Яа-яё]+\s+(?:19|20)\d{2}\s*г?\.?)",
                 re.IGNORECASE,
             ),
@@ -683,6 +691,24 @@ class EmAvtoKlgParser(BaseParser):
         if iso_match:
             year = int(iso_match.group(1))
             month = int(iso_match.group(2))
+            if 1 <= month <= 12:
+                return year, month
+        dmy_match = re.search(
+            r"\b(\d{1,2})[-/.](\d{1,2})[-/.]((?:19|20)\d{2})\b",
+            text,
+        )
+        if dmy_match:
+            year = int(dmy_match.group(3))
+            month = int(dmy_match.group(2))
+            if 1 <= month <= 12:
+                return year, month
+        my_match = re.search(
+            r"\b(\d{1,2})[-/.]((?:19|20)\d{2})\b",
+            text,
+        )
+        if my_match:
+            year = int(my_match.group(2))
+            month = int(my_match.group(1))
             if 1 <= month <= 12:
                 return year, month
         year_match = re.search(r"\b((?:19|20)\d{2})\b", text)

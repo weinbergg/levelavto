@@ -250,7 +250,7 @@ def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
 
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
-    assert '/static/css/home.css?v=24' in template
+    assert '/static/css/home.css?v=25' in template
 
 
 def test_home_template_places_partners_block_after_search():
@@ -265,6 +265,17 @@ def test_home_css_uses_full_width_partners_block():
     assert ".hero-partners {" in css
     assert ".hero-partners-card--full" in css or ".hero-partners-card {" in css
     assert "grid-template-columns: minmax(0, 1fr);" in css
+
+
+def test_home_search_stacks_above_partners_and_keeps_overlay_visible():
+    css = _read("app/static/css/home.css")
+    assert ".hero-search {" in css
+    assert "z-index: 8;" in css
+    assert "isolation: isolate;" in css
+    assert ".hero-partners {" in css
+    assert "z-index: 1;" in css
+    assert ".search-card--overlay {" in css
+    assert "overflow: visible;" in css
 
 
 def test_text_query_input_only_lives_in_advanced_search():
@@ -585,9 +596,15 @@ def test_search_page_uses_payload_on_initial_render_and_has_telegram_ping_tool()
 
 def test_registration_year_filters_fallback_to_car_year_when_missing():
     service = _read("app/services/cars_service.py")
-    assert "reg_year_expr = func.coalesce(Car.registration_year, Car.year)" in service
-    assert "reg_month_floor_expr = func.coalesce(Car.registration_month, 12)" in service
-    assert "reg_month_ceil_expr = func.coalesce(Car.registration_month, 1)" in service
+    counts = _read("app/tools/car_counts_refresh.py")
+    assert "def _registration_defaulted_expr()" in service
+    assert "def _effective_registration_year_expr(cls)" in service
+    assert "def _effective_registration_month_floor_expr(cls)" in service
+    assert "def _effective_registration_month_ceil_expr(cls)" in service
+    assert "reg_year_expr = self._effective_registration_year_expr()" in service
+    assert "reg_month_floor_expr = self._effective_registration_month_floor_expr()" in service
+    assert "reg_month_ceil_expr = self._effective_registration_month_ceil_expr()" in service
+    assert "CarsService._effective_registration_year_expr().cast(Integer)" in counts
 
 
 def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_description():
@@ -616,7 +633,7 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
     assert 'or "2026"' in reg_defaults
     assert 'or "1"' in reg_defaults
     assert 'source_payload["registration_defaulted"] = True' in reg_defaults
-    assert "apply_missing_registration_fallback(payload)" in parsing_service
+    assert "apply_missing_registration_fallback(payload, persist_fields=False)" in parsing_service
     assert "--only-defaulted-registration" in recalc_script
     assert 'jsonb_extract_path_text(payload_json, "registration_defaulted")' in recalc_script
     assert "[backfill_missing_registration]" in reg_backfill_script
