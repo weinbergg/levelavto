@@ -250,7 +250,21 @@ def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
 
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
-    assert '/static/css/home.css?v=22' in template
+    assert '/static/css/home.css?v=23' in template
+
+
+def test_home_template_places_partners_block_after_search():
+    template = _read("app/templates/home.html")
+    assert 'class="la-container hero-search"' in template
+    assert 'class="la-container hero-partners" id="home-partners"' in template
+    assert template.index('class="la-container hero-search"') < template.index('class="la-container hero-partners" id="home-partners"')
+
+
+def test_home_css_uses_full_width_partners_block():
+    css = _read("app/static/css/home.css")
+    assert ".hero-partners {" in css
+    assert ".hero-partners-card--full" in css or ".hero-partners-card {" in css
+    assert "grid-template-columns: minmax(0, 1fr);" in css
 
 
 def test_text_query_input_only_lives_in_advanced_search():

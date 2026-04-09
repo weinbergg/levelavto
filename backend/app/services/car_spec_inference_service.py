@@ -257,7 +257,12 @@ class CarSpecInferenceService:
         if not sig["brand_norm"] or not sig["model_norm"]:
             return None
 
-        def _query_rows(window: int, *, region_scope: str = "same") -> list[Dict[str, Any]]:
+        def _query_rows(
+            window: int,
+            *,
+            region_scope: str = "same",
+            loose_match: bool = False,
+        ) -> list[Dict[str, Any]]:
             query = self.db.query(CarSpecReference).join(
                 Car,
                 Car.id == CarSpecReference.source_car_id,
@@ -267,9 +272,9 @@ class CarSpecInferenceService:
                 CarSpecReference.source_car_id != car.id,
                 Car.is_available.is_(True),
             )
-            if sig["engine_type_norm"]:
+            if sig["engine_type_norm"] and not loose_match:
                 query = query.filter(CarSpecReference.engine_type_norm == sig["engine_type_norm"])
-            if sig["body_type_norm"]:
+            if sig["body_type_norm"] and not loose_match:
                 query = query.filter(CarSpecReference.body_type_norm == sig["body_type_norm"])
             if sig["year"]:
                 query = query.filter(
@@ -448,6 +453,21 @@ class CarSpecInferenceService:
             consensus = _cross_region_wrap(
                 _consensus_from_rows(rows),
                 rule_prefix="eu_cross_region_year_expanded",
+            )
+            if consensus:
+                return consensus
+        rows = _query_rows(year_window, region_scope="EU", loose_match=True)
+        consensus = _cross_region_wrap(
+            _consensus_from_rows(rows),
+            rule_prefix="eu_cross_region_relaxed",
+        )
+        if consensus:
+            return consensus
+        if expanded_year_window > year_window:
+            rows = _query_rows(expanded_year_window, region_scope="EU", loose_match=True)
+            consensus = _cross_region_wrap(
+                _consensus_from_rows(rows),
+                rule_prefix="eu_cross_region_relaxed_year_expanded",
             )
             if consensus:
                 return consensus

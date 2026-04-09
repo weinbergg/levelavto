@@ -42,6 +42,9 @@ def test_pipeline_and_recalc_support_inferred_specs_refresh():
     assert "power_matched" in service
     assert 'region_scope="EU"' in service
     assert "eu_cross_region" in service
+    assert "loose_match: bool = False" in service
+    assert "eu_cross_region_relaxed" in service
+    assert 'region_scope="EU", loose_match=True' in service
     assert 'echo "[kr_pipeline] step=recalc_inferred_specs"' in kr_pipeline
     assert 'echo "[kr_pipeline] step=recalc_recoverable_fallbacks"' in kr_pipeline
     assert 'echo "[kr_pipeline] step=cache_maintenance"' in kr_pipeline
