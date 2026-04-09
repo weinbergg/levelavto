@@ -6,6 +6,8 @@ import time
 from datetime import datetime
 from typing import Any, Iterable
 
+from sqlalchemy.exc import OperationalError
+
 from backend.app.db import SessionLocal
 from backend.app.models import Car
 from backend.app.services.cars_service import CarsService
@@ -100,6 +102,15 @@ def recompute_total_from_breakdown(steps: list[dict], eur_rate: float, usd_rate:
     return float(sum_rub + sum_eur * eur_rate + sum_usd * usd_rate + sum_cny * cny_rate)
 
 
+def _is_retryable_write_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return (
+        "deadlock detected" in msg
+        or "could not serialize access" in msg
+        or "serialization_failure" in msg
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", type=int, default=2000)
@@ -184,9 +195,25 @@ def main() -> None:
                     }
                 )
             if updates and not args.dry_run:
-                db.bulk_update_mappings(Car, updates)
-                db.commit()
-                total_updated += len(updates)
+                attempt = 0
+                while True:
+                    try:
+                        db.bulk_update_mappings(Car, updates)
+                        db.commit()
+                        total_updated += len(updates)
+                        break
+                    except OperationalError as exc:
+                        db.rollback()
+                        attempt += 1
+                        if attempt >= 5 or not _is_retryable_write_error(exc):
+                            raise
+                        wait_sec = min(2.0, 0.25 * (2 ** (attempt - 1)))
+                        print(
+                            f"[update_fx_prices] retryable_write_error attempt={attempt} "
+                            f"sleep={wait_sec:.2f}s",
+                            flush=True,
+                        )
+                        time.sleep(wait_sec)
             if args.sleep:
                 time.sleep(args.sleep)
         summary = f"fx_update checked={total_checked} updated={total_updated} eur={eur_rate} usd={usd_rate} cny={cny_rate}"

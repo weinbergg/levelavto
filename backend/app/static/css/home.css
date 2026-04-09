@@ -1080,12 +1080,12 @@ textarea {
   .collage-track {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: clamp(112px, 20vw, 156px);
+    grid-auto-columns: clamp(70px, 11vw, 102px);
     grid-template-columns: none;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(5, minmax(0, 1fr));
     width: max-content;
     min-width: max-content;
-    gap: 6px;
+    gap: 4px;
   }
   .collage-track .collage-item:nth-child(n + 1) {
     display: block;
@@ -1093,12 +1093,12 @@ textarea {
 }
 @media (max-width: 640px) {
   .collage-track {
-    grid-auto-columns: clamp(102px, 24vw, 144px);
+    grid-auto-columns: clamp(64px, 17vw, 88px);
   }
 }
 @media (max-width: 480px) {
   .collage-track {
-    grid-auto-columns: clamp(92px, 26vw, 132px);
+    grid-auto-columns: clamp(58px, 18vw, 78px);
   }
 }
 .vehicle-icon svg {

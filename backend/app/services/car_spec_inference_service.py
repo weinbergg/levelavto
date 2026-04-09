@@ -513,6 +513,12 @@ class CarSpecInferenceService:
             "power_kw": ref.power_kw,
         }
 
+    def _fit_inferred_rule(self, value: Any) -> str | None:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        return text[:64]
+
     def _apply_inferred_specs(self, car: Car, inference: Dict[str, Any]) -> None:
         engine_type_norm = normalize_engine_type(car.engine_type)
         applied_any = False
@@ -537,7 +543,7 @@ class CarSpecInferenceService:
 
         car.inferred_source_car_id = inference.get("source_car_id")
         car.inferred_confidence = inference.get("confidence")
-        car.inferred_rule = inference.get("rule")
+        car.inferred_rule = self._fit_inferred_rule(inference.get("rule"))
         car.spec_inferred_at = datetime.utcnow()
 
     def _clear_inferred_specs(self, car: Car) -> bool:

@@ -250,7 +250,7 @@ def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
 
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
-    assert '/static/css/home.css?v=23' in template
+    assert '/static/css/home.css?v=24' in template
 
 
 def test_home_template_places_partners_block_after_search():
@@ -494,6 +494,9 @@ def test_che168_supports_cny_and_china_country_label():
     assert 'elif cur == "CNY" and fx_cny > 0:' in pages_router
     assert 'PRICE_NOTE_CHINA = "Цена в Китае"' in price_utils
     assert 'elif car.currency == "CNY" and car.price is not None:' in fx_script
+    assert "def _is_retryable_write_error(exc: Exception) -> bool:" in fx_script
+    assert 'print(' in fx_script
+    assert "[update_fx_prices] retryable_write_error attempt=" in fx_script
 
 
 def test_che168_parser_and_offline_tool_are_registered():
