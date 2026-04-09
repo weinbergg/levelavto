@@ -15,6 +15,7 @@ from .routers.account import router as account_router
 from .routers.favorites import router as favorites_router
 from .routers.calculator import router as calc_router
 from .routers.thumbs import router as thumbs_router
+from .schema_bootstrap import ensure_runtime_schema
 from pathlib import Path
 
 
@@ -31,6 +32,10 @@ def create_app() -> FastAPI:
         app.mount("/media", StaticFiles(directory=str(media_dir)), name="media")
     app.state.templates = Jinja2Templates(directory=str(templates_dir))
     app.add_middleware(SessionMiddleware, secret_key=settings.APP_SECRET)
+
+    @app.on_event("startup")
+    def _bootstrap_runtime_schema() -> None:
+        ensure_runtime_schema()
 
     @app.middleware("http")
     async def timing_middleware(request: Request, call_next):

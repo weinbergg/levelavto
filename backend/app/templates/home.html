@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% import "_thumbs.html" as thumbs %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
-<link rel="stylesheet" href="/static/css/home.css?v=21" />
+<link rel="stylesheet" href="/static/css/home.css?v=22" />
 {% endblock %} {% block content %}
 <section class="hero hero-with-video" id="hero">
   {% if hero_videos %}
@@ -19,6 +19,42 @@
     <div class="hero-video__overlay"></div>
   </div>
   {% endif %}
+  <div class="la-container hero-grid">
+    <div class="hero-text">
+      <div class="stats-badge"><span id="home-badge-count" data-count="{{ total_cars }}" data-home-count>{{ total_cars }}</span> {{ home.hero.stats_suffix }}</div>
+      <h1>{{ home.hero.title }}</h1>
+      <p class="subtitle">{{ home.hero.subtitle }}</p>
+      <div class="benefits">
+        {% set benefit_icons = ["💳", "⏱️", "📑"] %}
+        {% for item in home.hero.benefits %}
+        <div class="benefit">
+          <span class="icon">{{ benefit_icons[loop.index0] }}</span>{{ item }}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#cases-collage">{{ home.hero.actions.primary_label }}</a>
+        <a class="btn btn-secondary" href="#lead-form">{{ home.hero.actions.secondary_label }}</a>
+      </div>
+      <div class="hero-note">{{ home.hero.note }}</div>
+    </div>
+    <div class="hero-visual">
+      <div class="card hero-partners-card">
+        <h3 style="margin-top: 0">{{ home.hero.why_title }}</h3>
+        <div class="partner-grid">
+          {% for item in partner_logos %}
+          <div class="partner-logo{% if not item.logo %} partner-logo--text{% endif %}">
+            {% if item.logo %}
+            <img src="{{ item.logo }}" alt="{{ item.name }}" loading="lazy" decoding="async" />
+            {% else %}
+            <span>{{ item.name }}</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="la-container hero-search">
     <div class="search-card search-card--overlay">
@@ -133,43 +169,6 @@
       </form>
     </div>
   </div>
-
-  <div class="la-container hero-grid">
-    <div class="hero-text">
-      <div class="stats-badge"><span id="home-badge-count" data-count="{{ total_cars }}" data-home-count>{{ total_cars }}</span> {{ home.hero.stats_suffix }}</div>
-      <h1>{{ home.hero.title }}</h1>
-      <p class="subtitle">{{ home.hero.subtitle }}</p>
-      <div class="benefits">
-        {% set benefit_icons = ["💳", "⏱️", "📑"] %}
-        {% for item in home.hero.benefits %}
-        <div class="benefit">
-          <span class="icon">{{ benefit_icons[loop.index0] }}</span>{{ item }}
-        </div>
-        {% endfor %}
-      </div>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="#cases-collage">{{ home.hero.actions.primary_label }}</a>
-        <a class="btn btn-secondary" href="#lead-form">{{ home.hero.actions.secondary_label }}</a>
-      </div>
-      <div class="hero-note">{{ home.hero.note }}</div>
-    </div>
-    <div class="hero-visual">
-      <div class="card hero-partners-card">
-        <h3 style="margin-top: 0">{{ home.hero.why_title }}</h3>
-        <div class="partner-grid">
-          {% for item in partner_logos %}
-          <div class="partner-logo{% if not item.logo %} partner-logo--text{% endif %}">
-            {% if item.logo %}
-            <img src="{{ item.logo }}" alt="{{ item.name }}" loading="lazy" decoding="async" />
-            {% else %}
-            <span>{{ item.name }}</span>
-            {% endif %}
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  </div>
 </section>
 <script>
   window.HOME_COUNTRIES = {{ countries_labeled | tojson }};
@@ -184,9 +183,10 @@
     </div>
   </div>
   <div class="collage-wrap" id="cases-collage">
-    {% set visible = collage_images[:75] %}
-    <div class="collage-track" id="collage-track">
-      {% for img in visible %}
+    {% set collage_base = collage_images[:50] if collage_images|length > 50 else collage_images %}
+    {% set collage_loop = collage_base + collage_base + collage_base %}
+    <div class="collage-track" id="collage-track" data-loop-base-count="{{ collage_base|length }}">
+      {% for img in collage_loop %}
       <div class="collage-item">
         <img
           src="{{ img.src }}"
@@ -595,6 +595,8 @@
           {% set email = contact_email or content.get('contact_email','Level.avto@mail.ru') %}
           {% set address = contact_address or content.get('contact_address','Шелепихинская наб., 34к4зд8, Москва') %}
           {% set map_link = contact_map_link or content.get('contact_map_link','https://yandex.ru/navi/org/level_avto/84440785619?si=0zmrqk6ar44eg33t1xd7j74k7m') %}
+          {% set contact_tg_link = 'https://t.me/DmitriyMotorov' %}
+          {% set contact_max_link = page_max %}
           <p class="section-sub">{{ address }}. {{ home.contacts.subtitle_suffix }}</p>
         </div>
       </div>
@@ -602,37 +604,23 @@
         <div class="contact-card">
           <h3><a href="tel:{{ phone|replace(' ','') }}">{{ phone }}</a></h3>
           <p class="hero-note">
-            {{ home.contacts.callback_label }} ·
-            {% if page_tg %}
-            <a href="{{ page_tg }}" target="_blank" rel="noopener">Telegram</a>
-            {% endif %}
-            {% if page_max %}
-            · <a href="{{ page_max }}" target="_blank" rel="noopener">MAX</a>
-            {% endif %}
-            {% if contact_wa or content.get('contact_wa') %}
-            · <a href="{{ contact_wa or content.get('contact_wa') }}" target="_blank" rel="noopener">WhatsApp</a>
-            {% endif %}
-            {% if contact_vk or content.get('contact_vk') %}
-            · <a href="{{ contact_vk or content.get('contact_vk') }}" target="_blank" rel="noopener">VK</a>
-            {% endif %}
-            {% if contact_avito or content.get('contact_avito') %}
-            · <a href="{{ contact_avito or content.get('contact_avito') }}" target="_blank" rel="noopener">Avito</a>
-            {% endif %}
-            {% if contact_autoru or content.get('contact_autoru') %}
-            · <a href="{{ contact_autoru or content.get('contact_autoru') }}" target="_blank" rel="noopener">Auto.ru</a>
-            {% endif %}
+            {{ home.contacts.callback_label }} · {{ home.contacts.hours_note }}
           </p>
           <p class="muted"><a href="{{ map_link }}" target="_blank" rel="noopener">{{ address }}</a></p>
           <p class="muted">{{ home.contacts.hours_note }}</p>
-          <div class="inline-actions" style="margin-top: 10px">
+          <div class="inline-actions contact-actions" style="margin-top: 10px">
             <a class="btn btn-primary" href="tel:{{ phone|replace(' ','') }}">{{ home.contacts.call_button }}</a>
             <a class="btn btn-secondary" href="mailto:{{ email }}">{{ home.contacts.email_button }}</a>
-            {% if page_tg %}
-            <a class="btn btn-secondary" href="{{ page_tg }}" target="_blank" rel="noopener">Написать в TG</a>
-            {% endif %}
-            {% if page_max %}
-            <a class="btn btn-secondary" href="{{ page_max }}" target="_blank" rel="noopener">Написать в MAX</a>
-            {% endif %}
+            <div class="contact-messenger-links" aria-label="Мессенджеры">
+              <a class="lead-messenger-link" href="{{ contact_tg_link }}" target="_blank" rel="noopener" aria-label="Telegram">
+                <img class="lead-messenger-link__icon" src="/static/img/social/telegram.png" alt="Telegram" />
+              </a>
+              {% if contact_max_link %}
+              <a class="lead-messenger-link" href="{{ contact_max_link }}" target="_blank" rel="noopener" aria-label="MAX">
+                <img class="lead-messenger-link__icon" src="/static/img/social/max.png" alt="MAX" />
+              </a>
+              {% endif %}
+            </div>
           </div>
         </div>
         <iframe
@@ -653,7 +641,7 @@
           <h2 class="section-title">{{ home.social.title }}</h2>
         </div>
       </div>
-      {% set social_tg = page_tg or 'https://t.me/levelavto' %}
+      {% set social_tg = 'https://t.me/DmitriyMotorov' %}
       {% set social_vk = contact_vk or content.get('contact_vk') or 'https://vk.ru/levelavto' %}
       {% set social_avito = contact_avito or content.get('contact_avito') or 'https://www.avito.ru/brands/i113720154?src=sharing' %}
       {% set social_autoru = contact_autoru or content.get('contact_autoru') or 'https://auto.ru/profile/28529976' %}
@@ -724,151 +712,189 @@
         }
       }
 
+      const collageWrap = document.getElementById("cases-collage");
+      const collageTrack = document.getElementById("collage-track");
+      let collageBaseSpan = 0;
+      let collageScrollBound = false;
+
+      const isMobileCollage = () => window.matchMedia("(max-width: 820px)").matches;
+
+      const syncCollageLoop = () => {
+        if (!collageWrap || !collageTrack || !isMobileCollage()) {
+          collageBaseSpan = 0;
+          return;
+        }
+        const baseCount = Number(collageTrack.dataset.loopBaseCount || 0);
+        if (!baseCount) return;
+        const items = collageTrack.querySelectorAll(".collage-item");
+        if (items.length <= baseCount) return;
+        collageBaseSpan = items[baseCount].offsetLeft - items[0].offsetLeft;
+        if (!collageBaseSpan) return;
+        const target = collageBaseSpan;
+        if (Math.abs(collageWrap.scrollLeft - target) > 24) {
+          collageWrap.scrollLeft = target;
+        }
+      };
+
+      const onCollageScroll = () => {
+        if (!collageWrap || !collageBaseSpan || !isMobileCollage()) return;
+        if (collageWrap.scrollLeft < collageBaseSpan * 0.35) {
+          collageWrap.scrollLeft += collageBaseSpan;
+        } else if (collageWrap.scrollLeft > collageBaseSpan * 1.65) {
+          collageWrap.scrollLeft -= collageBaseSpan;
+        }
+      };
+
+      if (collageWrap && collageTrack && !collageScrollBound) {
+        collageWrap.addEventListener("scroll", onCollageScroll, { passive: true });
+        collageScrollBound = true;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(syncCollageLoop);
+        });
+        window.addEventListener("resize", syncCollageLoop);
+      }
+
       const form = document.getElementById("mini-calc-form");
-      if (!form) return;
-      const modeSelect = document.getElementById("mini-mode");
-      const scenarioSelect = document.getElementById("mini-scenario");
-    const blockEngine = form.querySelector('[data-block="engine"]');
-    const blockPower = form.querySelector('[data-block="power"]');
-      const resultWrap = document.getElementById("mini-calc-result");
-      const resultTotal = document.getElementById("mini-calc-total");
-      const resultList = document.getElementById("mini-calc-breakdown");
-      const warn = document.getElementById("mini-warn");
-      const submitBtn = form.querySelector("button[type='submit']");
+      if (form) {
+        const modeSelect = document.getElementById("mini-mode");
+        const scenarioSelect = document.getElementById("mini-scenario");
+        const blockEngine = form.querySelector('[data-block="engine"]');
+        const blockPower = form.querySelector('[data-block="power"]');
+        const resultWrap = document.getElementById("mini-calc-result");
+        const resultTotal = document.getElementById("mini-calc-total");
+        const resultList = document.getElementById("mini-calc-breakdown");
+        const warn = document.getElementById("mini-warn");
+        const submitBtn = form.querySelector("button[type='submit']");
 
-      const fmt = (num) =>
-        Number(num).toLocaleString("ru-RU", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        });
-      const ageBucket = (y, m) => {
-        if (!y || !m) return null;
-        const d = new Date(y, m - 1, 1);
-        const now = new Date();
-        const months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
-        if (months < 36) return "under_3";
-        if (months <= 60) return "3_5";
-        return "too_old";
-      };
-
-      const updateVisibility = () => {
-        const mode = modeSelect.value;
-        const s = scenarioSelect.value;
-        if (mode === "manual") {
-          scenarioSelect.disabled = false;
-          blockEngine.style.display = s === "electric" ? "none" : "";
-          blockPower.style.display = s === "electric" ? "" : "none";
-          warn.style.display = "none";
-          submitBtn.disabled = false;
-          return;
-        }
-        // auto mode
-        scenarioSelect.disabled = true;
-        const regY = Number(document.getElementById("mini-reg-year").value) || null;
-        const regM = Number(document.getElementById("mini-reg-month").value) || null;
-        const isElectric = document.getElementById("mini-is-electric").value === "1";
-        const cc = Number(document.getElementById("mini-engine").value) || null;
-        const hp = Number(document.getElementById("mini-power").value) || null;
-        const price = Number(document.getElementById("mini-price").value) || null;
-        const bucket = ageBucket(regY, regM);
-        let autoScenario = "";
-        if (bucket === "too_old") {
-          warn.style.display = "";
-          warn.querySelector(".hero-note").textContent = "Авто старше 5 лет — расчёт недоступен, оставьте заявку.";
-          submitBtn.disabled = true;
-        } else {
-          warn.style.display = "none";
-          submitBtn.disabled = false;
-        }
-        if (isElectric) {
-          autoScenario = "electric";
-        } else if (bucket === "under_3") {
-          autoScenario = "under_3";
-        } else if (bucket === "3_5") {
-          autoScenario = "3_5";
-        }
-        scenarioSelect.value = autoScenario;
-        blockEngine.style.display = isElectric ? "none" : "";
-        blockPower.style.display = isElectric ? "" : "none";
-        const hasData =
-          price &&
-          regY &&
-          regM &&
-          (isElectric ? hp : cc) &&
-          bucket !== "too_old" &&
-          autoScenario;
-        if (!hasData) {
-          submitBtn.disabled = true;
-          warn.style.display = "";
-          warn.querySelector(".hero-note").textContent =
-            "Не хватает данных для автоподстановки — оставьте заявку, поможем.";
-        }
-      };
-      scenarioSelect.addEventListener("change", updateVisibility);
-      updateVisibility();
-
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        if (submitBtn.disabled) return;
-        const payload = {
-          scenario: modeSelect.value === "manual" ? scenarioSelect.value : scenarioSelect.value,
-          price_net_eur: Number(document.getElementById("mini-price").value),
-          engine_cc:
-            Number(document.getElementById("mini-engine").value) || undefined,
-          power_hp:
-            Number(document.getElementById("mini-power").value) || undefined,
-        first_registration_year:
-          Number(document.getElementById("mini-reg-year").value) || undefined,
-        first_registration_month:
-          Number(document.getElementById("mini-reg-month").value) || undefined,
-        is_electric: document.getElementById("mini-is-electric").value === "1",
+        const fmt = (num) =>
+          Number(num).toLocaleString("ru-RU", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+        const ageBucket = (y, m) => {
+          if (!y || !m) return null;
+          const d = new Date(y, m - 1, 1);
+          const now = new Date();
+          const months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+          if (months < 36) return "under_3";
+          if (months <= 60) return "3_5";
+          return "too_old";
         };
-        const resp = await fetch("/api/calc", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          alert(err.detail || "Ошибка расчёта");
-          return;
-        }
-        const res = await resp.json();
-        resultTotal.textContent = fmt(res.total_rub) + " ₽";
-        resultList.innerHTML = "";
-        (res.breakdown || []).slice(0, 8).forEach((item) => {
-          const row = document.createElement("div");
-          row.className = "calc-row";
-          row.innerHTML = `<div>${item.title}</div><div>${fmt(item.amount)} ${
-            item.currency
-          }</div>`;
-          resultList.appendChild(row);
-        });
-        resultWrap.style.display = "";
-      });
 
-      // Prefill from query params
-      (() => {
-        const params = new URLSearchParams(window.location.search);
-        const setVal = (id, key) => {
-          const el = document.getElementById(id);
-          if (el && params.get(key)) el.value = params.get(key);
+        const updateVisibility = () => {
+          const mode = modeSelect.value;
+          const s = scenarioSelect.value;
+          if (mode === "manual") {
+            scenarioSelect.disabled = false;
+            blockEngine.style.display = s === "electric" ? "none" : "";
+            blockPower.style.display = s === "electric" ? "" : "none";
+            warn.style.display = "none";
+            submitBtn.disabled = false;
+            return;
+          }
+          scenarioSelect.disabled = true;
+          const regY = Number(document.getElementById("mini-reg-year").value) || null;
+          const regM = Number(document.getElementById("mini-reg-month").value) || null;
+          const isElectric = document.getElementById("mini-is-electric").value === "1";
+          const cc = Number(document.getElementById("mini-engine").value) || null;
+          const hp = Number(document.getElementById("mini-power").value) || null;
+          const price = Number(document.getElementById("mini-price").value) || null;
+          const bucket = ageBucket(regY, regM);
+          let autoScenario = "";
+          if (bucket === "too_old") {
+            warn.style.display = "";
+            warn.querySelector(".hero-note").textContent = "Авто старше 5 лет — расчёт недоступен, оставьте заявку.";
+            submitBtn.disabled = true;
+          } else {
+            warn.style.display = "none";
+            submitBtn.disabled = false;
+          }
+          if (isElectric) {
+            autoScenario = "electric";
+          } else if (bucket === "under_3") {
+            autoScenario = "under_3";
+          } else if (bucket === "3_5") {
+            autoScenario = "3_5";
+          }
+          scenarioSelect.value = autoScenario;
+          blockEngine.style.display = isElectric ? "none" : "";
+          blockPower.style.display = isElectric ? "" : "none";
+          const hasData =
+            price &&
+            regY &&
+            regM &&
+            (isElectric ? hp : cc) &&
+            bucket !== "too_old" &&
+            autoScenario;
+          if (!hasData) {
+            submitBtn.disabled = true;
+            warn.style.display = "";
+            warn.querySelector(".hero-note").textContent =
+              "Не хватает данных для автоподстановки — оставьте заявку, поможем.";
+          }
         };
-        setVal("mini-price", "price");
-        setVal("mini-engine", "engine_cc");
-        setVal("mini-power", "power_hp");
-        setVal("mini-reg-year", "reg_year");
-        setVal("mini-reg-month", "reg_month");
-        if (params.get("is_electric") === "1") {
-          document.getElementById("mini-is-electric").value = "1";
-          scenarioSelect.value = "electric";
-          modeSelect.value = "auto";
-        }
+        scenarioSelect.addEventListener("change", updateVisibility);
         updateVisibility();
-      })();
 
-      // Collage animation only when visible
-      // collage now static (no autoscroll)
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          if (submitBtn.disabled) return;
+          const payload = {
+            scenario: modeSelect.value === "manual" ? scenarioSelect.value : scenarioSelect.value,
+            price_net_eur: Number(document.getElementById("mini-price").value),
+            engine_cc:
+              Number(document.getElementById("mini-engine").value) || undefined,
+            power_hp:
+              Number(document.getElementById("mini-power").value) || undefined,
+            first_registration_year:
+              Number(document.getElementById("mini-reg-year").value) || undefined,
+            first_registration_month:
+              Number(document.getElementById("mini-reg-month").value) || undefined,
+            is_electric: document.getElementById("mini-is-electric").value === "1",
+          };
+          const resp = await fetch("/api/calc", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            alert(err.detail || "Ошибка расчёта");
+            return;
+          }
+          const res = await resp.json();
+          resultTotal.textContent = fmt(res.total_rub) + " ₽";
+          resultList.innerHTML = "";
+          (res.breakdown || []).slice(0, 8).forEach((item) => {
+            const row = document.createElement("div");
+            row.className = "calc-row";
+            row.innerHTML = `<div>${item.title}</div><div>${fmt(item.amount)} ${
+              item.currency
+            }</div>`;
+            resultList.appendChild(row);
+          });
+          resultWrap.style.display = "";
+        });
+
+        (() => {
+          const params = new URLSearchParams(window.location.search);
+          const setVal = (id, key) => {
+            const el = document.getElementById(id);
+            if (el && params.get(key)) el.value = params.get(key);
+          };
+          setVal("mini-price", "price");
+          setVal("mini-engine", "engine_cc");
+          setVal("mini-power", "power_hp");
+          setVal("mini-reg-year", "reg_year");
+          setVal("mini-reg-month", "reg_month");
+          if (params.get("is_electric") === "1") {
+            document.getElementById("mini-is-electric").value = "1";
+            scenarioSelect.value = "electric";
+            modeSelect.value = "auto";
+          }
+          updateVisibility();
+        })();
+      }
     })();
   </script>
   {% endblock %}

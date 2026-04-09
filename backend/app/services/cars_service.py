@@ -142,6 +142,8 @@ _MODEL_TOKEN_EQUIVALENTS = {
     "class": {"class"},
 }
 
+_MODEL_OPTIONAL_TAIL_TOKENS = {"series", "class"}
+
 
 def normalize_model_label(value: Optional[str]) -> str:
     raw = str(value or "").replace("\xa0", " ").strip()
@@ -331,7 +333,7 @@ class CarsService:
         if not raw_tokens:
             return None
         best_label: Optional[str] = None
-        best_score: tuple[int, int, tuple] | None = None
+        best_score: tuple[int, int, int, int, tuple] | None = None
         for donor in donors:
             donor_label = normalize_model_label(donor)
             if not donor_label:
@@ -339,9 +341,28 @@ class CarsService:
             donor_tokens = _model_search_tokens(donor_label)
             if not donor_tokens:
                 continue
-            if not all(self._model_token_present(raw_tokens, token) for token in donor_tokens):
+            matched_tokens: List[str] = []
+            missing_tokens: List[str] = []
+            for token in donor_tokens:
+                if self._model_token_present(raw_tokens, token):
+                    matched_tokens.append(token)
+                else:
+                    missing_tokens.append(token)
+            if not matched_tokens:
                 continue
-            score = (len(donor_tokens), len("".join(donor_tokens)), self._natural_text_key(donor_label))
+            core_matches = [token for token in matched_tokens if token.lower() not in _MODEL_OPTIONAL_TAIL_TOKENS]
+            if missing_tokens:
+                if not all(token.lower() in _MODEL_OPTIONAL_TAIL_TOKENS for token in missing_tokens):
+                    continue
+                if not core_matches:
+                    continue
+            score = (
+                len(core_matches),
+                len(matched_tokens),
+                -len(missing_tokens),
+                len("".join(donor_tokens)),
+                self._natural_text_key(donor_label),
+            )
             if best_score is None or score > best_score:
                 best_score = score
                 best_label = donor_label

@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     MOBILE_DE_HTTP_PROXY: str | None = Field(default=None)
     ENCAR_CARAPIS_API_KEY: str | None = Field(default=None)
     ENCAR_CARAPIS_BASE_URL: str | None = Field(default=None)
+    SMS_PROVIDER: str = Field(default="log")
+    SMS_CODE_LENGTH: int = Field(default=6)
+    SMS_CODE_TTL_SEC: int = Field(default=300)
+    SMS_RESEND_COOLDOWN_SEC: int = Field(default=60)
+    SMS_MAX_ATTEMPTS: int = Field(default=5)
+    SMS_SENDER_NAME: str | None = Field(default=None)
+    SMS_RU_API_ID: str | None = Field(default=None)
 
     @property
     def sync_database_url(self) -> str:

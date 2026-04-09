@@ -15,12 +15,44 @@ content %}
       <form method="post" action="/register" class="form-vertical">
         <label
           >Email
-          <input type="email" name="email" required />
+          <input type="email" name="email" required value="{{ form_data.email if form_data is defined else '' }}" />
         </label>
         <label
           >Имя
-          <input type="text" name="full_name" />
+          <input type="text" name="full_name" value="{{ form_data.full_name if form_data is defined else '' }}" />
         </label>
+        <label
+          >Телефон
+          <input
+            type="tel"
+            name="phone"
+            id="register-phone"
+            required
+            inputmode="tel"
+            autocomplete="tel"
+            placeholder="+7 9xx xxx-xx-xx"
+            value="{{ form_data.phone if form_data is defined else '' }}"
+          />
+        </label>
+        <div class="inline-actions" style="margin-top: -6px">
+          <button type="button" class="btn btn-secondary" id="send-phone-code">Отправить код</button>
+          <span class="hero-note" id="phone-status">Подтвердите номер телефона по SMS</span>
+        </div>
+        <label
+          >Код из SMS
+          <input
+            type="text"
+            id="register-phone-code"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="8"
+            placeholder="Введите код"
+          />
+        </label>
+        <div class="inline-actions" style="margin-top: -6px">
+          <button type="button" class="btn btn-secondary" id="verify-phone-code">Подтвердить номер</button>
+        </div>
+        <input type="hidden" name="phone_verification_token" id="phone-verification-token" value="{{ form_data.phone_verification_token if form_data is defined else '' }}" />
         <label
           >Пароль
           <input type="password" name="password" required minlength="6" />
@@ -44,4 +76,120 @@ content %}
     </div>
   </div>
 </section>
+{% endblock %}
+{% block scripts_extra %}
+<script>
+  (() => {
+    const form = document.querySelector('form[action="/register"]')
+    const phoneInput = document.getElementById('register-phone')
+    const codeInput = document.getElementById('register-phone-code')
+    const sendBtn = document.getElementById('send-phone-code')
+    const verifyBtn = document.getElementById('verify-phone-code')
+    const statusEl = document.getElementById('phone-status')
+    const tokenInput = document.getElementById('phone-verification-token')
+    if (!form || !phoneInput || !codeInput || !sendBtn || !verifyBtn || !statusEl || !tokenInput) return
+
+    let challengeToken = ''
+    let verifiedPhone = ''
+
+    const setStatus = (message, tone = '') => {
+      statusEl.textContent = message
+      statusEl.style.color = tone === 'error' ? '#ff8d7d' : tone === 'success' ? '#7ce3a1' : ''
+    }
+
+    const resetVerification = () => {
+      challengeToken = ''
+      verifiedPhone = ''
+      tokenInput.value = ''
+      setStatus('Подтвердите номер телефона по SMS')
+    }
+
+    if (tokenInput.value.trim()) {
+      challengeToken = tokenInput.value.trim()
+      verifiedPhone = phoneInput.value.trim()
+      setStatus('Номер уже подтверждён, можно завершить регистрацию', 'success')
+    }
+
+    phoneInput.addEventListener('input', () => {
+      if (verifiedPhone && verifiedPhone !== phoneInput.value.trim()) {
+        resetVerification()
+      }
+    })
+
+    sendBtn.addEventListener('click', async () => {
+      const phone = phoneInput.value.trim()
+      if (!phone) {
+        setStatus('Введите номер телефона', 'error')
+        return
+      }
+      sendBtn.disabled = true
+      try {
+        const response = await fetch('/api/auth/phone/send-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          setStatus(data.detail || 'Не удалось отправить код', 'error')
+          return
+        }
+        challengeToken = String(data.challenge_token || '')
+        verifiedPhone = phone
+        tokenInput.value = ''
+        setStatus(`Код отправлен на ${data.phone_masked || 'номер'}. Введите его ниже.`)
+      } catch (error) {
+        setStatus('Ошибка сети при отправке кода', 'error')
+      } finally {
+        sendBtn.disabled = false
+      }
+    })
+
+    verifyBtn.addEventListener('click', async () => {
+      const phone = phoneInput.value.trim()
+      const code = codeInput.value.trim()
+      if (!challengeToken) {
+        setStatus('Сначала запросите код по SMS', 'error')
+        return
+      }
+      if (!code) {
+        setStatus('Введите код из SMS', 'error')
+        return
+      }
+      verifyBtn.disabled = true
+      try {
+        const response = await fetch('/api/auth/phone/verify-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, code, challenge_token: challengeToken }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          setStatus(data.detail || 'Код не подошёл', 'error')
+          return
+        }
+        tokenInput.value = String(data.verification_token || '')
+        verifiedPhone = phone
+        setStatus(`Номер подтверждён: ${data.phone_masked || phone}`, 'success')
+      } catch (error) {
+        setStatus('Ошибка сети при проверке кода', 'error')
+      } finally {
+        verifyBtn.disabled = false
+      }
+    })
+
+    form.addEventListener('submit', (event) => {
+      const phone = phoneInput.value.trim()
+      if (!phone) {
+        setStatus('Введите номер телефона', 'error')
+        event.preventDefault()
+        return
+      }
+      if (!tokenInput.value.trim()) {
+        setStatus('Сначала подтвердите номер телефона', 'error')
+        event.preventDefault()
+      }
+    })
+  })()
+</script>
 {% endblock %}

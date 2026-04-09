@@ -32,13 +32,34 @@ class AuthService:
         candidate = self._hash(password, salt=salt, iterations=iterations)
         return hmac.compare_digest(candidate, stored)
 
-    def create_user(self, email: str, password: str, full_name: Optional[str] = None, is_admin: bool = False) -> User:
+    def create_user(
+        self,
+        email: str,
+        password: str,
+        full_name: Optional[str] = None,
+        *,
+        phone: Optional[str] = None,
+        phone_verified_at: Optional[datetime] = None,
+        is_admin: bool = False,
+    ) -> User:
         email_norm = email.strip().lower()
         existing = self.db.execute(select(User).where(User.email == email_norm)).scalar_one_or_none()
         if existing:
             raise ValueError("Пользователь с таким email уже существует")
+        phone_norm = (phone or "").strip() or None
+        if phone_norm:
+            existing_phone = self.db.execute(select(User).where(User.phone == phone_norm)).scalar_one_or_none()
+            if existing_phone:
+                raise ValueError("Пользователь с таким телефоном уже существует")
         pwd_hash = self._hash(password)
-        user = User(email=email_norm, full_name=full_name, password_hash=pwd_hash, is_admin=is_admin)
+        user = User(
+            email=email_norm,
+            full_name=full_name,
+            phone=phone_norm,
+            phone_verified_at=phone_verified_at,
+            password_hash=pwd_hash,
+            is_admin=is_admin,
+        )
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
@@ -54,5 +75,4 @@ class AuthService:
         user.last_login_at = datetime.utcnow()
         self.db.commit()
         return user
-
 

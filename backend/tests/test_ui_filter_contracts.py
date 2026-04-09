@@ -250,18 +250,47 @@ def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
 
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
-    assert '/static/css/home.css?v=21' in template
+    assert '/static/css/home.css?v=22' in template
 
 
-def test_text_query_inputs_removed_from_home_search_and_catalog_filters():
+def test_text_query_input_only_lives_in_advanced_search():
     home = _read("app/templates/home.html")
     search = _read("app/templates/search.html")
     catalog = _read("app/templates/catalog.html")
-    script = _read("app/static/js/app.js")
     assert 'name="q"' not in home
-    assert 'name="q"' not in search
+    assert 'name="q"' in search
     assert 'name="q"' not in catalog
-    assert "q: 'Поиск'" not in script
+
+
+def test_home_contacts_use_icon_messengers_and_direct_telegram_link():
+    template = _read("app/templates/home.html")
+    css = _read("app/static/css/home.css")
+    assert "https://t.me/DmitriyMotorov" in template
+    assert "contact-messenger-links" in template
+    assert "lead-messenger-link__icon" in template
+    assert ".contact-messenger-links" in css
+
+
+def test_register_template_and_backend_support_phone_verification():
+    router = _read("app/routers/auth.py")
+    template = _read("app/templates/auth/register.html")
+    service = _read("app/services/phone_verification_service.py")
+    model = _read("app/models/phone_verification.py")
+    bootstrap = _read("app/schema_bootstrap.py")
+    config = _read("app/config.py")
+    assert '@router.post("/api/auth/phone/send-code")' in router
+    assert '@router.post("/api/auth/phone/verify-code")' in router
+    assert "phone_verification_token" in router
+    assert 'id="register-phone"' in template
+    assert 'id="send-phone-code"' in template
+    assert 'id="verify-phone-code"' in template
+    assert 'id="phone-verification-token"' in template
+    assert "normalize_phone_number" in service
+    assert "class SmsRuProvider" in service
+    assert "class PhoneVerificationService" in service
+    assert "PhoneVerificationChallenge" in model
+    assert "ALTER TABLE users ADD COLUMN phone" in bootstrap
+    assert "SMS_RU_API_ID" in config
 
 
 def test_emavto_registration_recovery_and_stale_lock_contracts():
@@ -314,7 +343,9 @@ def test_pages_home_uses_recommended_and_media_cache_helpers():
 def test_home_collage_and_home_content_copy_are_updated():
     template = _read("app/templates/home.html")
     home_content = _read("app/utils/home_content.py")
-    assert "collage_images[:75]" in template
+    assert "collage_base = collage_images[:50] if collage_images|length > 50 else collage_images" in template
+    assert 'data-loop-base-count="{{ collage_base|length }}"' in template
+    assert "const syncCollageLoop = () => {" in template
     assert 'data-expand-toggle="home-more-offers-grid"' in template
     assert 'data-expand-pages="2"' in template
     assert 'id="home-more-offers-catalog"' in template

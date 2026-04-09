@@ -479,6 +479,23 @@
         </div>
       </section>
 
+      <section class="advanced-section" id="advanced-keywords">
+        <h2 class="advanced-section__title">Поиск по ключевым словам</h2>
+        <div class="search-filters search-filters--base">
+          <div class="advanced-basic">
+            <label class="field field--full">Ключевые слова
+              <input
+                type="text"
+                name="q"
+                autocomplete="off"
+                placeholder="Например: дизель, 4x4, панорама"
+                value="{{ params.get('q','') }}"
+              >
+            </label>
+          </div>
+        </div>
+      </section>
+
       <div class="advanced-actions">
         <button type="submit" class="btn btn-primary" id="advanced-submit">
           <span class="label">Найти</span>

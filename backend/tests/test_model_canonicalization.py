@@ -12,9 +12,10 @@ def test_canonical_model_label_maps_bmw_trim_titles_to_eu_model_codes():
 def test_canonical_model_label_maps_generic_kr_titles_to_eu_donors():
     service = CarsService(db=None)  # type: ignore[arg-type]
     kia_donors = ["Sorento", "Carnival", "Sportage"]
-    mercedes_donors = ["E-Class", "GLE", "CLS"]
+    mercedes_donors = ["S-Class", "E-Class", "GLE", "CLS"]
     assert service._canonical_model_label("Kia", "Sorento 4th Generation HEV 1.6 2WD", donors=kia_donors) == "Sorento"
     assert service._canonical_model_label("Kia", "Carnival 4th Generation Nine-seater Prestige", donors=kia_donors) == "Carnival"
+    assert service._canonical_model_label("Mercedes-Benz", "Mercedes-Benz S 450 4MATIC Long", donors=mercedes_donors) == "S-Class"
     assert service._canonical_model_label("Mercedes-Benz", "Benz E-Class W213 E350 4MATIC AMG Line", donors=mercedes_donors) == "E-Class"
 
 

@@ -10,6 +10,7 @@ from .progress_kv import ProgressKV
 from .calculator_config import CalculatorConfig
 from .favorite import Favorite
 from .car_spec_reference import CarSpecReference
+from .phone_verification import PhoneVerificationChallenge
 
 __all__ = [
     "Source",
@@ -24,4 +25,5 @@ __all__ = [
     "ProgressKV",
     "Favorite",
     "CarSpecReference",
+    "PhoneVerificationChallenge",
 ]
