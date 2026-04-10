@@ -38,6 +38,8 @@ def _merge_source_payload(existing_payload: object, parsed_payload: object) -> d
     if isinstance(parsed_payload, dict):
         merged.update(parsed_payload)
     merged.pop("registration_defaulted", None)
+    merged.pop("registration_year_defaulted", None)
+    merged.pop("registration_month_defaulted", None)
     merged.pop("registration_default_year", None)
     merged.pop("registration_default_month", None)
     return merged

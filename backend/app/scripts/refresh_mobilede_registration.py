@@ -145,6 +145,10 @@ def main() -> None:
 
                     if payload.pop("registration_defaulted", None) is not None:
                         changed = True
+                    if payload.pop("registration_year_defaulted", None) is not None:
+                        changed = True
+                    if payload.pop("registration_month_defaulted", None) is not None:
+                        changed = True
                     if payload.pop("registration_default_year", None) is not None:
                         changed = True
                     if payload.pop("registration_default_month", None) is not None:

@@ -41,3 +41,20 @@ def test_registration_fallback_can_mark_payload_without_overwriting_real_columns
     assert payload["registration_year"] is None
     assert payload["registration_month"] is None
     assert payload["source_payload"]["registration_defaulted"] is True
+
+
+def test_registration_fallback_marks_month_only_gap_without_year_default_flag():
+    payload = {
+        "registration_year": 2024,
+        "registration_month": None,
+        "source_payload": {},
+    }
+
+    changed = apply_missing_registration_fallback(payload, persist_fields=False)
+
+    assert changed is True
+    assert payload["registration_year"] == 2024
+    assert payload["registration_month"] is None
+    assert payload["source_payload"]["registration_defaulted"] is True
+    assert payload["source_payload"].get("registration_year_defaulted") is None
+    assert payload["source_payload"]["registration_month_defaulted"] is True

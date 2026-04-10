@@ -644,6 +644,8 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
     pipeline = Path(__file__).resolve().parents[2] / "scripts" / "mobilede_daily_pipeline.sh"
     fx_daily = Path(__file__).resolve().parents[2] / "scripts" / "fx_daily_update.sh"
     assert "get_missing_registration_default" in service
+    assert "def _registration_year_defaulted_expr" in service
+    assert "def _registration_month_defaulted_expr" in service
     assert "car.display_description" in detail_template
     assert "description=row.description" in parser
     assert 'description: Mapped[str | None] = mapped_column(Text, nullable=True)' in model
@@ -656,6 +658,8 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
     assert 'or "2026"' in reg_defaults
     assert 'or "1"' in reg_defaults
     assert 'source_payload["registration_defaulted"] = True' in reg_defaults
+    assert 'source_payload["registration_year_defaulted"] = True' in reg_defaults
+    assert 'source_payload["registration_month_defaulted"] = True' in reg_defaults
     assert "apply_missing_registration_fallback(payload, persist_fields=False)" in parsing_service
     assert "--only-defaulted-registration" in recalc_script
     assert 'jsonb_extract_path_text(payload_json, "registration_defaulted")' in recalc_script

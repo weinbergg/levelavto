@@ -52,6 +52,14 @@ def apply_missing_registration_fallback(
         else:
             source_payload = {}
         source_payload["registration_defaulted"] = True
+        if missing_year:
+            source_payload["registration_year_defaulted"] = True
+        else:
+            source_payload.pop("registration_year_defaulted", None)
+        if missing_month:
+            source_payload["registration_month_defaulted"] = True
+        else:
+            source_payload.pop("registration_month_defaulted", None)
         source_payload["registration_default_year"] = int(
             payload.get("registration_year") or fallback_year
         )

@@ -282,9 +282,57 @@ class CarsService:
         )
 
     @classmethod
+    def _registration_year_defaulted_expr(cls):
+        payload_json = cast(Car.source_payload, JSONB)
+        fallback_year, _ = get_missing_registration_default()
+        year_defaulted_flag = (
+            func.coalesce(
+                func.jsonb_extract_path_text(payload_json, "registration_year_defaulted"),
+                "false",
+            )
+            == "true"
+        )
+        # Legacy rows only had the generic registration_defaulted flag. Treat them
+        # as year-defaulted only when the stored year equals the global fallback.
+        legacy_year_defaulted = and_(
+            cls._registration_defaulted_expr(),
+            Car.registration_year.is_not(None),
+            Car.registration_year == fallback_year,
+            func.coalesce(
+                cast(func.jsonb_extract_path_text(payload_json, "registration_default_year"), String),
+                "",
+            )
+            == str(fallback_year),
+        )
+        return or_(year_defaulted_flag, legacy_year_defaulted)
+
+    @classmethod
+    def _registration_month_defaulted_expr(cls):
+        payload_json = cast(Car.source_payload, JSONB)
+        _, fallback_month = get_missing_registration_default()
+        month_defaulted_flag = (
+            func.coalesce(
+                func.jsonb_extract_path_text(payload_json, "registration_month_defaulted"),
+                "false",
+            )
+            == "true"
+        )
+        legacy_month_defaulted = and_(
+            cls._registration_defaulted_expr(),
+            Car.registration_month.is_not(None),
+            Car.registration_month == fallback_month,
+            func.coalesce(
+                cast(func.jsonb_extract_path_text(payload_json, "registration_default_month"), String),
+                "",
+            )
+            == str(fallback_month),
+        )
+        return or_(month_defaulted_flag, legacy_month_defaulted)
+
+    @classmethod
     def _registration_uses_model_year_expr(cls):
         return or_(
-            cls._registration_defaulted_expr(),
+            cls._registration_year_defaulted_expr(),
             Car.registration_year.is_(None),
         )
 
@@ -292,6 +340,7 @@ class CarsService:
     def _registration_uses_fallback_month_expr(cls):
         return or_(
             cls._registration_uses_model_year_expr(),
+            cls._registration_month_defaulted_expr(),
             Car.registration_month.is_(None),
         )
 
