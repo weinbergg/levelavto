@@ -29,3 +29,11 @@ def test_refresh_emavto_registration_script_has_targeted_repair_flags():
     assert "--limit" in content
     assert '"registration_defaulted"' in content
     assert "[refresh_emavto_registration]" in content
+
+
+def test_refresh_mobilede_registration_script_has_targeted_repair_flags():
+    content = _read("app/scripts/refresh_mobilede_registration.py")
+    assert "--car-id" in content
+    assert "--limit" in content
+    assert '"first_registration"' in content
+    assert "[refresh_mobilede_registration]" in content

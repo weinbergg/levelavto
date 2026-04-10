@@ -27,3 +27,23 @@ def test_normalize_engine_electric():
 def test_normalize_engine_diesel():
     p = _parser()
     assert p._normalize_engine("Diesel", None) == "Diesel"
+
+
+def test_parse_first_registration_month_year():
+    p = _parser()
+    assert p._parse_first_registration("03/2024") == (2024, 3)
+
+
+def test_parse_first_registration_day_month_year():
+    p = _parser()
+    assert p._parse_first_registration("21.03.2024") == (2024, 3)
+
+
+def test_parse_first_registration_year_month():
+    p = _parser()
+    assert p._parse_first_registration("2024/03") == (2024, 3)
+
+
+def test_parse_first_registration_year_only():
+    p = _parser()
+    assert p._parse_first_registration("2024") == (2024, None)

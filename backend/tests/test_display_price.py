@@ -186,6 +186,57 @@ def test_refresh_visible_price_cache_updates_visible_foreign_cards_even_when_laz
         assert rows[0]["calc_breakdown_json"] == [{"title": "Итого (RUB)", "amount_rub": 6_800_000}]
 
 
+def test_sync_light_rows_from_db_overwrites_stale_card_year_and_price():
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.add(
+            Car(
+                id=1,
+                source_id=1,
+                external_id="1",
+                country="DE",
+                brand="Mercedes-Benz",
+                model="GLE-Class",
+                year=2025,
+                registration_year=2024,
+                registration_month=7,
+                price=35000,
+                currency="EUR",
+                price_rub_cached=3_500_000,
+                total_price_rub_cached=5_200_000,
+                is_available=True,
+            )
+        )
+        db.commit()
+        svc = CarsService(db)
+        rows = [
+            {
+                "id": 1,
+                "brand": "Mercedes-Benz",
+                "model": "GLE-Class",
+                "year": 2026,
+                "registration_year": 2026,
+                "registration_month": 1,
+                "price": 99999,
+                "currency": "USD",
+                "price_rub_cached": 9_999_999,
+                "total_price_rub_cached": 9_999_999,
+            }
+        ]
+
+        refreshed = svc.sync_light_rows_from_db(rows, refresh_prices=False)
+        assert refreshed == 0
+        assert rows[0]["year"] == 2025
+        assert rows[0]["registration_year"] == 2024
+        assert rows[0]["registration_month"] == 7
+        assert float(rows[0]["price"]) == 35000.0
+        assert rows[0]["currency"] == "EUR"
+        assert float(rows[0]["price_rub_cached"]) == 3_500_000.0
+        assert float(rows[0]["total_price_rub_cached"]) == 5_200_000.0
+
+
 def test_needs_recalc_when_fx_signature_changes():
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)

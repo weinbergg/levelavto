@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Iterable, Iterator, List, Optional, Any, Dict
 from dataclasses import asdict
 from decimal import Decimal, ROUND_HALF_UP
@@ -114,6 +115,43 @@ class MobileDeFeedParser:
             return "RWD"
         return None
 
+    def _parse_first_registration(self, raw: Optional[str]) -> tuple[Optional[int], Optional[int]]:
+        if not raw:
+            return None, None
+        value = str(raw).strip()
+        if not value:
+            return None, None
+        normalized = re.sub(r"\s+", "", value)
+        if not normalized or normalized in {"-", "--", "n/a", "na"}:
+            return None, None
+
+        patterns = [
+            r"^(?P<month>\d{1,2})[./-](?P<year>\d{4})$",
+            r"^(?P<day>\d{1,2})[./-](?P<month>\d{1,2})[./-](?P<year>\d{4})$",
+            r"^(?P<year>\d{4})[./-](?P<month>\d{1,2})$",
+            r"^(?P<year>\d{4})$",
+        ]
+        for pattern in patterns:
+            match = re.match(pattern, normalized)
+            if not match:
+                continue
+            year_raw = match.groupdict().get("year")
+            month_raw = match.groupdict().get("month")
+            try:
+                year = int(year_raw) if year_raw else None
+            except Exception:
+                year = None
+            try:
+                month = int(month_raw) if month_raw else None
+            except Exception:
+                month = None
+            if year is None or year < 1950 or year > 2100:
+                return None, None
+            if month is not None and (month < 1 or month > 12):
+                return None, None
+            return year, month
+        return None, None
+
     def iter_parsed_from_csv(self, rows: Iterable[MobileDeCsvRow]) -> Iterator[CarParsed]:
         for row in rows:
             images: List[str] = list(row.image_urls) if row.image_urls else []
@@ -123,6 +161,9 @@ class MobileDeFeedParser:
                 option_values.extend(row.features)
             drive = self._detect_drive(option_values)
             payload = self._payload_from_row(row)
+            registration_year, registration_month = self._parse_first_registration(
+                row.first_registration
+            )
             # skip obviously broken rows
             if not row.mark and not row.model and not row.title:
                 continue
@@ -136,8 +177,8 @@ class MobileDeFeedParser:
                 model=(row.model or None),
                 variant=(row.sub_title or None),
                 year=row.year,
-                registration_year=int(row.first_registration.split("/")[1]) if row.first_registration and "/" in row.first_registration else None,
-                registration_month=int(row.first_registration.split("/")[0]) if row.first_registration and "/" in row.first_registration else None,
+                registration_year=registration_year,
+                registration_month=registration_month,
                 mileage=row.km_age,
                 price=self._resolve_price_eur(row),
                 currency="EUR",

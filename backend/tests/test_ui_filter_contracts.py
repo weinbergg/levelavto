@@ -615,9 +615,11 @@ def test_registration_year_filters_fallback_to_car_year_when_missing():
     service = _read("app/services/cars_service.py")
     counts = _read("app/tools/car_counts_refresh.py")
     assert "def _registration_defaulted_expr()" in service
+    assert "def _registration_uses_model_year_expr(cls)" in service
     assert "def _effective_registration_year_expr(cls)" in service
     assert "def _effective_registration_month_floor_expr(cls)" in service
     assert "def _effective_registration_month_ceil_expr(cls)" in service
+    assert "else_=Car.registration_year" in service
     assert "reg_year_expr = self._effective_registration_year_expr()" in service
     assert "reg_month_floor_expr = self._effective_registration_month_floor_expr()" in service
     assert "reg_month_ceil_expr = self._effective_registration_month_ceil_expr()" in service
@@ -655,6 +657,16 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
     assert 'jsonb_extract_path_text(payload_json, "registration_defaulted")' in recalc_script
     assert "[backfill_missing_registration]" in reg_backfill_script
     assert "step=ensure_services" in fx_daily.read_text(encoding="utf-8")
+
+
+def test_catalog_cache_refreshes_stale_rows_from_db_and_mobilede_parser_supports_registration_formats():
+    catalog = _read("app/routers/catalog.py")
+    parser = _read("app/parsing/mobile_de_feed.py")
+    assert "service.sync_light_rows_from_db(items, refresh_prices=True)" in catalog
+    assert "_serialize_catalog_payload_items(" in catalog
+    assert "def _parse_first_registration" in parser
+    assert r"^(?P<month>\d{1,2})[./-](?P<year>\d{4})$" in parser
+    assert r"^(?P<day>\d{1,2})[./-](?P<month>\d{1,2})[./-](?P<year>\d{4})$" in parser
 
 
 def test_interior_filters_use_derived_text_fallback_from_payload_and_description():

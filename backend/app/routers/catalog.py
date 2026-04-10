@@ -356,6 +356,127 @@ def _to_bool(value: Any) -> Optional[bool]:
     return None
 
 
+def _normalize_thumb_candidate(url: str | None) -> str | None:
+    normalized = normalize_classistatic_url(url)
+    if normalized:
+        return normalized
+    raw = (url or "").strip()
+    return raw or None
+
+
+def _serialize_catalog_payload_items(
+    service: CarsService,
+    items: list[dict],
+    *,
+    image_counts: Optional[dict[int, int]] = None,
+    image_first: Optional[dict[int, str]] = None,
+) -> tuple[list[dict], int]:
+    payload_items: list[dict] = []
+    image_counts = image_counts or {}
+    image_first = image_first or {}
+    fx_rates = service.get_fx_rates() or {}
+    fx_eur = float(fx_rates.get("EUR") or 0)
+    fx_usd = float(fx_rates.get("USD") or 0)
+    fx_cny = float(fx_rates.get("CNY") or 0)
+    eu_sources = set(service._source_ids_for_europe())
+    kr_sources = set(service._source_ids_for_hints(service.KOREA_SOURCE_HINTS))
+    eu_countries = set(service.EU_COUNTRIES)
+    thumb_replaced = 0
+
+    for c in items:
+        country_raw = c.get("country") if isinstance(c, dict) else None
+        country_norm = normalize_country_code(country_raw) if country_raw else None
+        source_id = c.get("source_id") if isinstance(c, dict) else None
+        if country_norm == "KR" or (country_norm and country_norm.startswith("KR")) or source_id in kr_sources:
+            region_val = "KR"
+        elif country_norm == "RU":
+            region_val = "RU"
+        elif country_norm in eu_countries or source_id in eu_sources:
+            region_val = "EU"
+        else:
+            region_val = country_norm or None
+        img_count = image_counts.get(c.get("id"), 0)
+        raw_thumb = _normalize_thumb_candidate(c.get("thumbnail_url")) or image_first.get(c.get("id"))
+        thumb_url = resolve_thumbnail_url(raw_thumb, c.get("thumbnail_local_path"))
+        if not thumb_url:
+            thumb_url = "/static/img/no-photo.svg"
+        if isinstance(thumb_url, str) and "rule=mo-" in thumb_url:
+            thumb_replaced += 1
+        total_cached = c.get("total_price_rub_cached")
+        price_cached = c.get("price_rub_cached")
+        display_rub = display_price_rub(
+            total_cached,
+            price_cached,
+            allow_price_fallback=True,
+        )
+        if display_rub is None and c.get("price") is not None:
+            cur = str(c.get("currency") or "").upper()
+            if cur == "EUR" and fx_eur > 0:
+                display_rub = display_price_rub(None, float(c.get("price")) * fx_eur, allow_price_fallback=True)
+            elif cur == "USD" and fx_usd > 0:
+                display_rub = display_price_rub(None, float(c.get("price")) * fx_usd, allow_price_fallback=True)
+            elif cur == "CNY" and fx_cny > 0:
+                display_rub = display_price_rub(None, float(c.get("price")) * fx_cny, allow_price_fallback=True)
+            elif cur in {"RUB", "₽"}:
+                display_rub = display_price_rub(None, float(c.get("price")), allow_price_fallback=True)
+        effective_engine_cc = effective_engine_cc_value(c)
+        effective_power_hp = effective_power_hp_value(c)
+        effective_power_kw = effective_power_kw_value(c)
+        payload_items.append(
+            {
+                "id": c.get("id"),
+                "brand": c.get("brand"),
+                "model": c.get("model"),
+                "variant": c.get("variant"),
+                "year": c.get("year"),
+                "registration_year": c.get("registration_year"),
+                "registration_month": c.get("registration_month"),
+                "mileage": c.get("mileage"),
+                "total_price_rub_cached": total_cached,
+                "price_rub_cached": price_cached,
+                "display_price_rub": display_rub,
+                "price_note": price_without_util_note(
+                    display_price=display_rub,
+                    total_price_rub_cached=total_cached,
+                    calc_breakdown=c.get("calc_breakdown_json"),
+                    region=region_val,
+                    country=country_norm or country_raw,
+                ),
+                "calc_updated_at": c.get("calc_updated_at"),
+                "thumbnail_url": thumb_url,
+                "country": country_norm or country_raw,
+                "region": region_val,
+                "color": c.get("color"),
+                "display_color": (
+                    ru_color(c.get("color"))
+                    or display_color(c.get("color"))
+                    or (ru_color(normalize_color(c.get("color"))) if normalize_color(c.get("color")) else None)
+                    or (display_color(normalize_color(c.get("color"))) if normalize_color(c.get("color")) else None)
+                    or c.get("color")
+                ),
+                "color_hex": color_hex(normalize_color(c.get("color")) or c.get("color")),
+                "engine_cc": effective_engine_cc,
+                "power_hp": effective_power_hp,
+                "power_kw": effective_power_kw,
+                "engine_type": c.get("engine_type"),
+                "display_engine_type": translate_payload_value("engine_type", c.get("engine_type")) or c.get("engine_type"),
+                "body_type": c.get("body_type"),
+                "display_body_type": ru_body(c.get("body_type")) or display_body(c.get("body_type")) or c.get("body_type"),
+                "transmission": c.get("transmission"),
+                "display_transmission": translate_payload_value("transmission", c.get("transmission")) or c.get("transmission"),
+                "drive_type": c.get("drive_type"),
+                "display_drive_type": translate_payload_value("drive_type", c.get("drive_type")) or c.get("drive_type"),
+                "images_count": img_count,
+                "photos_count": img_count,
+                "price": c.get("price"),
+                "currency": c.get("currency"),
+                "display_country_label": country_label_ru(country_norm or country_raw) or (country_norm or country_raw),
+            }
+        )
+
+    return payload_items, thumb_replaced
+
+
 @router.get("/cars")
 def list_cars(
     request: Request,
@@ -494,6 +615,7 @@ def list_cars(
         source=source,
     )
     cache_key = None
+    cached_response = None
     cache_lock_key = None
     cache_lock_token = None
     strict_photo_mode = _strict_photo_cache_mode(canon.get("region"))
@@ -510,15 +632,16 @@ def list_cars(
         cached = redis_get_json(cache_key)
         if cached is not None:
             print("CARS_LIST_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
-            return cached
-        print("CARS_LIST_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
-        cache_lock_key = f"{cache_key}:lock"
-        cache_lock_token = redis_try_lock(cache_lock_key, ttl_sec=25)
-        if cache_lock_token is None:
-            waited = redis_wait_json(cache_key, timeout_ms=2200, poll_ms=120)
-            if waited is not None:
-                print("CARS_LIST_CACHE hit=1 source=redis_wait key=%s" % cache_key, flush=True)
-                return waited
+            cached_response = cached
+        else:
+            print("CARS_LIST_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
+            cache_lock_key = f"{cache_key}:lock"
+            cache_lock_token = redis_try_lock(cache_lock_key, ttl_sec=25)
+            if cache_lock_token is None:
+                waited = redis_wait_json(cache_key, timeout_ms=2200, poll_ms=120)
+                if waited is not None:
+                    print("CARS_LIST_CACHE hit=1 source=redis_wait key=%s" % cache_key, flush=True)
+                    cached_response = waited
     elif not price_cache_bypass:
         full_cache_params = {
             "region": canon.get("region"),
@@ -569,15 +692,16 @@ def list_cars(
         cached = redis_get_json(cache_key)
         if cached is not None:
             print("CARS_LIST_FULL_CACHE hit=1 source=redis key=%s" % cache_key, flush=True)
-            return cached
-        print("CARS_LIST_FULL_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
-        cache_lock_key = f"{cache_key}:lock"
-        cache_lock_token = redis_try_lock(cache_lock_key, ttl_sec=25)
-        if cache_lock_token is None:
-            waited = redis_wait_json(cache_key, timeout_ms=2200, poll_ms=120)
-            if waited is not None:
-                print("CARS_LIST_FULL_CACHE hit=1 source=redis_wait key=%s" % cache_key, flush=True)
-                return waited
+            cached_response = cached
+        else:
+            print("CARS_LIST_FULL_CACHE hit=0 source=fallback key=%s" % cache_key, flush=True)
+            cache_lock_key = f"{cache_key}:lock"
+            cache_lock_token = redis_try_lock(cache_lock_key, ttl_sec=25)
+            if cache_lock_token is None:
+                waited = redis_wait_json(cache_key, timeout_ms=2200, poll_ms=120)
+                if waited is not None:
+                    print("CARS_LIST_FULL_CACHE hit=1 source=redis_wait key=%s" % cache_key, flush=True)
+                    cached_response = waited
     if os.getenv("FILTERS_CANON") == "1":
         print(
             "FILTERS_CANON cars_count "
@@ -592,72 +716,77 @@ def list_cars(
             f"brand={canon.get('brand')} model={canon.get('model')}",
             flush=True,
         )
-    items, total = service.list_cars(
-        region=canon.get("region"),
-        country=canon.get("country"),
-        brand=canon.get("brand"),
-        lines=line,
-        source_key=source,
-        q=q,
-        model=canon.get("model"),
-        generation=generation,
-        color=color,
-        price_min=price_min,
-        price_max=price_max,
-        power_hp_min=power_hp_min,
-        power_hp_max=power_hp_max,
-        engine_cc_min=engine_cc_min,
-        engine_cc_max=engine_cc_max,
-        year_min=year_min,
-        year_max=year_max,
-        mileage_min=mileage_min,
-        mileage_max=mileage_max,
-        kr_type=canon.get("kr_type"),
-        reg_year_min=reg_year_min,
-        reg_month_min=reg_month_min,
-        reg_year_max=reg_year_max,
-        reg_month_max=reg_month_max,
-        body_type=body_type,
-        engine_type=engine_type,
-        transmission=transmission,
-        drive_type=drive_type,
-        num_seats=num_seats,
-        doors_count=doors_count,
-        emission_class=emission_class,
-        efficiency_class=efficiency_class,
-        climatisation=climatisation,
-        airbags=airbags,
-        interior_design=interior_design,
-        interior_color=interior_color,
-        interior_material=interior_material,
-        vat_reclaimable=vat_reclaimable,
-        air_suspension=air_suspension,
-        price_rating_label=price_rating_label,
-        owners_count=owners_count,
-        condition=condition,
-        sort=sort,
-        page=page,
-        page_size=page_size,
-        light=True,
-        use_fast_count=os.getenv("CATALOG_USE_FAST_COUNT", "1") != "0",
-        hide_no_local_photo=(strict_photo_mode == "1"),
-    )
+    if cached_response is not None:
+        cached_items = cached_response.get("items") if isinstance(cached_response, dict) else None
+        items = [dict(item) for item in (cached_items or []) if isinstance(item, dict)]
+        total = _to_int(cached_response.get("total")) if isinstance(cached_response, dict) else None
+        total = total if total is not None else 0
+        if items:
+            try:
+                service.sync_light_rows_from_db(items, refresh_prices=True)
+            except Exception:
+                logger.exception("catalog_cache_refresh_failed")
+    else:
+        items, total = service.list_cars(
+            region=canon.get("region"),
+            country=canon.get("country"),
+            brand=canon.get("brand"),
+            lines=line,
+            source_key=source,
+            q=q,
+            model=canon.get("model"),
+            generation=generation,
+            color=color,
+            price_min=price_min,
+            price_max=price_max,
+            power_hp_min=power_hp_min,
+            power_hp_max=power_hp_max,
+            engine_cc_min=engine_cc_min,
+            engine_cc_max=engine_cc_max,
+            year_min=year_min,
+            year_max=year_max,
+            mileage_min=mileage_min,
+            mileage_max=mileage_max,
+            kr_type=canon.get("kr_type"),
+            reg_year_min=reg_year_min,
+            reg_month_min=reg_month_min,
+            reg_year_max=reg_year_max,
+            reg_month_max=reg_month_max,
+            body_type=body_type,
+            engine_type=engine_type,
+            transmission=transmission,
+            drive_type=drive_type,
+            num_seats=num_seats,
+            doors_count=doors_count,
+            emission_class=emission_class,
+            efficiency_class=efficiency_class,
+            climatisation=climatisation,
+            airbags=airbags,
+            interior_design=interior_design,
+            interior_color=interior_color,
+            interior_material=interior_material,
+            vat_reclaimable=vat_reclaimable,
+            air_suspension=air_suspension,
+            price_rating_label=price_rating_label,
+            owners_count=owners_count,
+            condition=condition,
+            sort=sort,
+            page=page,
+            page_size=page_size,
+            light=True,
+            use_fast_count=os.getenv("CATALOG_USE_FAST_COUNT", "1") != "0",
+            hide_no_local_photo=(strict_photo_mode == "1"),
+        )
+        try:
+            service.refresh_visible_price_cache(items)
+        except Exception:
+            pass
     t1 = time.perf_counter()
-    try:
-        service.refresh_visible_price_cache(items)
-    except Exception:
-        pass
     if items and not isinstance(items[0], dict):
         items = [dict(row) for row in items]
     image_counts = {}
     image_first = {}
     with_photo_stats = os.getenv("CATALOG_WITH_PHOTO_STATS", "0") == "1"
-    def _normalize_thumb(url: str | None) -> str | None:
-        normalized = normalize_classistatic_url(url)
-        if normalized:
-            return normalized
-        raw = (url or "").strip()
-        return raw or None
     if items and with_photo_stats:
         ids = [c.get("id") for c in items if c.get("id")]
         if ids:
@@ -678,7 +807,7 @@ def list_cars(
                 )
                 .all()
             )
-            image_first = {car_id: _normalize_thumb(url) for car_id, url in rows if url}
+            image_first = {car_id: _normalize_thumb_candidate(url) for car_id, url in rows if url}
     elif items:
         ids = [
             c.get("id")
@@ -696,108 +825,14 @@ def list_cars(
                 )
                 .all()
             )
-            image_first = {car_id: _normalize_thumb(url) for car_id, url in rows if url}
+            image_first = {car_id: _normalize_thumb_candidate(url) for car_id, url in rows if url}
     t2 = time.perf_counter()
-    payload_items = []
-    fx_rates = service.get_fx_rates() or {}
-    fx_eur = float(fx_rates.get("EUR") or 0)
-    fx_usd = float(fx_rates.get("USD") or 0)
-    fx_cny = float(fx_rates.get("CNY") or 0)
-    eu_sources = set(service._source_ids_for_europe())
-    kr_sources = set(service._source_ids_for_hints(service.KOREA_SOURCE_HINTS))
-    eu_countries = set(service.EU_COUNTRIES)
-    thumb_replaced = 0
-    for c in items:
-        country_raw = c.get("country") if isinstance(c, dict) else None
-        country_norm = normalize_country_code(
-            country_raw) if country_raw else None
-        source_id = c.get("source_id") if isinstance(c, dict) else None
-        if country_norm == "KR" or (country_norm and country_norm.startswith("KR")) or source_id in kr_sources:
-            region_val = "KR"
-        elif country_norm == "RU":
-            region_val = "RU"
-        elif country_norm in eu_countries or source_id in eu_sources:
-            region_val = "EU"
-        else:
-            region_val = country_norm or None
-        img_count = image_counts.get(c.get("id"), 0)
-        raw_thumb = _normalize_thumb(c.get("thumbnail_url")) or image_first.get(c.get("id"))
-        thumb_url = resolve_thumbnail_url(raw_thumb, c.get("thumbnail_local_path"))
-        if not thumb_url:
-            thumb_url = "/static/img/no-photo.svg"
-        if isinstance(thumb_url, str) and "rule=mo-" in thumb_url:
-            thumb_replaced += 1
-        total_cached = c.get("total_price_rub_cached")
-        price_cached = c.get("price_rub_cached")
-        display_rub = display_price_rub(
-            total_cached,
-            price_cached,
-            allow_price_fallback=True,
-        )
-        if display_rub is None and c.get("price") is not None:
-            cur = str(c.get("currency") or "").upper()
-            if cur == "EUR" and fx_eur > 0:
-                display_rub = display_price_rub(None, float(c.get("price")) * fx_eur, allow_price_fallback=True)
-            elif cur == "USD" and fx_usd > 0:
-                display_rub = display_price_rub(None, float(c.get("price")) * fx_usd, allow_price_fallback=True)
-            elif cur == "CNY" and fx_cny > 0:
-                display_rub = display_price_rub(None, float(c.get("price")) * fx_cny, allow_price_fallback=True)
-            elif cur in {"RUB", "₽"}:
-                display_rub = display_price_rub(None, float(c.get("price")), allow_price_fallback=True)
-        effective_engine_cc = effective_engine_cc_value(c)
-        effective_power_hp = effective_power_hp_value(c)
-        effective_power_kw = effective_power_kw_value(c)
-        payload_items.append(
-            {
-                "id": c.get("id"),
-                "brand": c.get("brand"),
-                "model": c.get("model"),
-                "variant": c.get("variant"),
-                "year": c.get("year"),
-                "registration_year": c.get("registration_year"),
-                "registration_month": c.get("registration_month"),
-                "mileage": c.get("mileage"),
-                "total_price_rub_cached": total_cached,
-                "price_rub_cached": price_cached,
-                "display_price_rub": display_rub,
-                "price_note": price_without_util_note(
-                    display_price=display_rub,
-                    total_price_rub_cached=total_cached,
-                    calc_breakdown=c.get("calc_breakdown_json"),
-                    region=region_val,
-                    country=country_norm or country_raw,
-                ),
-                "calc_updated_at": c.get("calc_updated_at"),
-                "thumbnail_url": thumb_url,
-                "country": country_norm or country_raw,
-                "region": region_val,
-                "color": c.get("color"),
-                "display_color": (
-                    ru_color(c.get("color"))
-                    or display_color(c.get("color"))
-                    or (ru_color(normalize_color(c.get("color"))) if normalize_color(c.get("color")) else None)
-                    or (display_color(normalize_color(c.get("color"))) if normalize_color(c.get("color")) else None)
-                    or c.get("color")
-                ),
-                "color_hex": color_hex(normalize_color(c.get("color")) or c.get("color")),
-                "engine_cc": effective_engine_cc,
-                "power_hp": effective_power_hp,
-                "power_kw": effective_power_kw,
-                "engine_type": c.get("engine_type"),
-                "display_engine_type": translate_payload_value("engine_type", c.get("engine_type")) or c.get("engine_type"),
-                "body_type": c.get("body_type"),
-                "display_body_type": ru_body(c.get("body_type")) or display_body(c.get("body_type")) or c.get("body_type"),
-                "transmission": c.get("transmission"),
-                "display_transmission": translate_payload_value("transmission", c.get("transmission")) or c.get("transmission"),
-                "drive_type": c.get("drive_type"),
-                "display_drive_type": translate_payload_value("drive_type", c.get("drive_type")) or c.get("drive_type"),
-                "images_count": img_count,
-                "photos_count": img_count,
-                "price": c.get("price"),
-                "currency": c.get("currency"),
-                "display_country_label": country_label_ru(country_norm or country_raw) or (country_norm or country_raw),
-            }
-        )
+    payload_items, thumb_replaced = _serialize_catalog_payload_items(
+        service,
+        items,
+        image_counts=image_counts,
+        image_first=image_first,
+    )
     t3 = time.perf_counter()
     if timing_enabled:
         parts = {

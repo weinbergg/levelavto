@@ -282,24 +282,29 @@ class CarsService:
         )
 
     @classmethod
+    def _registration_uses_model_year_expr(cls):
+        country_expr = func.upper(func.coalesce(Car.country, ""))
+        return and_(cls._registration_defaulted_expr(), country_expr.like("KR%"))
+
+    @classmethod
     def _effective_registration_year_expr(cls):
         return case(
-            (cls._registration_defaulted_expr(), Car.year),
-            else_=func.coalesce(Car.registration_year, Car.year),
+            (cls._registration_uses_model_year_expr(), Car.year),
+            else_=Car.registration_year,
         )
 
     @classmethod
     def _effective_registration_month_floor_expr(cls):
         return case(
-            (cls._registration_defaulted_expr(), 12),
-            else_=func.coalesce(Car.registration_month, 12),
+            (cls._registration_uses_model_year_expr(), 12),
+            else_=Car.registration_month,
         )
 
     @classmethod
     def _effective_registration_month_ceil_expr(cls):
         return case(
-            (cls._registration_defaulted_expr(), 1),
-            else_=func.coalesce(Car.registration_month, 1),
+            (cls._registration_uses_model_year_expr(), 1),
+            else_=Car.registration_month,
         )
 
     def _normalized_model_expr(self):
@@ -2295,8 +2300,24 @@ class CarsService:
                     self.logger.exception("lazy_recalc_item_failed car=%s", getattr(car, "id", None))
 
     def _merge_light_row_from_car(self, row: Dict[str, Any], car: Car) -> None:
+        row["brand"] = car.brand
+        row["model"] = car.model
         row["variant"] = car.variant
+        row["year"] = car.year
+        row["registration_year"] = car.registration_year
+        row["registration_month"] = car.registration_month
+        row["mileage"] = car.mileage
+        row["price"] = car.price
+        row["currency"] = car.currency
+        row["country"] = car.country
+        row["source_id"] = car.source_id
+        row["thumbnail_url"] = car.thumbnail_url
+        row["thumbnail_local_path"] = car.thumbnail_local_path
+        row["color"] = car.color
+        row["body_type"] = car.body_type
         row["engine_type"] = car.engine_type
+        row["transmission"] = car.transmission
+        row["drive_type"] = car.drive_type
         row["engine_cc"] = car.engine_cc
         row["power_hp"] = car.power_hp
         row["power_kw"] = car.power_kw
@@ -2309,6 +2330,65 @@ class CarsService:
         row["calc_updated_at"] = car.calc_updated_at
         row["updated_at"] = car.updated_at
         row["spec_inferred_at"] = car.spec_inferred_at
+
+    def sync_light_rows_from_db(self, items: List[Dict[str, Any]], *, refresh_prices: bool = False) -> int:
+        if not items:
+            return 0
+        ids: list[int] = []
+        seen_ids: set[int] = set()
+        for row in items:
+            if not isinstance(row, dict):
+                continue
+            car_id = row.get("id")
+            if not isinstance(car_id, int) or car_id in seen_ids:
+                continue
+            ids.append(car_id)
+            seen_ids.add(car_id)
+        if not ids:
+            return 0
+        cars = self.db.execute(select(Car).where(Car.id.in_(ids))).scalars().all()
+        cars_by_id = {car.id: car for car in cars}
+        refreshed = 0
+        if refresh_prices:
+            _, cfg_version, customs_version, fx_signature = self._load_lazy_recalc_versions()
+            for car_id in ids:
+                car = cars_by_id.get(car_id)
+                if car is None:
+                    continue
+                if not self._needs_visible_price_refresh(
+                    car,
+                    cfg_version,
+                    customs_version,
+                    fx_signature,
+                ):
+                    continue
+                try:
+                    before_total = car.total_price_rub_cached
+                    before_calc = car.calc_updated_at
+                    self.ensure_calc_cache(car, force=False)
+                    if car.total_price_rub_cached != before_total or car.calc_updated_at != before_calc:
+                        refreshed += 1
+                except Exception:
+                    self.logger.exception("visible_price_refresh_failed car=%s", car_id)
+        merged = 0
+        for row in items:
+            if not isinstance(row, dict):
+                continue
+            car_id = row.get("id")
+            if not isinstance(car_id, int):
+                continue
+            car = cars_by_id.get(car_id)
+            if car is None:
+                continue
+            self._merge_light_row_from_car(row, car)
+            merged += 1
+        if refreshed:
+            self.logger.info(
+                "visible_price_refresh refreshed=%s items=%s",
+                refreshed,
+                len(ids),
+            )
+        return refreshed
 
     def _lazy_recalc_light_items(self, items: List[Dict[str, Any]]) -> None:
         lazy_enabled, cfg_version, customs_version, fx_signature = self._load_lazy_recalc_versions()
@@ -2393,65 +2473,10 @@ class CarsService:
         )
 
     def refresh_visible_price_cache(self, items: List[Any]) -> int:
-        if not items:
-            return 0
-        _, cfg_version, customs_version, fx_signature = self._load_lazy_recalc_versions()
-        candidate_ids: list[int] = []
-        seen_ids: set[int] = set()
-        for item in items:
-            car_id = _record_value(item, "id")
-            if not isinstance(car_id, int) or car_id in seen_ids:
-                continue
-            country = str(_record_value(item, "country") or "").upper()
-            if country == "RU":
-                continue
-            if not self._needs_visible_price_refresh(
-                item,
-                cfg_version,
-                customs_version,
-                fx_signature,
-            ):
-                continue
-            candidate_ids.append(car_id)
-            seen_ids.add(car_id)
-        if not candidate_ids:
-            return 0
-        cars = (
-            self.db.execute(select(Car).where(Car.id.in_(candidate_ids)))
-            .scalars()
-            .all()
+        return self.sync_light_rows_from_db(
+            [item for item in items if isinstance(item, dict)],
+            refresh_prices=True,
         )
-        cars_by_id = {car.id: car for car in cars}
-        refreshed = 0
-        for car_id in candidate_ids:
-            car = cars_by_id.get(car_id)
-            if car is None:
-                continue
-            try:
-                before_total = car.total_price_rub_cached
-                before_calc = car.calc_updated_at
-                self.ensure_calc_cache(car, force=False)
-                if car.total_price_rub_cached != before_total or car.calc_updated_at != before_calc:
-                    refreshed += 1
-            except Exception:
-                self.logger.exception("visible_price_refresh_failed car=%s", car_id)
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            car_id = item.get("id")
-            if not isinstance(car_id, int):
-                continue
-            car = cars_by_id.get(car_id)
-            if car is None:
-                continue
-            self._merge_light_row_from_car(item, car)
-        if refreshed:
-            self.logger.info(
-                "visible_price_refresh refreshed=%s items=%s",
-                refreshed,
-                len(candidate_ids),
-            )
-        return refreshed
 
     def _refresh_price_sensitive_candidates(
         self,
