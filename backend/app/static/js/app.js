@@ -1642,14 +1642,92 @@
             const rawThumb = item.thumbnail_url || ''
             const src = normalizeThumbUrl(rawThumb, { thumb: true })
             const orig = normalizeThumbUrl(rawThumb)
-            if (src !== '/static/img/no-photo.svg') {
-              img.dataset.thumb = src
-              img.setAttribute('src', src)
-            }
-            if (orig && orig !== '/static/img/no-photo.svg') {
-              img.dataset.orig = orig
-            }
+            img.dataset.thumb = src
+            img.setAttribute('src', src)
+            img.dataset.orig = (orig && orig !== '/static/img/no-photo.svg') ? orig : ''
             applyThumbFallback(img)
+          }
+          const titleNode = card.querySelector('.car-card__title')
+          if (titleNode) {
+            titleNode.textContent = `${item.brand || ''} ${item.model || ''}`.trim()
+          }
+          let subtitleNode = card.querySelector('.car-card__subtitle')
+          if (item.variant) {
+            if (!subtitleNode && titleNode?.parentNode) {
+              subtitleNode = document.createElement('div')
+              subtitleNode.className = 'car-card__subtitle'
+              titleNode.insertAdjacentElement('afterend', subtitleNode)
+            }
+            if (subtitleNode) subtitleNode.textContent = item.variant
+          } else if (subtitleNode) {
+            subtitleNode.remove()
+            subtitleNode = null
+          }
+          let regLabel = ''
+          if (item.registration_year) {
+            const m = Number(item.registration_month || 1)
+            const label = window.MONTH_LABELS && window.MONTH_LABELS[m]
+            regLabel = label ? `${label} ${item.registration_year}` : `${String(m).padStart(2, '0')}.${item.registration_year}`
+          } else if (item.year) {
+            regLabel = String(item.year)
+          }
+          const metaText = [regLabel, item.display_engine_type || item.engine_type].filter(Boolean).join(' · ')
+          let metaNode = card.querySelector('.car-card__meta')
+          if (metaText) {
+            if (!metaNode && titleNode?.parentNode) {
+              metaNode = document.createElement('div')
+              metaNode.className = 'car-card__meta'
+              ;(subtitleNode || titleNode).insertAdjacentElement('afterend', metaNode)
+            }
+            if (metaNode) metaNode.textContent = metaText
+          } else if (metaNode) {
+            metaNode.remove()
+            metaNode = null
+          }
+          const colorDot = (hex, raw) => {
+            if (!hex) return ''
+            const title = raw ? ` title="${escapeHtml(raw)}"` : ''
+            return `<span class="spec-dot" style="background:${hex}"${title}></span>`
+          }
+          const specLines = []
+          if (item.mileage != null) {
+            specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/mileage.svg" alt="">${Number(item.mileage).toLocaleString('ru-RU')} км</span>`)
+          }
+          if (item.engine_type) {
+            specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/fuel.svg" alt="">${escapeHtml(item.display_engine_type || item.engine_type)}</span>`)
+          }
+          if (item.power_hp) {
+            specLines.push(`<span class="spec-line">Мощность: ${Math.round(item.power_hp)} л.с.</span>`)
+          }
+          if (item.engine_cc) {
+            specLines.push(`<span class="spec-line">Объём: ${Number(item.engine_cc).toLocaleString('ru-RU')} см³</span>`)
+          }
+          if (item.display_transmission || item.transmission) {
+            specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/drive.svg" alt="">${escapeHtml(item.display_transmission || item.transmission)}</span>`)
+          }
+          if (item.display_body_type || item.body_type) {
+            specLines.push(`<span class="spec-line">${escapeHtml(item.display_body_type || item.body_type)}</span>`)
+          }
+          if (item.display_color || item.color) {
+            const label = escapeHtml(item.display_color || item.color)
+            specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/color.svg" alt="">${colorDot(item.color_hex, item.color)}${label}</span>`)
+          }
+          if (item.display_country_label || item.country) {
+            specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/flag.svg" alt="">${escapeHtml(item.display_country_label || item.country)}</span>`)
+          }
+          let specsNode = card.querySelector('.specs')
+          if (specLines.length) {
+            if (!specsNode && titleNode?.parentNode) {
+              specsNode = document.createElement('ul')
+              specsNode.className = 'specs'
+              const anchorNode = metaNode || subtitleNode || titleNode
+              anchorNode.insertAdjacentElement('afterend', specsNode)
+            }
+            if (specsNode) {
+              specsNode.innerHTML = specLines.map((line) => `<li>${line}</li>`).join('')
+            }
+          } else if (specsNode) {
+            specsNode.remove()
           }
           const priceMain = card.querySelector('.price-main')
           if (priceMain) {

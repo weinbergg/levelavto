@@ -59,6 +59,8 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "select.disabled = normalizedItems.length === 0" in script or "select.disabled = deduped.length === 0" in script
     assert "bindChoiceChips(filtersForm, () => loadCars(1, { scrollToTop: true }))" in script
     assert "const priceMain = card.querySelector('.price-main')" in script
+    assert "let metaNode = card.querySelector('.car-card__meta')" in script
+    assert "let specsNode = card.querySelector('.specs')" in script
     assert "void loadCars(initialPage)" in script
     assert "contentWrap.className = 'model-accordion__content'" in script or 'contentWrap.className = "model-accordion__content"' in script
 
@@ -117,7 +119,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=101' in template
+    assert '/static/js/app.js?v=102' in template
     assert '/static/css/styles.css?v=62' in template
 
 
@@ -616,6 +618,8 @@ def test_registration_year_filters_fallback_to_car_year_when_missing():
     counts = _read("app/tools/car_counts_refresh.py")
     assert "def _registration_defaulted_expr()" in service
     assert "def _registration_uses_model_year_expr(cls)" in service
+    assert "def _registration_uses_fallback_month_expr(cls)" in service
+    assert "Car.registration_year.is_(None)" in service
     assert "def _effective_registration_year_expr(cls)" in service
     assert "def _effective_registration_month_floor_expr(cls)" in service
     assert "def _effective_registration_month_ceil_expr(cls)" in service

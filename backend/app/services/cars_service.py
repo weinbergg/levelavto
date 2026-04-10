@@ -283,8 +283,17 @@ class CarsService:
 
     @classmethod
     def _registration_uses_model_year_expr(cls):
-        country_expr = func.upper(func.coalesce(Car.country, ""))
-        return and_(cls._registration_defaulted_expr(), country_expr.like("KR%"))
+        return or_(
+            cls._registration_defaulted_expr(),
+            Car.registration_year.is_(None),
+        )
+
+    @classmethod
+    def _registration_uses_fallback_month_expr(cls):
+        return or_(
+            cls._registration_uses_model_year_expr(),
+            Car.registration_month.is_(None),
+        )
 
     @classmethod
     def _effective_registration_year_expr(cls):
@@ -296,14 +305,14 @@ class CarsService:
     @classmethod
     def _effective_registration_month_floor_expr(cls):
         return case(
-            (cls._registration_uses_model_year_expr(), 12),
+            (cls._registration_uses_fallback_month_expr(), 12),
             else_=Car.registration_month,
         )
 
     @classmethod
     def _effective_registration_month_ceil_expr(cls):
         return case(
-            (cls._registration_uses_model_year_expr(), 1),
+            (cls._registration_uses_fallback_month_expr(), 1),
             else_=Car.registration_month,
         )
 
