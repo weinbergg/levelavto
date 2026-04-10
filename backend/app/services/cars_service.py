@@ -550,6 +550,22 @@ class CarsService:
                 continue
             aliases = _dedupe_model_values([*(item.get("aliases") or []), str(item.get("value") or "")])
             resolved = aliases or [label]
+            groups = self.build_model_groups(brand=norm_brand, models=models)
+            for group in groups:
+                group_label = normalize_model_label(group.get("label"))
+                group_key = model_lookup_key(group_label)
+                group_models = group.get("models") or []
+                if group_key != target_key or len(group_models) <= 1:
+                    continue
+                expanded = _dedupe_model_values(
+                    [
+                        *(alias for row in group_models for alias in (row.get("aliases") or [])),
+                        *(str(row.get("value") or "") for row in group_models),
+                    ]
+                )
+                if expanded:
+                    resolved = expanded
+                break
             self._resolved_model_alias_cache[cache_key] = list(resolved)
             return resolved
         self._resolved_model_alias_cache[cache_key] = [label]
@@ -3261,7 +3277,8 @@ class CarsService:
         raw = str(model or "").strip()
         if not raw:
             return "other"
-        token = re.split(r"\s+", raw, maxsplit=1)[0].strip(" ,.;")
+        search_tokens = _model_search_tokens(raw)
+        token = (search_tokens[0] if search_tokens else re.split(r"\s+", raw, maxsplit=1)[0]).strip(" ,.;")
         if not token:
             return "other"
         brand_norm = normalize_brand(brand).strip().upper()
@@ -3317,6 +3334,37 @@ class CarsService:
             return "Series 911"
         return key
 
+    def _model_group_display_label(
+        self,
+        brand: str,
+        key: str,
+        models: List[Dict[str, Any]],
+    ) -> str:
+        base_label = self._model_family_label(brand, key)
+        norm_brand = normalize_brand(brand).strip().upper() if brand else ""
+        if (norm_brand == "BMW" and key.endswith("-series")) or (
+            norm_brand == "PORSCHE" and key == "911-series"
+        ):
+            return base_label
+        candidates = _dedupe_model_values(
+            [
+                str(item.get("label") or item.get("value") or "").strip()
+                for item in models
+                if str(item.get("label") or item.get("value") or "").strip()
+            ]
+        )
+        if norm_brand == "MERCEDES-BENZ":
+            class_candidates = [
+                value
+                for value in candidates
+                if "class" in _model_search_tokens(value)
+            ]
+            if class_candidates:
+                candidates = class_candidates
+        if not candidates:
+            return base_label
+        return min(candidates, key=lambda value: (len(value), self._natural_text_key(value)))
+
     def build_model_groups(
         self, *, brand: Optional[str], models: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
@@ -3329,8 +3377,7 @@ class CarsService:
             key = self._model_family_key(norm_brand, value)
             bucket = grouped.get(key)
             if bucket is None:
-                label = self._model_family_label(norm_brand, key)
-                bucket = {"key": key, "label": label, "count": 0, "models": []}
+                bucket = {"key": key, "label": key, "count": 0, "models": []}
                 grouped[key] = bucket
             bucket["models"].append(item)
             bucket["count"] += int(item.get("count") or 0)
@@ -3340,6 +3387,11 @@ class CarsService:
             group["models"] = sorted(
                 group["models"],
                 key=lambda x: self._natural_text_key(x.get("label") or x.get("value") or ""),
+            )
+            group["label"] = self._model_group_display_label(
+                norm_brand,
+                str(group.get("key") or ""),
+                group["models"],
             )
         def group_sort_key(item: Dict[str, Any]) -> tuple:
             label = str(item.get("label") or "")

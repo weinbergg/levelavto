@@ -54,3 +54,15 @@ def test_model_grouping_porsche_911_series():
     assert "Series 911" in labels
     family = next(g for g in groups if g["label"] == "Series 911")
     assert {m["value"] for m in family["models"]} == {"911", "930", "964", "991", "992"}
+
+
+def test_model_grouping_mercedes_class_family_merges_coupe_variants():
+    service = CarsService(db=None)  # type: ignore[arg-type]
+    models = [
+        {"value": "GLE-Class", "label": "GLE-Class", "count": 12},
+        {"value": "GLE Coupe", "label": "GLE Coupe", "count": 5},
+        {"value": "GLC-Class", "label": "GLC-Class", "count": 9},
+    ]
+    groups = service.build_model_groups(brand="Mercedes-Benz", models=models)
+    gle_group = next(g for g in groups if g["label"] == "GLE-Class")
+    assert {m["value"] for m in gle_group["models"]} == {"GLE-Class", "GLE Coupe"}

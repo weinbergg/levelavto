@@ -50,3 +50,24 @@ def test_model_grouping_bmw_normalizes_series_family_labels():
     assert "7 серия" in labels
     family = next(group for group in groups if group["label"] == "7 серия")
     assert {item["value"] for item in family["models"]} == {"7 серия", "7"}
+
+
+def test_resolve_model_aliases_expands_family_label_to_group_members(monkeypatch):
+    service = CarsService(db=object())  # type: ignore[arg-type]
+
+    def fake_models_for_brand_filtered(**kwargs):
+        return [
+            {"value": "Cayenne", "label": "Cayenne", "count": 12, "aliases": ["Cayenne"]},
+            {"value": "Cayenne Coupe", "label": "Cayenne Coupe", "count": 5, "aliases": ["Cayenne Coupe"]},
+            {"value": "Macan", "label": "Macan", "count": 8, "aliases": ["Macan"]},
+        ]
+
+    monkeypatch.setattr(service, "models_for_brand_filtered", fake_models_for_brand_filtered)
+
+    assert set(service._resolve_model_aliases(region="EU", brand="Porsche", model="Cayenne")) == {
+        "Cayenne",
+        "Cayenne Coupe",
+    }
+    assert service._resolve_model_aliases(region="EU", brand="Porsche", model="Cayenne Coupe") == [
+        "Cayenne Coupe"
+    ]
