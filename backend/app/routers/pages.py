@@ -80,8 +80,29 @@ def _home_dataset_version() -> str:
         return "0"
 
 
+def _home_media_cache_version() -> str:
+    app_root = Path(__file__).resolve().parents[1]
+    static_collage_dir = app_root / "static" / "home-collage"
+    manifest_path = static_collage_dir / "manifest.json"
+    try:
+        if manifest_path.exists():
+            stat = manifest_path.stat()
+            return f"v5:{int(stat.st_mtime)}:{int(stat.st_size)}"
+        latest_mtime = 0
+        file_count = 0
+        if static_collage_dir.exists():
+            for path_obj in static_collage_dir.rglob("*"):
+                if not path_obj.is_file():
+                    continue
+                file_count += 1
+                latest_mtime = max(latest_mtime, int(path_obj.stat().st_mtime))
+        return f"v5:dir:{file_count}:{latest_mtime}"
+    except Exception:
+        return "v5:unknown"
+
+
 def _home_media_redis_key() -> str:
-    return "home_media_ctx:v4"
+    return f"home_media_ctx:{_home_media_cache_version()}"
 
 
 def _home_recommended_redis_key(cfg: Dict[str, Any], limit: int) -> str:
@@ -1141,7 +1162,7 @@ def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
 
 
 def _build_home_media_context(db: Session) -> Dict[str, Any]:
-    cache_key = "home_media:default"
+    cache_key = f"home_media:{_home_media_cache_version()}"
     cached = _HOME_MEDIA_CACHE.get(cache_key)
     if cached:
         return cached
@@ -1243,7 +1264,7 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
                     "srcset": "",
                     "width": 320,
                     "height": 240,
-                    "fallback": src,
+                    "fallback": "/static/img/no-photo.svg",
                 }
             )
     else:

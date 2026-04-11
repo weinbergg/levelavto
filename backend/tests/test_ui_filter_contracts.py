@@ -276,6 +276,7 @@ def test_home_media_loader_supports_collage_manifest():
     assert 'static_manifest_path = static_collage_dir / "manifest.json"' in router
     assert 'manifest_entries = [item for item in raw_manifest if isinstance(item, dict)]' in router
     assert 'static_collage_dir / str(item.get("file") or "").strip()' in router
+    assert '"fallback": "/static/img/no-photo.svg"' in router
 
 
 def test_home_template_places_partners_block_after_search_and_hides_legacy_copy():
@@ -398,7 +399,8 @@ def test_pages_home_uses_recommended_and_media_cache_helpers():
     router = _read("app/routers/pages.py")
     assert "_get_home_recommended(service, db, reco_cfg, limit=12)" in router
     assert "_get_home_more_offers(service, db, limit=12)" in router
-    assert "home_media_ctx:v4" in router
+    assert "def _home_media_cache_version()" in router
+    assert 'return f"home_media_ctx:{_home_media_cache_version()}"' in router
     assert 'static" / "home-collage"' in router
     assert "home_recommended:" in router
     assert "home_more_offers:" in router
