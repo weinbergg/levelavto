@@ -1205,20 +1205,36 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
         ]
 
     collage_images: List[Dict[str, Any]] = []
+    static_manifest_path = static_collage_dir / "manifest.json"
+    manifest_entries: list[dict[str, Any]] = []
+    if static_manifest_path.exists():
+        try:
+            raw_manifest = json.loads(static_manifest_path.read_text(encoding="utf-8"))
+            if isinstance(raw_manifest, list):
+                manifest_entries = [item for item in raw_manifest if isinstance(item, dict)]
+        except Exception:
+            logger.exception("home_collage_manifest_load_failed path=%s", static_manifest_path)
     static_gallery_files = (
-        sorted(
-            p
-            for p in static_collage_dir.rglob("*")
-            if p.is_file()
-            and p.suffix.lower() in image_exts
-            and not any(part.startswith(".") for part in p.parts)
+        [
+            static_collage_dir / str(item.get("file") or "").strip()
+            for item in manifest_entries
+            if str(item.get("file") or "").strip()
+            and (static_collage_dir / str(item.get("file") or "").strip()).exists()
+        ]
+        if manifest_entries
+        else (
+            sorted(
+                p
+                for p in static_collage_dir.rglob("*")
+                if p.is_file()
+                and p.suffix.lower() in image_exts
+                and not any(part.startswith(".") for part in p.parts)
+            )
+            if static_collage_dir.exists()
+            else []
         )
-        if static_collage_dir.exists()
-        else []
     )
     if static_gallery_files:
-        rng_files = random.Random(42)
-        rng_files.shuffle(static_gallery_files)
         for path_obj in static_gallery_files:
             src = build_static_url(path_obj)
             collage_images.append(

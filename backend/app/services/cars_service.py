@@ -285,12 +285,19 @@ class CarsService:
     def _registration_year_defaulted_expr(cls):
         payload_json = cast(Car.source_payload, JSONB)
         fallback_year, _ = get_missing_registration_default()
-        year_defaulted_flag = (
+        # EU rows should trust the parsed first-registration year when it exists.
+        # The defaulted flags were introduced to protect KR imports where fallback
+        # registration values were historically persisted into the real columns.
+        # Some older EU payloads can still carry default markers, but treating
+        # those flags as authoritative would wrongly collapse first-registration
+        # filters back to model-year filters.
+        year_defaulted_flag = and_(
+            Car.country.like("KR%"),
             func.coalesce(
                 func.jsonb_extract_path_text(payload_json, "registration_year_defaulted"),
                 "false",
             )
-            == "true"
+            == "true",
         )
         # Legacy rows only had the generic registration_defaulted flag. Treat them
         # as year-defaulted only for KR rows, where old imports persisted fallback
@@ -313,12 +320,13 @@ class CarsService:
     def _registration_month_defaulted_expr(cls):
         payload_json = cast(Car.source_payload, JSONB)
         _, fallback_month = get_missing_registration_default()
-        month_defaulted_flag = (
+        month_defaulted_flag = and_(
+            Car.country.like("KR%"),
             func.coalesce(
                 func.jsonb_extract_path_text(payload_json, "registration_month_defaulted"),
                 "false",
             )
-            == "true"
+            == "true",
         )
         legacy_month_defaulted = and_(
             Car.country.like("KR%"),

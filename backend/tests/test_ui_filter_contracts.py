@@ -263,11 +263,23 @@ def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
     assert '/static/css/home.css?v=25' in template
+    assert "collage_images[:120]" in template
 
 
 def test_home_template_places_partners_block_after_search():
     template = _read("app/templates/home.html")
     assert 'class="la-container hero-search"' in template
+
+
+def test_home_media_loader_supports_collage_manifest():
+    router = _read("app/routers/pages.py")
+    assert 'static_manifest_path = static_collage_dir / "manifest.json"' in router
+    assert 'manifest_entries = [item for item in raw_manifest if isinstance(item, dict)]' in router
+    assert 'static_collage_dir / str(item.get("file") or "").strip()' in router
+
+
+def test_home_template_places_partners_block_after_search_and_hides_legacy_copy():
+    template = _read("app/templates/home.html")
     assert 'class="la-container hero-partners" id="home-partners"' in template
     assert template.index('class="la-container hero-search"') < template.index('class="la-container hero-partners" id="home-partners"')
     assert "{{ home.hero.why_title }}" not in template
@@ -397,7 +409,7 @@ def test_pages_home_uses_recommended_and_media_cache_helpers():
 def test_home_collage_and_home_content_copy_are_updated():
     template = _read("app/templates/home.html")
     home_content = _read("app/utils/home_content.py")
-    assert "collage_base = collage_images[:50] if collage_images|length > 50 else collage_images" in template
+    assert "collage_base = collage_images[:120] if collage_images|length > 120 else collage_images" in template
     assert 'data-loop-base-count="{{ collage_base|length }}"' in template
     assert "const syncCollageLoop = () => {" in template
     assert 'data-expand-toggle="home-more-offers-grid"' in template

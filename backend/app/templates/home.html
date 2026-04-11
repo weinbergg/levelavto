@@ -183,7 +183,7 @@
     </div>
   </div>
   <div class="collage-wrap" id="cases-collage">
-    {% set collage_base = collage_images[:50] if collage_images|length > 50 else collage_images %}
+    {% set collage_base = collage_images[:120] if collage_images|length > 120 else collage_images %}
     {% set collage_loop = collage_base + collage_base + collage_base %}
     <div class="collage-track" id="collage-track" data-loop-base-count="{{ collage_base|length }}">
       {% for img in collage_loop %}
