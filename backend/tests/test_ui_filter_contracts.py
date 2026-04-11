@@ -71,6 +71,10 @@ def test_filter_payload_includes_dynamic_brand_options():
     assert '"brands": brands' in router
     assert 'field="color_group"' in router
     assert '"reg_years": reg_years' in router
+    assert '"reg_year_min": None' in router
+    assert '"reg_month_min": None' in router
+    assert '"reg_year_max": None' in router
+    assert '"reg_month_max": None' in router
     assert '"_engine_type_source": "normalized"' in router
     assert '"interior_design_options_eu": build_interior_trim_options' in router
     assert '"interior_color_options_eu": build_interior_options' in router
@@ -157,6 +161,12 @@ def test_price_sensitive_catalog_paths_bypass_stale_cache():
     assert "price_cache_bypass = normalized.get(\"price_min\") is not None or normalized.get(\"price_max\") is not None" in pages_router
     assert "def _refresh_price_sensitive_candidates(" in service
     assert "self._refresh_price_sensitive_candidates(" in service
+
+
+def test_eu_registration_filters_ignore_legacy_generic_default_flag():
+    service = _read("app/services/cars_service.py")
+    assert 'Car.country.like("KR%")' in service
+    assert "EU rows could have only the month defaulted" in service
 
 
 def test_similar_cars_avoids_bare_numeric_order_by_constants():

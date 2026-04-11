@@ -1933,10 +1933,17 @@ def filter_payload(
         ]
     )
     colors_basic, colors_other = _split_colors(service.facet_counts_filtered(field="color_group", **common_filters))
+    reg_year_filters = {
+        **common_filters,
+        "reg_year_min": None,
+        "reg_month_min": None,
+        "reg_year_max": None,
+        "reg_month_max": None,
+    }
     reg_years = sorted(
         [
             int(row["value"])
-            for row in service.facet_counts_filtered(field="reg_year", **common_filters)
+            for row in service.facet_counts_filtered(field="reg_year", **reg_year_filters)
             if row.get("value")
         ],
         reverse=True,

@@ -293,8 +293,11 @@ class CarsService:
             == "true"
         )
         # Legacy rows only had the generic registration_defaulted flag. Treat them
-        # as year-defaulted only when the stored year equals the global fallback.
+        # as year-defaulted only for KR rows, where old imports persisted fallback
+        # years into the real columns. EU rows could have only the month defaulted
+        # while still carrying the generic legacy flag.
         legacy_year_defaulted = and_(
+            Car.country.like("KR%"),
             cls._registration_defaulted_expr(),
             Car.registration_year.is_not(None),
             Car.registration_year == fallback_year,
@@ -318,6 +321,7 @@ class CarsService:
             == "true"
         )
         legacy_month_defaulted = and_(
+            Car.country.like("KR%"),
             cls._registration_defaulted_expr(),
             Car.registration_month.is_not(None),
             Car.registration_month == fallback_month,
