@@ -16,9 +16,9 @@ DEFAULT_HOME_CONTENT: Dict[str, Any] = {
     },
     "hero": {
         "stats_suffix": "авто в наличии",
-        "title": "Импорт и подбор автомобилей из Европы и Азии",
+        "title": "Доставка и подбор автомобилей из Европы и Азии",
         "subtitle": "Актуальные предложения от мировых площадок с ценой под ключ в одном каталоге",
-        "note": "Возим проверенные авто из Европы, Азии и РФ. Минимальная предоплата — основная часть по факту поставки.",
+        "note": "",
         "benefits": [
             "От 10% предоплата",
             "Срок поставки от 10 дней",
@@ -238,7 +238,9 @@ def build_home_content(content_map: Dict[str, str]) -> Dict[str, Any]:
     if not cases_subtitle:
         base["cases"]["subtitle"] = DEFAULT_HOME_CONTENT["cases"]["subtitle"]
     hero_title_norm = (base.get("hero", {}).get("title") or "").strip().lower()
-    if "европ" in hero_title_norm and "коре" in hero_title_norm:
+    if hero_title_norm == "импорт и подбор автомобилей из европы и азии":
+        base["hero"]["title"] = DEFAULT_HOME_CONTENT["hero"]["title"]
+    elif "европ" in hero_title_norm and "коре" in hero_title_norm:
         base["hero"]["title"] = DEFAULT_HOME_CONTENT["hero"]["title"]
     hero_sub_norm = (base.get("hero", {}).get("subtitle") or "").strip().lower()
     if "проверенных европейских" in hero_sub_norm:
@@ -248,6 +250,11 @@ def build_home_content(content_map: Dict[str, str]) -> Dict[str, Any]:
         if subtitle.lower().endswith("в одном каталог"):
             subtitle = subtitle[: -len("в одном каталог")] + "в одном каталоге"
         base["hero"]["subtitle"] = subtitle
+    hero_note_norm = (base.get("hero", {}).get("note") or "").strip().lower()
+    if hero_note_norm == (
+        "возим проверенные авто из европы, азии и рф. минимальная предоплата — основная часть по факту поставки."
+    ):
+        base["hero"]["note"] = DEFAULT_HOME_CONTENT["hero"]["note"]
     cases_title_norm = (base.get("cases", {}).get("title") or "").strip().lower()
     if cases_title_norm.startswith("за 8 лет привезли"):
         base["cases"]["title"] = DEFAULT_HOME_CONTENT["cases"]["title"]

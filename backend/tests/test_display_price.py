@@ -83,6 +83,56 @@ def test_sort_price_asc_uses_display_price():
         assert ids_desc == [1, 2, 3, 5, 4]
 
 
+def test_sort_price_asc_includes_raw_price_fx_fallback(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.add_all(
+            [
+                Car(
+                    id=1,
+                    source_id=1,
+                    external_id="1",
+                    country="DE",
+                    is_available=True,
+                    price=50_000,
+                    currency="EUR",
+                    price_rub_cached=None,
+                    total_price_rub_cached=None,
+                ),
+                Car(
+                    id=2,
+                    source_id=1,
+                    external_id="2",
+                    country="DE",
+                    is_available=True,
+                    price=55_000,
+                    currency="EUR",
+                    price_rub_cached=5_500_000,
+                    total_price_rub_cached=None,
+                ),
+                Car(
+                    id=3,
+                    source_id=1,
+                    external_id="3",
+                    country="DE",
+                    is_available=True,
+                    price=None,
+                    currency="EUR",
+                    price_rub_cached=None,
+                    total_price_rub_cached=None,
+                ),
+            ]
+        )
+        db.commit()
+        svc = CarsService(db)
+        monkeypatch.setattr(svc, "get_fx_rates", lambda allow_fetch=True: {"EUR": 100.0, "USD": 90.0, "CNY": 12.0, "RUB": 1.0})
+        items, _ = svc.list_cars(sort="price_asc", page=1, page_size=10, light=True, use_fast_count=False)
+        ids = [item["id"] if isinstance(item, dict) else item.id for item in items]
+        assert ids == [1, 2, 3]
+
+
 def test_card_and_detail_use_same_field():
     base = Path(__file__).resolve().parents[1]
     catalog_tpl = (base / "app" / "templates" / "catalog.html").read_text(encoding="utf-8")

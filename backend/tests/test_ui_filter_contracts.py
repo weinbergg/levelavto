@@ -252,6 +252,17 @@ def test_home_content_keeps_cataloge_wordform_stable():
     assert legacy["hero"]["subtitle"] == "Актуальные предложения с ценой под ключ в одном каталоге"
 
 
+def test_home_content_rewrites_legacy_hero_title_and_note():
+    content = build_home_content(
+        {
+            "hero_title": "Импорт и подбор автомобилей из Европы и Азии",
+            "hero_note": "Возим проверенные авто из Европы, Азии и РФ. Минимальная предоплата — основная часть по факту поставки.",
+        }
+    )
+    assert content["hero"]["title"] == "Доставка и подбор автомобилей из Европы и Азии"
+    assert content["hero"]["note"] == ""
+
+
 def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
     css = _read("app/static/css/home.css")
     assert "#home-search .model-accordion__actions" in css
@@ -284,6 +295,7 @@ def test_home_template_places_partners_block_after_search_and_hides_legacy_copy(
     assert 'class="la-container hero-partners" id="home-partners"' in template
     assert template.index('class="la-container hero-search"') < template.index('class="la-container hero-partners" id="home-partners"')
     assert "{{ home.hero.why_title }}" not in template
+    assert "{% if home.hero.note %}" in template
 
 
 def test_home_css_uses_full_width_partners_block():
@@ -419,7 +431,8 @@ def test_home_collage_and_home_content_copy_are_updated():
     assert 'id="home-more-offers-catalog"' in template
     assert 'id="home-more-offers-grid"' in template
     assert "Показываем только марки, которые есть в каталоге" in home_content
-    assert "Возим проверенные авто из Европы, Азии и РФ." in home_content
+    assert "Доставка и подбор автомобилей из Европы и Азии" in home_content
+    assert "Возим проверенные авто из Европы, Азии и РФ." not in home_content
     assert 'href="#cases-collage"' in template
     assert 'id="cases-collage"' in template
 
@@ -544,8 +557,8 @@ def test_che168_supports_cny_and_china_country_label():
     assert 'payload.get("country") or ""' in parsing_service
     assert 'payload.get("country") and getattr(existing, "country", None) != payload.get("country")' in parsing_service
     assert '"CNY": cny' in cars_service
-    assert 'elif cur == "CNY" and fx_cny > 0:' in catalog_router
-    assert 'elif cur == "CNY" and fx_cny > 0:' in pages_router
+    assert "resolve_display_price_rub" in catalog_router
+    assert "resolve_display_price_rub" in pages_router
     assert 'PRICE_NOTE_CHINA = "Цена в Китае"' in price_utils
     assert 'elif car.currency == "CNY" and car.price is not None:' in fx_script
     assert "def _is_retryable_write_error(exc: Exception) -> bool:" in fx_script

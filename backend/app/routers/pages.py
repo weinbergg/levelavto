@@ -54,7 +54,11 @@ from ..utils.taxonomy import (
     normalize_color as _normalize_color,
     color_hex,
 )
-from ..utils.price_utils import display_price_rub, price_without_util_note
+from ..utils.price_utils import (
+    price_without_util_note,
+    resolve_display_price_rub,
+    sort_items_by_display_price,
+)
 normalize_color = _normalize_color
 from ..utils.country_map import country_label_ru, resolve_display_country, normalize_country_code
 from ..utils.color_groups import split_color_facets
@@ -131,7 +135,7 @@ def _load_cars_by_ids(db: Session, ids: List[int]) -> List[Car]:
     )
 
 
-def _decorate_showcase_car(car: Car) -> Car:
+def _decorate_showcase_car(car: Car, *, fx_rates: Optional[dict[str, float]] = None) -> Car:
     code, label = resolve_display_country(car)
     car.display_country_code = code
     car.display_country_label = label
@@ -147,9 +151,15 @@ def _decorate_showcase_car(car: Car) -> Car:
         or (display_color(normalized_color) if normalized_color else None)
         or car.color
     )
-    car.display_price_rub = display_price_rub(
+    fx_rates = fx_rates or {}
+    car.display_price_rub = resolve_display_price_rub(
         car.total_price_rub_cached,
         car.price_rub_cached,
+        raw_price=getattr(car, "price", None),
+        currency=getattr(car, "currency", None),
+        fx_eur=float(fx_rates.get("EUR") or 0),
+        fx_usd=float(fx_rates.get("USD") or 0),
+        fx_cny=float(fx_rates.get("CNY") or 0),
     )
     car.price_note = price_without_util_note(
         display_price=car.display_price_rub,
@@ -1374,18 +1384,19 @@ def _home_context(
     brand_stats = home_filter_ctx.get("brand_stats") or []
     body_type_stats = home_filter_ctx.get("body_type_stats") or []
     reco_cfg = load_config()
+    fx_rates = service.get_fx_rates() or {}
     t0 = time.perf_counter()
     recommended = _get_home_recommended(service, db, reco_cfg, limit=12)
     _stage("recommended_ms", t0)
     service.refresh_visible_price_cache(recommended)
     for car in recommended:
-        _decorate_showcase_car(car)
+        _decorate_showcase_car(car, fx_rates=fx_rates)
     t0 = time.perf_counter()
     more_offers = _get_home_more_offers(service, db, limit=12)
     _stage("more_offers_ms", t0)
     service.refresh_visible_price_cache(more_offers)
     for car in more_offers:
-        _decorate_showcase_car(car)
+        _decorate_showcase_car(car, fx_rates=fx_rates)
     t0 = time.perf_counter()
     content = ContentService(db).content_map(
         [
@@ -1808,26 +1819,17 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             for c in initial_items:
                 if not isinstance(c, dict):
                     continue
-                c["display_price_rub"] = display_price_rub(
+                c["display_price_rub"] = resolve_display_price_rub(
                     c.get("total_price_rub_cached"),
                     c.get("price_rub_cached"),
+                    raw_price=c.get("price"),
+                    currency=c.get("currency"),
+                    fx_eur=fx_eur,
+                    fx_usd=fx_usd,
+                    fx_cny=fx_cny,
                     allow_price_fallback=True,
+                    allow_raw_price_fallback=True,
                 )
-                if c["display_price_rub"] is None and c.get("price") is not None:
-                    cur = str(c.get("currency") or "").upper()
-                    try:
-                        raw_price = float(c.get("price"))
-                    except (TypeError, ValueError):
-                        raw_price = None
-                    if raw_price is not None:
-                        if cur == "EUR" and fx_eur > 0:
-                            c["display_price_rub"] = display_price_rub(None, raw_price * fx_eur, allow_price_fallback=True)
-                        elif cur == "USD" and fx_usd > 0:
-                            c["display_price_rub"] = display_price_rub(None, raw_price * fx_usd, allow_price_fallback=True)
-                        elif cur == "CNY" and fx_cny > 0:
-                            c["display_price_rub"] = display_price_rub(None, raw_price * fx_cny, allow_price_fallback=True)
-                        elif cur in {"RUB", "₽"}:
-                            c["display_price_rub"] = display_price_rub(None, raw_price, allow_price_fallback=True)
                 c["price_note"] = price_without_util_note(
                     display_price=c.get("display_price_rub"),
                     total_price_rub_cached=c.get("total_price_rub_cached"),
@@ -1850,6 +1852,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     or (display_color(normalized_color) if normalized_color else None)
                     or c.get("color")
                 )
+            sort_items_by_display_price(initial_items, sort=params.get("sort") or "price_asc")
             ids = [c.get("id") for c in initial_items if isinstance(c, dict) and c.get("id")]
             if ids:
                 rows = db.execute(
@@ -2090,10 +2093,17 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         code, label = resolve_display_country(car)
         car.display_country_code = code
         car.display_country_label = label
-        car.display_price_rub = display_price_rub(
+        detail_fx_rates = service.get_fx_rates() or {}
+        car.display_price_rub = resolve_display_price_rub(
             car.total_price_rub_cached,
             car.price_rub_cached,
+            raw_price=getattr(car, "price", None),
+            currency=getattr(car, "currency", None),
+            fx_eur=float(detail_fx_rates.get("EUR") or 0),
+            fx_usd=float(detail_fx_rates.get("USD") or 0),
+            fx_cny=float(detail_fx_rates.get("CNY") or 0),
             allow_price_fallback=True,
+            allow_raw_price_fallback=True,
         )
         car.price_note = price_without_util_note(
             display_price=car.display_price_rub,
@@ -2204,10 +2214,17 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         car.display_engine_type = translate_payload_value("engine_type", getattr(car, "engine_type", None)) or car.engine_type
         car.display_transmission = translate_payload_value("transmission", getattr(car, "transmission", None)) or car.transmission
         car.display_drive_type = translate_payload_value("drive_type", getattr(car, "drive_type", None)) or car.drive_type
-        car.display_price_rub = display_price_rub(
+        detail_fx_rates = service.get_fx_rates() or {}
+        car.display_price_rub = resolve_display_price_rub(
             car.total_price_rub_cached,
             car.price_rub_cached,
+            raw_price=getattr(car, "price", None),
+            currency=getattr(car, "currency", None),
+            fx_eur=float(detail_fx_rates.get("EUR") or 0),
+            fx_usd=float(detail_fx_rates.get("USD") or 0),
+            fx_cny=float(detail_fx_rates.get("CNY") or 0),
             allow_price_fallback=True,
+            allow_raw_price_fallback=True,
         )
         car.price_note = price_without_util_note(
             display_price=car.display_price_rub,
@@ -2220,8 +2237,9 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         pricing = service.price_info(car)
         similar_offers = service.similar_cars(car, limit=10)
         service.refresh_visible_price_cache(similar_offers)
+        detail_fx_rates = service.get_fx_rates() or {}
         for item in similar_offers:
-            _decorate_showcase_car(item)
+            _decorate_showcase_car(item, fx_rates=detail_fx_rates)
         raw_description = (getattr(car, "description", None) or payload.get("description") or "").strip()
         car.display_description = _sanitize_detail_description(raw_description)
 

@@ -1,17 +1,46 @@
-from backend.app.utils.price_utils import display_price_rub
+from backend.app.utils.price_utils import (
+    display_price_rub,
+    raw_price_to_rub,
+    resolve_display_price_rub,
+    sort_items_by_display_price,
+)
 
 
 def test_display_price_prefers_total_price_and_rounds():
-    # total_price_rub_cached takes precedence and rounds up to 100k
-    assert display_price_rub(14_760_777, 9_000_001) == 14_800_000
+    # total_price_rub_cached takes precedence and rounds up to the configured UI step
+    assert display_price_rub(14_760_777, 9_000_001) == 14_770_000
 
 
 def test_display_price_fallback_total_when_no_ad_price():
-    # fallback to total price and round up to 100k
-    assert display_price_rub(12_345_001, None) == 12_400_000
+    # fallback to total price and round up to the configured UI step
+    assert display_price_rub(12_345_001, None) == 12_350_000
 
 
 def test_display_price_allows_price_fallback_for_kr_only():
     # fallback to price only when explicitly allowed
-    assert display_price_rub(None, 6_548_387.7, allow_price_fallback=True) == 6_600_000
+    assert display_price_rub(None, 6_548_387.7, allow_price_fallback=True) == 6_550_000
     assert display_price_rub(None, 6_548_387.7, allow_price_fallback=False) is None
+
+
+def test_resolve_display_price_uses_raw_price_fx_fallback():
+    assert raw_price_to_rub(50_000, "EUR", fx_eur=95.0) == 4_750_000
+    assert resolve_display_price_rub(
+        None,
+        None,
+        raw_price=50_000,
+        currency="EUR",
+        fx_eur=95.0,
+    ) == 4_750_000
+
+
+def test_sort_items_by_display_price_keeps_visible_order_consistent():
+    items = [
+        {"id": 3, "display_price_rub": None},
+        {"id": 2, "display_price_rub": 5_200_000},
+        {"id": 1, "display_price_rub": 4_700_000},
+    ]
+    sort_items_by_display_price(items, sort="price_asc")
+    assert [item["id"] for item in items] == [1, 2, 3]
+
+    sort_items_by_display_price(items, sort="price_desc")
+    assert [item["id"] for item in items] == [2, 1, 3]

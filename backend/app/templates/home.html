@@ -36,7 +36,9 @@
         <a class="btn btn-primary" href="#cases-collage">{{ home.hero.actions.primary_label }}</a>
         <a class="btn btn-secondary" href="#lead-form">{{ home.hero.actions.secondary_label }}</a>
       </div>
+      {% if home.hero.note %}
       <div class="hero-note">{{ home.hero.note }}</div>
+      {% endif %}
     </div>
   </div>
 

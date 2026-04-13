@@ -1227,6 +1227,30 @@ class CarsService:
                 return cached
             return {"EUR": eur_env, "USD": usd_env, "CNY": cny_env, "RUB": 1.0}
 
+    def _raw_price_rub_expr(self):
+        rates = self.get_fx_rates() or {}
+        fx_eur = float(rates.get("EUR") or 0)
+        fx_usd = float(rates.get("USD") or 0)
+        fx_cny = float(rates.get("CNY") or 0)
+        currency_expr = func.upper(func.coalesce(Car.currency, ""))
+        raw_price = Car.price
+        clauses: list[tuple[Any, Any]] = []
+        if fx_eur > 0:
+            clauses.append((and_(raw_price.is_not(None), currency_expr == "EUR"), raw_price * literal(fx_eur)))
+        if fx_usd > 0:
+            clauses.append((and_(raw_price.is_not(None), currency_expr == "USD"), raw_price * literal(fx_usd)))
+        if fx_cny > 0:
+            clauses.append((and_(raw_price.is_not(None), currency_expr == "CNY"), raw_price * literal(fx_cny)))
+        clauses.append((and_(raw_price.is_not(None), currency_expr.in_(["RUB", "₽"])), raw_price))
+        return case(*clauses, else_=None)
+
+    def _display_price_rub_expr(self):
+        return func.coalesce(
+            Car.total_price_rub_cached,
+            Car.price_rub_cached,
+            self._raw_price_rub_expr(),
+        )
+
     def _build_list_conditions(
         self,
         *,
@@ -1612,7 +1636,7 @@ class CarsService:
                     conditions.append(Car.source_id.in_(src_ids))
 
         if (price_min is not None or price_max is not None) and "price" not in exclude:
-            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+            price_expr = self._display_price_rub_expr()
             conditions.append(price_expr.is_not(None))
             if price_min is not None:
                 conditions.append(price_expr >= price_min)
@@ -2113,22 +2137,16 @@ class CarsService:
 
         order_clause = []
         if sort == "price_asc":
-            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
-            missing_price = and_(
-                Car.price_rub_cached.is_(None),
-                Car.total_price_rub_cached.is_(None),
-            )
+            price_expr = self._display_price_rub_expr()
+            missing_price = price_expr.is_(None)
             order_clause = [
                 missing_price.asc(),
                 price_expr.asc().nullslast(),
                 Car.id.asc(),
             ]
         elif sort == "price_desc":
-            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
-            missing_price = and_(
-                Car.price_rub_cached.is_(None),
-                Car.total_price_rub_cached.is_(None),
-            )
+            price_expr = self._display_price_rub_expr()
+            missing_price = price_expr.is_(None)
             order_clause = [
                 missing_price.asc(),
                 price_expr.desc().nullslast(),
@@ -2152,7 +2170,7 @@ class CarsService:
             order_clause = [Car.listing_sort_ts.asc().nullslast(), Car.id.desc()]
         else:
             # default: цена сначала дешевые
-            price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+            price_expr = self._display_price_rub_expr()
             order_clause = [price_expr.asc().nullslast(), Car.id.desc()]
 
         thumb_rank = case(
@@ -2582,7 +2600,7 @@ class CarsService:
             )
         except Exception:
             batch_size = max(120, max(1, int(page or 1)) * max(1, int(page_size or 20)))
-        price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+        price_expr = self._display_price_rub_expr()
         if sort == "price_desc":
             order_clause = [price_expr.desc().nullslast(), Car.id.asc()]
         else:
@@ -3509,7 +3527,7 @@ class CarsService:
         reg_month_expr = self._effective_registration_month_ceil_expr()
         power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)
         engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)
-        price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+        price_expr = self._display_price_rub_expr()
 
         if max_age_years is not None:
             # возраст в месяцах
@@ -3577,7 +3595,7 @@ class CarsService:
         reg_year_expr = self._effective_registration_year_expr()
         power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)
         engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)
-        price_expr = func.coalesce(Car.total_price_rub_cached, Car.price_rub_cached)
+        price_expr = self._display_price_rub_expr()
 
         model_rank = (
             case(

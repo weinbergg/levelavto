@@ -29,7 +29,11 @@ from ..utils.taxonomy import (
     translate_payload_value,
 )
 from ..utils.localization import display_body, display_color
-from ..utils.price_utils import display_price_rub, price_without_util_note
+from ..utils.price_utils import (
+    price_without_util_note,
+    resolve_display_price_rub,
+    sort_items_by_display_price,
+)
 from ..utils.color_groups import split_color_facets
 from ..utils.thumbs import normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.redis_cache import (
@@ -368,6 +372,7 @@ def _serialize_catalog_payload_items(
     service: CarsService,
     items: list[dict],
     *,
+    sort: Optional[str] = None,
     image_counts: Optional[dict[int, int]] = None,
     image_first: Optional[dict[int, str]] = None,
 ) -> tuple[list[dict], int]:
@@ -404,21 +409,17 @@ def _serialize_catalog_payload_items(
             thumb_replaced += 1
         total_cached = c.get("total_price_rub_cached")
         price_cached = c.get("price_rub_cached")
-        display_rub = display_price_rub(
+        display_rub = resolve_display_price_rub(
             total_cached,
             price_cached,
+            raw_price=c.get("price"),
+            currency=c.get("currency"),
+            fx_eur=fx_eur,
+            fx_usd=fx_usd,
+            fx_cny=fx_cny,
             allow_price_fallback=True,
+            allow_raw_price_fallback=True,
         )
-        if display_rub is None and c.get("price") is not None:
-            cur = str(c.get("currency") or "").upper()
-            if cur == "EUR" and fx_eur > 0:
-                display_rub = display_price_rub(None, float(c.get("price")) * fx_eur, allow_price_fallback=True)
-            elif cur == "USD" and fx_usd > 0:
-                display_rub = display_price_rub(None, float(c.get("price")) * fx_usd, allow_price_fallback=True)
-            elif cur == "CNY" and fx_cny > 0:
-                display_rub = display_price_rub(None, float(c.get("price")) * fx_cny, allow_price_fallback=True)
-            elif cur in {"RUB", "₽"}:
-                display_rub = display_price_rub(None, float(c.get("price")), allow_price_fallback=True)
         effective_engine_cc = effective_engine_cc_value(c)
         effective_power_hp = effective_power_hp_value(c)
         effective_power_kw = effective_power_kw_value(c)
@@ -474,6 +475,7 @@ def _serialize_catalog_payload_items(
             }
         )
 
+    sort_items_by_display_price(payload_items, sort=sort)
     return payload_items, thumb_replaced
 
 
@@ -830,6 +832,7 @@ def list_cars(
     payload_items, thumb_replaced = _serialize_catalog_payload_items(
         service,
         items,
+        sort=sort,
         image_counts=image_counts,
         image_first=image_first,
     )
@@ -1362,16 +1365,23 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
             service.ensure_calc_cache(car)
         except Exception:
             pass
+    fx_rates = service.get_fx_rates() or {}
     detail = CarDetailOut.model_validate(car)
     detail.engine_cc = effective_engine_cc_value(car)
     detail.power_hp = effective_power_hp_value(car)
     detail.power_kw = effective_power_kw_value(car)
     if car.images:
         detail.images = [im.url for im in car.images if im.url]
-    detail.display_price_rub = display_price_rub(
+    detail.display_price_rub = resolve_display_price_rub(
         car.total_price_rub_cached,
         car.price_rub_cached,
+        raw_price=getattr(car, "price", None),
+        currency=getattr(car, "currency", None),
+        fx_eur=float(fx_rates.get("EUR") or 0),
+        fx_usd=float(fx_rates.get("USD") or 0),
+        fx_cny=float(fx_rates.get("CNY") or 0),
         allow_price_fallback=True,
+        allow_raw_price_fallback=True,
     )
     detail.price_note = price_without_util_note(
         display_price=detail.display_price_rub,
