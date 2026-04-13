@@ -15,7 +15,16 @@ pars/
 pars/**
 foto-video/
 фото-видео/
+фото-видео/**
+**/фото-видео/
+**/фото-видео/**
+backend/app/imports
 backend/app/runtime/
 backend/app/runtime/**
+backend/app/imports/
+backend/app/imports/**
+backend/app/imports/mobilede/
+backend/app/imports/mobilede/**
+tmp/**
 .pytest_cache/
 .DS_Store

@@ -163,7 +163,7 @@ def convert_image(src: Path, dst: Path, *, max_width: int, quality: int) -> tupl
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build curated home collage assets from nested photo folders.")
-    parser.add_argument("--source", default="фото-видео/машины_thumbs")
+    parser.add_argument("--source", default="фото-видео/фото коллаж для сайта")
     parser.add_argument("--output", default="backend/app/static/home-collage")
     parser.add_argument("--prefix", default="collage")
     parser.add_argument("--limit", type=int, default=240)

@@ -57,7 +57,30 @@ def main() -> None:
     ap.add_argument("--sample-limit", type=int, default=20)
     args = ap.parse_args()
 
-    csv_path = _resolve_csv_path(args.csv)
+    try:
+        csv_path = _resolve_csv_path(args.csv)
+    except FileNotFoundError as exc:
+        print(
+            json.dumps(
+                {
+                    "filters": {
+                        "brand": args.brand,
+                        "model": args.model,
+                        "mileage_max": args.mileage_max,
+                        "reg_year_min": args.reg_year_min,
+                    },
+                    "csv": {
+                        "path": args.csv,
+                        "status": "missing",
+                        "error": str(exc),
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise SystemExit(0)
+
     parser = MobileDeFeedParser(load_sites_config().get("mobile_de"))
     brand_norm = _normalize(args.brand)
     model_norm = _normalize(args.model)

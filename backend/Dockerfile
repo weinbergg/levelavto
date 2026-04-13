@@ -11,12 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Copy only requirement files first (faster layer caching if we add later)
-COPY backend/requirements.txt /app/backend/requirements.txt
+COPY requirements.txt /app/backend/requirements.txt
 RUN pip install --upgrade pip && pip install -r /app/backend/requirements.txt
 
-# Copy project
-COPY . /app
+# Copy backend project only
+COPY . /app/backend
 
 EXPOSE 8000
-
 
