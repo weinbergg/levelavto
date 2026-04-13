@@ -34,6 +34,13 @@ def numeric_sort_key(path: Path) -> tuple:
     return tuple(key)
 
 
+def thumb_base_and_width(path: Path) -> tuple[str, int] | None:
+    match = re.match(r"(.+)__w(\d+)$", path.stem, re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1), int(match.group(2))
+
+
 def iter_image_files(root: Path) -> Iterable[Path]:
     for path in root.rglob("*"):
         if not path.is_file():
@@ -49,7 +56,10 @@ def group_key_for(path: Path, root: Path) -> str:
     rel = path.relative_to(root)
     parts = list(rel.parts[:-1])
     if not parts:
-        return "__root__"
+        thumb_info = thumb_base_and_width(path)
+        if thumb_info:
+            return f"thumb:{thumb_info[0].casefold()}"
+        return f"file:{path.stem.casefold()}"
     cleaned: list[str] = []
     for idx, part in enumerate(parts):
         cleaned.append(part)
@@ -59,6 +69,17 @@ def group_key_for(path: Path, root: Path) -> str:
 
 
 def select_group_images(paths: list[Path], max_per_group: int) -> list[Path]:
+    thumb_variants: list[tuple[int, Path]] = []
+    for path in paths:
+        info = thumb_base_and_width(path)
+        if info is None:
+            thumb_variants = []
+            break
+        thumb_variants.append((info[1], path))
+    if thumb_variants:
+        best = max(thumb_variants, key=lambda item: (item[0], numeric_sort_key(item[1])))
+        return [best[1]]
+
     ordered = sorted(paths, key=numeric_sort_key)
     if len(ordered) <= max_per_group:
         return ordered
@@ -142,8 +163,9 @@ def convert_image(src: Path, dst: Path, *, max_width: int, quality: int) -> tupl
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build curated home collage assets from nested photo folders.")
-    parser.add_argument("--source", default="фото-видео/Фото Level Avto")
+    parser.add_argument("--source", default="фото-видео/машины_thumbs")
     parser.add_argument("--output", default="backend/app/static/home-collage")
+    parser.add_argument("--prefix", default="collage")
     parser.add_argument("--limit", type=int, default=240)
     parser.add_argument("--max-per-group", type=int, default=4)
     parser.add_argument("--min-gap", type=int, default=10)
@@ -187,7 +209,7 @@ def main() -> None:
 
     manifest: list[dict[str, object]] = []
     for idx, (group, src) in enumerate(ordered, start=1):
-        filename = f"levelavto-{idx:04d}.webp"
+        filename = f"{args.prefix}-{idx:04d}.webp"
         dst = output_root / filename
         width, height = convert_image(
             src,
