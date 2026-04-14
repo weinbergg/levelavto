@@ -28,6 +28,10 @@ cleanup() {
   rmdir "${LOCK_DIR}" 2>/dev/null || true
 }
 
+find_active_worker() {
+  ps -ax -o pid=,command= 2>/dev/null | grep -E 'backend\.app\.tools\.emavto_chunk_runner|scripts/nightly_emavto\.sh' | grep -v 'grep' || true
+}
+
 lock_owner_alive() {
   local pid=""
   local cmd=""
@@ -48,11 +52,41 @@ lock_owner_alive() {
   return 1
 }
 
+wait_for_active_worker_without_lock() {
+  local wait_started_sec now_sec waited probe
+  probe=$(find_active_worker)
+  if [[ -z "${probe}" ]]; then
+    return 0
+  fi
+  echo "[emavto] detected active worker without lock"
+  if [[ "${WAIT_ON_LOCK}" != "1" ]]; then
+    exit 0
+  fi
+  wait_started_sec=$(date -u +%s)
+  while true; do
+    probe=$(find_active_worker)
+    if [[ -z "${probe}" ]]; then
+      echo "[emavto] active worker without lock finished"
+      return 0
+    fi
+    now_sec=$(date -u +%s)
+    waited=$((now_sec - wait_started_sec))
+    if (( waited >= WAIT_TIMEOUT_SEC )); then
+      echo "[emavto] wait timeout after ${waited}s for active worker without lock"
+      exit 1
+    fi
+    echo "[emavto] waiting for active worker without lock (${waited}s elapsed)"
+    sleep "${WAIT_POLL_SEC}"
+  done
+}
+
 clear_stale_lock() {
   echo "[emavto] clearing stale lock at ${LOCK_DIR}"
   rm -f "${PID_FILE}" 2>/dev/null || true
   rmdir "${LOCK_DIR}" 2>/dev/null || true
 }
+
+wait_for_active_worker_without_lock
 
 while true; do
   if mkdir "${LOCK_DIR}" 2>/dev/null; then

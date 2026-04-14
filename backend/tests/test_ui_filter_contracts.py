@@ -374,6 +374,9 @@ def test_emavto_registration_recovery_and_stale_lock_contracts():
     assert 'PID_FILE="${LOCK_DIR}/pid"' in wrapper
     assert 'echo "[emavto] clearing stale lock at ${LOCK_DIR}"' in wrapper
     assert "printf '%s\\n' \"$$\" > \"${PID_FILE}\"" in wrapper
+    assert "find_active_worker()" in wrapper
+    assert "wait_for_active_worker_without_lock" in wrapper
+    assert 'echo "[emavto] detected active worker without lock"' in wrapper
     assert 'if [[ "${STATUS}" != "ok" ]]; then' in wrapper
     assert "exit 1" in wrapper
 
