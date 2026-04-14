@@ -20,6 +20,8 @@ _ENGINE_LITER_CONTEXT_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_POWER_KW_RE = re.compile(r"\b(\d{2,4})(?:[.,]\d+)?\s*k\s*w\b", re.IGNORECASE)
+_POWER_HP_RE = re.compile(r"\b(\d{2,4})(?:[.,]\d+)?\s*(?:cv|ps|hp)\b", re.IGNORECASE)
 _GENERIC_STOPWORDS = {
     "hud",
     "led",
@@ -376,6 +378,32 @@ def infer_engine_cc_from_text(*values: Any) -> Optional[int]:
         ),
     )[0][0]
     return best
+
+
+def infer_power_from_text(*values: Any) -> tuple[Optional[float], Optional[float]]:
+    hp_candidates: list[float] = []
+    kw_candidates: list[float] = []
+    for value in values:
+        text = normalize_spec_text(value)
+        if not text:
+            continue
+        for match in _POWER_KW_RE.finditer(text):
+            kw = _to_float(match.group(1))
+            if kw is None or kw > 2500:
+                continue
+            kw_candidates.append(round(kw, 2))
+        for match in _POWER_HP_RE.finditer(text):
+            hp = _to_float(match.group(1))
+            if hp is None or hp > 3500:
+                continue
+            hp_candidates.append(round(hp, 1))
+    if kw_candidates:
+        kw = kw_candidates[0]
+        return round(kw * 1.35962, 1), kw
+    if hp_candidates:
+        hp = hp_candidates[0]
+        return hp, round(hp / 1.35962, 2)
+    return None, None
 
 
 def _tokenize(value: str) -> list[str]:

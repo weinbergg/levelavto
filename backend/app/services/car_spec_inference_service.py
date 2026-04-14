@@ -15,6 +15,7 @@ from ..utils.spec_inference import (
     filter_candidates_by_target_power,
     has_complete_raw_specs,
     infer_engine_cc_from_text,
+    infer_power_from_text,
     normalize_engine_type,
     normalize_spec_text,
     normalized_power_hp,
@@ -225,9 +226,10 @@ class CarSpecInferenceService:
         if not need_engine_cc and not need_power:
             return None
         target_is_kr = str(car.country or "").upper().startswith("KR")
-        target_power_hp = normalized_power_hp(car.power_hp, car.power_kw)
         payload = car.source_payload or {}
         parsed_engine_cc = None
+        parsed_power_hp = None
+        parsed_power_kw = None
         if need_engine_cc:
             parsed_engine_cc = infer_engine_cc_from_text(
                 car.variant,
@@ -245,6 +247,24 @@ class CarSpecInferenceService:
                     "rule": "text_engine_cc",
                     "support_count": 1,
                 }
+        if need_power:
+            parsed_power_hp, parsed_power_kw = infer_power_from_text(
+                car.variant,
+                payload.get("sub_title"),
+                payload.get("title"),
+                car.description,
+            )
+            if (parsed_power_hp is not None or parsed_power_kw is not None) and not need_engine_cc:
+                return {
+                    "engine_cc": None,
+                    "power_hp": parsed_power_hp,
+                    "power_kw": parsed_power_kw,
+                    "source_car_id": None,
+                    "confidence": "medium",
+                    "rule": "text_power",
+                    "support_count": 1,
+                }
+        target_power_hp = normalized_power_hp(car.power_hp, car.power_kw) or parsed_power_hp
         sig = build_reference_signature(
             brand=normalize_brand(car.brand),
             model=self._canonical_model(car.brand, car.model),
@@ -323,6 +343,14 @@ class CarSpecInferenceService:
                 rule = str(consensus.get("rule") or "")
                 if rule_prefix:
                     rule = f"{rule_prefix}_{rule}" if rule else rule_prefix
+                if need_power and (parsed_power_hp is not None or parsed_power_kw is not None):
+                    rule = f"text_power_plus_{rule}" if rule else "text_power"
+                    consensus = {
+                        **consensus,
+                        "power_hp": parsed_power_hp,
+                        "power_kw": parsed_power_kw,
+                        "rule": rule,
+                    }
                 if parsed_engine_cc is not None:
                     rule = f"text_engine_cc_plus_{rule}" if rule else "text_engine_cc"
                     consensus = {

@@ -4,6 +4,7 @@ from backend.app.utils.spec_inference import (
     filter_candidates_by_target_power,
     has_complete_raw_specs,
     infer_engine_cc_from_text,
+    infer_power_from_text,
     normalize_engine_type,
     variant_primary_token,
 )
@@ -122,6 +123,11 @@ def test_normalize_engine_type_drops_numeric_and_co2_noise():
 def test_variant_primary_token_extracts_core_variant():
     assert variant_primary_token("xdrive30d|m-sport|individual|manhattan") == "xdrive30d"
     assert variant_primary_token("p530|autobiography") == "p530"
+
+
+def test_infer_power_from_text_supports_kw_and_cv_tokens():
+    assert infer_power_from_text("Opel Corsa-e 100 kW GS") == (136.0, 100.0)
+    assert infer_power_from_text("FORD Mustang mach-e standard range awd 269cv aut") == (269.0, 197.85)
 
 
 def test_choose_reference_consensus_can_infer_engine_only_when_power_conflicts():
