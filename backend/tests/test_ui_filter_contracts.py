@@ -374,6 +374,8 @@ def test_emavto_registration_recovery_and_stale_lock_contracts():
     assert 'PID_FILE="${LOCK_DIR}/pid"' in wrapper
     assert 'echo "[emavto] clearing stale lock at ${LOCK_DIR}"' in wrapper
     assert "printf '%s\\n' \"$$\" > \"${PID_FILE}\"" in wrapper
+    assert 'if [[ "${STATUS}" != "ok" ]]; then' in wrapper
+    assert "exit 1" in wrapper
 
 
 def test_model_filters_use_canonical_labels_with_alias_restore():

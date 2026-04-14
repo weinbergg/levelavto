@@ -164,3 +164,7 @@ EOF
 send_job_notify
 
 echo "[emavto] done status=${STATUS} duration=${DUR}s"
+
+if [[ "${STATUS}" != "ok" ]]; then
+  exit 1
+fi
