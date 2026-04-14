@@ -37,3 +37,12 @@ def test_refresh_mobilede_registration_script_has_targeted_repair_flags():
     assert "--limit" in content
     assert '"first_registration"' in content
     assert "[refresh_mobilede_registration]" in content
+
+
+def test_reclassify_emavto_market_type_script_has_safe_bulk_repair_flags():
+    content = _read("app/scripts/reclassify_emavto_market_type.py")
+    assert "--reset-first" in content
+    assert "--chunk-pages" in content
+    assert "--start-page" in content
+    assert "skip_details" in content
+    assert "[reclassify_emavto_market_type]" in content
