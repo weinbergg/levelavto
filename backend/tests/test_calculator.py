@@ -3,7 +3,7 @@ from pathlib import Path
 from pytest import approx
 
 from backend.app.services.calculator_config_loader import load_runtime_payload
-from backend.app.services.calculator_runtime import EstimateRequest, calculate
+from backend.app.services.calculator_runtime import EstimateRequest, calculate, is_bev
 from backend.app.services.customs_config import calc_duty_eur, get_customs_config
 
 
@@ -43,3 +43,7 @@ def test_electric_example():
     )
     result = calculate(payload, req)
     assert result["total_rub"] > 0
+
+
+def test_is_bev_ignores_dirty_engine_cc_for_real_evs_with_power():
+    assert is_bev(10, 35.3, 48, "Electric") is True

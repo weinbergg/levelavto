@@ -73,6 +73,9 @@ class EmAvtoKlgParser(BaseParser):
         self.last_details_done: int = 0
         self.missing_tasks: List[Dict[str, Any]] = []
         self.last_list_tasks: List[Dict[str, Any]] = []
+        self.last_pages_processed: int = 0
+        self.last_reached_end: bool = False
+        self.last_stop_reason: str = ""
 
     def _build_query(self, profile: Dict[str, Any], page: int) -> Dict[str, str]:
         # Base query from profile + pagination
@@ -96,6 +99,7 @@ class EmAvtoKlgParser(BaseParser):
         deadline_sec = int(profile.get("max_runtime_sec") or 1800)
         deadline = time.monotonic() + deadline_sec
         deadline_hit = False
+        stop_reason = ""
 
         list_bucket = TokenBucket(rate_per_sec=self.list_rps)
         detail_bucket = TokenBucket(rate_per_sec=self.detail_rps)
@@ -103,13 +107,17 @@ class EmAvtoKlgParser(BaseParser):
         results: List[CarParsed] = []
         processed_pages: List[int] = []
         tasks: List[Dict[str, Any]] = []
+        self.last_pages_processed = 0
+        self.last_reached_end = False
+        self.last_stop_reason = ""
 
         for page in range(start_page, start_page + max_pages):
             if time.monotonic() > deadline:
                 deadline_hit = True
+                stop_reason = "deadline"
                 break
             logger.info(f"[emavto_klg] list start page={page}")
-            ok = self._produce_page(
+            page_status = self._produce_page(
                 page,
                 list_bucket,
                 tasks,
@@ -119,11 +127,19 @@ class EmAvtoKlgParser(BaseParser):
                 min_price_usd,
                 deadline,
             )
-            if not ok:
+            if page_status != "ok":
+                stop_reason = page_status
+                if page_status == "empty":
+                    self.last_reached_end = True
                 break
             processed_pages.append(page)
             if max_items and len(tasks) >= max_items:
+                stop_reason = "max_items"
                 break
+        if not stop_reason and not deadline_hit:
+            stop_reason = "page_limit"
+        self.last_pages_processed = len(processed_pages)
+        self.last_stop_reason = stop_reason or ("deadline" if deadline_hit else "unknown")
 
         # If skipping details, we already appended results inside produce_page
         if skip_details:
@@ -204,10 +220,12 @@ class EmAvtoKlgParser(BaseParser):
             ).isoformat()
 
         logger.info(
-            "[emavto_klg] run done mode=%s pages_done=%s total_items=%s list_req=%s detail_req=%s list_429=%s detail_429=%s",
+            "[emavto_klg] run done mode=%s pages_done=%s total_items=%s stop_reason=%s reached_end=%s list_req=%s detail_req=%s list_429=%s detail_429=%s",
             mode,
             processed_pages,
             len(results),
+            self.last_stop_reason,
+            self.last_reached_end,
             self.metrics["list_requests"],
             self.metrics["detail_requests"],
             self.metrics["list_429"],
@@ -298,7 +316,7 @@ class EmAvtoKlgParser(BaseParser):
         max_items: int,
         min_price_usd: int,
         deadline: float,
-    ) -> bool:
+    ) -> str:
         query = self._build_query(profile, page)
         url = self.config.base_search_url
         expected_per_page = 50
@@ -307,7 +325,7 @@ class EmAvtoKlgParser(BaseParser):
         if not resp or resp.status_code != 200 or not resp.text:
             logger.warning(
                 f"[emavto_klg] stop at page={page} status={getattr(resp, 'status_code', None)}")
-            return False
+            return "error"
         logger.info(
             "[emavto_klg] page=%s status=%s body_len=%s url=%s",
             page,
@@ -322,7 +340,7 @@ class EmAvtoKlgParser(BaseParser):
                 "[emavto_klg] page %s parsed %s (<%s expected)", page, len(raw_items), expected_per_page
             )
         if not raw_items:
-            return False
+            return "empty"
         for idx, r in enumerate(raw_items):
             if time.monotonic() > deadline:
                 break
@@ -391,7 +409,7 @@ class EmAvtoKlgParser(BaseParser):
                 )
                 if max_items and len(tasks) >= max_items:
                     break
-        return True
+        return "ok"
 
     # --- request helpers ---
     def _request_with_backoff(

@@ -49,14 +49,16 @@ def _calc_age_months(reg_year: Optional[int], reg_month: Optional[int]) -> Optio
 
 
 def is_bev(engine_cc: Optional[int], power_kw: Optional[float], power_hp: Optional[float], engine_type: Optional[str]) -> bool:
-    if engine_cc and engine_cc > 0:
-        return False
-    if not ((power_kw and power_kw > 0) or (power_hp and power_hp > 0)):
-        return False
     if not engine_type:
         return False
     fuel = engine_type.lower()
-    return ("electric" in fuel) or ("ev" in fuel)
+    if "hybrid" in fuel or "plug-in" in fuel or "plug in" in fuel or "phev" in fuel:
+        return False
+    if not (("electric" in fuel) or ("ev" in fuel)):
+        return False
+    if not ((power_kw and power_kw > 0) or (power_hp and power_hp > 0)):
+        return False
+    return True
 
 
 def choose_scenario(req: EstimateRequest, payload: Dict[str, Any]) -> str:

@@ -83,10 +83,8 @@ class ParsingDataService:
             payload.setdefault("thumbnail_url", None)
             payload.setdefault("is_available", True)
             payload["color_group"] = normalize_color_group(payload.get("color"))
-            # normalize KR market type
+            # Normalize KR listing fields, but never invent a market type we did not parse.
             if payload.get("country") == "KR":
-                if not payload.get("kr_market_type"):
-                    payload["kr_market_type"] = "domestic"
                 listing_val = payload.get("listing_date")
                 ts = None
                 if isinstance(listing_val, str):

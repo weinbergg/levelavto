@@ -836,7 +836,7 @@ def _build_filter_context(
         price_rating_labels_kr = []
     kr_types = []
     t0 = time.perf_counter()
-    if service.has_korea():
+    if service.has_korea_market_type_data():
         kr_types = [
             {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
             {"value": "KR_IMPORT", "label": "Корея (импорт)"},
@@ -1687,7 +1687,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         seen_countries.add(code)
     country_labels = {**{c: country_label_ru(c) for c in countries}, "EU": "Европа", "KR": "Корея"}
     kr_types = []
-    if "KR" in regions:
+    if service.has_korea_market_type_data():
         kr_types = [
             {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
             {"value": "KR_IMPORT", "label": "Корея (импорт)"},

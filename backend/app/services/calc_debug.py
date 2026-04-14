@@ -66,7 +66,10 @@ def build_calc_debug(
         car.engine_type,
     )
     if car.engine_type and "electric" in car.engine_type.lower() and car.engine_cc and car.engine_cc > 0:
-        notes.append("fuel_conflict: engine_type electric but engine_cc>0, treating as ICE/PHEV")
+        if is_electric:
+            notes.append("fuel_conflict: engine_type electric but raw engine_cc>0, ignoring engine_cc for EV classification")
+        else:
+            notes.append("fuel_conflict: engine_type electric but engine_cc>0, treating as ICE/PHEV")
 
     fallback_reg_year, fallback_reg_month = get_missing_registration_default()
 

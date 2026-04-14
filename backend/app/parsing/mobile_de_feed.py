@@ -11,6 +11,9 @@ from ..importing.mobilede_csv import MobileDeCsvRow
 
 
 class MobileDeFeedParser:
+    _POWER_KW_RE = re.compile(r"\b(\d{2,4})(?:[.,]\d+)?\s*k\s*w\b", re.IGNORECASE)
+    _POWER_HP_RE = re.compile(r"\b(\d{2,4})(?:[.,]\d+)?\s*(?:cv|ps|hp)\b", re.IGNORECASE)
+
     def __init__(self, site_config: SiteConfig):
         self.config = site_config
 
@@ -103,6 +106,53 @@ class MobileDeFeedParser:
                 return float(row.horse_power) / 1.35962
             except Exception:
                 return None
+        for raw in (row.sub_title, row.title, row.description):
+            if not raw:
+                continue
+            match = self._POWER_KW_RE.search(str(raw))
+            if match:
+                try:
+                    value = float(match.group(1))
+                except Exception:
+                    continue
+                if 0 < value <= 2500:
+                    return value
+        return None
+
+    def _resolve_power_hp(self, row: MobileDeCsvRow) -> Optional[float]:
+        if row.horse_power:
+            try:
+                value = float(row.horse_power)
+                if 0 < value <= 3500:
+                    return value
+            except Exception:
+                pass
+        if row.power_kw is not None:
+            try:
+                value = float(row.power_kw)
+                if 0 < value <= 2500:
+                    return round(value * 1.35962, 1)
+            except Exception:
+                pass
+        for raw in (row.sub_title, row.title, row.description):
+            if not raw:
+                continue
+            match_hp = self._POWER_HP_RE.search(str(raw))
+            if match_hp:
+                try:
+                    value = float(match_hp.group(1))
+                except Exception:
+                    continue
+                if 0 < value <= 3500:
+                    return value
+            match_kw = self._POWER_KW_RE.search(str(raw))
+            if match_kw:
+                try:
+                    value_kw = float(match_kw.group(1))
+                except Exception:
+                    continue
+                if 0 < value_kw <= 2500:
+                    return round(value_kw * 1.35962, 1)
         return None
 
     def _detect_drive(self, options: List[str]) -> Optional[str]:
@@ -169,6 +219,15 @@ class MobileDeFeedParser:
                 continue
             if not row.url:
                 continue
+            engine_type = self._normalize_engine(
+                row.envkv_engine_type or row.engine_type,
+                row.envkv_consumption_fuel or row.full_fuel_type,
+            )
+            power_hp = self._resolve_power_hp(row)
+            power_kw = self._resolve_power_kw(row)
+            engine_cc = self._resolve_engine_cc(row)
+            if engine_type == "Electric":
+                engine_cc = None
             yield CarParsed(
                 source_key=self.config.key,
                 external_id=str(row.inner_id),
@@ -183,14 +242,11 @@ class MobileDeFeedParser:
                 price=self._resolve_price_eur(row),
                 currency="EUR",
                 listing_date=row.created_at,
-                engine_cc=self._resolve_engine_cc(row),
-                power_hp=float(row.horse_power) if row.horse_power else None,
-                power_kw=self._resolve_power_kw(row),
+                engine_cc=engine_cc,
+                power_hp=power_hp,
+                power_kw=power_kw,
                 body_type=self._normalize_body(row.body_type),
-                engine_type=self._normalize_engine(
-                    row.envkv_engine_type or row.engine_type,
-                    row.envkv_consumption_fuel or row.full_fuel_type,
-                ),
+                engine_type=engine_type,
                 transmission=self._normalize_transmission(row.transmission),
                 drive_type=drive,
                 color=row.manufacturer_color or row.color,

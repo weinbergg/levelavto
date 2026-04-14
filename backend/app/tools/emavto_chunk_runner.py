@@ -6,12 +6,14 @@ import time
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import func, select
+
 from ..db import SessionLocal
+from ..models import Car, ParserRun, ParserRunSource
 from ..parsing.config import load_sites_config
 from ..parsing.emavto_klg import EmAvtoKlgParser
 from ..services.parsing_data_service import ParsingDataService
-from ..models import Car
-from sqlalchemy import select
+from ..utils.feed_deactivation import should_deactivate_feed
 
 
 def needs_detail_refresh(car: Car) -> bool:
@@ -31,7 +33,7 @@ def run_chunk(
     min_price_usd: int = 0,
     backfill_missing: bool = False,
     mode: str = "full",
-) -> tuple[int, int, int, int, int, int]:
+) -> tuple[int, int, int, int, int, int, int, str, bool]:
     profile = {
         "mode": mode,
         "resume_page_full": start_page,
@@ -138,7 +140,17 @@ def run_chunk(
     else:
         last_page = start_page + pages - 1
     ds.set_progress(f"{parser.config.key}.last_page_full", str(last_page))
-    return len(items), inserted, updated, last_page, missing, parser.last_tasks_total
+    return (
+        len(items),
+        inserted,
+        updated,
+        last_page,
+        missing,
+        parser.last_tasks_total,
+        int(getattr(parser, "last_pages_processed", 0) or 0),
+        str(getattr(parser, "last_stop_reason", "") or ""),
+        bool(getattr(parser, "last_reached_end", False)),
+    )
 
 
 def main() -> None:
@@ -179,6 +191,10 @@ def main() -> None:
         source = ds.ensure_source(
             key=cfg.key, name=cfg.name, country=cfg.country, base_url=cfg.base_search_url
         )
+        run = ParserRun(started_at=datetime.utcnow(), trigger=f"emavto_chunk_runner:{args.mode}", status="partial")
+        db.add(run)
+        db.commit()
+        db.refresh(run)
         total_pages_left: Optional[int] = (
             args.total_pages if args.total_pages and args.total_pages > 0 else None
         )
@@ -192,7 +208,24 @@ def main() -> None:
             except ValueError:
                 start_page = cfg.pagination.start_page
 
+        previous_seen_before_run = int(
+            db.execute(
+                select(func.count(Car.id)).where(
+                    Car.source_id == source.id,
+                    Car.is_available.is_(True),
+                )
+            ).scalar()
+            or 0
+        )
+        run_started_at = datetime.utcnow()
+        initial_start_page = start_page
         current_page = start_page
+        total_seen = 0
+        inserted_total = 0
+        updated_total = 0
+        deactivated_total = 0
+        completed_full_scan = False
+        failed = False
         while True:
             if os.path.exists(args.stop_file):
                 print(
@@ -208,7 +241,17 @@ def main() -> None:
 
             print(
                 f"[runner] chunk start page={current_page} pages={pages_this} min_price_usd={args.min_price_usd}")
-            chunk_items, inserted, updated, last_page, missing, tasks_total = run_chunk(
+            (
+                chunk_items,
+                inserted,
+                updated,
+                last_page,
+                missing,
+                tasks_total,
+                pages_done,
+                stop_reason,
+                reached_end,
+            ) = run_chunk(
                 parser,
                 ds,
                 source,
@@ -219,11 +262,15 @@ def main() -> None:
                 args.backfill_missing,
                 args.mode,
             )
+            total_seen += chunk_items
+            inserted_total += inserted
+            updated_total += updated
             expected = pages_this * 50
             print(
                 f"[runner] chunk done pages={pages_this} items={chunk_items} "
                 f"(expected~{expected}) inserted={inserted} updated={updated} missing_after_backfill={missing} "
-                f"last_page={last_page} tasks_total={tasks_total}"
+                f"last_page={last_page} tasks_total={tasks_total} pages_done={pages_done} "
+                f"stop_reason={stop_reason or '-'} reached_end={int(reached_end)}"
             )
             if missing:
                 try:
@@ -236,6 +283,19 @@ def main() -> None:
                 except Exception as e:  # noqa: BLE001
                     print(f"[runner] failed to dump missing ids: {e}")
 
+            if reached_end:
+                completed_full_scan = True
+                print(f"[runner] reached end of catalog at page={last_page + 1}")
+                break
+            if stop_reason in {"error", "deadline"}:
+                failed = True
+                print(f"[runner] stopping after chunk because stop_reason={stop_reason}")
+                break
+            if pages_done <= 0:
+                failed = True
+                print("[runner] no pages processed in chunk; stopping to avoid stalled loop")
+                break
+
             current_page = last_page + 1
             if total_pages_left is not None:
                 total_pages_left -= pages_this
@@ -245,8 +305,56 @@ def main() -> None:
 
             print(f"[runner] sleeping {args.pause_sec}s before next chunk...")
             time.sleep(args.pause_sec)
+
+        if (
+            args.mode == "incremental"
+            and completed_full_scan
+            and initial_start_page == cfg.pagination.start_page
+            and (args.total_pages or 0) <= 0
+        ):
+            deactivate_mode = str(os.getenv("EMAVTO_DEACTIVATE_MODE", "auto") or "auto")
+            min_ratio = float(os.getenv("EMAVTO_DEACTIVATE_MIN_RATIO", "0.85") or 0.85)
+            min_seen = int(os.getenv("EMAVTO_DEACTIVATE_MIN_SEEN", "1000") or 1000)
+            allow_deactivate, reason = should_deactivate_feed(
+                mode=deactivate_mode,
+                current_seen=total_seen,
+                previous_seen=previous_seen_before_run,
+                min_ratio=min_ratio,
+                min_seen=min_seen,
+            )
+            print(
+                f"[runner] deactivation gate mode={deactivate_mode} current_seen={total_seen} "
+                f"previous_seen={previous_seen_before_run or 'n/a'} min_ratio={min_ratio:.4f} min_seen={min_seen} "
+                f"decision={'allow' if allow_deactivate else 'skip'} reason={reason}"
+            )
+            if allow_deactivate:
+                deactivated_total = ds.deactivate_missing_by_last_seen(source, run_started_at)
+                print(f"[runner] deactivated={deactivated_total} source={source.key}")
+
+        prs = ParserRunSource(
+            parser_run_id=run.id,
+            source_id=source.id,
+            total_seen=total_seen,
+            inserted=inserted_total,
+            updated=updated_total,
+            deactivated=deactivated_total,
+        )
+        db.add(prs)
+        run.finished_at = datetime.utcnow()
+        run.total_seen = total_seen
+        run.inserted = inserted_total
+        run.updated = updated_total
+        run.deactivated = deactivated_total
+        if failed:
+            run.status = "failed"
+        elif completed_full_scan:
+            run.status = "success"
+        else:
+            run.status = "partial"
+        db.commit()
     except KeyboardInterrupt:
         print("[runner] interrupted, progress saved up to last completed chunk")
+        db.rollback()
     finally:
         db.close()
 

@@ -1529,7 +1529,7 @@ def filter_ctx_base(
     countries = _sort_by_label([{"value": c, "label": country_label_ru(c) or c} for c in countries_raw])
     country_labels = {**{c: country_label_ru(c) or c for c in countries_raw}, "EU": "Европа", "KR": "Корея"}
     kr_types = []
-    if any(r["value"] == "KR" for r in regions):
+    if service.has_korea_market_type_data():
         kr_types = [
             {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
             {"value": "KR_IMPORT", "label": "Корея (импорт)"},
