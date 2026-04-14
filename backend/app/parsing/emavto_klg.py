@@ -46,6 +46,18 @@ class EmAvtoKlgParser(BaseParser):
         "color": ["Цвет"],
         "vin": ["VIN", "ВИН"],
     }
+    MARKET_STREAMS = (
+        {
+            "market_type": "domestic",
+            "page_param": "koreaPage",
+            "scope_selector": "#korea-cars",
+        },
+        {
+            "market_type": "import",
+            "page_param": "importPage",
+            "scope_selector": "#import-cars",
+        },
+    )
 
     def __init__(self, config: SiteConfig):
         super().__init__(config)
@@ -78,10 +90,33 @@ class EmAvtoKlgParser(BaseParser):
         self.last_stop_reason: str = ""
 
     def _build_query(self, profile: Dict[str, Any], page: int) -> Dict[str, str]:
-        # Base query from profile + pagination
+        # Kept for compatibility with callers that still rely on the configured page param.
         qp = super()._build_query(profile, page)
-        # emavto requires koreaPage=1 to return the KR catalog
-        qp.setdefault("koreaPage", "1")
+        qp.setdefault(self.config.pagination.page_param, "1")
+        return qp
+
+    def _build_market_query(self, profile: Dict[str, Any], page: int, page_param: str) -> Dict[str, str]:
+        qp: Dict[str, str] = {}
+        for logical, value in profile.items():
+            if logical in {
+                "mode",
+                "resume_page_full",
+                "pages",
+                "max_pages",
+                "max_items",
+                "max_runtime_sec",
+                "min_price_usd",
+                "skip_details",
+                "details",
+            }:
+                continue
+            if value is None or value == "":
+                continue
+            key = self.config.query_params.get(logical)
+            if not key:
+                continue
+            qp[key] = str(value)
+        qp[page_param] = str(page)
         return qp
 
     # --- public API ---
@@ -110,29 +145,64 @@ class EmAvtoKlgParser(BaseParser):
         self.last_pages_processed = 0
         self.last_reached_end = False
         self.last_stop_reason = ""
+        stream_done = {str(stream["market_type"]): False for stream in self.MARKET_STREAMS}
 
         for page in range(start_page, start_page + max_pages):
             if time.monotonic() > deadline:
                 deadline_hit = True
                 stop_reason = "deadline"
                 break
-            logger.info(f"[emavto_klg] list start page={page}")
-            page_status = self._produce_page(
-                page,
-                list_bucket,
-                tasks,
-                profile,
-                skip_details,
-                max_items,
-                min_price_usd,
-                deadline,
-            )
-            if page_status != "ok":
-                stop_reason = page_status
-                if page_status == "empty":
-                    self.last_reached_end = True
+            page_had_results = False
+            attempted_streams = 0
+            section_stats: List[Tuple[str, str, int]] = []
+            for stream in self.MARKET_STREAMS:
+                market_type = str(stream["market_type"])
+                if stream_done.get(market_type):
+                    continue
+                attempted_streams += 1
+                logger.info(
+                    "[emavto_klg] list start market_type=%s page=%s",
+                    market_type,
+                    page,
+                )
+                page_status, added = self._produce_page(
+                    page,
+                    list_bucket,
+                    tasks,
+                    profile,
+                    skip_details,
+                    max_items,
+                    min_price_usd,
+                    deadline,
+                    page_param=str(stream["page_param"]),
+                    scope_selector=str(stream["scope_selector"]),
+                    market_type=market_type,
+                )
+                section_stats.append((market_type, page_status, added))
+                if page_status == "ok":
+                    page_had_results = page_had_results or added > 0
+                elif page_status == "empty":
+                    stream_done[market_type] = True
+                else:
+                    stop_reason = page_status
+                    break
+                if max_items and len(tasks) >= max_items:
+                    break
+            if stop_reason == "error":
                 break
-            processed_pages.append(page)
+            if section_stats:
+                logger.info(
+                    "[emavto_klg] combined page=%s stats=%s tasks_total=%s",
+                    page,
+                    section_stats,
+                    len(tasks),
+                )
+            if page_had_results:
+                processed_pages.append(page)
+            if attempted_streams == 0 or all(stream_done.values()):
+                stop_reason = "empty"
+                self.last_reached_end = True
+                break
             if max_items and len(tasks) >= max_items:
                 stop_reason = "max_items"
                 break
@@ -173,10 +243,14 @@ class EmAvtoKlgParser(BaseParser):
                 )
                 detail = self._fetch_detail(
                     task["source_url"], detail_bucket, client=client, deadline=deadline)
+                detail_payload = dict(detail.get("source_payload") or {})
+                detail_payload["kr_market_type"] = task.get("kr_market_type")
+                detail_payload["kr_market_type_source"] = "emavto_tab"
                 car = CarParsed(
                     source_key=self.config.key,
                     external_id=task["external_id"],
                     country=(self.config.country or "KR").upper(),
+                    kr_market_type=task.get("kr_market_type"),
                     brand=task["brand"],
                     model=task["model"],
                     year=task["year"],
@@ -194,7 +268,7 @@ class EmAvtoKlgParser(BaseParser):
                     source_url=task["source_url"],
                     thumbnail_url=detail.get(
                         "thumbnail") or task["thumbnail_url"],
-                    source_payload=detail.get("source_payload"),
+                    source_payload=detail_payload,
                     images=detail.get("images"),
                 )
                 results.append(car)
@@ -273,10 +347,14 @@ class EmAvtoKlgParser(BaseParser):
                 task.get("source_url"),
             )
             detail = self._fetch_detail(task["source_url"], detail_bucket, client=client, deadline=deadline)
+            detail_payload = dict(detail.get("source_payload") or {})
+            detail_payload["kr_market_type"] = task.get("kr_market_type")
+            detail_payload["kr_market_type_source"] = "emavto_tab"
             car = CarParsed(
                 source_key=self.config.key,
                 external_id=task["external_id"],
                 country=(self.config.country or "KR").upper(),
+                kr_market_type=task.get("kr_market_type"),
                 brand=task["brand"],
                 model=task["model"],
                 year=task["year"],
@@ -293,7 +371,7 @@ class EmAvtoKlgParser(BaseParser):
                 vin=detail.get("vin"),
                 source_url=task["source_url"],
                 thumbnail_url=detail.get("thumbnail") or task["thumbnail_url"],
-                source_payload=detail.get("source_payload"),
+                source_payload=detail_payload,
                 images=detail.get("images"),
             )
             results.append(car)
@@ -316,31 +394,45 @@ class EmAvtoKlgParser(BaseParser):
         max_items: int,
         min_price_usd: int,
         deadline: float,
-    ) -> str:
-        query = self._build_query(profile, page)
+        page_param: str,
+        scope_selector: str,
+        market_type: str,
+    ) -> Tuple[str, int]:
+        query = self._build_market_query(profile, page, page_param)
         url = self.config.base_search_url
         expected_per_page = 50
         resp = self._request_with_backoff(
             url, query, bucket, is_detail=False, deadline=deadline)
         if not resp or resp.status_code != 200 or not resp.text:
             logger.warning(
-                f"[emavto_klg] stop at page={page} status={getattr(resp, 'status_code', None)}")
-            return "error"
+                f"[emavto_klg] stop market_type={market_type} page={page} status={getattr(resp, 'status_code', None)}")
+            return "error", 0
         logger.info(
-            "[emavto_klg] page=%s status=%s body_len=%s url=%s",
+            "[emavto_klg] market_type=%s page=%s status=%s body_len=%s url=%s",
+            market_type,
             page,
             getattr(resp, "status_code", None),
             len(resp.text or ""),
             getattr(resp, "url", url),
         )
-        raw_items = self._parse_html_list(resp.text)
-        logger.info(f"[emavto_klg] page {page} parsed {len(raw_items)} cards")
+        raw_items = self._parse_html_list_scoped(resp.text, scope_selector)
+        logger.info(
+            "[emavto_klg] market_type=%s page=%s parsed=%s cards",
+            market_type,
+            page,
+            len(raw_items),
+        )
         if len(raw_items) < expected_per_page:
             logger.warning(
-                "[emavto_klg] page %s parsed %s (<%s expected)", page, len(raw_items), expected_per_page
+                "[emavto_klg] market_type=%s page=%s parsed %s (<%s expected)",
+                market_type,
+                page,
+                len(raw_items),
+                expected_per_page,
             )
         if not raw_items:
-            return "empty"
+            return "empty", 0
+        added = 0
         for idx, r in enumerate(raw_items):
             if time.monotonic() > deadline:
                 break
@@ -361,6 +453,7 @@ class EmAvtoKlgParser(BaseParser):
                     source_key=self.config.key,
                     external_id=external_id or f"emavto_klg_{page}_{idx}",
                     country=(self.config.country or "KR").upper(),
+                    kr_market_type=market_type,
                     brand=brand,
                     model=model,
                     year=year,
@@ -375,12 +468,17 @@ class EmAvtoKlgParser(BaseParser):
                     vin=None,
                     source_url=link,
                     thumbnail_url=r.get("image"),
+                    source_payload={
+                        "kr_market_type": market_type,
+                        "kr_market_type_source": "emavto_tab",
+                    },
                     images=None,
                 )
                 tasks.append(
                     {
                         "external_id": car.external_id,
                         "source_url": car.source_url,
+                        "kr_market_type": market_type,
                         "brand": car.brand,
                         "model": car.model,
                         "year": car.year,
@@ -397,6 +495,7 @@ class EmAvtoKlgParser(BaseParser):
                     {
                         "external_id": external_id or f"emavto_klg_{page}_{idx}",
                         "source_url": link,
+                        "kr_market_type": market_type,
                         "brand": brand,
                         "model": model,
                         "year": year,
@@ -407,9 +506,43 @@ class EmAvtoKlgParser(BaseParser):
                         "details_text": details_text,
                     }
                 )
-                if max_items and len(tasks) >= max_items:
-                    break
-        return "ok"
+            added += 1
+            if max_items and len(tasks) >= max_items:
+                break
+        return "ok", added
+
+    def _parse_html_list_scoped(self, html: str, scope_selector: str) -> List[Dict[str, Optional[str]]]:
+        try:
+            soup = BeautifulSoup(html, "lxml")
+        except Exception:
+            soup = BeautifulSoup(html, "html.parser")
+        sel = self.config.selectors
+        root = soup.select_one(scope_selector)
+        if root is None:
+            return []
+        items = []
+        for card in root.select(sel.get("item", ""))[:1000]:
+            link_el = card.select_one(sel.get("link", "")) if sel.get("link") else card
+            img_el = card.select_one(sel.get("image", "")) if sel.get("image") else None
+            title_el = card.select_one(sel.get("title", "")) if sel.get("title") else None
+            price_el = card.select_one(sel.get("price", "")) if sel.get("price") else None
+            year_el = card.select_one(sel.get("year", "")) if sel.get("year") else None
+            mileage_el = card.select_one(sel.get("mileage", "")) if sel.get("mileage") else None
+            details_el = card.select_one(sel.get("details", "")) if sel.get("details") else None
+            items.append(
+                {
+                    "raw_html": str(card),
+                    "title": title_el.get_text(strip=True) if title_el else None,
+                    "price": price_el.get_text(strip=True) if price_el else None,
+                    "year": year_el.get_text(strip=True) if year_el else None,
+                    "mileage": mileage_el.get_text(strip=True) if mileage_el else None,
+                    "link": link_el.get("href") if link_el else None,
+                    "image": (img_el.get("src") if img_el else None),
+                    "details": details_el.get_text(strip=True) if details_el else None,
+                    "details_html": str(details_el) if details_el else None,
+                }
+            )
+        return items
 
     # --- request helpers ---
     def _request_with_backoff(

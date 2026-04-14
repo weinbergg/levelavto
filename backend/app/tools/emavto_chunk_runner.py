@@ -105,6 +105,7 @@ def run_chunk(
                     "source_key": parser.config.key,
                     "external_id": ext_id,
                     "country": parser.config.country,
+                    "kr_market_type": task.get("kr_market_type"),
                     "brand": task.get("brand"),
                     "model": task.get("model"),
                     "year": task.get("year"),
@@ -119,6 +120,10 @@ def run_chunk(
                     "vin": None,
                     "source_url": task.get("source_url"),
                     "thumbnail_url": task.get("thumbnail_url"),
+                    "source_payload": {
+                        "kr_market_type": task.get("kr_market_type"),
+                        "kr_market_type_source": "emavto_tab",
+                    },
                     "images": None,
                 }
             )
