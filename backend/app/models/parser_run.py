@@ -12,7 +12,7 @@ class ParserRun(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     started_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    trigger: Mapped[str] = mapped_column(String(20), nullable=False)  # auto/manual/telegram
+    trigger: Mapped[str] = mapped_column(String(64), nullable=False)  # auto/manual/telegram/chunk runners
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="partial")
     total_seen: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     inserted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -36,5 +36,4 @@ class ParserRunSource(Base):
 
     run = relationship("ParserRun", back_populates="sources")
     source = relationship("Source")
-
 

@@ -12,6 +12,7 @@ from ..db import SessionLocal
 from ..models import Car, ParserRun, ParserRunSource
 from ..parsing.config import load_sites_config
 from ..parsing.emavto_klg import EmAvtoKlgParser
+from ..schema_bootstrap import ensure_runtime_schema
 from ..services.parsing_data_service import ParsingDataService
 from ..utils.feed_deactivation import should_deactivate_feed
 
@@ -180,6 +181,8 @@ def main() -> None:
     ap.add_argument("--backfill-missing", action="store_true",
                     help="After main loop, try to доfetch missing details within half runtime")
     args = ap.parse_args()
+
+    ensure_runtime_schema()
 
     sites = load_sites_config()
     cfg = sites.get("emavto_klg")
