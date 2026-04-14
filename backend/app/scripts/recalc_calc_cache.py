@@ -96,6 +96,8 @@ def main() -> None:
         base = db.query(Car.id).filter(Car.is_available.is_(True))
         if args.region.upper() == "EU":
             base = base.filter(~Car.country.like("KR%"))
+        elif args.region.upper() == "KR":
+            base = base.filter(Car.country.like("KR%"))
         if args.country:
             base = base.filter(Car.country == args.country.upper())
         if args.shard_total > 1:
