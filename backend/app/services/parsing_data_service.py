@@ -85,6 +85,7 @@ class ParsingDataService:
             payload["color_group"] = normalize_color_group(payload.get("color"))
             # Normalize KR listing fields, but never invent a market type we did not parse.
             if payload.get("country") == "KR":
+                payload["kr_market_type"] = payload.get("kr_market_type") or None
                 listing_val = payload.get("listing_date")
                 ts = None
                 if isinstance(listing_val, str):
@@ -158,6 +159,9 @@ class ParsingDataService:
                         updated += 1
                     if payload.get("country") and getattr(existing, "country", None) != payload.get("country"):
                         existing.country = payload.get("country")
+                        updated += 1
+                    if getattr(existing, "kr_market_type", None) != payload.get("kr_market_type"):
+                        existing.kr_market_type = payload.get("kr_market_type")
                         updated += 1
                     if existing.price_rub_cached is None and payload.get("price_rub_cached") is not None:
                         existing.price_rub_cached = payload["price_rub_cached"]
