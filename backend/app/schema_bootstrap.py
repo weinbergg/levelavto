@@ -5,6 +5,7 @@ import logging
 from sqlalchemy import inspect, text
 
 from .db import engine
+from .models.email_verification import EmailVerificationChallenge
 from .models.phone_verification import PhoneVerificationChallenge
 from .models.parser_run import ParserRun, ParserRunSource
 
@@ -16,6 +17,8 @@ def ensure_runtime_schema() -> None:
         inspector = inspect(engine)
         if not inspector.has_table("phone_verification_challenges"):
             PhoneVerificationChallenge.__table__.create(bind=engine, checkfirst=True)
+        if not inspector.has_table("email_verification_challenges"):
+            EmailVerificationChallenge.__table__.create(bind=engine, checkfirst=True)
         if not inspector.has_table("parser_runs"):
             ParserRun.__table__.create(bind=engine, checkfirst=True)
         if not inspector.has_table("parser_run_sources"):
@@ -43,6 +46,8 @@ def ensure_runtime_schema() -> None:
         with engine.begin() as conn:
             if "phone" not in user_columns:
                 conn.execute(text("ALTER TABLE users ADD COLUMN phone VARCHAR(32)"))
+            if "email_verified_at" not in user_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMP"))
             if "phone_verified_at" not in user_columns:
                 conn.execute(text("ALTER TABLE users ADD COLUMN phone_verified_at TIMESTAMP"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_phone ON users (phone)"))

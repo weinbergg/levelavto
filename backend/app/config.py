@@ -37,6 +37,18 @@ class Settings(BaseSettings):
     SMS_MAX_ATTEMPTS: int = Field(default=5)
     SMS_SENDER_NAME: str | None = Field(default=None)
     SMS_RU_API_ID: str | None = Field(default=None)
+    EMAIL_PROVIDER: str = Field(default="smtp")
+    EMAIL_CODE_LENGTH: int = Field(default=6)
+    EMAIL_CODE_TTL_SEC: int = Field(default=900)
+    EMAIL_RESEND_COOLDOWN_SEC: int = Field(default=60)
+    EMAIL_MAX_ATTEMPTS: int = Field(default=5)
+    EMAIL_HOST: str | None = Field(default=None)
+    EMAIL_PORT: int = Field(default=587)
+    EMAIL_HOST_USER: str | None = Field(default=None)
+    EMAIL_HOST_PASSWORD: str | None = Field(default=None)
+    EMAIL_FROM: str | None = Field(default=None)
+    EMAIL_USE_TLS: bool = Field(default=True)
+    EMAIL_USE_SSL: bool = Field(default=False)
 
     @property
     def sync_database_url(self) -> str:

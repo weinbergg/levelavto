@@ -39,6 +39,7 @@ class AuthService:
         full_name: Optional[str] = None,
         *,
         phone: Optional[str] = None,
+        email_verified_at: Optional[datetime] = None,
         phone_verified_at: Optional[datetime] = None,
         is_admin: bool = False,
     ) -> User:
@@ -56,6 +57,7 @@ class AuthService:
             email=email_norm,
             full_name=full_name,
             phone=phone_norm,
+            email_verified_at=email_verified_at,
             phone_verified_at=phone_verified_at,
             password_hash=pwd_hash,
             is_admin=is_admin,
@@ -75,4 +77,3 @@ class AuthService:
         user.last_login_at = datetime.utcnow()
         self.db.commit()
         return user
-

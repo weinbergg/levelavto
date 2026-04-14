@@ -334,25 +334,39 @@ def test_home_contacts_use_icon_messengers_and_direct_telegram_link():
     assert ".contact-messenger-links" in css
 
 
-def test_register_template_and_backend_support_phone_verification():
+def test_register_template_and_backend_support_phone_and_email_verification():
     router = _read("app/routers/auth.py")
     template = _read("app/templates/auth/register.html")
+    email_service = _read("app/services/email_verification_service.py")
     service = _read("app/services/phone_verification_service.py")
+    email_model = _read("app/models/email_verification.py")
     model = _read("app/models/phone_verification.py")
     bootstrap = _read("app/schema_bootstrap.py")
     config = _read("app/config.py")
+    assert '@router.post("/api/auth/email/send-code")' in router
+    assert '@router.post("/api/auth/email/verify-code")' in router
     assert '@router.post("/api/auth/phone/send-code")' in router
     assert '@router.post("/api/auth/phone/verify-code")' in router
+    assert "email_verification_token" in router
     assert "phone_verification_token" in router
+    assert 'id="register-email"' in template
+    assert 'id="send-email-code"' in template
+    assert 'id="verify-email-code"' in template
+    assert 'id="email-verification-token"' in template
     assert 'id="register-phone"' in template
     assert 'id="send-phone-code"' in template
     assert 'id="verify-phone-code"' in template
     assert 'id="phone-verification-token"' in template
+    assert "class SmtpEmailProvider" in email_service
+    assert "class EmailVerificationService" in email_service
     assert "normalize_phone_number" in service
     assert "class SmsRuProvider" in service
     assert "class PhoneVerificationService" in service
+    assert "EmailVerificationChallenge" in email_model
     assert "PhoneVerificationChallenge" in model
+    assert "ALTER TABLE users ADD COLUMN email_verified_at" in bootstrap
     assert "ALTER TABLE users ADD COLUMN phone" in bootstrap
+    assert "EMAIL_PROVIDER" in config
     assert "SMS_RU_API_ID" in config
 
 

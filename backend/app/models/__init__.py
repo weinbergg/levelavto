@@ -11,6 +11,7 @@ from .calculator_config import CalculatorConfig
 from .favorite import Favorite
 from .car_spec_reference import CarSpecReference
 from .phone_verification import PhoneVerificationChallenge
+from .email_verification import EmailVerificationChallenge
 
 __all__ = [
     "Source",
@@ -26,4 +27,5 @@ __all__ = [
     "Favorite",
     "CarSpecReference",
     "PhoneVerificationChallenge",
+    "EmailVerificationChallenge",
 ]

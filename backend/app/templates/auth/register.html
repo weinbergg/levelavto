@@ -15,8 +15,39 @@ content %}
       <form method="post" action="/register" class="form-vertical">
         <label
           >Email
-          <input type="email" name="email" required value="{{ form_data.email if form_data is defined else '' }}" />
+          <input
+            type="email"
+            name="email"
+            id="register-email"
+            required
+            autocomplete="email"
+            value="{{ form_data.email if form_data is defined else '' }}"
+          />
         </label>
+        <div class="inline-actions" style="margin-top: -6px">
+          <button type="button" class="btn btn-secondary" id="send-email-code">Отправить код</button>
+          <span class="hero-note" id="email-status">Подтвердите email кодом из письма</span>
+        </div>
+        <label
+          >Код из email
+          <input
+            type="text"
+            id="register-email-code"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="8"
+            placeholder="Введите код"
+          />
+        </label>
+        <div class="inline-actions" style="margin-top: -6px">
+          <button type="button" class="btn btn-secondary" id="verify-email-code">Подтвердить email</button>
+        </div>
+        <input
+          type="hidden"
+          name="email_verification_token"
+          id="email-verification-token"
+          value="{{ form_data.email_verification_token if form_data is defined else '' }}"
+        />
         <label
           >Имя
           <input type="text" name="full_name" value="{{ form_data.full_name if form_data is defined else '' }}" />
@@ -27,7 +58,6 @@ content %}
             type="tel"
             name="phone"
             id="register-phone"
-            required
             inputmode="tel"
             autocomplete="tel"
             placeholder="+7 9xx xxx-xx-xx"
@@ -36,7 +66,7 @@ content %}
         </label>
         <div class="inline-actions" style="margin-top: -6px">
           <button type="button" class="btn btn-secondary" id="send-phone-code">Отправить код</button>
-          <span class="hero-note" id="phone-status">Подтвердите номер телефона по SMS</span>
+          <span class="hero-note" id="phone-status">Необязательно: номер можно дополнительно подтвердить по SMS</span>
         </div>
         <label
           >Код из SMS
@@ -81,38 +111,134 @@ content %}
 <script>
   (() => {
     const form = document.querySelector('form[action="/register"]')
+    const emailInput = document.getElementById('register-email')
+    const emailCodeInput = document.getElementById('register-email-code')
+    const sendEmailBtn = document.getElementById('send-email-code')
+    const verifyEmailBtn = document.getElementById('verify-email-code')
+    const emailStatusEl = document.getElementById('email-status')
+    const emailTokenInput = document.getElementById('email-verification-token')
     const phoneInput = document.getElementById('register-phone')
     const codeInput = document.getElementById('register-phone-code')
     const sendBtn = document.getElementById('send-phone-code')
     const verifyBtn = document.getElementById('verify-phone-code')
     const statusEl = document.getElementById('phone-status')
-    const tokenInput = document.getElementById('phone-verification-token')
-    if (!form || !phoneInput || !codeInput || !sendBtn || !verifyBtn || !statusEl || !tokenInput) return
+    const phoneTokenInput = document.getElementById('phone-verification-token')
+    if (!form || !emailInput || !emailCodeInput || !sendEmailBtn || !verifyEmailBtn || !emailStatusEl || !emailTokenInput || !phoneInput || !codeInput || !sendBtn || !verifyBtn || !statusEl || !phoneTokenInput) return
 
+    let emailChallengeToken = ''
+    let verifiedEmail = ''
     let challengeToken = ''
     let verifiedPhone = ''
+
+    const setEmailStatus = (message, tone = '') => {
+      emailStatusEl.textContent = message
+      emailStatusEl.style.color = tone === 'error' ? '#ff8d7d' : tone === 'success' ? '#7ce3a1' : ''
+    }
 
     const setStatus = (message, tone = '') => {
       statusEl.textContent = message
       statusEl.style.color = tone === 'error' ? '#ff8d7d' : tone === 'success' ? '#7ce3a1' : ''
     }
 
+    const resetEmailVerification = () => {
+      emailChallengeToken = ''
+      verifiedEmail = ''
+      emailTokenInput.value = ''
+      emailCodeInput.value = ''
+      setEmailStatus('Подтвердите email кодом из письма')
+    }
+
     const resetVerification = () => {
       challengeToken = ''
       verifiedPhone = ''
-      tokenInput.value = ''
-      setStatus('Подтвердите номер телефона по SMS')
+      phoneTokenInput.value = ''
+      codeInput.value = ''
+      setStatus('Необязательно: номер можно дополнительно подтвердить по SMS')
     }
 
-    if (tokenInput.value.trim()) {
-      challengeToken = tokenInput.value.trim()
+    if (emailTokenInput.value.trim()) {
+      emailChallengeToken = emailTokenInput.value.trim()
+      verifiedEmail = emailInput.value.trim().toLowerCase()
+      setEmailStatus('Email уже подтверждён, можно завершить регистрацию', 'success')
+    }
+
+    if (phoneTokenInput.value.trim()) {
+      challengeToken = phoneTokenInput.value.trim()
       verifiedPhone = phoneInput.value.trim()
-      setStatus('Номер уже подтверждён, можно завершить регистрацию', 'success')
+      setStatus('Номер уже подтверждён', 'success')
+    }
+
+    emailInput.addEventListener('input', () => {
+      if (verifiedEmail && verifiedEmail !== emailInput.value.trim().toLowerCase()) {
+        resetEmailVerification()
+      }
     }
 
     phoneInput.addEventListener('input', () => {
       if (verifiedPhone && verifiedPhone !== phoneInput.value.trim()) {
         resetVerification()
+      }
+    })
+
+    sendEmailBtn.addEventListener('click', async () => {
+      const email = emailInput.value.trim()
+      if (!email) {
+        setEmailStatus('Введите email', 'error')
+        return
+      }
+      sendEmailBtn.disabled = true
+      try {
+        const response = await fetch('/api/auth/email/send-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          setEmailStatus(data.detail || 'Не удалось отправить код', 'error')
+          return
+        }
+        emailChallengeToken = String(data.challenge_token || '')
+        verifiedEmail = email.toLowerCase()
+        emailTokenInput.value = ''
+        setEmailStatus(`Код отправлен на ${data.email_masked || 'email'}. Введите его ниже.`)
+      } catch (error) {
+        setEmailStatus('Ошибка сети при отправке кода', 'error')
+      } finally {
+        sendEmailBtn.disabled = false
+      }
+    })
+
+    verifyEmailBtn.addEventListener('click', async () => {
+      const email = emailInput.value.trim()
+      const code = emailCodeInput.value.trim()
+      if (!emailChallengeToken) {
+        setEmailStatus('Сначала запросите код по email', 'error')
+        return
+      }
+      if (!code) {
+        setEmailStatus('Введите код из email', 'error')
+        return
+      }
+      verifyEmailBtn.disabled = true
+      try {
+        const response = await fetch('/api/auth/email/verify-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code, challenge_token: emailChallengeToken }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          setEmailStatus(data.detail || 'Код не подошёл', 'error')
+          return
+        }
+        emailTokenInput.value = String(data.verification_token || '')
+        verifiedEmail = email.toLowerCase()
+        setEmailStatus(`Email подтверждён: ${data.email_masked || email}`, 'success')
+      } catch (error) {
+        setEmailStatus('Ошибка сети при проверке кода', 'error')
+      } finally {
+        verifyEmailBtn.disabled = false
       }
     })
 
@@ -168,7 +294,7 @@ content %}
           setStatus(data.detail || 'Код не подошёл', 'error')
           return
         }
-        tokenInput.value = String(data.verification_token || '')
+        phoneTokenInput.value = String(data.verification_token || '')
         verifiedPhone = phone
         setStatus(`Номер подтверждён: ${data.phone_masked || phone}`, 'success')
       } catch (error) {
@@ -179,14 +305,14 @@ content %}
     })
 
     form.addEventListener('submit', (event) => {
-      const phone = phoneInput.value.trim()
-      if (!phone) {
-        setStatus('Введите номер телефона', 'error')
+      const email = emailInput.value.trim()
+      if (!email) {
+        setEmailStatus('Введите email', 'error')
         event.preventDefault()
         return
       }
-      if (!tokenInput.value.trim()) {
-        setStatus('Сначала подтвердите номер телефона', 'error')
+      if (!emailTokenInput.value.trim()) {
+        setEmailStatus('Сначала подтвердите email', 'error')
         event.preventDefault()
       }
     })
