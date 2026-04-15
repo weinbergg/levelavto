@@ -607,8 +607,10 @@ def test_che168_parser_and_offline_tool_are_registered():
 def test_catalog_and_search_color_filters_use_non_label_wrapper():
     search_template = _read("app/templates/search.html")
     catalog_template = _read("app/templates/catalog.html")
+    pages = _read("app/routers/pages.py")
     assert '<div class="field field--full"><span class="field-label">Цвет кузова</span>' in search_template
     assert '<div class="field field--full"><span class="field-label">Цвет кузова</span>' in catalog_template
+    assert '"_color_source": "color_group"' in pages
 
 
 def test_catalog_scroll_and_grouped_filters_contracts():

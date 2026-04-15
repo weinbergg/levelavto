@@ -895,6 +895,7 @@ def _build_filter_context(
         "engine_types": engine_types,
         "transmissions": transmissions,
         "drive_types": drive_types,
+        "_color_source": "color_group",
         "_engine_type_source": "normalized",
         "seats_options": seats_options,
         "doors_options": doors_options,
