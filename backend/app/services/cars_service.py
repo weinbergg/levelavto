@@ -1048,11 +1048,13 @@ class CarsService:
             elif kt_raw in ("KR_IMPORT", "IMPORT"):
                 kt = "import"
             if kt:
-                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-                conds = [func.lower(Car.kr_market_type) == kt, Car.country.like("KR%")]
-                if kr_sources:
-                    conds.append(Car.source_id.in_(kr_sources))
-                conditions.append(and_(or_(*conds)))
+                conditions.append(func.lower(Car.kr_market_type) == kt)
+                if not region and not country:
+                    kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                    conds = [Car.country.like("KR%")]
+                    if kr_sources:
+                        conds.append(Car.source_id.in_(kr_sources))
+                    conditions.append(or_(*conds))
         if brand:
             b = normalize_brand(brand).strip()
             if b:
@@ -1383,11 +1385,13 @@ class CarsService:
             elif kt_raw in ("KR_IMPORT", "IMPORT"):
                 kt = "import"
             if kt:
-                kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
-                conds = [func.lower(Car.kr_market_type) == kt, Car.country.like("KR%")]
-                if kr_sources:
-                    conds.append(Car.source_id.in_(kr_sources))
-                conditions.append(and_(or_(*conds)))
+                conditions.append(func.lower(Car.kr_market_type) == kt)
+                if not region and not country:
+                    kr_sources = self._source_ids_for_hints(self.KOREA_SOURCE_HINTS)
+                    conds = [Car.country.like("KR%")]
+                    if kr_sources:
+                        conds.append(Car.source_id.in_(kr_sources))
+                    conditions.append(or_(*conds))
 
         if brand and "brand" not in exclude:
             b = normalize_brand(brand).strip().strip(".,;")
