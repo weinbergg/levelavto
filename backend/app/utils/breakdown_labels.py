@@ -7,6 +7,8 @@ from typing import Dict
 _LABELS: Dict[str, str] = {
     "bank": "Банковские расходы",
     "purchase": "Покупка автомобиля",
+    "emavto_price": "Цена EMAVTO",
+    "kr_commission": "Комиссия 3%",
     "inspection": "Осмотр",
     "delivery_eu_msk": "Доставка Европа — МСК",
     "delivery": "Доставка",

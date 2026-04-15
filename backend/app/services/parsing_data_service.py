@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Iterable, Tuple, List, Dict, Any
 from datetime import datetime
 import hashlib
+import logging
+import os
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update, or_
 from ..models import Car, Source, CarImage, ProgressKV
@@ -39,6 +41,7 @@ def compute_car_hash(payload: Dict[str, Any]) -> str:
 class ParsingDataService:
     def __init__(self, db: Session) -> None:
         self.db = db
+        self.logger = logging.getLogger(__name__)
 
     def ensure_source(self, *, key: str, name: str, country: str, base_url: str) -> Source:
         existing = self.db.execute(select(Source).where(
@@ -71,7 +74,9 @@ class ParsingDataService:
         now = datetime.utcnow()
         inserted = 0
         updated = 0
-        rates = CarsService(self.db).get_fx_rates() or {}
+        cars_service = CarsService(self.db)
+        rates = cars_service.get_fx_rates() or {}
+        recalc_car_ids: set[int] = set()
         # Normalize and de-duplicate by external_id
         unique_items: Dict[str, Dict[str, Any]] = {}
         for p in parsed_items:
@@ -141,6 +146,7 @@ class ParsingDataService:
                     "thumbnail_url") or new_thumb
             existing = existing_by_eid.get(eid)
             if existing:
+                needs_recalc = False
                 if existing.hash != payload["hash"]:
                     for k, v in payload.items():
                         if hasattr(existing, k) and k not in ("id", "created_at", "first_seen_at"):
@@ -149,26 +155,33 @@ class ParsingDataService:
                     existing.last_seen_at = now
                     existing.is_available = True
                     updated += 1
+                    needs_recalc = True
                 else:
                     if payload.get("source_payload") is not None and existing.source_payload != payload["source_payload"]:
                         existing.source_payload = payload["source_payload"]
                         self._clear_inferred_specs(existing)
                         updated += 1
+                        needs_recalc = True
                     if getattr(existing, "description", None) != payload.get("description"):
                         existing.description = payload.get("description")
                         updated += 1
+                        needs_recalc = True
                     if payload.get("country") and getattr(existing, "country", None) != payload.get("country"):
                         existing.country = payload.get("country")
                         updated += 1
+                        needs_recalc = True
                     if getattr(existing, "kr_market_type", None) != payload.get("kr_market_type"):
                         existing.kr_market_type = payload.get("kr_market_type")
                         updated += 1
+                        needs_recalc = True
                     if existing.price_rub_cached is None and payload.get("price_rub_cached") is not None:
                         existing.price_rub_cached = payload["price_rub_cached"]
                         updated += 1
+                        needs_recalc = True
                     if existing.listing_date is None and payload.get("listing_date") is not None:
                         existing.listing_date = payload["listing_date"]
                         updated += 1
+                        needs_recalc = True
                     existing.last_seen_at = now
                     existing.is_available = True
                 car_row = existing
@@ -182,10 +195,16 @@ class ParsingDataService:
                 self.db.add(car)
                 inserted += 1
                 car_row = car
+                needs_recalc = True
             # Sync images for this car: if provided, use them; else fallback to thumbnail_url
             # Flush to get ids for newly created rows
             self.db.flush()
             if car_row and getattr(car_row, "id", None):
+                if (
+                    needs_recalc
+                    and str(getattr(car_row, "country", payload.get("country") or source.country) or "").upper().startswith("KR")
+                ):
+                    recalc_car_ids.add(int(car_row.id))
                 old_imgs = self.db.execute(select(CarImage).where(
                     CarImage.car_id == car_row.id).order_by(CarImage.position.asc())).scalars().all()
                 # decide images list
@@ -217,6 +236,14 @@ class ParsingDataService:
                                     is_primary=(pos == 0), position=pos))
 
         self.db.commit()
+        if recalc_car_ids and os.getenv("PARSER_AUTO_CALC_KR", "1") != "0":
+            cars = self.db.execute(select(Car).where(Car.id.in_(sorted(recalc_car_ids)))).scalars().all()
+            for car in cars:
+                try:
+                    cars_service.ensure_calc_cache(car, force=True)
+                except Exception:
+                    self.db.rollback()
+                    self.logger.exception("kr_auto_calc_failed car=%s source=%s", getattr(car, "id", None), getattr(source, "key", None))
         return inserted, updated, len(ext_ids)
 
     @staticmethod

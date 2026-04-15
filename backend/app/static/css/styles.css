@@ -1941,7 +1941,8 @@ body.filters-open {
 .advanced-search #advanced-tech,
 .advanced-search #advanced-exterior,
 .advanced-search #advanced-interior,
-.advanced-search #advanced-details {
+.advanced-search #advanced-details,
+.advanced-search #advanced-keywords {
   display: grid !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -1950,7 +1951,8 @@ body.filters-open {
 .advanced-search #advanced-tech > .search-filters,
 .advanced-search #advanced-exterior > .search-filters,
 .advanced-search #advanced-interior > .search-filters,
-.advanced-search #advanced-details > .search-filters {
+.advanced-search #advanced-details > .search-filters,
+.advanced-search #advanced-keywords > .search-filters {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;

@@ -320,9 +320,25 @@ def test_text_query_input_only_lives_in_advanced_search():
     home = _read("app/templates/home.html")
     search = _read("app/templates/search.html")
     catalog = _read("app/templates/catalog.html")
+    css = _read("app/static/css/styles.css")
     assert 'name="q"' not in home
     assert 'name="q"' in search
     assert 'name="q"' not in catalog
+    assert ".advanced-search #advanced-keywords," in css or ".advanced-search #advanced-keywords {" in css
+
+
+def test_search_template_uses_full_kr_type_options_in_advanced_search():
+    search = _read("app/templates/search.html")
+    assert '{% for kt in kr_types %}' in search
+    assert 'params.get(\'kr_type\')|upper == kt.value' in search
+    assert '<option value="import">Импортные</option>' not in search
+
+
+def test_parsing_service_auto_recalculates_korea_prices_after_upsert():
+    parsing_service = _read("app/services/parsing_data_service.py")
+    assert 'PARSER_AUTO_CALC_KR' in parsing_service
+    assert 'ensure_calc_cache(car, force=True)' in parsing_service
+    assert 'country") or source.country' in parsing_service or "country') or source.country" in parsing_service
 
 
 def test_home_contacts_use_icon_messengers_and_direct_telegram_link():

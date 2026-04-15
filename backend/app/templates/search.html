@@ -93,7 +93,9 @@
                 <label class="region-sub region-sub--kr{% if region_value != 'KR' %} is-hidden{% endif %}" data-region-sub-kr>Тип (Корея)
                   <select name="kr_type" data-kr-type>
                     <option value="">Корейские</option>
-                    <option value="import">Импортные</option>
+                    {% for kt in kr_types %}
+                    <option value="{{ kt.value }}" {% if params.get('kr_type')|upper == kt.value %}selected{% endif %}>{{ kt.label }}</option>
+                    {% endfor %}
                   </select>
                 </label>
                 {% endif %}

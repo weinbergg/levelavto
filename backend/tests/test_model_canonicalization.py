@@ -13,6 +13,12 @@ def test_canonical_model_label_maps_bmw_trim_titles_to_eu_model_codes():
     assert service._canonical_model_label("BMW", "X7 (G07) xDrive 40i M Sport 6 seater", donors=donors) == "X7"
 
 
+def test_canonical_model_label_keeps_bmw_x5m_separate_from_x5():
+    service = CarsService(db=None)  # type: ignore[arg-type]
+    donors = ["X5", "X5 M", "X6"]
+    assert service._canonical_model_label("BMW", "BMW X5M Competition", donors=donors) == "X5 M"
+
+
 def test_canonical_model_label_maps_generic_kr_titles_to_eu_donors():
     service = CarsService(db=None)  # type: ignore[arg-type]
     kia_donors = ["Sorento", "Carnival", "Sportage"]

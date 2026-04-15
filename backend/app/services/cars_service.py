@@ -41,8 +41,11 @@ from ..utils.taxonomy import (
     parse_interior_trim_token,
 )
 from ..utils.breakdown_labels import label_for
+from ..utils.price_utils import ceil_to_step, get_round_step_rub, raw_price_to_rub
 from .calculator_config_service import CalculatorConfigService
+from .calculator import get_util_fee_rub as legacy_util_fee_rub
 from .calculator_runtime import EstimateRequest, calculate, is_bev
+from .customs_config import calc_util_fee_rub, get_customs_config
 
 BRAND_ALIASES = {
     "alfa": "Alfa Romeo",
@@ -185,7 +188,14 @@ def _model_search_tokens(value: Optional[str]) -> List[str]:
     if not text:
         return []
     text = _MODEL_NON_ALNUM_RE.sub(" ", text)
-    return [token for token in text.split() if token]
+    tokens = [token for token in text.split() if token]
+    expanded: List[str] = []
+    for token in tokens:
+        if re.fullmatch(r"x\d+m", token):
+            expanded.extend([token[:-1], "m"])
+            continue
+        expanded.append(token)
+    return expanded
 
 
 def _dedupe_model_values(values: List[str]) -> List[str]:
@@ -2901,6 +2911,89 @@ class CarsService:
             self.db.commit()
             self.logger.info("calc_fallback_total car=%s reason=%s", car.id, reason)
             return {"total_rub": total, "breakdown": car.calc_breakdown_json or []}
+
+        def _calc_kr_age_bucket(*, bev: bool) -> str:
+            if bev:
+                return "electric"
+            if reg_fallback_missing:
+                return "under_3"
+            try:
+                reg_dt = datetime(int(reg_year), int(reg_month), 1)
+                now_dt = datetime.utcnow().replace(day=1)
+                age_months = max(0, (now_dt.year - reg_dt.year) * 12 + (now_dt.month - reg_dt.month))
+            except Exception:
+                return "under_3"
+            return "under_3" if age_months < 36 else "3_5"
+
+        def _calculate_kr_total(*, bev: bool) -> dict | None:
+            base_rub = raw_price_to_rub(
+                used_price,
+                used_currency,
+                fx_eur=eur_rate,
+                fx_usd=usd_rate,
+                fx_cny=cny_rate,
+            )
+            if base_rub is None and car.price_rub_cached is not None:
+                base_rub = float(car.price_rub_cached)
+            if base_rub is None:
+                return None
+
+            commission_rub = float(base_rub) * 0.03
+            util_rub: int | None = None
+            without_util_fee = False
+            age_bucket = _calc_kr_age_bucket(bev=bev)
+            engine_cc_val = int(effective_engine_cc) if effective_engine_cc is not None else None
+            power_hp_val = float(effective_power_hp) if effective_power_hp is not None else None
+            power_kw_val = float(effective_power_kw) if effective_power_kw is not None else None
+            has_power = bool((power_kw_val and power_kw_val > 0) or (power_hp_val and power_hp_val > 0))
+
+            try:
+                customs_cfg = get_customs_config()
+                if bev:
+                    if has_power:
+                        util_rub = calc_util_fee_rub(
+                            engine_cc=engine_cc_val or 0,
+                            kw=power_kw_val,
+                            hp=int(power_hp_val) if power_hp_val is not None else None,
+                            cfg=customs_cfg,
+                            age_bucket="electric",
+                        )
+                    else:
+                        without_util_fee = True
+                else:
+                    if engine_cc_val is not None and has_power:
+                        util_rub = calc_util_fee_rub(
+                            engine_cc=engine_cc_val,
+                            kw=power_kw_val,
+                            hp=int(power_hp_val) if power_hp_val is not None else None,
+                            cfg=customs_cfg,
+                            age_bucket=age_bucket,
+                        )
+                    elif engine_cc_val is not None:
+                        util_rub = int(legacy_util_fee_rub(engine_cc_val, age_bucket))
+                    else:
+                        without_util_fee = True
+            except Exception:
+                self.logger.exception("calc_kr_util_failed car=%s src=%s", car.id, getattr(car.source, "key", None))
+                without_util_fee = True
+                util_rub = None
+
+            total_rub = float(base_rub) + float(commission_rub) + float(util_rub or 0)
+            total_rub = float(ceil_to_step(total_rub, get_round_step_rub()) or total_rub)
+            breakdown = [
+                {"title": "emavto_price", "amount": float(base_rub), "currency": "RUB"},
+                {"title": "kr_commission", "amount": float(commission_rub), "currency": "RUB"},
+            ]
+            if util_rub is not None:
+                breakdown.append({"title": "util_fee", "amount": int(util_rub), "currency": "RUB"})
+            breakdown.append({"title": "total_rub", "amount": total_rub, "currency": "RUB"})
+            return {
+                "scenario": f"kr_{age_bucket}",
+                "total_rub": total_rub,
+                "breakdown": breakdown,
+                "euro_rate_used": float(eur_rate),
+                "without_util_fee": without_util_fee,
+            }
         # базовые цены из source_payload
         payload = car.source_payload or {}
         price_gross = payload.get("price_eur")
@@ -3019,33 +3112,44 @@ class CarsService:
             float(effective_power_hp) if effective_power_hp is not None else None,
             car.engine_type,
         )
+        is_korea = str(car.country or "").upper().startswith("KR")
+        if is_korea:
+            result = _calculate_kr_total(bev=is_electric)
+            if result is None:
+                self.logger.info("calc_skip_kr_no_base_price car=%s src=%s", car.id, getattr(car.source, "key", None))
+                return _fallback_total("kr_no_base_price")
+        else:
+            result = None
         if is_electric and not (effective_power_hp or effective_power_kw):
-            self.logger.info("calc_skip_no_power car=%s src=%s", car.id, getattr(car.source, "key", None))
-            return _fallback_total("no_power")
+            if result is None:
+                self.logger.info("calc_skip_no_power car=%s src=%s", car.id, getattr(car.source, "key", None))
+                return _fallback_total("no_power")
         if not is_electric and not effective_engine_cc:
-            self.logger.info("calc_skip_no_cc car=%s src=%s", car.id, getattr(car.source, "key", None))
-            return _fallback_total("no_engine_cc")
-        scenario = None
-        if is_electric:
-            scenario = "electric"
-        elif reg_fallback_missing:
-            scenario = "under_3"
-        req = EstimateRequest(
-            scenario=scenario,
-            price_net_eur=price_net_eur,
-            eur_rate=eur_rate,
-            engine_cc=effective_engine_cc,
-            power_hp=float(effective_power_hp) if effective_power_hp is not None else None,
-            power_kw=float(effective_power_kw) if effective_power_kw is not None else None,
-            is_electric=is_electric,
-            reg_year=reg_year,
-            reg_month=reg_month,
-        )
-        try:
-            result = calculate(cfg.payload, req)
-        except Exception:
-            self.logger.exception("calc_failed car=%s src=%s", car.id, getattr(car.source, "key", None))
-            return _fallback_total("calc_failed")
+            if result is None:
+                self.logger.info("calc_skip_no_cc car=%s src=%s", car.id, getattr(car.source, "key", None))
+                return _fallback_total("no_engine_cc")
+        if result is None:
+            scenario = None
+            if is_electric:
+                scenario = "electric"
+            elif reg_fallback_missing:
+                scenario = "under_3"
+            req = EstimateRequest(
+                scenario=scenario,
+                price_net_eur=price_net_eur,
+                eur_rate=eur_rate,
+                engine_cc=effective_engine_cc,
+                power_hp=float(effective_power_hp) if effective_power_hp is not None else None,
+                power_kw=float(effective_power_kw) if effective_power_kw is not None else None,
+                is_electric=is_electric,
+                reg_year=reg_year,
+                reg_month=reg_month,
+            )
+            try:
+                result = calculate(cfg.payload, req)
+            except Exception:
+                self.logger.exception("calc_failed car=%s src=%s", car.id, getattr(car.source, "key", None))
+                return _fallback_total("calc_failed")
         display = []
         label_map = cfg.payload.get("label_map", {})
         for item in result.get("breakdown", []):
