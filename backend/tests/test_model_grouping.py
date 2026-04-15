@@ -66,3 +66,15 @@ def test_model_grouping_mercedes_class_family_merges_coupe_variants():
     groups = service.build_model_groups(brand="Mercedes-Benz", models=models)
     gle_group = next(g for g in groups if g["label"] == "GLE-Class")
     assert {m["value"] for m in gle_group["models"]} == {"GLE-Class", "GLE Coupe"}
+
+
+def test_model_grouping_bentley_hp_variants_keep_base_family_label():
+    service = CarsService(db=None)  # type: ignore[arg-type]
+    models = [
+        {"value": "Bentayga@@hp550", "label": "Bentayga 550 л.с.", "count": 5, "base_model": "Bentayga"},
+        {"value": "Bentayga@@hp635", "label": "Bentayga 635 л.с.", "count": 3, "base_model": "Bentayga"},
+        {"value": "Continental GT@@hp550", "label": "Continental GT 550 л.с.", "count": 4, "base_model": "Continental GT"},
+    ]
+    groups = service.build_model_groups(brand="Bentley", models=models)
+    bentayga_group = next(g for g in groups if g["label"] == "Bentayga")
+    assert {m["value"] for m in bentayga_group["models"]} == {"Bentayga@@hp550", "Bentayga@@hp635"}

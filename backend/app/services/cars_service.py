@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import select, func, and_, or_, case, cast, String, text, literal, not_
+from sqlalchemy import select, func, and_, or_, case, cast, String, text, literal, not_, Integer
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.dialects.postgresql import JSONB
 import logging
@@ -73,6 +73,8 @@ _MODEL_PARENS_RE = re.compile(r"\([^)]{0,40}\)")
 _MODEL_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 _MODEL_GEN_TOKEN_RE = re.compile(r"^[a-z]{1,3}\d{2,3}[a-z]?$")
 _MODEL_NUMERIC_ORDINAL_RE = re.compile(r"^\d+(?:st|nd|rd|th)$")
+_BENTLEY_POWER_MODEL_RE = re.compile(r"^(?P<model>.+?)@@hp(?P<hp>\d{2,4})$")
+_BENTLEY_POWER_LABEL_RE = re.compile(r"^(?P<model>.+?)\s+(?P<hp>\d{2,4})\s*л\.с\.?$", re.IGNORECASE)
 
 _MODEL_NOISE_PREFIXES = (
     "the all new ",
@@ -568,6 +570,98 @@ class CarsService:
             return matched
         return self._fallback_model_label(brand, raw_model)
 
+    def _power_hp_expr(self):
+        return func.coalesce(Car.power_hp, Car.inferred_power_hp)
+
+    def _power_hp_bucket_expr(self):
+        power_expr = self._power_hp_expr()
+        return cast(func.round(power_expr / literal(10.0)) * literal(10), Integer)
+
+    def _parse_bentley_power_model_token(self, value: Optional[str]) -> Optional[Tuple[str, int]]:
+        raw = normalize_model_label(value)
+        if not raw:
+            return None
+        match = _BENTLEY_POWER_MODEL_RE.fullmatch(raw) or _BENTLEY_POWER_LABEL_RE.fullmatch(raw)
+        if not match:
+            return None
+        base_model = normalize_model_label(match.group("model"))
+        hp_raw = match.group("hp")
+        if not base_model or not hp_raw:
+            return None
+        try:
+            hp = int(hp_raw)
+        except Exception:
+            return None
+        if hp <= 0:
+            return None
+        return base_model, hp
+
+    def _bentley_power_model_value(self, model_label: str, hp: int) -> str:
+        return f"{normalize_model_label(model_label)}@@hp{int(hp)}"
+
+    def _bentley_power_model_label(self, model_label: str, hp: int) -> str:
+        return f"{normalize_model_label(model_label)} {int(hp)} л.с."
+
+    def _bentley_power_models(self, brand: str) -> Dict[str, List[Dict[str, Any]]]:
+        norm_brand = normalize_brand(brand).strip()
+        if norm_brand.upper() != "BENTLEY" or self.db is None:
+            return {}
+        power_expr = self._power_hp_expr()
+        power_bucket_expr = self._power_hp_bucket_expr()
+        variants_lc = [value.lower() for value in brand_variants(norm_brand) if value]
+        if not variants_lc:
+            return {}
+        rows = self.db.execute(
+            select(
+                Car.model,
+                power_bucket_expr.label("power_bucket"),
+                func.count().label("count"),
+            )
+            .where(
+                self._available_expr(),
+                func.lower(func.trim(Car.brand)).in_(variants_lc),
+                Car.model.is_not(None),
+                Car.model != "",
+                power_expr.is_not(None),
+            )
+            .group_by(Car.model, power_bucket_expr)
+            .order_by(Car.model.asc(), power_bucket_expr.asc())
+        ).all()
+        if not rows:
+            return {}
+        split_rows: Dict[str, List[Dict[str, Any]]] = {}
+        for raw_model, power_bucket, count in rows:
+            if raw_model is None or power_bucket is None:
+                continue
+            hp = int(power_bucket)
+            if hp <= 0:
+                continue
+            label = self._canonical_model_label(norm_brand, str(raw_model))
+            if not label:
+                continue
+            split_rows.setdefault(label, []).append(
+                {
+                    "value": self._bentley_power_model_value(label, hp),
+                    "label": self._bentley_power_model_label(label, hp),
+                    "count": int(count or 0),
+                    "aliases": [],
+                    "base_model": label,
+                    "power_hp_bucket": hp,
+                }
+            )
+        out: Dict[str, List[Dict[str, Any]]] = {}
+        for label, items in split_rows.items():
+            unique: Dict[str, Dict[str, Any]] = {}
+            for item in items:
+                unique[item["value"]] = item
+            deduped = sorted(
+                unique.values(),
+                key=lambda item: (int(item.get("power_hp_bucket") or 0), self._natural_text_key(item.get("label") or "")),
+            )
+            if len(deduped) > 1:
+                out[label] = deduped
+        return out
+
     def _resolve_model_aliases(
         self,
         *,
@@ -644,6 +738,15 @@ class CarsService:
         label = normalize_model_label(model)
         if not label:
             return None
+        bentley_token = self._parse_bentley_power_model_token(label)
+        if bentley_token is not None:
+            base_model, hp = bentley_token
+            bentley_variants = [value.lower() for value in brand_variants("Bentley") if value]
+            clauses = [self._normalized_model_expr() == model_lookup_key(base_model)]
+            if bentley_variants:
+                clauses.append(func.lower(func.trim(Car.brand)).in_(bentley_variants))
+            clauses.append(self._power_hp_bucket_expr() == hp)
+            return and_(*clauses)
         aliases = self._resolve_model_aliases(
             region=region,
             country=country,
@@ -1329,8 +1432,13 @@ class CarsService:
                     parts.append("")
                 b, m, v = parts[0], parts[1], parts[2]
                 group = []
+                norm_b = normalize_brand(b).strip().strip(".,;") if b else ""
+                bentley_token = (
+                    self._parse_bentley_power_model_token(m)
+                    if norm_b.upper() == "BENTLEY" and m
+                    else None
+                )
                 if b:
-                    norm_b = normalize_brand(b).strip().strip(".,;")
                     variants = brand_variants(norm_b) if norm_b else []
                     if variants:
                         group.append(
@@ -1339,7 +1447,12 @@ class CarsService:
                     else:
                         group.append(brand_field.like(func.lower(f"%{b}%")))
                 if m:
-                    group.append(model_field.like(func.lower(f"%{m}%")))
+                    if bentley_token is not None:
+                        base_model, hp = bentley_token
+                        group.append(self._normalized_model_expr() == model_lookup_key(base_model))
+                        group.append(self._power_hp_bucket_expr() == hp)
+                    else:
+                        group.append(model_field.like(func.lower(f"%{m}%")))
                 if v:
                     group.append(variant_field.like(func.lower(f"%{v}%")))
                 if group:
@@ -3364,6 +3477,17 @@ class CarsService:
                 bucket["label"] = label
         models = list(buckets.values())
         models = sorted(models, key=lambda x: self._natural_text_key(x.get("label") or x.get("value") or ""))
+        if norm_brand.upper() == "BENTLEY":
+            split_models = self._bentley_power_models(norm_brand)
+            if split_models:
+                expanded: List[Dict[str, Any]] = []
+                for item in models:
+                    label = normalize_model_label(item.get("label") or item.get("value") or "")
+                    if label and label in split_models:
+                        expanded.extend(dict(row) for row in split_models[label])
+                    else:
+                        expanded.append(item)
+                models = expanded
         self._filtered_models_cache[cache_key] = [dict(item) for item in models]
         return models
 
@@ -3439,6 +3563,22 @@ class CarsService:
         if (norm_brand == "BMW" and key.endswith("-series")) or (
             norm_brand == "PORSCHE" and key == "911-series"
         ):
+            return base_label
+        if norm_brand == "BENTLEY":
+            candidates = _dedupe_model_values(
+                [
+                    normalize_model_label(
+                        _BENTLEY_POWER_LABEL_RE.sub(
+                            lambda match: normalize_model_label(match.group("model")),
+                            str(item.get("base_model") or item.get("label") or item.get("value") or "").strip(),
+                        )
+                    )
+                    for item in models
+                    if str(item.get("base_model") or item.get("label") or item.get("value") or "").strip()
+                ]
+            )
+            if candidates:
+                return min(candidates, key=lambda value: (len(value), self._natural_text_key(value)))
             return base_label
         candidates = _dedupe_model_values(
             [

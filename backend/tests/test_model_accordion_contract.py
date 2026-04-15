@@ -26,6 +26,8 @@ def test_js_has_model_accordion_rendering():
     assert "applyBtn.textContent = 'Применить'" in script
     assert "root.open = false" in script
     assert "dataset.skipTriggerOnce = '1'" in script
+    assert "applySelection()" in script
+    assert "meta.baseModel" in script
 
 
 def test_css_has_model_accordion_styles():

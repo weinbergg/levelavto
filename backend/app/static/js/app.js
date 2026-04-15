@@ -2492,11 +2492,11 @@
     const models = Array.isArray(payload?.models) ? payload.models : []
     const groups = Array.isArray(payload?.model_groups) ? payload.model_groups : []
     const enableAccordion = window.ENABLE_MODEL_ACCORDION === true
-    const modelMeta = new Map()
-    models.forEach((row) => {
-      const value = String(row?.value || row?.model || '').trim()
-      if (!value) return
-      const aliases = Array.from(
+      const modelMeta = new Map()
+      models.forEach((row) => {
+        const value = String(row?.value || row?.model || '').trim()
+        if (!value) return
+        const aliases = Array.from(
         new Set(
           (Array.isArray(row?.aliases) ? row.aliases : [])
             .map((item) => String(item || '').trim())
@@ -2508,6 +2508,7 @@
         value,
         label: row?.label || value,
         aliases,
+        baseModel: String(row?.base_model || '').trim(),
       })
     })
     select.__modelMeta = modelMeta
@@ -2517,16 +2518,27 @@
       ;(Array.isArray(values) ? values : [values]).forEach((item) => {
         const raw = String(item || '').trim()
         if (!raw) return
-        let matched = raw
+        const matchedValues = []
         for (const [value, meta] of modelMeta.entries()) {
-          if (value === raw || (meta.aliases || []).includes(raw)) {
-            matched = value
-            break
+          if (
+            value === raw
+            || (meta.aliases || []).includes(raw)
+            || (meta.baseModel && meta.baseModel === raw)
+          ) {
+            matchedValues.push(value)
           }
         }
-        if (seen.has(matched)) return
-        seen.add(matched)
-        resolved.push(matched)
+        if (!matchedValues.length) {
+          if (seen.has(raw)) return
+          seen.add(raw)
+          resolved.push(raw)
+          return
+        }
+        matchedValues.forEach((matched) => {
+          if (seen.has(matched)) return
+          seen.add(matched)
+          resolved.push(matched)
+        })
       })
       return resolved
     }
@@ -2737,6 +2749,7 @@
         event.stopPropagation()
         draftSelectedModels.clear()
         syncDraftState()
+        applySelection()
       })
       contentWrap.appendChild(clearBtn)
 
