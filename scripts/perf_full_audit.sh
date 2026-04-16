@@ -77,6 +77,8 @@ bench_endpoint() {
   local out_file="$RAW_DIR/bench_${name}.tsv"
   : >"$out_file"
 
+  echo "[perf] bench_start name=$name target=$target" >&2
+
   local i
   for ((i=1; i<=WARMUP; i++)); do
     curl -sS -o /dev/null --max-time "$TIMEOUT_SEC" "$target" || true
@@ -84,6 +86,8 @@ bench_endpoint() {
   for ((i=1; i<=REQUESTS; i++)); do
     curl -sS -o /dev/null --max-time "$TIMEOUT_SEC" -w "%{time_total}\t%{http_code}\n" "$target" >>"$out_file" || echo "-1\t000" >>"$out_file"
   done
+
+  echo "[perf] bench_done name=$name target=$target" >&2
 }
 
 append_section "Host Snapshot"
