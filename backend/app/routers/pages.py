@@ -1816,7 +1816,8 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
 
         if isinstance(items, list):
             initial_items = items
-            service.refresh_visible_price_cache(initial_items)
+            if os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0":
+                service.refresh_visible_price_cache(initial_items)
             for c in initial_items:
                 if not isinstance(c, dict):
                     continue
@@ -1854,7 +1855,16 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     or c.get("color")
                 )
             sort_items_by_display_price(initial_items, sort=params.get("sort") or "price_asc")
-            ids = [c.get("id") for c in initial_items if isinstance(c, dict) and c.get("id")]
+            ids = [
+                c.get("id")
+                for c in initial_items
+                if (
+                    isinstance(c, dict)
+                    and c.get("id")
+                    and not c.get("thumbnail_url")
+                    and not c.get("thumbnail_local_path")
+                )
+            ]
             if ids:
                 rows = db.execute(
                     select(CarImage.car_id, func.min(CarImage.url))

@@ -104,8 +104,8 @@ capture_cmd "docker_system_df" docker system df
 append_section "Service Snapshot"
 capture_cmd "health" curl -sS --max-time "$TIMEOUT_SEC" "$BASE_URL/health"
 capture_cmd "web_env_perf_flags" docker compose exec -T web sh -lc "env | grep -E 'CAR_API_TIMING|CAR_API_SQL|CATALOG_USE_FAST_COUNT|CATALOG_WITH_PHOTO_STATS|PRICE_ROUND_STEP_RUB|REDIS_URL' || true"
-capture_cmd "response_headers_catalog" curl -sSI --max-time "$TIMEOUT_SEC" "$BASE_URL/catalog?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
-capture_cmd "response_headers_search" curl -sSI --max-time "$TIMEOUT_SEC" "$BASE_URL/search?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
+capture_cmd "response_headers_catalog" curl -sS -D - -o /dev/null --max-time "$TIMEOUT_SEC" "$BASE_URL/catalog?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
+capture_cmd "response_headers_search" curl -sS -D - -o /dev/null --max-time "$TIMEOUT_SEC" "$BASE_URL/search?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
 
 append_section "Data Snapshot"
 capture_cmd "db_counts" docker compose exec -T web python - <<'PY'
