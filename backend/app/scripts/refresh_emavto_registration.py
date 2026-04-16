@@ -4,7 +4,7 @@ import argparse
 import time
 from typing import Iterable
 
-from sqlalchemy import cast, func, select
+from sqlalchemy import cast, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 
 from backend.app.db import SessionLocal
@@ -51,6 +51,11 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=200, help="How many KR cars to refresh")
     ap.add_argument("--batch", type=int, default=20, help="Detail fetch batch size")
     ap.add_argument("--max-runtime-sec", type=int, default=2400, help="Overall runtime budget")
+    ap.add_argument(
+        "--include-missing-engine-cc",
+        action="store_true",
+        help="also refresh ICE rows with missing engine_cc so KR util fee can be recalculated",
+    )
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -77,11 +82,17 @@ def main() -> None:
                 )
                 == "true"
             )
-            base = base.filter(
-                defaulted_expr
-                | Car.registration_year.is_(None)
-                | Car.registration_month.is_(None)
-            )
+            filters = [
+                defaulted_expr,
+                Car.registration_year.is_(None),
+                Car.registration_month.is_(None),
+            ]
+            if args.include_missing_engine_cc:
+                filters.append(
+                    (Car.engine_cc.is_(None))
+                    & (func.lower(func.coalesce(Car.engine_type, "")) != "electric")
+                )
+            base = base.filter(or_(*filters))
 
         cars = base.order_by(Car.id.asc()).limit(max(1, int(args.limit))).all()
         print(
