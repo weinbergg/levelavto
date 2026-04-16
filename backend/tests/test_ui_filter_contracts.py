@@ -169,6 +169,9 @@ def test_price_sensitive_catalog_paths_bypass_stale_cache():
     assert "price_cache_bypass = normalized.get(\"price_min\") is not None or normalized.get(\"price_max\") is not None" in pages_router
     assert "def _refresh_price_sensitive_candidates(" in service
     assert "self._refresh_price_sensitive_candidates(" in service
+    assert "def _catalog_inline_price_refresh_enabled(self) -> bool:" in service
+    assert 'os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0"' in service
+    assert 'if os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0":' in catalog_router
 
 
 def test_eu_registration_filters_ignore_legacy_generic_default_flag():

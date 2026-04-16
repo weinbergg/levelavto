@@ -1377,6 +1377,9 @@ class CarsService:
             self._raw_price_rub_expr(),
         )
 
+    def _catalog_inline_price_refresh_enabled(self) -> bool:
+        return os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0"
+
     def _build_list_conditions(
         self,
         *,
@@ -2047,7 +2050,12 @@ class CarsService:
                 ]
             )
         )
-        if where_expr is not None and price_sensitive and lazy_price_refresh_allowed:
+        if (
+            where_expr is not None
+            and price_sensitive
+            and lazy_price_refresh_allowed
+            and self._catalog_inline_price_refresh_enabled()
+        ):
             self._refresh_price_sensitive_candidates(
                 where_expr,
                 sort=sort,
@@ -2426,7 +2434,7 @@ class CarsService:
                 page_size,
                 count_key,
             )
-        if items:
+        if items and self._catalog_inline_price_refresh_enabled():
             try:
                 if light:
                     self._lazy_recalc_light_items(items)
