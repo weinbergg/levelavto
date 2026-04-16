@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup  # type: ignore
 from .base import BaseParser, CarParsed, logger
 from .config import SiteConfig
 from ..utils.rate_limiter import TokenBucket
+from ..utils.spec_inference import infer_engine_cc_from_text
 
 
 class EmAvtoKlgParser(BaseParser):
@@ -45,6 +46,7 @@ class EmAvtoKlgParser(BaseParser):
         "drive_type": ["Привод"],
         "color": ["Цвет"],
         "vin": ["VIN", "ВИН"],
+        "engine_cc": ["Объем двигателя", "Объём двигателя", "Объем", "Объём"],
     }
     MARKET_STREAMS = (
         {
@@ -695,6 +697,16 @@ class EmAvtoKlgParser(BaseParser):
             soup, self.LABELS["color"]) or self._extract_by_regex(page_text, self.LABELS["color"])
         vin_raw = from_pairs(self.LABELS["vin"]) or self._extract_label_value(
             soup, self.LABELS["vin"]) or self._extract_by_regex(page_text, self.LABELS["vin"])
+        engine_cc_attr = None
+        root = soup.select_one("main.car-details[data-displacement]")
+        if root is not None:
+            engine_cc_attr = root.get("data-displacement")
+        engine_cc_raw = (
+            engine_cc_attr
+            or from_pairs(self.LABELS["engine_cc"])
+            or self._extract_label_value(soup, self.LABELS["engine_cc"])
+            or self._extract_by_regex(page_text, self.LABELS["engine_cc"])
+        )
         reg_year, reg_month, reg_raw = self._extract_registration(
             soup, pairs, page_text)
 
@@ -702,17 +714,26 @@ class EmAvtoKlgParser(BaseParser):
         out["transmission"] = self._normalize_transmission(trans_raw)
         out["drive_type"] = self._normalize_drive(drive_raw)
         out["color"] = color_raw.strip().capitalize() if color_raw else None
+        out["engine_cc"] = infer_engine_cc_from_text(engine_cc_raw, page_text)
         out["registration_year"] = reg_year
         out["registration_month"] = reg_month
         if vin_raw:
             vin_clean = re.sub(r"\s+", "", vin_raw)
             if 11 <= len(vin_clean) <= 20:
                 out["vin"] = vin_clean.upper()
+        detail_payload: Dict[str, Any] = {}
         if reg_raw:
-            out["source_payload"] = {
-                "registration_raw": reg_raw,
-                "registration_source": "emavto_detail",
-            }
+            detail_payload["registration_raw"] = reg_raw
+            detail_payload["registration_source"] = "emavto_detail"
+        if engine_cc_raw:
+            detail_payload["engine_cc_raw"] = str(engine_cc_raw)
+            detail_payload["engine_cc_source"] = (
+                "emavto_data_displacement"
+                if engine_cc_attr and str(engine_cc_raw) == str(engine_cc_attr)
+                else "emavto_detail"
+            )
+        if detail_payload:
+            out["source_payload"] = detail_payload
 
         # images: prefer gallery; fallback to first images on page
         imgs = []

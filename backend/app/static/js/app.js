@@ -2312,10 +2312,10 @@
         reapplySelected()
         initialReapplyDone = true
       }
-      hydrateCatalogFromSSR()
-      // Reconcile SSR cards against fresh API data on first paint so price
-      // placeholders do not persist until the user changes filters or sorting.
-      void loadCars(initialPage)
+      const ssrHydrated = hydrateCatalogFromSSR()
+      if (!ssrHydrated) {
+        void loadCars(initialPage)
+      }
       if (brandSelect && brandSelect.value) {
         await basePromise
         await updateCatalogModels()

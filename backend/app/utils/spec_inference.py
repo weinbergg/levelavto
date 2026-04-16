@@ -8,7 +8,7 @@ import re
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+(?:[._+-][a-z0-9]+)?", re.IGNORECASE)
 _MULTISPACE_RE = re.compile(r"\s+")
-_ENGINE_CC_RE = re.compile(r"\b([1-9][0-9]{3,4})\s*(?:cc|ccm|cm3|cm³)\b", re.IGNORECASE)
+_ENGINE_CC_RE = re.compile(r"\b([1-9][0-9]{3,4})\s*(?:cc|ccm|cm3|cm³|см3|см³)\b", re.IGNORECASE)
 _ENGINE_LITER_RE = re.compile(
     r"\b([0-9](?:[.,][0-9])?)\s*(?:l|liter|litre)\b",
     re.IGNORECASE,

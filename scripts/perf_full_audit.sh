@@ -100,6 +100,8 @@ capture_cmd "docker_system_df" docker system df
 append_section "Service Snapshot"
 capture_cmd "health" curl -sS --max-time "$TIMEOUT_SEC" "$BASE_URL/health"
 capture_cmd "web_env_perf_flags" docker compose exec -T web sh -lc "env | grep -E 'CAR_API_TIMING|CAR_API_SQL|CATALOG_USE_FAST_COUNT|CATALOG_WITH_PHOTO_STATS|PRICE_ROUND_STEP_RUB|REDIS_URL' || true"
+capture_cmd "response_headers_catalog" curl -sSI --max-time "$TIMEOUT_SEC" "$BASE_URL/catalog?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
+capture_cmd "response_headers_search" curl -sSI --max-time "$TIMEOUT_SEC" "$BASE_URL/search?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
 
 append_section "Data Snapshot"
 capture_cmd "db_counts" docker compose exec -T web python - <<'PY'
@@ -119,6 +121,8 @@ capture_cmd "redis_memory" docker compose exec -T redis sh -lc "redis-cli INFO m
 
 append_section "API Benchmarks"
 bench_endpoint "health" "/health"
+bench_endpoint "catalog_ssr_eu" "/catalog?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
+bench_endpoint "search_ssr_eu" "/search?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
 bench_endpoint "filter_ctx_base_eu" "/api/filter_ctx_base?region=EU"
 bench_endpoint "filter_payload_eu" "/api/filter_payload?region=EU&country=${COUNTRY}"
 bench_endpoint "cars_count_eu" "/api/cars_count?region=EU&country=${COUNTRY}"
@@ -127,6 +131,10 @@ bench_endpoint "cars_count_country_brand" "/api/cars_count?region=EU&country=${C
 bench_endpoint "cars_list_country_brand" "/api/cars?region=EU&country=${COUNTRY}&brand=${BRAND}&sort=price_asc&page=1&page_size=12"
 bench_endpoint "cars_count_country_brand_model" "/api/cars_count?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
 bench_endpoint "cars_list_country_brand_model" "/api/cars?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}&sort=price_asc&page=1&page_size=12"
+bench_endpoint "cars_count_kr" "/api/cars_count?region=KR"
+bench_endpoint "cars_count_kr_internal" "/api/cars_count?region=KR&kr_type=KR_INTERNAL"
+bench_endpoint "cars_count_kr_import" "/api/cars_count?region=KR&kr_type=KR_IMPORT"
+bench_endpoint "cars_list_kr" "/api/cars?region=KR&sort=price_asc&page=1&page_size=12"
 if [ "$BENCH_SEARCH" = "1" ]; then
   bench_endpoint "cars_list_search" "/api/cars?region=EU&country=${COUNTRY}&q=diesel&sort=price_asc&page=1&page_size=12"
 fi

@@ -120,3 +120,36 @@ def test_emavto_parser_splits_domestic_and_import_tabs_without_mixing_cards():
     assert by_market["import"].brand == "Mercedes"
     assert by_market["domestic"].source_payload["kr_market_type"] == "domestic"
     assert by_market["import"].source_payload["kr_market_type"] == "import"
+
+
+def test_emavto_detail_extracts_engine_cc_from_data_displacement_and_label():
+    parser = _parser()
+    html = """
+    <html><body>
+      <main class="car-details" data-electra="0" data-displacement="5514" data-price="1680">
+        <section class="car-details-container">
+          <header><h2>Общие данные</h2></header>
+          <div class="car-details-content">
+            <dl>
+              <dt>Пробег</dt><dd>267000 км</dd>
+              <dt>Объем двигателя</dt><dd>5514 см³</dd>
+              <dt>Дата постановки на учет</dt><dd>01 январь 2007 г.</dd>
+            </dl>
+          </div>
+        </section>
+      </main>
+    </body></html>
+    """
+
+    class _Resp:
+        status_code = 200
+        text = html
+        headers = {}
+
+    parser._request_with_backoff = lambda url, params, bucket, is_detail, client=None, deadline=None: _Resp()  # type: ignore[assignment]
+
+    detail = parser._fetch_detail("https://example.com/car/21601161", bucket=type("B", (), {"acquire": lambda self: None})())
+
+    assert detail["engine_cc"] == 5514
+    assert detail["source_payload"]["engine_cc_raw"] == "5514"
+    assert detail["source_payload"]["engine_cc_source"] == "emavto_data_displacement"

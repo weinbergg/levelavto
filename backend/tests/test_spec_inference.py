@@ -257,6 +257,7 @@ def test_infer_engine_cc_from_text_parses_explicit_liter_patterns():
     assert infer_engine_cc_from_text("296 gtb 3.0 turbo v6 hybride 830 ch") == 3000
     assert infer_engine_cc_from_text("4.0 V8", "some title") == 4000
     assert infer_engine_cc_from_text("2993 cc diesel") == 2993
+    assert infer_engine_cc_from_text("5514 см³") == 5514
 
 
 def test_filter_candidates_by_target_power_prefers_close_matches_only():

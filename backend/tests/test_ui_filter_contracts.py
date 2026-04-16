@@ -61,6 +61,8 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "const priceMain = card.querySelector('.price-main')" in script
     assert "let metaNode = card.querySelector('.car-card__meta')" in script
     assert "let specsNode = card.querySelector('.specs')" in script
+    assert "const ssrHydrated = hydrateCatalogFromSSR()" in script
+    assert "if (!ssrHydrated) {" in script
     assert "void loadCars(initialPage)" in script
     assert "contentWrap.className = 'model-accordion__content'" in script or 'contentWrap.className = "model-accordion__content"' in script
 
@@ -125,6 +127,12 @@ def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
     assert '/static/js/app.js?v=103' in template
     assert '/static/css/styles.css?v=62' in template
+
+
+def test_main_enables_gzip_for_large_html_and_api_payloads():
+    main = _read("app/main.py")
+    assert "GZipMiddleware" in main
+    assert "minimum_size=1024" in main
 
 
 def test_search_page_passes_payload_deferred_flag():

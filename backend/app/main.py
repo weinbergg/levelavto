@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from .config import settings
 import logging
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
     if media_dir.exists():
         app.mount("/media", StaticFiles(directory=str(media_dir)), name="media")
     app.state.templates = Jinja2Templates(directory=str(templates_dir))
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
     app.add_middleware(SessionMiddleware, secret_key=settings.APP_SECRET)
 
     @app.on_event("startup")
