@@ -1077,6 +1077,7 @@ textarea {
     overflow-y: hidden;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
   }
   .collage-wrap::-webkit-scrollbar {
     display: none;
@@ -1084,12 +1085,21 @@ textarea {
   .collage-track {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: clamp(70px, 11vw, 102px);
+    grid-auto-columns: clamp(58px, 9vw, 84px);
     grid-template-columns: none;
     grid-template-rows: repeat(5, minmax(0, 1fr));
     width: max-content;
     min-width: max-content;
-    gap: 4px;
+    gap: 3px;
+    padding-right: 8px;
+  }
+  .collage-item {
+    border-radius: 10px;
+    content-visibility: auto;
+    contain-intrinsic-size: 72px 72px;
+  }
+  .collage-item img {
+    border-radius: 10px;
   }
   .collage-track .collage-item:nth-child(n + 1) {
     display: block;
@@ -1097,12 +1107,12 @@ textarea {
 }
 @media (max-width: 640px) {
   .collage-track {
-    grid-auto-columns: clamp(64px, 17vw, 88px);
+    grid-auto-columns: clamp(54px, 16vw, 72px);
   }
 }
 @media (max-width: 480px) {
   .collage-track {
-    grid-auto-columns: clamp(58px, 18vw, 78px);
+    grid-auto-columns: clamp(48px, 15vw, 64px);
   }
 }
 .vehicle-icon svg {

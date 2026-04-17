@@ -2434,20 +2434,22 @@ class CarsService:
                 page_size,
                 count_key,
             )
-        if items and self._catalog_inline_price_refresh_enabled():
-            try:
-                if light:
-                    self._lazy_recalc_light_items(items)
-                    for row in items:
-                        if not isinstance(row, dict):
-                            continue
-                        row["engine_cc"] = effective_engine_cc_value(row)
-                        row["power_hp"] = effective_power_hp_value(row)
-                        row["power_kw"] = effective_power_kw_value(row)
-                else:
-                    self._lazy_recalc_items(items)
-            except Exception:
-                self.logger.exception("lazy_recalc_failed")
+        if items:
+            if light:
+                for row in items:
+                    if not isinstance(row, dict):
+                        continue
+                    row["engine_cc"] = effective_engine_cc_value(row)
+                    row["power_hp"] = effective_power_hp_value(row)
+                    row["power_kw"] = effective_power_kw_value(row)
+            if self._catalog_inline_price_refresh_enabled():
+                try:
+                    if light:
+                        self._lazy_recalc_light_items(items)
+                    else:
+                        self._lazy_recalc_items(items)
+                except Exception:
+                    self.logger.exception("lazy_recalc_failed")
         return items, total
 
     def _extract_breakdown_version(self, breakdown: list[dict], title: str) -> str | None:

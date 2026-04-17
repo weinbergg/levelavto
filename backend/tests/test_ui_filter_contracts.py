@@ -288,8 +288,9 @@ def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
 
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
-    assert '/static/css/home.css?v=25' in template
-    assert "collage_images[:120]" in template
+    assert '/static/css/home.css?v=26' in template
+    assert "{% for img in collage_images %}" in template
+    assert "collage_images[:120]" not in template
 
 
 def test_home_template_places_partners_block_after_search():
@@ -302,6 +303,8 @@ def test_home_media_loader_supports_collage_manifest():
     assert 'static_manifest_path = static_collage_dir / "manifest.json"' in router
     assert 'manifest_entries = [item for item in raw_manifest if isinstance(item, dict)]' in router
     assert 'static_collage_dir / str(item.get("file") or "").strip()' in router
+    assert 'mobile_rel = str(manifest_item.get("mobile_file") or "").strip()' in router
+    assert 'srcset_parts.append(f"{build_static_url(mobile_path)} {mobile_width}w")' in router
     assert '"fallback": "/static/img/no-photo.svg"' in router
 
 
@@ -475,9 +478,10 @@ def test_pages_home_uses_recommended_and_media_cache_helpers():
 def test_home_collage_and_home_content_copy_are_updated():
     template = _read("app/templates/home.html")
     home_content = _read("app/utils/home_content.py")
-    assert "collage_base = collage_images[:120] if collage_images|length > 120 else collage_images" in template
-    assert 'data-loop-base-count="{{ collage_base|length }}"' in template
-    assert "const syncCollageLoop = () => {" in template
+    assert "{% for img in collage_images %}" in template
+    assert "data-loop-base-count" not in template
+    assert "const syncCollageLoop = () => {" not in template
+    assert "sizes=\"(max-width: 480px) 78px, (max-width: 640px) 88px, (max-width: 820px) 102px, 240px\"" in template
     assert 'data-expand-toggle="home-more-offers-grid"' in template
     assert 'data-expand-pages="2"' in template
     assert 'id="home-more-offers-catalog"' in template

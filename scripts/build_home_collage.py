@@ -5,6 +5,7 @@ import argparse
 import json
 import random
 import re
+import shutil
 from collections import deque
 from pathlib import Path
 from typing import Iterable
@@ -171,6 +172,9 @@ def main() -> None:
     parser.add_argument("--min-gap", type=int, default=10)
     parser.add_argument("--max-width", type=int, default=640)
     parser.add_argument("--quality", type=int, default=62)
+    parser.add_argument("--mobile-subdir", default="mobile")
+    parser.add_argument("--mobile-max-width", type=int, default=176)
+    parser.add_argument("--mobile-quality", type=int, default=44)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--clean", action="store_true")
     args = parser.parse_args()
@@ -203,11 +207,14 @@ def main() -> None:
     )
 
     if args.clean and output_root.exists():
-        for path in output_root.iterdir():
+        for path in sorted(output_root.rglob("*"), reverse=True):
             if path.is_file():
                 path.unlink()
+            elif path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
 
     manifest: list[dict[str, object]] = []
+    mobile_root = output_root / str(args.mobile_subdir).strip()
     for idx, (group, src) in enumerate(ordered, start=1):
         filename = f"{args.prefix}-{idx:04d}.webp"
         dst = output_root / filename
@@ -217,13 +224,24 @@ def main() -> None:
             max_width=args.max_width,
             quality=args.quality,
         )
+        mobile_rel = Path(str(args.mobile_subdir).strip()) / filename
+        mobile_dst = output_root / mobile_rel
+        mobile_width, mobile_height = convert_image(
+            src,
+            mobile_dst,
+            max_width=args.mobile_max_width,
+            quality=args.mobile_quality,
+        )
         manifest.append(
             {
                 "file": filename,
+                "mobile_file": mobile_rel.as_posix(),
                 "group": group,
                 "source": src.relative_to(source_root).as_posix(),
                 "width": width,
                 "height": height,
+                "mobile_width": mobile_width,
+                "mobile_height": mobile_height,
             }
         )
 

@@ -836,7 +836,7 @@ def _build_filter_context(
         price_rating_labels_kr = []
     kr_types = []
     t0 = time.perf_counter()
-    if service.has_korea_market_type_data():
+    if getattr(service, "has_korea_market_type_data", lambda: False)():
         kr_types = [
             {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
             {"value": "KR_IMPORT", "label": "Корея (импорт)"},
@@ -1261,20 +1261,38 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
                 if p.is_file()
                 and p.suffix.lower() in image_exts
                 and not any(part.startswith(".") for part in p.parts)
+                and "mobile" not in p.parts
             )
             if static_collage_dir.exists()
             else []
         )
     )
     if static_gallery_files:
+        manifest_map = {
+            str(item.get("file") or "").strip(): item
+            for item in manifest_entries
+            if str(item.get("file") or "").strip()
+        }
         for path_obj in static_gallery_files:
+            rel_file = path_obj.relative_to(static_collage_dir).as_posix()
+            manifest_item = manifest_map.get(rel_file, {})
             src = build_static_url(path_obj)
+            srcset_parts: List[str] = []
+            mobile_rel = str(manifest_item.get("mobile_file") or "").strip()
+            if not mobile_rel:
+                mobile_rel = f"mobile/{path_obj.name}"
+            mobile_path = static_collage_dir / mobile_rel
+            desktop_width = int(manifest_item.get("width") or 640)
+            if mobile_path.exists():
+                mobile_width = int(manifest_item.get("mobile_width") or 176)
+                srcset_parts.append(f"{build_static_url(mobile_path)} {mobile_width}w")
+            srcset_parts.append(f"{src} {desktop_width}w")
             collage_images.append(
                 {
                     "src": src,
-                    "srcset": "",
-                    "width": 320,
-                    "height": 240,
+                    "srcset": ", ".join(srcset_parts),
+                    "width": int(manifest_item.get("width") or 320),
+                    "height": int(manifest_item.get("height") or 240),
                     "fallback": "/static/img/no-photo.svg",
                 }
             )
@@ -1306,20 +1324,7 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
                     }
                 )
 
-    collage_display: List[Dict[str, Any]] = []
-    if collage_images:
-        rng = random.Random(21)
-        pool = collage_images.copy()
-        rng.shuffle(pool)
-        while len(collage_display) < 75:
-            for item in pool:
-                if collage_display and collage_display[-1]["src"] == item["src"]:
-                    continue
-                collage_display.append(item)
-                if len(collage_display) >= 75:
-                    break
-            rng.shuffle(pool)
-    else:
+    if not collage_images:
         rows = (
             db.execute(
                 select(Car.thumbnail_url)
@@ -1351,11 +1356,10 @@ def _build_home_media_context(db: Session) -> Dict[str, Any]:
             )
             if len(collage_images) >= 60:
                 break
-        collage_display = collage_images
 
     payload = {
         "hero_videos": hero_videos,
-        "collage_images": collage_display or collage_images,
+        "collage_images": collage_images,
     }
     _HOME_MEDIA_CACHE[cache_key] = payload
     redis_set_json(redis_key, payload, ttl_sec=3600)
@@ -1688,7 +1692,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         seen_countries.add(code)
     country_labels = {**{c: country_label_ru(c) for c in countries}, "EU": "Европа", "KR": "Корея"}
     kr_types = []
-    if service.has_korea_market_type_data():
+    if getattr(service, "has_korea_market_type_data", lambda: False)():
         kr_types = [
             {"value": "KR_INTERNAL", "label": "Корея (внутренний рынок)"},
             {"value": "KR_IMPORT", "label": "Корея (импорт)"},

@@ -13,6 +13,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 from PIL import Image
 import requests
 
+from ..utils.thumbs import resolve_thumbnail_url
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 

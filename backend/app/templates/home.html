@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% import "_thumbs.html" as thumbs %} {% block title %}Level Avto — Авто из Европы под
 заказ{% endblock %} {% block head_extra %}
-<link rel="stylesheet" href="/static/css/home.css?v=25" />
+<link rel="stylesheet" href="/static/css/home.css?v=26" />
 {% endblock %} {% block content %}
 <section class="hero hero-with-video" id="hero">
   {% if hero_videos %}
@@ -185,15 +185,13 @@
     </div>
   </div>
   <div class="collage-wrap" id="cases-collage">
-    {% set collage_base = collage_images[:120] if collage_images|length > 120 else collage_images %}
-    {% set collage_loop = collage_base + collage_base + collage_base %}
-    <div class="collage-track" id="collage-track" data-loop-base-count="{{ collage_base|length }}">
-      {% for img in collage_loop %}
+    <div class="collage-track" id="collage-track">
+      {% for img in collage_images %}
       <div class="collage-item">
         <img
           src="{{ img.src }}"
           srcset="{{ img.srcset }}"
-          sizes="(max-width: 768px) 45vw, 240px"
+          sizes="(max-width: 480px) 78px, (max-width: 640px) 88px, (max-width: 820px) 102px, 240px"
           alt="Авто кейс"
           loading="lazy"
           decoding="async"
@@ -712,48 +710,6 @@
             }
           });
         }
-      }
-
-      const collageWrap = document.getElementById("cases-collage");
-      const collageTrack = document.getElementById("collage-track");
-      let collageBaseSpan = 0;
-      let collageScrollBound = false;
-
-      const isMobileCollage = () => window.matchMedia("(max-width: 820px)").matches;
-
-      const syncCollageLoop = () => {
-        if (!collageWrap || !collageTrack || !isMobileCollage()) {
-          collageBaseSpan = 0;
-          return;
-        }
-        const baseCount = Number(collageTrack.dataset.loopBaseCount || 0);
-        if (!baseCount) return;
-        const items = collageTrack.querySelectorAll(".collage-item");
-        if (items.length <= baseCount) return;
-        collageBaseSpan = items[baseCount].offsetLeft - items[0].offsetLeft;
-        if (!collageBaseSpan) return;
-        const target = collageBaseSpan;
-        if (Math.abs(collageWrap.scrollLeft - target) > 24) {
-          collageWrap.scrollLeft = target;
-        }
-      };
-
-      const onCollageScroll = () => {
-        if (!collageWrap || !collageBaseSpan || !isMobileCollage()) return;
-        if (collageWrap.scrollLeft < collageBaseSpan * 0.35) {
-          collageWrap.scrollLeft += collageBaseSpan;
-        } else if (collageWrap.scrollLeft > collageBaseSpan * 1.65) {
-          collageWrap.scrollLeft -= collageBaseSpan;
-        }
-      };
-
-      if (collageWrap && collageTrack && !collageScrollBound) {
-        collageWrap.addEventListener("scroll", onCollageScroll, { passive: true });
-        collageScrollBound = true;
-        requestAnimationFrame(() => {
-          requestAnimationFrame(syncCollageLoop);
-        });
-        window.addEventListener("resize", syncCollageLoop);
       }
 
       const form = document.getElementById("mini-calc-form");
