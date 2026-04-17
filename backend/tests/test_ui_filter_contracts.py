@@ -173,6 +173,9 @@ def test_price_sensitive_catalog_paths_bypass_stale_cache():
     assert 'os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0"' in service
     assert 'if os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0":' in catalog_router
     assert 'if os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0":' in pages_router
+    assert 'timing["initial_list_ms"]' in pages_router
+    assert 'timing["initial_decorate_ms"]' in pages_router
+    assert 'timing["initial_images_ms"]' in pages_router
 
 
 def test_eu_registration_filters_ignore_legacy_generic_default_flag():

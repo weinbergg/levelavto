@@ -1707,7 +1707,9 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     canon_kr_type = str(params.get("kr_type") or "").strip().upper() or None
     canon_brand = normalize_brand(params.get("brand")).strip() if params.get("brand") else None
     canon_model = str(params.get("model") or "").strip() or None
+    t0 = time.perf_counter()
     base_ctx_cached = _load_cached_filter_ctx_base({"region": canon_region, "country": canon_country})
+    timing["base_filter_cache_ms"] = (time.perf_counter() - t0) * 1000
     cached_brands = [
         str(item.get("value") or "").strip()
         for item in (base_ctx_cached or {}).get("brands") or []
@@ -1759,6 +1761,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     try:
         source_list = qp.getlist("source") if hasattr(qp, "getlist") else []
         source_value: Optional[str | List[str]] = source_list if source_list else params.get("source")
+        t0 = time.perf_counter()
         items, initial_total = service.list_cars(
             region=canon_region,
             country=canon_country,
@@ -1807,6 +1810,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             page_size=12,
             light=True,
         )
+        timing["initial_list_ms"] = (time.perf_counter() - t0) * 1000
         def _normalize_thumb(url: str | None) -> str | None:
             normalized = normalize_classistatic_url(url)
             if normalized:
@@ -1818,6 +1822,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             initial_items = items
             if os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0":
                 service.refresh_visible_price_cache(initial_items)
+            t0 = time.perf_counter()
             for c in initial_items:
                 if not isinstance(c, dict):
                     continue
@@ -1854,6 +1859,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     or (display_color(normalized_color) if normalized_color else None)
                     or c.get("color")
                 )
+            timing["initial_decorate_ms"] = (time.perf_counter() - t0) * 1000
             sort_items_by_display_price(initial_items, sort=params.get("sort") or "price_asc")
             ids = [
                 c.get("id")
@@ -1865,6 +1871,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     and not c.get("thumbnail_local_path")
                 )
             ]
+            t0 = time.perf_counter()
             if ids:
                 rows = db.execute(
                     select(CarImage.car_id, func.min(CarImage.url))
@@ -1886,6 +1893,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                         c["thumbnail_url"] = thumb
                     if not c.get("thumbnail_url"):
                         c["thumbnail_url"] = "/static/img/no-photo.svg"
+            timing["initial_images_ms"] = (time.perf_counter() - t0) * 1000
     except Exception:
         logger.exception("catalog_initial_items_failed")
     timing["fx_rates_ms"] = 0.0
