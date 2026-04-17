@@ -622,6 +622,7 @@ def list_cars(
     cached_response = None
     cache_lock_key = None
     cache_lock_token = None
+    refresh_cached_list_prices = os.getenv("CATALOG_CACHE_HIT_REFRESH_PRICES", "0") != "0"
     strict_photo_mode = _strict_photo_cache_mode(canon.get("region"))
     if cache_ok and not price_cache_bypass:
         cache_key = build_cars_list_key(
@@ -727,7 +728,7 @@ def list_cars(
         total = total if total is not None else 0
         if items:
             try:
-                service.sync_light_rows_from_db(items, refresh_prices=True)
+                service.sync_light_rows_from_db(items, refresh_prices=refresh_cached_list_prices)
             except Exception:
                 logger.exception("catalog_cache_refresh_failed")
     else:

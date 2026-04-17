@@ -183,6 +183,7 @@ def test_catalog_perf_path_canonicalizes_free_text_fuel_and_prewarms_engine_list
     service = _read("app/services/cars_service.py")
     prewarm = _read("app/scripts/prewarm_cache.py")
     assert "canonicalize_free_text_filters" in catalog_router
+    assert 'CATALOG_CACHE_HIT_REFRESH_PRICES", "0") != "0"' in catalog_router
     assert "explicit_country_code not in self.EU_COUNTRIES" in service
     assert 'PREWARM_INCLUDE_ENGINE_LISTS' in prewarm
     assert 'engine_type=params.get("engine_type")' in prewarm
@@ -775,7 +776,8 @@ def test_calc_missing_registration_uses_fallback_year_and_detail_template_has_de
 def test_catalog_cache_refreshes_stale_rows_from_db_and_mobilede_parser_supports_registration_formats():
     catalog = _read("app/routers/catalog.py")
     parser = _read("app/parsing/mobile_de_feed.py")
-    assert "service.sync_light_rows_from_db(items, refresh_prices=True)" in catalog
+    assert "service.sync_light_rows_from_db(items, refresh_prices=refresh_cached_list_prices)" in catalog
+    assert 'CATALOG_CACHE_HIT_REFRESH_PRICES", "0") != "0"' in catalog
     assert "_serialize_catalog_payload_items(" in catalog
     assert "def _parse_first_registration" in parser
     assert r"^(?P<month>\d{1,2})[./-](?P<year>\d{4})$" in parser
