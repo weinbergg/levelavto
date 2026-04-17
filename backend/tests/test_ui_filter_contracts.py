@@ -408,8 +408,10 @@ def test_emavto_registration_recovery_and_stale_lock_contracts():
     assert 'root.get("data-reg-date")' in parser
     assert "registration_year=detail.get(\"registration_year\")" in parser
     assert "registration_month=detail.get(\"registration_month\")" in parser
-    assert 'out["source_payload"] = {' in parser
-    assert '"registration_source": "emavto_detail"' in parser
+    assert "detail_payload: Dict[str, Any] = {}" in parser
+    assert 'if detail_payload:' in parser
+    assert 'out["source_payload"] = detail_payload' in parser
+    assert 'detail_payload["registration_source"] = "emavto_detail"' in parser
     assert "def needs_detail_refresh(car: Car) -> bool:" in runner
     assert 'payload.get("registration_defaulted") is True' in runner
     assert "same_basic(car, task) and not needs_detail_refresh(car)" in runner
