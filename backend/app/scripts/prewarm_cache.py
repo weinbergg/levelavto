@@ -3,12 +3,15 @@ import os
 import time
 from typing import Dict, Any, List, Tuple
 
+from starlette.datastructures import QueryParams
+
 from backend.app.db import SessionLocal
 from backend.app.services.cars_service import CarsService, normalize_brand
 from backend.app.routers.catalog import (
     filter_ctx_base,
     filter_ctx_brand,
     filter_ctx_model,
+    filter_payload,
     list_cars,
 )
 from backend.app.utils.redis_cache import (
@@ -83,6 +86,29 @@ def _prewarm_model(db, params: Dict[str, Any]) -> Tuple[str, float]:
     return f"filter_ctx_model:{normalized}", (time.perf_counter() - started) * 1000
 
 
+class _QueryRequest:
+    def __init__(self, params: Dict[str, Any]) -> None:
+        flat: List[tuple[str, str]] = []
+        for key, raw in params.items():
+            if raw in (None, ""):
+                continue
+            if isinstance(raw, list):
+                for item in raw:
+                    if item in (None, ""):
+                        continue
+                    flat.append((str(key), str(item)))
+                continue
+            flat.append((str(key), str(raw)))
+        self.query_params = QueryParams(flat)
+
+
+def _prewarm_payload(db, params: Dict[str, Any]) -> Tuple[str, float]:
+    started = time.perf_counter()
+    normalized = normalize_count_params(params)
+    filter_payload(request=_QueryRequest(normalized), db=db)
+    return f"filter_payload:{normalized}", (time.perf_counter() - started) * 1000
+
+
 def _should_stop(started: float, max_sec: float, now: float | None = None) -> bool:
     if not max_sec:
         return False
@@ -95,6 +121,7 @@ def main() -> None:
     max_sec = float(os.getenv("PREWARM_MAX_SEC", "600") or 600)
     include_brand_ctx = os.getenv("PREWARM_INCLUDE_BRAND_CTX", "0") == "1"
     include_model_ctx = os.getenv("PREWARM_INCLUDE_MODEL_CTX", "0") == "1"
+    include_payload_ctx = os.getenv("PREWARM_INCLUDE_PAYLOAD", "1") != "0"
     include_brand_lists = os.getenv("PREWARM_INCLUDE_BRAND_LISTS", "1") != "0"
     include_brand_counts = os.getenv("PREWARM_INCLUDE_BRAND_COUNTS", "1") != "0"
     include_country_sweep = os.getenv("PREWARM_COUNTRY_SWEEP", "0") == "1"
@@ -180,6 +207,19 @@ def main() -> None:
                 return
             key, ms = _prewarm_base(db, params)
             print(f"[prewarm] filter_ctx_base key={key} ms={ms:.2f}")
+        if include_payload_ctx:
+            payload_tasks: List[Dict[str, Any]] = [
+                {},
+                {"region": "EU"},
+                {"region": "EU", "country": eu_country},
+                {"region": "KR"},
+            ]
+            for params in payload_tasks:
+                if _should_stop(started, max_sec):
+                    print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
+                    return
+                key, ms = _prewarm_payload(db, params)
+                print(f"[prewarm] filter_payload key={key} ms={ms:.2f}")
         priority_countries = [eu_country]
         brand_tasks: List[Dict[str, Any]] = []
         for region_name in brand_regions:
