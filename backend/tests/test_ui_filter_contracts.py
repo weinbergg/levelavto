@@ -178,6 +178,16 @@ def test_price_sensitive_catalog_paths_bypass_stale_cache():
     assert 'timing["initial_images_ms"]' in pages_router
 
 
+def test_catalog_perf_path_canonicalizes_free_text_fuel_and_prewarms_engine_lists():
+    catalog_router = _read("app/routers/catalog.py")
+    service = _read("app/services/cars_service.py")
+    prewarm = _read("app/scripts/prewarm_cache.py")
+    assert "canonicalize_free_text_filters" in catalog_router
+    assert "explicit_country_code not in self.EU_COUNTRIES" in service
+    assert 'PREWARM_INCLUDE_ENGINE_LISTS' in prewarm
+    assert 'engine_type=params.get("engine_type")' in prewarm
+
+
 def test_eu_registration_filters_ignore_legacy_generic_default_flag():
     service = _read("app/services/cars_service.py")
     assert 'Car.country.like("KR%")' in service

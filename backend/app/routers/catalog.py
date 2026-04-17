@@ -5,6 +5,7 @@ import os
 from ..db import get_db
 from ..services.cars_service import (
     CarsService,
+    canonicalize_free_text_filters,
     normalize_brand,
     effective_engine_cc_value,
     effective_power_hp_value,
@@ -540,6 +541,7 @@ def list_cars(
     service = CarsService(db)
     timing_enabled = os.environ.get("CAR_API_TIMING", "0") == "1"
     t0 = time.perf_counter()
+    q, engine_type = canonicalize_free_text_filters(q=q, engine_type=engine_type)
     canon = _canonicalize_params(
         region=region,
         country=country,
@@ -922,6 +924,7 @@ def cars_count(
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
+    q, engine_type = canonicalize_free_text_filters(q=q, engine_type=engine_type)
     canon = _canonicalize_params(
         region=region,
         country=country,

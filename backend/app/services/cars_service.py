@@ -61,6 +61,25 @@ BRAND_ALIASES = {
 }
 
 
+_FREE_TEXT_FUEL_MAP = {
+    "дизель": "diesel",
+    "дизельный": "diesel",
+    "дизельные": "diesel",
+    "дизельное": "diesel",
+    "diesel": "diesel",
+    "бензин": "petrol",
+    "бенз": "petrol",
+    "petrol": "petrol",
+    "gasoline": "petrol",
+    "hybrid": "hybrid",
+    "гибрид": "hybrid",
+    "электро": "electric",
+    "электр": "electric",
+    "electric": "electric",
+    "ev": "electric",
+}
+
+
 def normalize_brand(value: Optional[str]) -> str:
     if not value:
         return ""
@@ -68,6 +87,29 @@ def normalize_brand(value: Optional[str]) -> str:
     if not raw:
         return ""
     return BRAND_ALIASES.get(raw.lower(), raw)
+
+
+def canonicalize_free_text_filters(
+    *,
+    q: Optional[str] = None,
+    engine_type: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str]]:
+    normalized_engine_type = normalize_csv_values(engine_type) or engine_type
+    normalized_q = str(q or "").strip()
+    if normalized_engine_type or not normalized_q:
+        return (normalized_q or None, normalized_engine_type)
+
+    q_tokens = [t for t in re.split(r"[\s,]+", normalized_q.lower()) if t]
+    if len(q_tokens) != 1:
+        return normalized_q or None, normalized_engine_type
+
+    token = q_tokens[0]
+    mapped = _FREE_TEXT_FUEL_MAP.get(token)
+    if mapped:
+        return None, mapped
+    if token.startswith("дизел"):
+        return None, "diesel"
+    return normalized_q or None, normalized_engine_type
 
 
 _MODEL_WS_RE = re.compile(r"\s+")
@@ -783,6 +825,22 @@ class CarsService:
             func.nullif(Car.engine_type, ""),
         )
 
+    def _stored_fuel_expr(self):
+        return func.lower(func.trim(Car.engine_type))
+
+    def _payload_fuel_search_expr(self):
+        payload_json = cast(Car.source_payload, JSONB)
+        return func.lower(
+            func.coalesce(
+                func.nullif(func.jsonb_extract_path_text(payload_json, "full_fuel_type"), ""),
+                func.nullif(func.jsonb_extract_path_text(payload_json, "envkv_engine_type"), ""),
+                func.nullif(func.jsonb_extract_path_text(payload_json, "envkv_consumption_fuel"), ""),
+                func.nullif(func.jsonb_extract_path_text(payload_json, "fuel_raw"), ""),
+                func.nullif(func.jsonb_extract_path_text(payload_json, "engine_raw"), ""),
+                "",
+            )
+        )
+
     def _fuel_search_expr(self):
         return func.lower(func.coalesce(self._fuel_source_expr(), ""))
 
@@ -792,20 +850,42 @@ class CarsService:
     def _fuel_filter_clause(self, raw_value: str):
         key = normalize_fuel(raw_value) or str(raw_value or "").strip().lower()
         fuel_expr = self._fuel_search_expr()
+        stored_fuel_expr = self._stored_fuel_expr()
+        payload_fuel_expr = self._payload_fuel_search_expr()
+        stored_fuel_missing = or_(Car.engine_type.is_(None), func.trim(Car.engine_type) == "")
+
+        def _stored_exact_any(values: List[str]):
+            return or_(*[stored_fuel_expr == value for value in values if value])
+
+        def _payload_branch(positive: List[str], negative: Optional[List[str]] = None):
+            clauses = [stored_fuel_missing, self._fuel_like_any(payload_fuel_expr, positive)]
+            if negative:
+                clauses.append(not_(self._fuel_like_any(payload_fuel_expr, negative)))
+            return and_(*clauses)
+
         if key == "petrol":
-            return and_(
-                self._fuel_like_any(fuel_expr, ["petrol", "gasoline", "benzin", "benzina", "бензин"]),
-                not_(self._fuel_like_any(fuel_expr, ["hybrid", "гибрид", "plug-in", "phev", "electric", "электро"])),
+            return or_(
+                _stored_exact_any(["petrol", "gasoline", "benzin", "benzina", "бензин"]),
+                _payload_branch(
+                    ["petrol", "gasoline", "benzin", "benzina", "бензин"],
+                    ["hybrid", "гибрид", "plug-in", "phev", "electric", "электро"],
+                ),
             )
         if key == "diesel":
-            return and_(
-                self._fuel_like_any(fuel_expr, ["diesel", "дизель"]),
-                not_(self._fuel_like_any(fuel_expr, ["hybrid", "гибрид", "plug-in", "phev", "electric", "электро"])),
+            return or_(
+                _stored_exact_any(["diesel", "дизель"]),
+                _payload_branch(
+                    ["diesel", "дизель"],
+                    ["hybrid", "гибрид", "plug-in", "phev", "electric", "электро"],
+                ),
             )
         if key == "electric":
-            return and_(
-                self._fuel_like_any(fuel_expr, ["electric", "elektro", "электро"]),
-                not_(self._fuel_like_any(fuel_expr, ["hybrid", "гибрид", "plug-in", "phev"])),
+            return or_(
+                _stored_exact_any(["electric", "elektro", "электро", "ev"]),
+                _payload_branch(
+                    ["electric", "elektro", "электро"],
+                    ["hybrid", "гибрид", "plug-in", "phev"],
+                ),
             )
         if key == "ethanol":
             return self._fuel_like_any(fuel_expr, ["ethanol", "e85", "ffv", "flexfuel", "flex fuel", "этанол"])
@@ -820,11 +900,12 @@ class CarsService:
             )
         if key == "hybrid":
             return or_(
-                fuel_expr == "hybrid",
-                self._fuel_like_any(fuel_expr, ["hybrid (petrol/electric)", "бензин + электро", "vollhybrid"]),
+                _stored_exact_any(["hybrid", "гибрид"]),
+                _payload_branch(["hybrid (petrol/electric)", "бензин + электро", "vollhybrid"]),
                 and_(
-                    self._fuel_like_any(fuel_expr, ["hybrid", "гибрид"]),
-                    not_(self._fuel_like_any(fuel_expr, ["diesel", "дизель", "plug-in", "phev"])),
+                    stored_fuel_missing,
+                    self._fuel_like_any(payload_fuel_expr, ["hybrid", "гибрид"]),
+                    not_(self._fuel_like_any(payload_fuel_expr, ["diesel", "дизель", "plug-in", "phev"])),
                 ),
             )
         if key == "hydrogen":
@@ -1430,6 +1511,7 @@ class CarsService:
     ) -> Tuple[List[Any], Dict[str, Any]]:
         exclude = exclude_fields or set()
         conditions = [self._available_expr()]
+        explicit_country = country
 
         if region and not country and region.upper() == "KR":
             country = "KR"
@@ -1473,6 +1555,7 @@ class CarsService:
             if line_conditions:
                 conditions.append(or_(*line_conditions))
 
+        explicit_country_code = normalize_country_code(explicit_country) if explicit_country else None
         if country:
             c = normalize_country_code(country)
             if c == "EU":
@@ -1497,11 +1580,14 @@ class CarsService:
                     conds.append(Car.source_id.in_(kr_sources))
                 conditions.append(or_(*conds))
             elif r == "EU":
-                eu_sources = self._source_ids_for_europe()
-                if eu_sources:
-                    conditions.append(Car.source_id.in_(eu_sources))
-                else:
-                    conditions.append(Car.country.in_(self.EU_COUNTRIES))
+                # For explicit EU country routes like DE/NL the country predicate is already
+                # selective enough. Keeping the broad source_id IN (...) here hurts the planner.
+                if explicit_country_code not in self.EU_COUNTRIES:
+                    eu_sources = self._source_ids_for_europe()
+                    if eu_sources:
+                        conditions.append(Car.source_id.in_(eu_sources))
+                    else:
+                        conditions.append(Car.country.in_(self.EU_COUNTRIES))
 
         if kr_type and "kr_type" not in exclude:
             kt_raw = str(kr_type).upper()
@@ -1527,34 +1613,8 @@ class CarsService:
                 if variants_lc:
                     conditions.append(func.lower(func.trim(Car.brand)).in_(variants_lc))
 
-        if q and "q" not in exclude:
-            q_tokens = [t for t in re.split(r"[\s,]+", q.strip().lower()) if t]
-            if len(q_tokens) == 1 and not engine_type and "engine_type" not in exclude:
-                token = q_tokens[0]
-                quick_fuel_map = {
-                    "дизель": "diesel",
-                    "дизельный": "diesel",
-                    "дизельные": "diesel",
-                    "дизельное": "diesel",
-                    "diesel": "diesel",
-                    "бензин": "petrol",
-                    "бенз": "petrol",
-                    "petrol": "petrol",
-                    "gasoline": "petrol",
-                    "hybrid": "hybrid",
-                    "гибрид": "hybrid",
-                    "электро": "electric",
-                    "электр": "electric",
-                    "electric": "electric",
-                    "ev": "electric",
-                }
-                mapped = quick_fuel_map.get(token)
-                if mapped:
-                    engine_type = mapped
-                    q = None
-                elif token.startswith("дизел"):
-                    engine_type = "diesel"
-                    q = None
+        if "q" not in exclude:
+            q, engine_type = canonicalize_free_text_filters(q=q, engine_type=engine_type)
 
         if q and "q" not in exclude:
             tokens = [t for t in re.split(r"[\s,]+", q.strip().lower()) if t]

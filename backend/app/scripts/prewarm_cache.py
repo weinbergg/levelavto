@@ -124,11 +124,13 @@ def main() -> None:
     include_payload_ctx = os.getenv("PREWARM_INCLUDE_PAYLOAD", "1") != "0"
     include_brand_lists = os.getenv("PREWARM_INCLUDE_BRAND_LISTS", "1") != "0"
     include_brand_counts = os.getenv("PREWARM_INCLUDE_BRAND_COUNTS", "1") != "0"
+    include_engine_lists = os.getenv("PREWARM_INCLUDE_ENGINE_LISTS", "1") != "0"
     include_country_sweep = os.getenv("PREWARM_COUNTRY_SWEEP", "0") == "1"
     list_sort = os.getenv("PREWARM_LIST_SORT", "price_asc")
     list_sorts_raw = os.getenv("PREWARM_LIST_SORTS", "").strip()
     list_page_size = int(os.getenv("PREWARM_LIST_PAGE_SIZE", "12") or 12)
     eu_country = os.getenv("PREWARM_EU_COUNTRY", "DE")
+    engine_types_raw = os.getenv("PREWARM_ENGINE_TYPES", "diesel,electric,hybrid").strip()
     brand_regions_raw = os.getenv("PREWARM_BRAND_REGIONS", "EU")
     default_hot_brands = ",".join(
         [
@@ -172,6 +174,7 @@ def main() -> None:
     country_sweep_raw = os.getenv("PREWARM_COUNTRIES", "AT,NL,BE,FR,IT,ES")
     country_sweep = [c.strip().upper() for c in country_sweep_raw.split(",") if c.strip()]
     list_sorts = [s.strip() for s in list_sorts_raw.split(",") if s.strip()] or [list_sort]
+    engine_types = [s.strip().lower() for s in engine_types_raw.split(",") if s.strip()]
     brand_regions = []
     for item in brand_regions_raw.split(","):
         region = item.strip().upper()
@@ -291,13 +294,15 @@ def main() -> None:
                     region=params.get("region"),
                     country=params.get("country"),
                     brand=params.get("brand"),
+                    engine_type=params.get("engine_type"),
                     sort=sort_name,
                     page=1,
                     page_size=int(params.get("page_size") or 12),
                 )
                 print(
                     f"[prewarm] cars_list region={params.get('region')} country={params.get('country')} "
-                    f"brand={params.get('brand')} sort={sort_name} size={params.get('page_size') or 12}"
+                    f"brand={params.get('brand')} engine_type={params.get('engine_type')} "
+                    f"sort={sort_name} size={params.get('page_size') or 12}"
                 )
 
         # Priority: warm broad generic pages first so the main catalog is hot
@@ -314,6 +319,16 @@ def main() -> None:
                 return
             params["page_size"] = list_page_size
             _prewarm_list(params)
+        if include_engine_lists:
+            engine_list_tasks = []
+            for engine_type in engine_types:
+                engine_list_tasks.append({"region": "EU", "country": eu_country, "engine_type": engine_type})
+            for params in engine_list_tasks:
+                if _should_stop(started, max_sec):
+                    print("[prewarm] stop by PREWARM_MAX_SEC (engine lists)")
+                    break
+                params["page_size"] = list_page_size
+                _prewarm_list(params)
         if include_brand_lists:
             for params in brand_tasks:
                 if _should_stop(started, max_sec):
