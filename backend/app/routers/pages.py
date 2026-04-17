@@ -1667,6 +1667,24 @@ def submit_lead(
     return templates.TemplateResponse("home.html", ctx)
 
 
+def _catalog_should_defer_initial_items(
+    *,
+    region: Optional[str],
+    country: Optional[str],
+    page: int,
+    user: Any,
+) -> bool:
+    if os.getenv("CATALOG_DEFER_HEAVY_INITIAL_ITEMS", "1") == "0":
+        return False
+    if user is not None:
+        return False
+    if page != 1:
+        return False
+    region_norm = normalize_country_code(region) if region else None
+    country_norm = normalize_country_code(country) if country else None
+    return region_norm == "KR" or country_norm in {"KR", "DE"}
+
+
 @router.get("/catalog")
 def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
     templates = request.app.state.templates
@@ -1756,6 +1774,14 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         if value in {"0", "false", "no", "off"}:
             return False
         return None
+    current_page = _int_val("page") or 1
+    sort_value = params.get("sort") or "price_asc"
+    defer_initial_items = _catalog_should_defer_initial_items(
+        region=canon_region,
+        country=canon_country,
+        page=current_page,
+        user=getattr(request.state, "user", None) or user,
+    )
     initial_items: List[dict] = []
     initial_total: Optional[int] = None
     fx_rates = service.get_fx_rates() or {}
@@ -1765,139 +1791,146 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     try:
         source_list = qp.getlist("source") if hasattr(qp, "getlist") else []
         source_value: Optional[str | List[str]] = source_list if source_list else params.get("source")
-        t0 = time.perf_counter()
-        items, initial_total = service.list_cars(
-            region=canon_region,
-            country=canon_country,
-            kr_type=canon_kr_type,
-            brand=canon_brand,
-            lines=qp.getlist("line") if hasattr(qp, "getlist") else None,
-            source_key=source_value,
-            q=params.get("q"),
-            model=canon_model,
-            generation=params.get("generation"),
-            color=params.get("color"),
-            body_type=params.get("body_type"),
-            engine_type=params.get("engine_type"),
-            transmission=params.get("transmission"),
-            drive_type=params.get("drive_type"),
-            price_min=_float_val("price_min"),
-            price_max=_float_val("price_max"),
-            power_hp_min=_float_val("power_hp_min"),
-            power_hp_max=_float_val("power_hp_max"),
-            engine_cc_min=_int_val("engine_cc_min"),
-            engine_cc_max=_int_val("engine_cc_max"),
-            year_min=_int_val("year_min"),
-            year_max=_int_val("year_max"),
-            mileage_min=_int_val("mileage_min"),
-            mileage_max=_int_val("mileage_max"),
-            reg_year_min=_int_val("reg_year_min"),
-            reg_month_min=_int_val("reg_month_min"),
-            reg_year_max=_int_val("reg_year_max"),
-            reg_month_max=_int_val("reg_month_max"),
-            num_seats=params.get("num_seats"),
-            doors_count=params.get("doors_count"),
-            emission_class=params.get("emission_class"),
-            efficiency_class=params.get("efficiency_class"),
-            climatisation=params.get("climatisation"),
-            airbags=params.get("airbags"),
-            interior_design=params.get("interior_design"),
-            interior_color=params.get("interior_color"),
-            interior_material=params.get("interior_material"),
-            vat_reclaimable=params.get("vat_reclaimable"),
-            air_suspension=_bool_val("air_suspension"),
-            price_rating_label=params.get("price_rating_label"),
-            owners_count=params.get("owners_count"),
-            condition=params.get("condition"),
-            sort=params.get("sort") or "price_asc",
-            page=_int_val("page") or 1,
-            page_size=12,
-            light=True,
-        )
-        timing["initial_list_ms"] = (time.perf_counter() - t0) * 1000
-        def _normalize_thumb(url: str | None) -> str | None:
-            normalized = normalize_classistatic_url(url)
-            if normalized:
-                return normalized
-            raw = (url or "").strip()
-            return raw or None
+        timing["initial_items_deferred"] = 1.0 if defer_initial_items else 0.0
+        if not defer_initial_items:
+            t0 = time.perf_counter()
+            items, initial_total = service.list_cars(
+                region=canon_region,
+                country=canon_country,
+                kr_type=canon_kr_type,
+                brand=canon_brand,
+                lines=qp.getlist("line") if hasattr(qp, "getlist") else None,
+                source_key=source_value,
+                q=params.get("q"),
+                model=canon_model,
+                generation=params.get("generation"),
+                color=params.get("color"),
+                body_type=params.get("body_type"),
+                engine_type=params.get("engine_type"),
+                transmission=params.get("transmission"),
+                drive_type=params.get("drive_type"),
+                price_min=_float_val("price_min"),
+                price_max=_float_val("price_max"),
+                power_hp_min=_float_val("power_hp_min"),
+                power_hp_max=_float_val("power_hp_max"),
+                engine_cc_min=_int_val("engine_cc_min"),
+                engine_cc_max=_int_val("engine_cc_max"),
+                year_min=_int_val("year_min"),
+                year_max=_int_val("year_max"),
+                mileage_min=_int_val("mileage_min"),
+                mileage_max=_int_val("mileage_max"),
+                reg_year_min=_int_val("reg_year_min"),
+                reg_month_min=_int_val("reg_month_min"),
+                reg_year_max=_int_val("reg_year_max"),
+                reg_month_max=_int_val("reg_month_max"),
+                num_seats=params.get("num_seats"),
+                doors_count=params.get("doors_count"),
+                emission_class=params.get("emission_class"),
+                efficiency_class=params.get("efficiency_class"),
+                climatisation=params.get("climatisation"),
+                airbags=params.get("airbags"),
+                interior_design=params.get("interior_design"),
+                interior_color=params.get("interior_color"),
+                interior_material=params.get("interior_material"),
+                vat_reclaimable=params.get("vat_reclaimable"),
+                air_suspension=_bool_val("air_suspension"),
+                price_rating_label=params.get("price_rating_label"),
+                owners_count=params.get("owners_count"),
+                condition=params.get("condition"),
+                sort=sort_value,
+                page=current_page,
+                page_size=12,
+                light=True,
+            )
+            timing["initial_list_ms"] = (time.perf_counter() - t0) * 1000
 
-        if isinstance(items, list):
-            initial_items = items
-            if os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0":
-                service.refresh_visible_price_cache(initial_items)
-            t0 = time.perf_counter()
-            for c in initial_items:
-                if not isinstance(c, dict):
-                    continue
-                c["display_price_rub"] = resolve_display_price_rub(
-                    c.get("total_price_rub_cached"),
-                    c.get("price_rub_cached"),
-                    raw_price=c.get("price"),
-                    currency=c.get("currency"),
-                    fx_eur=fx_eur,
-                    fx_usd=fx_usd,
-                    fx_cny=fx_cny,
-                    allow_price_fallback=True,
-                    allow_raw_price_fallback=True,
-                )
-                c["price_note"] = price_without_util_note(
-                    display_price=c.get("display_price_rub"),
-                    total_price_rub_cached=c.get("total_price_rub_cached"),
-                    calc_breakdown=c.get("calc_breakdown_json"),
-                    region=params.get("region"),
-                    country=c.get("country"),
-                )
-                c["display_engine_type"] = translate_payload_value("engine_type", c.get("engine_type")) or c.get("engine_type")
-                c["display_transmission"] = translate_payload_value("transmission", c.get("transmission")) or c.get("transmission")
-                c["display_drive_type"] = translate_payload_value("drive_type", c.get("drive_type")) or c.get("drive_type")
-                c["engine_cc"] = effective_engine_cc_value(c)
-                c["power_hp"] = effective_power_hp_value(c)
-                c["power_kw"] = effective_power_kw_value(c)
-                c["display_body_type"] = ru_body(c.get("body_type")) or display_body(c.get("body_type")) or c.get("body_type")
-                normalized_color = normalize_color(c.get("color"))
-                c["display_color"] = (
-                    ru_color(c.get("color"))
-                    or display_color(c.get("color"))
-                    or (ru_color(normalized_color) if normalized_color else None)
-                    or (display_color(normalized_color) if normalized_color else None)
-                    or c.get("color")
-                )
-            timing["initial_decorate_ms"] = (time.perf_counter() - t0) * 1000
-            sort_items_by_display_price(initial_items, sort=params.get("sort") or "price_asc")
-            ids = [
-                c.get("id")
-                for c in initial_items
-                if (
-                    isinstance(c, dict)
-                    and c.get("id")
-                    and not c.get("thumbnail_url")
-                    and not c.get("thumbnail_local_path")
-                )
-            ]
-            t0 = time.perf_counter()
-            if ids:
-                rows = db.execute(
-                    select(CarImage.car_id, func.min(CarImage.url))
-                    .where(CarImage.car_id.in_(ids))
-                    .group_by(CarImage.car_id)
-                ).all()
-                first_urls = {car_id: _normalize_thumb(url) for car_id, url in rows if url}
+            def _normalize_thumb(url: str | None) -> str | None:
+                normalized = normalize_classistatic_url(url)
+                if normalized:
+                    return normalized
+                raw = (url or "").strip()
+                return raw or None
+
+            if isinstance(items, list):
+                initial_items = items
+                if os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0":
+                    service.refresh_visible_price_cache(initial_items)
+                t0 = time.perf_counter()
                 for c in initial_items:
                     if not isinstance(c, dict):
                         continue
-                    cid = c.get("id")
-                    if cid in first_urls and first_urls[cid]:
-                        c["thumbnail_url"] = first_urls[cid]
-                    thumb = resolve_thumbnail_url(
-                        _normalize_thumb(c.get("thumbnail_url")),
-                        c.get("thumbnail_local_path"),
+                    c["display_price_rub"] = resolve_display_price_rub(
+                        c.get("total_price_rub_cached"),
+                        c.get("price_rub_cached"),
+                        raw_price=c.get("price"),
+                        currency=c.get("currency"),
+                        fx_eur=fx_eur,
+                        fx_usd=fx_usd,
+                        fx_cny=fx_cny,
+                        allow_price_fallback=True,
+                        allow_raw_price_fallback=True,
                     )
-                    if thumb:
-                        c["thumbnail_url"] = thumb
-                    if not c.get("thumbnail_url"):
-                        c["thumbnail_url"] = "/static/img/no-photo.svg"
-            timing["initial_images_ms"] = (time.perf_counter() - t0) * 1000
+                    c["price_note"] = price_without_util_note(
+                        display_price=c.get("display_price_rub"),
+                        total_price_rub_cached=c.get("total_price_rub_cached"),
+                        calc_breakdown=c.get("calc_breakdown_json"),
+                        region=params.get("region"),
+                        country=c.get("country"),
+                    )
+                    c["display_engine_type"] = translate_payload_value("engine_type", c.get("engine_type")) or c.get("engine_type")
+                    c["display_transmission"] = translate_payload_value("transmission", c.get("transmission")) or c.get("transmission")
+                    c["display_drive_type"] = translate_payload_value("drive_type", c.get("drive_type")) or c.get("drive_type")
+                    c["engine_cc"] = effective_engine_cc_value(c)
+                    c["power_hp"] = effective_power_hp_value(c)
+                    c["power_kw"] = effective_power_kw_value(c)
+                    c["display_body_type"] = ru_body(c.get("body_type")) or display_body(c.get("body_type")) or c.get("body_type")
+                    normalized_color = normalize_color(c.get("color"))
+                    c["display_color"] = (
+                        ru_color(c.get("color"))
+                        or display_color(c.get("color"))
+                        or (ru_color(normalized_color) if normalized_color else None)
+                        or (display_color(normalized_color) if normalized_color else None)
+                        or c.get("color")
+                    )
+                timing["initial_decorate_ms"] = (time.perf_counter() - t0) * 1000
+                sort_items_by_display_price(initial_items, sort=sort_value)
+                ids = [
+                    c.get("id")
+                    for c in initial_items
+                    if (
+                        isinstance(c, dict)
+                        and c.get("id")
+                        and not c.get("thumbnail_url")
+                        and not c.get("thumbnail_local_path")
+                    )
+                ]
+                t0 = time.perf_counter()
+                if ids:
+                    rows = db.execute(
+                        select(CarImage.car_id, func.min(CarImage.url))
+                        .where(CarImage.car_id.in_(ids))
+                        .group_by(CarImage.car_id)
+                    ).all()
+                    first_urls = {car_id: _normalize_thumb(url) for car_id, url in rows if url}
+                    for c in initial_items:
+                        if not isinstance(c, dict):
+                            continue
+                        cid = c.get("id")
+                        if cid in first_urls and first_urls[cid]:
+                            c["thumbnail_url"] = first_urls[cid]
+                        thumb = resolve_thumbnail_url(
+                            _normalize_thumb(c.get("thumbnail_url")),
+                            c.get("thumbnail_local_path"),
+                        )
+                        if thumb:
+                            c["thumbnail_url"] = thumb
+                        if not c.get("thumbnail_url"):
+                            c["thumbnail_url"] = "/static/img/no-photo.svg"
+                timing["initial_images_ms"] = (time.perf_counter() - t0) * 1000
+        else:
+            timing["initial_list_ms"] = 0.0
+            timing["initial_decorate_ms"] = 0.0
+            timing["initial_images_ms"] = 0.0
     except Exception:
         logger.exception("catalog_initial_items_failed")
     timing["fx_rates_ms"] = 0.0
@@ -1932,7 +1965,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         logger.info("CATALOG_TIMING %s", request.state.html_parts)
     print(
         "CATALOG_SSR "
-        f"items={len(initial_items)} region={canon_region} country={canon_country} "
+        f"items={len(initial_items)} deferred={1 if defer_initial_items else 0} region={canon_region} country={canon_country} "
         f"brand={canon_brand} model={canon_model} sort={params.get('sort') or 'price_asc'}",
         flush=True,
     )
