@@ -11,6 +11,8 @@ import logging
 
 logger = logging.getLogger("mobilede_csv")
 _MAX_REASONABLE_POWER_KW = Decimal("2500")
+_SUSPICIOUS_POWER_KW_WARN_LIMIT = 20
+_suspicious_power_kw_warn_count = 0
 
 
 @dataclass
@@ -144,12 +146,17 @@ def _parse_json_list(raw: str | None, *, field_name: str) -> List[str]:
 
 
 def _parse_power_kw(raw_primary: str | None, raw_fallback: str | None) -> Optional[Decimal]:
+    global _suspicious_power_kw_warn_count
     for raw in (raw_primary, raw_fallback):
         value = _to_decimal(raw)
         if value is None:
             continue
         if value <= 0 or value > _MAX_REASONABLE_POWER_KW:
-            logger.warning("Ignoring suspicious power_kw value: %r -> %s", raw[:80] if raw else raw, value)
+            if _suspicious_power_kw_warn_count < _SUSPICIOUS_POWER_KW_WARN_LIMIT:
+                logger.warning("Ignoring suspicious power_kw value: %r -> %s", raw[:80] if raw else raw, value)
+            elif _suspicious_power_kw_warn_count == _SUSPICIOUS_POWER_KW_WARN_LIMIT:
+                logger.warning("Suppressing further suspicious power_kw warnings")
+            _suspicious_power_kw_warn_count += 1
             continue
         return value
     return None
