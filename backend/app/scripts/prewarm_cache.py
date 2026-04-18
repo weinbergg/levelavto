@@ -197,7 +197,6 @@ def main() -> None:
     with SessionLocal() as db:
         service = CarsService(db)
         base_tasks: List[Dict[str, Any]] = [
-            {},
             {"region": "EU"},
             {"region": "EU", "country": eu_country},
             {"region": "KR"},
@@ -212,7 +211,6 @@ def main() -> None:
             print(f"[prewarm] filter_ctx_base key={key} ms={ms:.2f}")
         if include_payload_ctx:
             payload_tasks: List[Dict[str, Any]] = [
-                {},
                 {"region": "EU"},
                 {"region": "EU", "country": eu_country},
                 {"region": "KR"},
@@ -243,7 +241,6 @@ def main() -> None:
         model_tasks = [
             {"region": "EU", "country": eu_country, "brand": "BMW", "model": "X5"},
             {"region": "KR", "brand": "BMW", "model": "X5"},
-            {"brand": "BMW", "model": "X5"},
         ]
         if include_model_ctx:
             for params in model_tasks:
@@ -308,7 +305,6 @@ def main() -> None:
         # Priority: warm broad generic pages first so the main catalog is hot
         # even if brand prewarming is cut short by PREWARM_MAX_SEC.
         list_tasks = [
-            {},
             {"region": "EU"},
             {"region": "KR"},
             {"region": "EU", "country": eu_country},
@@ -336,7 +332,7 @@ def main() -> None:
                     break
                 params["page_size"] = list_page_size
                 _prewarm_list(params)
-    print(f"[prewarm] done in {(time.perf_counter()-started)*1000:.2f} ms")
+    print(f"[prewarm] done in {(time.monotonic()-started)*1000:.2f} ms")
 
 
 if __name__ == "__main__":
