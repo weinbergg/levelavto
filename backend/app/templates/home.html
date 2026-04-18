@@ -421,7 +421,7 @@
       map(attribute='brand') | list %} {% set others = brand_stats[0:60] %}
       <div class="brand-logo-grid">
         {% for item in primary %}
-        <a class="brand-logo-tile" href="/catalog?brand={{ item.brand }}">
+        <a class="brand-logo-tile" href="/catalog?region=EU&brand={{ item.brand }}">
           <div class="brand-logo-thumb">
             <img src="{{ item.logo }}" alt="{{ item.brand }}" loading="lazy" />
           </div>

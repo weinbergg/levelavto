@@ -330,6 +330,16 @@ def _canonicalize_params(
     return normalized
 
 
+def _apply_public_catalog_default_scope(params: dict) -> dict:
+    normalized = dict(params or {})
+    region = normalize_country_code(normalized.get("region")) if normalized.get("region") else None
+    country = normalize_country_code(normalized.get("country")) if normalized.get("country") else None
+    kr_type = str(normalized.get("kr_type") or "").strip().upper() or None
+    if not region and not country and not kr_type:
+        normalized["region"] = "EU"
+    return normalized
+
+
 def _to_int(value: Any) -> Optional[int]:
     if value is None or value == "":
         return None
@@ -542,13 +552,15 @@ def list_cars(
     timing_enabled = os.environ.get("CAR_API_TIMING", "0") == "1"
     t0 = time.perf_counter()
     q, engine_type = canonicalize_free_text_filters(q=q, engine_type=engine_type)
-    canon = _canonicalize_params(
-        region=region,
-        country=country,
-        eu_country=eu_country,
-        kr_type=kr_type,
-        brand=brand,
-        model=model,
+    canon = _apply_public_catalog_default_scope(
+        _canonicalize_params(
+            region=region,
+            country=country,
+            eu_country=eu_country,
+            kr_type=kr_type,
+            brand=brand,
+            model=model,
+        )
     )
     cache_ok = _cacheable_catalog_filters(
         region=canon.get("region"),
@@ -926,13 +938,15 @@ def cars_count(
 ):
     service = CarsService(db)
     q, engine_type = canonicalize_free_text_filters(q=q, engine_type=engine_type)
-    canon = _canonicalize_params(
-        region=region,
-        country=country,
-        eu_country=eu_country,
-        kr_type=kr_type,
-        brand=brand,
-        model=model,
+    canon = _apply_public_catalog_default_scope(
+        _canonicalize_params(
+            region=region,
+            country=country,
+            eu_country=eu_country,
+            kr_type=kr_type,
+            brand=brand,
+            model=model,
+        )
     )
     params = {
         "region": canon.get("region"),
@@ -1202,13 +1216,15 @@ def advanced_count(request: Request, db: Session = Depends(get_db)):
     kr_type = qp.get("kr_type")
     brand = qp.get("brand")
     model = qp.get("model")
-    canon = _canonicalize_params(
-        region=region,
-        country=country,
-        eu_country=eu_country,
-        kr_type=kr_type,
-        brand=brand,
-        model=model,
+    canon = _apply_public_catalog_default_scope(
+        _canonicalize_params(
+            region=region,
+            country=country,
+            eu_country=eu_country,
+            kr_type=kr_type,
+            brand=brand,
+            model=model,
+        )
     )
     lines = qp.getlist("line") if hasattr(qp, "getlist") else []
     source = qp.getlist("source") if hasattr(qp, "getlist") else []
@@ -1486,7 +1502,9 @@ def filter_ctx_base(
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
-    params = normalize_filter_params({"region": region, "country": country})
+    params = _apply_public_catalog_default_scope(
+        normalize_filter_params({"region": region, "country": country})
+    )
     if os.getenv("FILTERS_CANON") == "1":
         print(
             "FILTERS_CANON filter_ctx_base "
@@ -1613,7 +1631,9 @@ def filter_ctx_base_raw(
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
-    params = normalize_filter_params({"region": region, "country": country})
+    params = _apply_public_catalog_default_scope(
+        normalize_filter_params({"region": region, "country": country})
+    )
     base_filters = {"region": params.get("region"), "country": params.get("country")}
     regions_raw = service.facet_counts(field="region", filters={})
     countries_raw = service.facet_counts(field="country", filters={"region": params.get("region")})
@@ -1637,7 +1657,9 @@ def filter_ctx_brand(
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
-    canon = _canonicalize_params(region=region, country=country, kr_type=kr_type, brand=brand)
+    canon = _apply_public_catalog_default_scope(
+        _canonicalize_params(region=region, country=country, kr_type=kr_type, brand=brand)
+    )
     if os.getenv("FILTERS_CANON") == "1":
         print(
             "FILTERS_CANON filter_ctx_brand "
@@ -1689,7 +1711,9 @@ def filter_ctx_model(
     db: Session = Depends(get_db),
 ):
     service = CarsService(db)
-    canon = _canonicalize_params(region=region, country=country, brand=brand, model=model)
+    canon = _apply_public_catalog_default_scope(
+        _canonicalize_params(region=region, country=country, brand=brand, model=model)
+    )
     if os.getenv("FILTERS_CANON") == "1":
         print(
             "FILTERS_CANON filter_ctx_model "
@@ -1762,13 +1786,15 @@ def filter_payload(
     kr_type = qp.get("kr_type")
     brand = qp.get("brand")
     model = qp.get("model")
-    canon = _canonicalize_params(
-        region=region,
-        country=country,
-        eu_country=eu_country,
-        kr_type=kr_type,
-        brand=brand,
-        model=model,
+    canon = _apply_public_catalog_default_scope(
+        _canonicalize_params(
+            region=region,
+            country=country,
+            eu_country=eu_country,
+            kr_type=kr_type,
+            brand=brand,
+            model=model,
+        )
     )
     lines = qp.getlist("line") if hasattr(qp, "getlist") else []
     source = qp.getlist("source") if hasattr(qp, "getlist") else []

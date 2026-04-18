@@ -189,6 +189,19 @@ def test_catalog_perf_path_canonicalizes_free_text_fuel_and_prewarms_engine_list
     assert 'engine_type=params.get("engine_type")' in prewarm
 
 
+def test_public_catalog_scope_defaults_to_eu_without_explicit_region_or_country():
+    catalog_router = _read("app/routers/catalog.py")
+    pages_router = _read("app/routers/pages.py")
+    home_template = _read("app/templates/home.html")
+    assert "def _apply_public_catalog_default_scope(params: dict) -> dict:" in catalog_router
+    assert 'normalized["region"] = "EU"' in catalog_router
+    assert "def _apply_public_catalog_default_scope(params: Dict[str, Any]) -> Dict[str, Any]:" in pages_router
+    assert 'normalized["region"] = "EU"' in pages_router
+    assert 'build_filter_ctx_base_key({"region": "EU"})' in pages_router
+    assert 'filters={"region": "EU"}' in pages_router
+    assert 'href="/catalog?region=EU&brand={{ item.brand }}"' in home_template
+
+
 def test_eu_registration_filters_ignore_legacy_generic_default_flag():
     service = _read("app/services/cars_service.py")
     assert 'Car.country.like("KR%")' in service

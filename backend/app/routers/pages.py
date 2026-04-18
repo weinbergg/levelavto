@@ -1088,12 +1088,12 @@ def _search_ssr_filter_context(
 
 
 def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
-    cache_key = "home_filter_ctx:all"
+    cache_key = "home_filter_ctx:eu_default"
     cached = _HOME_FILTER_CTX_CACHE.get(cache_key)
     if cached:
         return cached
 
-    base_ctx = redis_get_json(build_filter_ctx_base_key({}))
+    base_ctx = redis_get_json(build_filter_ctx_base_key({"region": "EU"}))
     if base_ctx:
         regions = [str(item.get("value") or "").strip() for item in base_ctx.get("regions") or [] if item.get("value")]
         countries = [str(item.get("value") or "").strip() for item in base_ctx.get("countries") or [] if item.get("value")]
@@ -1129,7 +1129,7 @@ def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
     ]
     countries = []
     seen_countries = set()
-    for row in service.facet_counts(field="country", filters={}):
+    for row in service.facet_counts(field="country", filters={"region": "EU"}):
         raw_val = row.get("value")
         if not raw_val:
             continue
@@ -1140,10 +1140,10 @@ def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
         countries.append(code)
     brand_stats = [
         {"brand": normalize_brand(row["value"]), "count": int(row["count"])}
-        for row in service.facet_counts(field="brand", filters={})
+        for row in service.facet_counts(field="brand", filters={"region": "EU"})
         if row.get("value")
     ]
-    body_type_stats = build_body_type_options(service.facet_counts(field="body_type", filters={}))
+    body_type_stats = build_body_type_options(service.facet_counts(field="body_type", filters={"region": "EU"}))
     payload = {
         "regions": regions,
         "countries": countries,
@@ -1170,6 +1170,16 @@ def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
     }
     _HOME_FILTER_CTX_CACHE[cache_key] = payload
     return payload
+
+
+def _apply_public_catalog_default_scope(params: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(params or {})
+    region = normalize_country_code(normalized.get("region")) if normalized.get("region") else None
+    country = normalize_country_code(normalized.get("country")) if normalized.get("country") else None
+    kr_type = str(normalized.get("kr_type") or "").strip().upper() or None
+    if not region and not country and not kr_type:
+        normalized["region"] = "EU"
+    return normalized
 
 
 def _build_home_media_context(db: Session) -> Dict[str, Any]:
@@ -1693,7 +1703,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     t_start = time.perf_counter()
     t0 = time.perf_counter()
     raw_params = dict(request.query_params)
-    ctx_params = normalize_filter_params(raw_params)
+    ctx_params = _apply_public_catalog_default_scope(normalize_filter_params(raw_params))
     region_param = ctx_params.get("region")
     regions = [r["value"] for r in service.facet_counts(field="region", filters={})]
     country_filters = {"region": region_param} if region_param else {}
@@ -1724,9 +1734,18 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         params["country"] = params.get("eu_country")
     if "eu_country" in params:
         params.pop("eu_country", None)
-    canon_region = str(params.get("region") or "").strip().upper() or None
-    canon_country = str(params.get("country") or "").strip().upper() or None
-    canon_kr_type = str(params.get("kr_type") or "").strip().upper() or None
+    scope_params = _apply_public_catalog_default_scope(
+        {
+            "region": params.get("region"),
+            "country": params.get("country"),
+            "kr_type": params.get("kr_type"),
+        }
+    )
+    if scope_params.get("region") and not params.get("region"):
+        params["region"] = scope_params.get("region")
+    canon_region = str(scope_params.get("region") or "").strip().upper() or None
+    canon_country = str(scope_params.get("country") or "").strip().upper() or None
+    canon_kr_type = str(scope_params.get("kr_type") or "").strip().upper() or None
     canon_brand = normalize_brand(params.get("brand")).strip() if params.get("brand") else None
     canon_model = str(params.get("model") or "").strip() or None
     t0 = time.perf_counter()
@@ -2023,7 +2042,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
     timing_enabled = os.environ.get("HTML_TIMING", "0") == "1"
     t0 = time.perf_counter()
     raw_params = dict(request.query_params)
-    params = normalize_filter_params(raw_params)
+    params = _apply_public_catalog_default_scope(normalize_filter_params(raw_params))
     filter_ctx, cache_hit, cache_source, cache_key = _search_ssr_filter_context(service, db, params)
     contact_content = ContentService(db).content_map(
         [
