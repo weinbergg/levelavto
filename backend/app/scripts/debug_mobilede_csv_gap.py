@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -48,6 +49,12 @@ def _serialize_dt(value: datetime | None) -> str | None:
 
 
 def main() -> None:
+    # This script is meant to emit a compact comparison report.
+    # The CSV parser can log thousands of suspicious field warnings for noisy rows,
+    # which makes the actual JSON result unusable in terminal sessions.
+    logging.getLogger("backend.app.importing.mobilede_csv").setLevel(logging.ERROR)
+    logging.getLogger("backend.app.imports.mobilede_csv").setLevel(logging.ERROR)
+
     ap = argparse.ArgumentParser(description="Compare current mobile.de CSV coverage with DB state")
     ap.add_argument("--csv", default=None, help="Optional path to CSV inside container")
     ap.add_argument("--brand", required=True)
