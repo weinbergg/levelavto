@@ -197,16 +197,22 @@ class ParsingDataService:
                 car_row = car
                 needs_recalc = True
             # Sync images for this car: if provided, use them; else fallback to thumbnail_url
-            # Flush to get ids for newly created rows
-            self.db.flush()
+            # Flush only newly created rows to obtain the car id.
+            if getattr(car_row, "id", None) is None:
+                self.db.flush()
             if car_row and getattr(car_row, "id", None):
                 if (
                     needs_recalc
                     and str(getattr(car_row, "country", payload.get("country") or source.country) or "").upper().startswith("KR")
                 ):
                     recalc_car_ids.add(int(car_row.id))
-                old_imgs = self.db.execute(select(CarImage).where(
-                    CarImage.car_id == car_row.id).order_by(CarImage.position.asc())).scalars().all()
+                old_imgs = []
+                if existing is not None:
+                    old_imgs = self.db.execute(
+                        select(CarImage)
+                        .where(CarImage.car_id == car_row.id)
+                        .order_by(CarImage.position.asc())
+                    ).scalars().all()
                 # decide images list
                 candidate_images: List[str] = images[:]
                 if candidate_images and old_imgs:
@@ -228,12 +234,21 @@ class ParsingDataService:
                 if not candidate_images and car_row.thumbnail_url:
                     candidate_images = [car_row.thumbnail_url]
                 if candidate_images:
-                    # replace old images only when we have something to set
-                    for oi in old_imgs:
-                        self.db.delete(oi)
-                    for pos, url in enumerate(candidate_images):
-                        self.db.add(CarImage(car_id=car_row.id, url=url,
-                                    is_primary=(pos == 0), position=pos))
+                    existing_urls = [str(img.url or "") for img in old_imgs]
+                    # Avoid rewriting the same gallery on every feed refresh: with the
+                    # current dataset size that creates excessive dead tuples and I/O.
+                    if existing_urls != candidate_images:
+                        for oi in old_imgs:
+                            self.db.delete(oi)
+                        for pos, url in enumerate(candidate_images):
+                            self.db.add(
+                                CarImage(
+                                    car_id=car_row.id,
+                                    url=url,
+                                    is_primary=(pos == 0),
+                                    position=pos,
+                                )
+                            )
 
         self.db.commit()
         if recalc_car_ids and os.getenv("PARSER_AUTO_CALC_KR", "1") != "0":
