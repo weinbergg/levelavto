@@ -55,3 +55,11 @@ def test_debug_kr_price_status_script_reports_missing_spec_causes():
     assert "missing_engine_cc" in content
     assert "missing_power" in content
     assert "without_util_marker" in content
+
+
+def test_debug_mobilede_csv_gap_reports_site_bucket_counts():
+    content = _read("app/scripts/debug_mobilede_csv_gap.py")
+    assert '"site_bucket"' in content
+    assert "--region" in content
+    assert "_resolve_model_aliases" in content
+    assert '"db_available_not_in_csv"' in content
