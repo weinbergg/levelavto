@@ -73,6 +73,7 @@ def main() -> None:
     # This script is meant to emit a compact comparison report.
     # The CSV parser can log thousands of suspicious field warnings for noisy rows,
     # which makes the actual JSON result unusable in terminal sessions.
+    logging.getLogger("mobilede_csv").setLevel(logging.ERROR)
     logging.getLogger("backend.app.importing.mobilede_csv").setLevel(logging.ERROR)
     logging.getLogger("backend.app.imports.mobilede_csv").setLevel(logging.ERROR)
 
