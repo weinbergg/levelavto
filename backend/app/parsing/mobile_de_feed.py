@@ -8,14 +8,58 @@ from datetime import datetime
 from .base import CarParsed
 from .config import SiteConfig
 from ..importing.mobilede_csv import MobileDeCsvRow
+from ..services.cars_service import CarsService, normalize_brand, normalize_model_label
 
 
 class MobileDeFeedParser:
     _POWER_KW_RE = re.compile(r"\b(\d{2,4})(?:[.,]\d+)?\s*k\s*w\b", re.IGNORECASE)
     _POWER_HP_RE = re.compile(r"\b(\d{2,4})(?:[.,]\d+)?\s*(?:cv|ps|hp)\b", re.IGNORECASE)
+    _PLACEHOLDER_MODELS = {"other", "others"}
+    _MODEL_RECOVERY_DONORS = {
+        "MERCEDES-BENZ": [
+            "A-Class",
+            "B-Class",
+            "C-Class",
+            "CL-Class",
+            "CLA",
+            "CLC",
+            "CLK",
+            "CLS",
+            "E-Class",
+            "G-Class",
+            "GLA",
+            "GLB",
+            "GLC",
+            "GLE",
+            "GLK",
+            "GLS",
+            "M-Class",
+            "ML",
+            "R-Class",
+            "S-Class",
+            "SL",
+            "SLK",
+            "SLC",
+            "AMG GT",
+            "Citan",
+            "Sprinter",
+            "V-Class",
+            "Vito",
+            "Viano",
+            "X-Class",
+            "EQA",
+            "EQB",
+            "EQC",
+            "EQE",
+            "EQS",
+            "EQV",
+            "Maybach",
+        ],
+    }
 
     def __init__(self, site_config: SiteConfig):
         self.config = site_config
+        self._model_recovery_service = CarsService(None)  # type: ignore[arg-type]
 
     def _payload_from_row(self, row: MobileDeCsvRow) -> Dict[str, Any]:
         data = asdict(row)
@@ -202,6 +246,23 @@ class MobileDeFeedParser:
             return year, month
         return None, None
 
+    def _resolve_model(self, row: MobileDeCsvRow) -> Optional[str]:
+        raw_model = normalize_model_label(row.model)
+        if raw_model and raw_model.casefold() not in self._PLACEHOLDER_MODELS:
+            return raw_model
+        brand = normalize_brand(row.mark).strip() if row.mark else ""
+        donors = self._MODEL_RECOVERY_DONORS.get(brand.upper(), [])
+        if not donors:
+            return raw_model or None
+        for candidate in (row.sub_title, row.title):
+            text = normalize_model_label(candidate)
+            if not text:
+                continue
+            recovered = self._model_recovery_service._match_eu_model_donor(text, donors)
+            if recovered:
+                return recovered
+        return raw_model or None
+
     def iter_parsed_from_csv(self, rows: Iterable[MobileDeCsvRow]) -> Iterator[CarParsed]:
         for row in rows:
             images: List[str] = list(row.image_urls) if row.image_urls else []
@@ -233,7 +294,7 @@ class MobileDeFeedParser:
                 external_id=str(row.inner_id),
                 country=(row.seller_country or self.config.country or "DE").upper(),
                 brand=(row.mark or None),
-                model=(row.model or None),
+                model=self._resolve_model(row),
                 variant=(row.sub_title or None),
                 year=row.year,
                 registration_year=registration_year,

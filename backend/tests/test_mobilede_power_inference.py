@@ -97,3 +97,26 @@ def test_iter_parsed_nulls_dirty_engine_cc_for_electric():
     assert parsed.engine_cc is None
     assert parsed.power_kw == 35.0
 
+
+def test_iter_parsed_recovers_mercedes_model_from_other_placeholder():
+    parser = _parser()
+    row = _row(
+        mark="Mercedes-Benz",
+        model="Other",
+        title="Mercedes-Benz B 180 d",
+        sub_title="Mercedes Benz B-Klasse 170 NGT",
+    )
+    parsed = next(parser.iter_parsed_from_csv([row]))
+    assert parsed.model == "B-Class"
+
+
+def test_iter_parsed_recovers_mercedes_vito_from_other_placeholder():
+    parser = _parser()
+    row = _row(
+        mark="Mercedes-Benz",
+        model="Other",
+        title="Mercedes-Benz Vito Tourer",
+        sub_title="Mercedes Vito Tourer 114 CDI extralang",
+    )
+    parsed = next(parser.iter_parsed_from_csv([row]))
+    assert parsed.model == "Vito"

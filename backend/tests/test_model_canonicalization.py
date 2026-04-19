@@ -29,6 +29,14 @@ def test_canonical_model_label_maps_generic_kr_titles_to_eu_donors():
     assert service._canonical_model_label("Mercedes-Benz", "Benz E-Class W213 E350 4MATIC AMG Line", donors=mercedes_donors) == "E-Class"
 
 
+def test_canonical_model_label_mercedes_matches_klasse_and_classe_aliases():
+    service = CarsService(db=None)  # type: ignore[arg-type]
+    mercedes_donors = ["A-Class", "B-Class", "E-Class", "GLC", "Vito"]
+    assert service._canonical_model_label("Mercedes-Benz", "Mercedes Benz B-Klasse 170 NGT", donors=mercedes_donors) == "B-Class"
+    assert service._canonical_model_label("Mercedes-Benz", "Classe B Mercedes-Benz Classe B 18", donors=mercedes_donors) == "B-Class"
+    assert service._canonical_model_label("Mercedes-Benz", "Mercedes Benz E Klasse W213", donors=mercedes_donors) == "E-Class"
+
+
 def test_canonical_model_label_has_short_safe_fallback_without_donors():
     service = CarsService(db=None)  # type: ignore[arg-type]
     assert service._canonical_model_label("Genesis", "GV80 2.5 T Gasoline AWD", donors=[]) == "GV80"

@@ -186,7 +186,7 @@ _MODEL_TOKEN_EQUIVALENTS = {
     "cabriolet": {"cabriolet", "convertible"},
     "convertible": {"convertible", "cabriolet"},
     "series": {"series", "serie", "seria", "серия", "er"},
-    "class": {"class"},
+    "class": {"class", "klasse", "classe", "klasa"},
 }
 
 _MODEL_OPTIONAL_TAIL_TOKENS = {"series", "class"}
