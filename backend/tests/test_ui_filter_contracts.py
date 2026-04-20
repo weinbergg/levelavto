@@ -700,16 +700,19 @@ def test_catalog_and_search_interior_filters_use_chip_multiselect():
     assert 'syncChoiceInputOptions' in script
 
 
-def test_catalog_cards_stay_rub_only_and_detail_primary_prefers_orig_with_proxy_fallback():
+def test_catalog_cards_stay_rub_only_and_detail_primary_prefers_thumb_with_orig_fallback():
     catalog_template = _read("app/templates/catalog.html")
     detail_template = _read("app/templates/car_detail.html")
     script = _read("app/static/js/app.js")
     pages = _read("app/routers/pages.py")
     assert "{% elif car.price %}" not in catalog_template
     assert "primary_thumb_src = thumbs.thumb_src(primary_raw, 960, 5)" in detail_template
+    assert "{% set primary_src = primary_thumb_src %}" in detail_template
+    assert 'fetchpriority="high"' in detail_template
     assert "data-thumb=\"{{ primary_thumb_src or '' }}\"" in detail_template
     assert "if (!img.dataset.thumbFallbackTried" in script
-    assert "applyThumbFallback(primary, { thumbProxy: false })" in script
+    assert "if os.getenv(\"DETAIL_REFRESH_SIMILAR_PRICES\", \"0\") == \"1\":" in pages
+    assert "applyThumbFallback(primary)" in script
     assert "ordered_images = sorted(" in pages
 
 

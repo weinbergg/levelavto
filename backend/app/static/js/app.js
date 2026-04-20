@@ -4182,8 +4182,8 @@
       delete img.dataset.thumbRetried
       delete img.dataset.thumbFallbackTried
       delete img.dataset.fallbackApplied
-      img.src = nextOrig
-      applyThumbFallback(img, { thumbProxy: false })
+      img.src = nextThumb && nextThumb !== '/static/img/no-photo.svg' ? nextThumb : nextOrig
+      applyThumbFallback(img)
       syncActive()
     }
     const move = (step) => {
@@ -4208,7 +4208,7 @@
       })
     })
     setImageByIndex(idx)
-    applyThumbFallback(img, { thumbProxy: false })
+    applyThumbFallback(img)
     refreshGalleryChrome()
     prevBtn?.addEventListener('click', (e) => {
       e.preventDefault()
@@ -4281,7 +4281,7 @@
   function initThumbFallbacks() {
     qsa('img.thumb').forEach((img) => applyThumbFallback(img))
     const primary = qs('#primaryImage')
-    if (primary) applyThumbFallback(primary, { thumbProxy: false })
+    if (primary) applyThumbFallback(primary)
   }
 
   function initAll() {

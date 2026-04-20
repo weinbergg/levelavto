@@ -11,6 +11,7 @@ TIMEOUT_SEC="${TIMEOUT_SEC:-12}"
 COUNTRY="${COUNTRY:-DE}"
 BRAND="${BRAND:-BMW}"
 MODEL="${MODEL:-X5}"
+DETAIL_CAR_ID="${DETAIL_CAR_ID:-}"
 BENCH_SEARCH="${BENCH_SEARCH:-1}"
 OUT_DIR="${OUT_DIR:-logs/perf_audit}"
 TS="$(date +%Y%m%d_%H%M%S)"
@@ -44,6 +45,9 @@ require_cmd docker
   echo "- Country benchmark: $COUNTRY"
   echo "- Brand benchmark: $BRAND"
   echo "- Model benchmark: $MODEL"
+  if [ -n "$DETAIL_CAR_ID" ]; then
+    echo "- Detail car id: $DETAIL_CAR_ID"
+  fi
   echo
 } >"$REPORT_MD"
 
@@ -107,6 +111,38 @@ capture_cmd "web_env_perf_flags" docker compose exec -T web sh -lc "env | grep -
 capture_cmd "response_headers_catalog" curl -sS -D - -o /dev/null --max-time "$TIMEOUT_SEC" "$BASE_URL/catalog?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
 capture_cmd "response_headers_search" curl -sS -D - -o /dev/null --max-time "$TIMEOUT_SEC" "$BASE_URL/search?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
 
+if [ -z "$DETAIL_CAR_ID" ]; then
+  DETAIL_CAR_ID="$(
+    docker compose exec -T web env COUNTRY="$COUNTRY" BRAND="$BRAND" MODEL="$MODEL" python - <<'PY'
+from sqlalchemy import select, func
+from backend.app.db import SessionLocal
+from backend.app.models import Car
+from backend.app.services.cars_service import normalize_brand
+import os
+
+country = (os.getenv("COUNTRY") or "").strip().upper()
+brand = normalize_brand(os.getenv("BRAND") or "").strip()
+model = (os.getenv("MODEL") or "").strip()
+
+with SessionLocal() as db:
+    stmt = select(Car.id).where(Car.is_available.is_(True))
+    if country:
+        stmt = stmt.where(func.upper(Car.country) == country)
+    if brand:
+        stmt = stmt.where(func.lower(func.trim(Car.brand)) == brand.lower())
+    if model:
+        stmt = stmt.where(func.lower(func.trim(Car.model)) == model.lower())
+    stmt = stmt.order_by(Car.updated_at.desc().nullslast(), Car.id.desc()).limit(1)
+    car_id = db.execute(stmt).scalar_one_or_none()
+    print(car_id or "")
+PY
+  )"
+fi
+
+if [ -n "$DETAIL_CAR_ID" ]; then
+  capture_cmd "response_headers_detail" curl -sS -D - -o /dev/null --max-time "$TIMEOUT_SEC" "$BASE_URL/car/${DETAIL_CAR_ID}"
+fi
+
 append_section "Data Snapshot"
 capture_cmd "db_counts" docker compose exec -T web python - <<'PY'
 from sqlalchemy import text
@@ -114,10 +150,25 @@ from backend.app.db import SessionLocal
 with SessionLocal() as db:
     total = db.execute(text("select count(*) from cars")).scalar_one()
     available = db.execute(text("select count(*) from cars where is_available is true")).scalar_one()
+    missing_total = db.execute(text("select count(*) from cars where is_available is true and total_price_rub_cached is null")).scalar_one()
+    europe_fallback = db.execute(text("""
+        select count(*)
+        from cars
+        where is_available is true
+          and total_price_rub_cached is null
+          and (
+            price_rub_cached is not null
+            or (price is not null and currency is not null)
+          )
+          and upper(coalesce(country, '')) not in ('RU', 'CN')
+          and upper(coalesce(country, '')) not like 'KR%'
+    """)).scalar_one()
     no_price = db.execute(text("select count(*) from cars where is_available is true and total_price_rub_cached is null and price_rub_cached is null")).scalar_one()
     missing_share = (float(no_price) / float(available) * 100.0) if available else 0.0
     print(f"cars_total={total}")
     print(f"cars_available={available}")
+    print(f"cars_missing_total_price={missing_total}")
+    print(f"cars_price_note_europe={europe_fallback}")
     print(f"cars_no_cached_price={no_price}")
     print(f"cars_no_cached_price_pct={missing_share:.2f}")
 PY
@@ -127,6 +178,9 @@ append_section "API Benchmarks"
 bench_endpoint "health" "/health"
 bench_endpoint "catalog_ssr_eu" "/catalog?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
 bench_endpoint "search_ssr_eu" "/search?region=EU&country=${COUNTRY}&brand=${BRAND}&model=${MODEL}"
+if [ -n "$DETAIL_CAR_ID" ]; then
+  bench_endpoint "detail_ssr" "/car/${DETAIL_CAR_ID}"
+fi
 bench_endpoint "filter_ctx_base_eu" "/api/filter_ctx_base?region=EU"
 bench_endpoint "filter_payload_eu" "/api/filter_payload?region=EU&country=${COUNTRY}"
 bench_endpoint "cars_count_eu" "/api/cars_count?region=EU&country=${COUNTRY}"

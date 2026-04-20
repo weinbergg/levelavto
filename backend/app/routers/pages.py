@@ -2311,7 +2311,8 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         payload = car.source_payload or {}
         pricing = service.price_info(car)
         similar_offers = service.similar_cars(car, limit=10)
-        service.refresh_visible_price_cache(similar_offers)
+        if os.getenv("DETAIL_REFRESH_SIMILAR_PRICES", "0") == "1":
+            service.refresh_visible_price_cache(similar_offers)
         detail_fx_rates = service.get_fx_rates() or {}
         for item in similar_offers:
             _decorate_showcase_car(item, fx_rates=detail_fx_rates)

@@ -45,11 +45,7 @@
         {% set primary = image_urls[0] if image_urls and image_urls|length > 0 else car.thumbnail_url %}
         {% set primary_raw = (primary or '')|trim %}
         {% set primary_thumb_src = thumbs.thumb_src(primary_raw, 960, 5) %}
-        {% if primary_raw.startswith('https://') or primary_raw.startswith('/media/') or primary_raw.startswith('/static/') %}
-          {% set primary_src = primary_raw %}
-        {% else %}
-          {% set primary_src = primary_thumb_src %}
-        {% endif %}
+        {% set primary_src = primary_thumb_src %}
         <div class="detail-hero__main placeholder" data-images='{{ image_urls | tojson }}'>
           <button class="fav-btn fav-btn--detail" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>
           {% if primary %}
@@ -58,6 +54,7 @@
             src="{{ primary_src }}"
             alt="{{ car.brand }} {{ car.model }}"
             loading="eager"
+            fetchpriority="high"
             decoding="async"
             referrerpolicy="no-referrer"
             data-thumb="{{ primary_thumb_src or '' }}"
