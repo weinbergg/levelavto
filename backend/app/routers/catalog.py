@@ -1937,6 +1937,13 @@ def filter_payload(
                 "country": canon.get("country"),
             }
         )
+        body_type_filters = {**common_filters, "body_type": None}
+        engine_type_filters = {**common_filters, "engine_type": None}
+        transmission_filters = {**common_filters, "transmission": None}
+        drive_type_filters = {**common_filters, "drive_type": None}
+        color_filters = {**common_filters, "color": None}
+        generation_filters = {**common_filters, "generation": None}
+
         base_ctx = None
         if params == base_scope_params:
             base_ctx = redis_get_json(
@@ -1997,8 +2004,16 @@ def filter_payload(
                     if row.get("value")
                 ]
             )
-            body_types = _sort_by_label(build_body_type_options(service.facet_counts_filtered(field="body_type", **common_filters)))
-            engine_types = _sort_by_label(build_engine_type_options(service.facet_counts_filtered(field="engine_type", **common_filters)))
+            body_types = _sort_by_label(
+                build_body_type_options(
+                    service.facet_counts_filtered(field="body_type", **body_type_filters)
+                )
+            )
+            engine_types = _sort_by_label(
+                build_engine_type_options(
+                    service.facet_counts_filtered(field="engine_type", **engine_type_filters)
+                )
+            )
             transmissions = _sort_by_label(
                 [
                     {
@@ -2006,7 +2021,7 @@ def filter_payload(
                         "label": translate_payload_value("transmission", row["value"]) or row["value"],
                         "count": row.get("count", 0),
                     }
-                    for row in service.facet_counts_filtered(field="transmission", **common_filters)
+                    for row in service.facet_counts_filtered(field="transmission", **transmission_filters)
                     if row.get("value")
                 ]
             )
@@ -2017,11 +2032,13 @@ def filter_payload(
                         "label": translate_payload_value("drive_type", row["value"]) or row["value"],
                         "count": row.get("count", 0),
                     }
-                    for row in service.facet_counts_filtered(field="drive_type", **common_filters)
+                    for row in service.facet_counts_filtered(field="drive_type", **drive_type_filters)
                     if row.get("value")
                 ]
             )
-            colors_basic, colors_other = _split_colors(service.facet_counts_filtered(field="color_group", **common_filters))
+            colors_basic, colors_other = _split_colors(
+                service.facet_counts_filtered(field="color_group", **color_filters)
+            )
             reg_year_filters = {
                 **common_filters,
                 "reg_year_min": None,
@@ -2041,7 +2058,7 @@ def filter_payload(
         generations = _sort_by_label(
             [
                 {"value": row["value"], "label": row["value"], "count": row.get("count", 0)}
-                for row in service.facet_counts_filtered(field="generation", **common_filters)
+                for row in service.facet_counts_filtered(field="generation", **generation_filters)
                 if row.get("value")
             ]
         )

@@ -150,6 +150,15 @@ docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
   --since-minutes "${RECOVERABLE_FALLBACK_SINCE_MINUTES:-10080}" \
   --batch "${RECOVERABLE_FALLBACK_BATCH:-2000}"
 
+if [ "${ELECTRIC_RECOVERABLE_FALLBACK_ENABLED:-1}" = "1" ]; then
+  echo "[mobilede_pipeline] step=recalc_electric_recoverable_fallbacks"
+  docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
+    --region EU \
+    --engine-type electric \
+    --only-recoverable-fallback \
+    --batch "${ELECTRIC_RECOVERABLE_FALLBACK_BATCH:-2000}"
+fi
+
 if [ "${MOBILEDE_PRUNE_UNUSED_MEDIA:-1}" = "1" ]; then
   echo "[mobilede_pipeline] step=prune_unused_local_media"
   docker compose exec -T web python -m backend.app.scripts.prune_unused_local_media \

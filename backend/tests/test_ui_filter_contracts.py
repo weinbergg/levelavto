@@ -61,6 +61,9 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "const priceMain = card.querySelector('.price-main')" in script
     assert "let metaNode = card.querySelector('.car-card__meta')" in script
     assert "let specsNode = card.querySelector('.specs')" in script
+    assert "function positionFloatingOverlay(" in script
+    assert "function bindFloatingOverlayPosition(" in script
+    assert "body.style.bottom = openUp ? `calc(100% + ${gap}px)` : 'auto'" in script
     assert "const ssrHydrated = hydrateCatalogFromSSR()" in script
     assert "if (!ssrHydrated) {" in script
     assert "void loadCars(initialPage)" in script
@@ -77,6 +80,12 @@ def test_filter_payload_includes_dynamic_brand_options():
     assert '"reg_month_min": None' in router
     assert '"reg_year_max": None' in router
     assert '"reg_month_max": None' in router
+    assert 'body_type_filters = {**common_filters, "body_type": None}' in router
+    assert 'engine_type_filters = {**common_filters, "engine_type": None}' in router
+    assert 'transmission_filters = {**common_filters, "transmission": None}' in router
+    assert 'drive_type_filters = {**common_filters, "drive_type": None}' in router
+    assert 'color_filters = {**common_filters, "color": None}' in router
+    assert 'generation_filters = {**common_filters, "generation": None}' in router
     assert '"_engine_type_source": "normalized"' in router
     assert '"interior_design_options_eu": build_interior_trim_options' in router
     assert '"interior_color_options_eu": build_interior_options' in router
@@ -125,8 +134,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=103' in template
-    assert '/static/css/styles.css?v=63' in template
+    assert '/static/js/app.js?v=104' in template
+    assert '/static/css/styles.css?v=64' in template
 
 
 def test_main_enables_gzip_for_large_html_and_api_payloads():
@@ -247,6 +256,24 @@ def test_model_group_summary_has_visible_selected_states():
     assert ".advanced-row > .field:has(.multi-select-menu__root[open])" in css
     assert ".multi-select-menu--fuel .multi-select-menu__option" in css
     assert "grid-template-columns: 18px minmax(0, 1fr);" in css
+
+
+def test_price_note_matches_price_scale():
+    css = _read("app/static/css/styles.css")
+    assert ".price-note {" in css
+    assert "font-size: inherit;" in css
+    assert ".detail-price__note {" in css
+    assert "font-weight: 800;" in css
+
+
+def test_recalc_scripts_support_engine_type_targeting_and_daily_ev_recovery():
+    recalc_missing = _read("app/scripts/recalc_missing_prices.py")
+    recalc_cache = _read("app/scripts/recalc_calc_cache.py")
+    pipeline = _read("../scripts/mobilede_daily_pipeline.sh")
+    assert 'ap.add_argument("--engine-type"' in recalc_missing
+    assert 'ap.add_argument("--engine-type"' in recalc_cache
+    assert '--engine-type electric \\' in pipeline
+    assert 'step=recalc_electric_recoverable_fallbacks' in pipeline
 
 
 def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():
