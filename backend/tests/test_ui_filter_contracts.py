@@ -171,8 +171,9 @@ def test_price_sensitive_catalog_paths_bypass_stale_cache():
     assert "self._refresh_price_sensitive_candidates(" in service
     assert "def _catalog_inline_price_refresh_enabled(self) -> bool:" in service
     assert 'os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0"' in service
-    assert 'if os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0":' in catalog_router
-    assert 'if os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0":' in pages_router
+    assert "def _should_catalog_inline_price_refresh(" in service
+    assert 'page_num <= max_page and size_num <= max_page_size' in service
+    assert 'service._should_catalog_inline_price_refresh(page=page, page_size=page_size)' in catalog_router
     assert 'timing["initial_list_ms"]' in pages_router
     assert 'timing["initial_decorate_ms"]' in pages_router
     assert 'timing["initial_images_ms"]' in pages_router

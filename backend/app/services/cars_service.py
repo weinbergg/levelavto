@@ -1461,6 +1461,45 @@ class CarsService:
     def _catalog_inline_price_refresh_enabled(self) -> bool:
         return os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0"
 
+    def _should_catalog_inline_price_refresh(
+        self,
+        *,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> bool:
+        raw_flag = os.getenv("CATALOG_INLINE_PRICE_REFRESH")
+        if raw_flag is not None:
+            return self._catalog_inline_price_refresh_enabled()
+
+        try:
+            default_enabled = os.getenv("CATALOG_INLINE_PRICE_REFRESH_DEFAULT", "1") != "0"
+        except Exception:
+            default_enabled = True
+        if not default_enabled:
+            return False
+
+        try:
+            max_page = max(1, int(os.getenv("CATALOG_INLINE_PRICE_REFRESH_MAX_PAGE", "3") or 3))
+        except Exception:
+            max_page = 3
+        try:
+            max_page_size = max(
+                1,
+                int(os.getenv("CATALOG_INLINE_PRICE_REFRESH_MAX_PAGE_SIZE", "24") or 24),
+            )
+        except Exception:
+            max_page_size = 24
+
+        try:
+            page_num = max(1, int(page or 1))
+        except Exception:
+            page_num = 1
+        try:
+            size_num = max(1, int(page_size or 12))
+        except Exception:
+            size_num = 12
+        return page_num <= max_page and size_num <= max_page_size
+
     def _build_list_conditions(
         self,
         *,
@@ -2114,7 +2153,7 @@ class CarsService:
             where_expr is not None
             and price_sensitive
             and lazy_price_refresh_allowed
-            and self._catalog_inline_price_refresh_enabled()
+            and self._should_catalog_inline_price_refresh(page=page, page_size=page_size)
         ):
             self._refresh_price_sensitive_candidates(
                 where_expr,
@@ -2502,7 +2541,7 @@ class CarsService:
                     row["engine_cc"] = effective_engine_cc_value(row)
                     row["power_hp"] = effective_power_hp_value(row)
                     row["power_kw"] = effective_power_kw_value(row)
-            if self._catalog_inline_price_refresh_enabled():
+            if self._should_catalog_inline_price_refresh(page=page, page_size=page_size):
                 try:
                     if light:
                         self._lazy_recalc_light_items(items)

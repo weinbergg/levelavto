@@ -1872,8 +1872,6 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
 
             if isinstance(items, list):
                 initial_items = items
-                if os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0":
-                    service.refresh_visible_price_cache(initial_items)
                 t0 = time.perf_counter()
                 for c in initial_items:
                     if not isinstance(c, dict):

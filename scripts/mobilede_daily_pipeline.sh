@@ -125,7 +125,7 @@ echo "[mobilede_pipeline] step=recalc_missing_prices"
 docker compose exec -T web python -m backend.app.scripts.recalc_missing_prices \
   --region EU \
   --batch "${MISSING_PRICE_BATCH:-2000}" \
-  --limit "${MISSING_PRICE_LIMIT:-50000}" \
+  --limit "${MISSING_PRICE_LIMIT:-250000}" \
   --only-missing-total \
   --report-json /app/artifacts/recalc_missing_prices_daily.json
 
