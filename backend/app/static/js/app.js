@@ -811,6 +811,35 @@
     return match ? String(match.textContent || match.value || '').trim() : value
   }
 
+  function positionFloatingOverlay(root, body, { gap = 8, minVisible = 220, maxHeight = 420 } = {}) {
+    if (!root || !body) return
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+    if (!viewportHeight) return
+    const rect = root.getBoundingClientRect()
+    const safeGap = 12
+    const spaceBelow = Math.max(0, viewportHeight - rect.bottom - safeGap)
+    const spaceAbove = Math.max(0, rect.top - safeGap)
+    const openUp = spaceBelow < minVisible && spaceAbove > spaceBelow
+    const available = openUp ? spaceAbove : spaceBelow
+    const appliedMaxHeight = Math.max(160, Math.min(maxHeight, Math.max(available, 160)))
+    body.style.top = openUp ? 'auto' : `calc(100% + ${gap}px)`
+    body.style.bottom = openUp ? `calc(100% + ${gap}px)` : 'auto'
+    body.style.maxHeight = `${appliedMaxHeight}px`
+  }
+
+  function bindFloatingOverlayPosition(root, body, options = {}) {
+    if (!root || !body || root.__overlayPositionBound === '1') return
+    const reposition = () => {
+      if (!root.open) return
+      window.requestAnimationFrame(() => positionFloatingOverlay(root, body, options))
+    }
+    root.addEventListener('toggle', reposition)
+    window.addEventListener('resize', reposition, { passive: true })
+    document.addEventListener('scroll', reposition, true)
+    root.__overlayPositionBound = '1'
+    root.__overlayReposition = reposition
+  }
+
   function bindMultiSelectMenus(scope, onChange, inputName = '') {
     if (!scope) return
     const selects = inputName
@@ -867,6 +896,7 @@
         container.__optionsWrap = optionsWrap
         container.__applyBtn = applyBtn
         container.__draft = new Set(parseSelectedCsvValues(input))
+        bindFloatingOverlayPosition(root, body, { maxHeight: 420 })
 
         const syncState = () => {
           const items = getMultiSelectItems(select)
@@ -917,6 +947,9 @@
             optionsWrap.appendChild(btn)
           })
           container.classList.toggle('is-hidden', items.length === 0)
+          if (root.open && typeof root.__overlayReposition === 'function') {
+            root.__overlayReposition()
+          }
         }
 
         clearBtn.addEventListener('mousedown', (event) => {
@@ -2684,6 +2717,7 @@
       rootBody.appendChild(contentWrap)
       root.appendChild(rootBody)
       container.appendChild(root)
+      bindFloatingOverlayPosition(root, rootBody, { maxHeight: 440 })
       if (!container.dataset.outsideBound) {
         document.addEventListener('click', (event) => {
           if (!container.contains(event.target)) {
@@ -2711,6 +2745,9 @@
       setAccordionSelectedModels(select, Array.from(selectedModels))
       const syncDraftState = () => {
         setAccordionState(container, select.value || '', Array.from(draftSelectedModels))
+        if (root.open && typeof root.__overlayReposition === 'function') {
+          root.__overlayReposition()
+        }
       }
       const resetDraftSelection = () => {
         draftSelectedModels.clear()

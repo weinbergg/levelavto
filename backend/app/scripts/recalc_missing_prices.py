@@ -11,6 +11,7 @@ from sqlalchemy import and_, or_
 from backend.app.db import SessionLocal
 from backend.app.models.car import Car
 from backend.app.services.cars_service import CarsService
+from backend.app.utils.filter_values import split_csv_values
 
 
 def _has_minimum_data_expr():
@@ -29,6 +30,7 @@ def main() -> None:
     )
     ap.add_argument("--region", default="EU", help="EU|KR|RU|ALL")
     ap.add_argument("--country", default=None, help="Country code, e.g. DE")
+    ap.add_argument("--engine-type", default=None, help="Optional normalized fuel filter, e.g. electric")
     ap.add_argument("--batch", type=int, default=500)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--sleep", type=float, default=0.0, help="Sleep between batches (sec)")
@@ -64,6 +66,14 @@ def main() -> None:
             q = q.filter(~Car.country.like("KR%"), Car.country != "RU")
         elif reg == "RU":
             q = q.filter(Car.country == "RU")
+        if args.engine_type:
+            engine_clauses = []
+            for raw_engine in split_csv_values(args.engine_type):
+                clause = svc._fuel_filter_clause(raw_engine)
+                if clause is not None:
+                    engine_clauses.append(clause)
+            if engine_clauses:
+                q = q.filter(or_(*engine_clauses))
 
         total_candidates = q.count()
         print(f"[recalc_missing_prices] candidates={total_candidates} dry_run={args.dry_run}", flush=True)

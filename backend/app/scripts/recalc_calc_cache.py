@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from backend.app.db import SessionLocal
 from backend.app.models import Car
 from backend.app.services.cars_service import CarsService
+from backend.app.utils.filter_values import split_csv_values
 from backend.app.utils.telegram import send_telegram_message
 from sqlalchemy import or_, func, cast
 from sqlalchemy.dialects.postgresql import JSONB
@@ -15,6 +16,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--region", default="EU")
     ap.add_argument("--country", default=None)
+    ap.add_argument("--engine-type", default=None, help="Optional normalized fuel filter, e.g. electric")
     ap.add_argument("--batch", type=int, default=2000)
     ap.add_argument("--only-missing", action="store_true")
     ap.add_argument(
@@ -104,6 +106,14 @@ def main() -> None:
             base = base.filter((Car.id % args.shard_total) == args.shard_index)
         if brands:
             base = base.filter(func.lower(func.trim(Car.brand)).in_(brands))
+        if args.engine_type:
+            engine_clauses = []
+            for raw_engine in split_csv_values(args.engine_type):
+                clause = svc._fuel_filter_clause(raw_engine)
+                if clause is not None:
+                    engine_clauses.append(clause)
+            if engine_clauses:
+                base = base.filter(or_(*engine_clauses))
         if args.only_missing:
             base = base.filter(Car.total_price_rub_cached.is_(None))
         if args.only_missing_registration:
