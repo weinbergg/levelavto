@@ -85,3 +85,24 @@ def test_resolve_model_aliases_expands_family_label_to_group_members(monkeypatch
     assert service._resolve_model_aliases(region="EU", brand="Porsche", model="Cayenne Coupe") == [
         "Cayenne Coupe"
     ]
+
+
+def test_resolve_model_aliases_keeps_mercedes_vito_separate_from_v_class_family(monkeypatch):
+    service = CarsService(db=object())  # type: ignore[arg-type]
+
+    def fake_models_for_brand_filtered(**kwargs):
+        return [
+            {"value": "V-Class", "label": "V-Class", "count": 12, "aliases": ["V-Class"]},
+            {"value": "V 250", "label": "V 250", "count": 5, "aliases": ["V 250"]},
+            {"value": "Vito", "label": "Vito", "count": 8, "aliases": ["Vito"]},
+        ]
+
+    monkeypatch.setattr(service, "models_for_brand_filtered", fake_models_for_brand_filtered)
+
+    assert set(service._resolve_model_aliases(region="EU", brand="Mercedes-Benz", model="V-Class")) == {
+        "V-Class",
+        "V 250",
+    }
+    assert service._resolve_model_aliases(region="EU", brand="Mercedes-Benz", model="Vito") == [
+        "Vito"
+    ]

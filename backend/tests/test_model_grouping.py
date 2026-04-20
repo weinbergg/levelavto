@@ -68,6 +68,20 @@ def test_model_grouping_mercedes_class_family_merges_coupe_variants():
     assert {m["value"] for m in gle_group["models"]} == {"GLE-Class", "GLE Coupe"}
 
 
+def test_model_grouping_mercedes_keeps_vito_separate_from_v_class_family():
+    service = CarsService(db=None)  # type: ignore[arg-type]
+    models = [
+        {"value": "V-Class", "label": "V-Class", "count": 12},
+        {"value": "V 250", "label": "V 250", "count": 5},
+        {"value": "Vito", "label": "Vito", "count": 9},
+    ]
+    groups = service.build_model_groups(brand="Mercedes-Benz", models=models)
+    v_class_group = next(g for g in groups if g["label"] == "V-Class")
+    vito_group = next(g for g in groups if g["label"] == "Vito")
+    assert {m["value"] for m in v_class_group["models"]} == {"V-Class", "V 250"}
+    assert {m["value"] for m in vito_group["models"]} == {"Vito"}
+
+
 def test_model_grouping_bentley_hp_variants_keep_base_family_label():
     service = CarsService(db=None)  # type: ignore[arg-type]
     models = [

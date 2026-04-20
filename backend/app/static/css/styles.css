@@ -1367,6 +1367,10 @@ html {
   overflow-x: hidden;
   z-index: 70;
 }
+.filters-panel:has(.model-accordion__root[open]),
+.filters-panel:has(.multi-select-menu__root[open]) {
+  overflow: visible;
+}
 .filters-panel__header {
   display: flex;
   align-items: center;
@@ -2138,9 +2142,10 @@ body.filters-open {
 .model-accordion__content {
   min-height: 0;
   overflow: auto;
-  padding: 8px 8px 14px;
+  padding: 8px 8px 88px;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  scroll-padding-bottom: 88px;
 }
 
 .model-accordion__group {
@@ -2220,8 +2225,11 @@ body.filters-open {
 }
 .model-accordion__actions {
   display: flex;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   justify-content: stretch;
-  margin: 0;
+  margin: 16px -8px 0;
   padding: 14px 8px calc(10px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(180deg, rgba(17, 23, 37, 0.72) 0%, rgba(17, 23, 37, 0.96) 22%, #111725 100%);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -4555,11 +4563,20 @@ select:focus {
     border-radius: 16px;
   }
   .field--multi-select,
+  .has-model-accordion,
+  .model-accordion,
+  .model-accordion__root,
   .has-multi-select-menu,
   .multi-select-menu,
   .multi-select-menu__root {
     width: 100%;
     min-width: 0;
+  }
+  .model-accordion__body,
+  .multi-select-menu__body {
+    left: 0;
+    right: 0;
+    max-height: min(54vh, 380px);
   }
   .multi-select-menu__root > summary {
     min-height: 48px;
@@ -4569,17 +4586,21 @@ select:focus {
     line-height: 1.25;
     padding: 12px;
   }
+  .model-accordion__content,
   .multi-select-menu__body {
-    left: 0;
-    right: 0;
-    max-height: min(54vh, 380px);
     padding: 10px 10px 14px;
   }
+  .model-accordion__content {
+    padding-bottom: 88px;
+  }
+  .model-accordion__models,
   .multi-select-menu__options {
     display: grid;
     grid-template-columns: 1fr;
     gap: 8px;
   }
+  .model-accordion__item,
+  .model-accordion__model,
   .multi-select-menu__option,
   .multi-select-menu__clear {
     width: 100%;
@@ -4588,6 +4609,7 @@ select:focus {
     white-space: normal;
     line-height: 1.25;
   }
+  .model-accordion__actions,
   .multi-select-menu__actions {
     margin-left: -10px;
     margin-right: -10px;
