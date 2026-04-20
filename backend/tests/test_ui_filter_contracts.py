@@ -39,6 +39,9 @@ def test_search_template_keeps_core_selects_clickable():
     assert 'name="interior_material"' in template
     assert "payload_deferred or (interior_color_options_eu" in template
     assert 'data-has-eu="{{ 1 if payload_deferred or (seats_options_eu' in template
+    assert '<div class="field field--multi-select"><span class="field-label">Кузов</span>' in template
+    assert '<div class="field field--multi-select"><span class="field-label">Топливо</span>' in template
+    assert template.index('name="q"') < template.index('id="advanced-tech"')
 
 
 def test_js_updates_generation_visibility_and_select_disabled_state():
@@ -63,6 +66,8 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "let specsNode = card.querySelector('.specs')" in script
     assert "function positionFloatingOverlay(" in script
     assert "function bindFloatingOverlayPosition(" in script
+    assert "function findOverlayHost(control)" in script
+    assert "const field = control.closest('.field')" in script
     assert "body.style.bottom = openUp ? `calc(100% + ${gap}px)` : 'auto'" in script
     assert "const ssrHydrated = hydrateCatalogFromSSR()" in script
     assert "if (!ssrHydrated) {" in script
@@ -134,7 +139,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=104' in template
+    assert '/static/js/app.js?v=105' in template
     assert '/static/css/styles.css?v=64' in template
 
 
@@ -155,6 +160,8 @@ def test_catalog_template_does_not_duplicate_visible_interior_hidden_inputs():
     template = _read("app/templates/catalog.html")
     assert "data-chip-input=\"interior_color\"" in template
     assert "data-chip-input=\"interior_material\"" in template
+    assert '<div class="field field--multi-select"><span class="field-label">Кузов</span>' in template
+    assert '<div class="field field--multi-select"><span class="field-label">Топливо</span>' in template
     assert "<span class=\"field-label\">Цвет салона</span>" in template
     assert "<span class=\"field-label\">Материал салона</span>" in template
     assert "'interior_color'" not in template.split("{% set adv_keys = ", 1)[1].split("%}", 1)[0]

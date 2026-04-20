@@ -103,7 +103,7 @@
             </div>
 
             <div class="advanced-row advanced-row--two">
-              <label class="field field--multi-select">Кузов
+              <div class="field field--multi-select"><span class="field-label">Кузов</span>
                 <input type="hidden" name="body_type" value="{{ params.get('body_type','') }}">
                 <select id="search_body_type" data-multi-source-select="body_type" data-multi-placeholder="Любой">
                   <option value="">Любой</option>
@@ -111,7 +111,7 @@
                   <option value="{{ t.value }}" {% if params.get('body_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
                   {% endfor %}
                 </select>
-              </label>
+              </div>
               <label class="field">Состояние
                 <select name="condition">
                   <option value="">Все</option>
@@ -186,6 +186,15 @@
                 {% endfor %}
               </select>
             </label>
+            <label class="field field--full">Ключевые слова
+              <input
+                type="text"
+                name="q"
+                autocomplete="off"
+                placeholder="Например: дизель, 4x4, панорама"
+                value="{{ params.get('q','') }}"
+              >
+            </label>
           </div>
         </div>
       </section>
@@ -195,7 +204,7 @@
         <div class="search-filters search-filters--base">
           <div class="advanced-basic">
             <div class="advanced-row advanced-row--three">
-              <label class="field field--multi-select">Топливо
+              <div class="field field--multi-select"><span class="field-label">Топливо</span>
                 <input type="hidden" name="engine_type" value="{{ params.get('engine_type','') }}">
                 <select id="search_engine_type" data-multi-source-select="engine_type" data-multi-placeholder="Любое">
                   <option value="">Любое</option>
@@ -203,8 +212,8 @@
                   <option value="{{ t.value }}" {% if params.get('engine_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
                   {% endfor %}
                 </select>
-              </label>
-              <label class="field field--multi-select">Трансмиссия
+              </div>
+              <div class="field field--multi-select"><span class="field-label">Трансмиссия</span>
                 <input type="hidden" name="transmission" value="{{ params.get('transmission','') }}">
                 <select id="search_transmission" data-multi-source-select="transmission" data-multi-placeholder="Любая">
                   <option value="">Любая</option>
@@ -212,8 +221,8 @@
                   <option value="{{ t.value }}" {% if params.get('transmission') == t.value %}selected{% endif %}>{{ t.label }}</option>
                   {% endfor %}
                 </select>
-              </label>
-              <label class="field field--multi-select">Привод
+              </div>
+              <div class="field field--multi-select"><span class="field-label">Привод</span>
                 <input type="hidden" name="drive_type" value="{{ params.get('drive_type','') }}">
                 <select id="search_drive_type" data-multi-source-select="drive_type" data-multi-placeholder="Любой">
                   <option value="">Любой</option>
@@ -221,7 +230,7 @@
                   <option value="{{ t.value }}" {% if params.get('drive_type') == t.value %}selected{% endif %}>{{ t.label }}</option>
                   {% endfor %}
                 </select>
-              </label>
+              </div>
             </div>
 
             <div class="advanced-row advanced-row--two">
@@ -476,23 +485,6 @@
                 <option value="1" {% if params.get('vat_reclaimable') == '1' %}selected{% endif %}>Возмещается</option>
                 <option value="0" {% if params.get('vat_reclaimable') == '0' %}selected{% endif %}>Не возмещается</option>
               </select>
-            </label>
-          </div>
-        </div>
-      </section>
-
-      <section class="advanced-section" id="advanced-keywords">
-        <h2 class="advanced-section__title">Поиск по ключевым словам</h2>
-        <div class="search-filters search-filters--base">
-          <div class="advanced-basic">
-            <label class="field field--full">Ключевые слова
-              <input
-                type="text"
-                name="q"
-                autocomplete="off"
-                placeholder="Например: дизель, 4x4, панорама"
-                value="{{ params.get('q','') }}"
-              >
             </label>
           </div>
         </div>

@@ -811,6 +811,15 @@
     return match ? String(match.textContent || match.value || '').trim() : value
   }
 
+  function findOverlayHost(control) {
+    if (!control) return null
+    const field = control.closest('.field')
+    if (field) return field
+    const label = control.closest('label')
+    if (label) return label
+    return control.closest('.search-row')
+  }
+
   function positionFloatingOverlay(root, body, { gap = 8, minVisible = 220, maxHeight = 420 } = {}) {
     if (!root || !body) return
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
@@ -849,7 +858,7 @@
       const name = select.dataset.multiSourceSelect || ''
       const input = name ? qs(`input[name="${name}"]`, scope) : null
       if (!name || !input) return
-      const host = select.closest('.field, label, .search-row')
+      const host = findOverlayHost(select)
       if (!host) return
       let container = host.querySelector(`[data-multi-menu-for="${name}"]`)
       if (!container) {
@@ -2610,7 +2619,7 @@
     }
 
     const removeAccordion = () => {
-      const host = select.closest('.field, label, .search-row')
+      const host = findOverlayHost(select)
       const key = select.id || select.name || 'model'
       const container = host?.querySelector?.(`[data-model-accordion-for="${key}"]`)
       if (container) container.remove()
@@ -2672,7 +2681,7 @@
         removeAccordion()
         return
       }
-      const host = select.closest('.field, label, .search-row')
+      const host = findOverlayHost(select)
       if (!host) return
       let container = host.querySelector(`[data-model-accordion-for="${select.id || select.name || 'model'}"]`)
       if (!container) {
