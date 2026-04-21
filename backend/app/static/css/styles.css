@@ -1367,10 +1367,6 @@ html {
   overflow-x: hidden;
   z-index: 70;
 }
-.filters-panel:has(.model-accordion__root[open]),
-.filters-panel:has(.multi-select-menu__root[open]) {
-  overflow: visible;
-}
 .filters-panel__header {
   display: flex;
   align-items: center;

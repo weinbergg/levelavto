@@ -820,14 +820,16 @@
     return control.closest('.search-row')
   }
 
-  function positionFloatingOverlay(root, body, { gap = 8, minVisible = 220, maxHeight = 420 } = {}) {
+  function positionFloatingOverlay(root, body, { gap = 8, minVisible = 220, maxHeight = 420, boundsEl = null } = {}) {
     if (!root || !body) return
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
-    if (!viewportHeight) return
     const rect = root.getBoundingClientRect()
     const safeGap = 12
-    const spaceBelow = Math.max(0, viewportHeight - rect.bottom - safeGap)
-    const spaceAbove = Math.max(0, rect.top - safeGap)
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+    const boundsRect = boundsEl?.getBoundingClientRect?.() || null
+    const topLimit = boundsRect ? (boundsRect.top + safeGap) : safeGap
+    const bottomLimit = boundsRect ? (boundsRect.bottom - safeGap) : Math.max(safeGap, viewportHeight - safeGap)
+    const spaceBelow = Math.max(0, bottomLimit - rect.bottom)
+    const spaceAbove = Math.max(0, rect.top - topLimit)
     const openUp = spaceBelow < minVisible && spaceAbove > spaceBelow
     const available = openUp ? spaceAbove : spaceBelow
     const appliedMaxHeight = Math.max(160, Math.min(maxHeight, Math.max(available, 160)))
@@ -905,7 +907,7 @@
         container.__optionsWrap = optionsWrap
         container.__applyBtn = applyBtn
         container.__draft = new Set(parseSelectedCsvValues(input))
-        bindFloatingOverlayPosition(root, body, { maxHeight: 420 })
+        bindFloatingOverlayPosition(root, body, { maxHeight: 420, boundsEl: root.closest('.filters-panel') || null })
 
         const syncState = () => {
           const items = getMultiSelectItems(select)
@@ -2726,7 +2728,7 @@
       rootBody.appendChild(contentWrap)
       root.appendChild(rootBody)
       container.appendChild(root)
-      bindFloatingOverlayPosition(root, rootBody, { maxHeight: 440 })
+      bindFloatingOverlayPosition(root, rootBody, { maxHeight: 440, boundsEl: root.closest('.filters-panel') || null })
       if (!container.dataset.outsideBound) {
         document.addEventListener('click', (event) => {
           if (!container.contains(event.target)) {

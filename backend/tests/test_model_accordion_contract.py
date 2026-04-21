@@ -44,7 +44,6 @@ def test_css_has_model_accordion_styles():
 
 def test_css_keeps_filter_panel_dropdowns_unclipped():
     css = _read("app/static/css/styles.css")
-    assert ".filters-panel:has(.model-accordion__root[open])" in css
-    assert ".filters-panel:has(.multi-select-menu__root[open])" in css
-    assert "overflow: visible;" in css
+    assert ".filters-panel {" in css
+    assert "overflow-y: auto;" in css
     assert "scroll-padding-bottom: 88px;" in css

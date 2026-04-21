@@ -68,6 +68,8 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "function bindFloatingOverlayPosition(" in script
     assert "function findOverlayHost(control)" in script
     assert "const field = control.closest('.field')" in script
+    assert "const boundsRect = boundsEl?.getBoundingClientRect?.() || null" in script
+    assert "boundsEl: root.closest('.filters-panel') || null" in script
     assert "body.style.bottom = openUp ? `calc(100% + ${gap}px)` : 'auto'" in script
     assert "const ssrHydrated = hydrateCatalogFromSSR()" in script
     assert "if (!ssrHydrated) {" in script
@@ -139,8 +141,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=105' in template
-    assert '/static/css/styles.css?v=64' in template
+    assert '/static/js/app.js?v=106' in template
+    assert '/static/css/styles.css?v=65' in template
 
 
 def test_main_enables_gzip_for_large_html_and_api_payloads():
@@ -263,6 +265,7 @@ def test_model_group_summary_has_visible_selected_states():
     assert ".advanced-row > .field:has(.multi-select-menu__root[open])" in css
     assert ".multi-select-menu--fuel .multi-select-menu__option" in css
     assert "grid-template-columns: 18px minmax(0, 1fr);" in css
+    assert "overflow-y: auto;" in css
 
 
 def test_price_note_matches_price_scale():
