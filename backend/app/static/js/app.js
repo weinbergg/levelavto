@@ -92,7 +92,7 @@
   }
 
   const THUMB_REV = '4'
-  const DETAIL_PRIMARY_WIDTH = 960
+  const DETAIL_PRIMARY_WIDTH = 640
 
   function tryParseUrl(url) {
     try {
@@ -713,14 +713,36 @@
     })
   }
 
-  function syncChoiceInputOptions(scope, inputName, items) {
+  function readRenderedChoiceChipItems(container) {
+    if (!container) return []
+    const seen = new Set()
+    return qsa('.choice-chip', container).reduce((acc, chip) => {
+      const value = String(chip?.dataset?.value || '').trim()
+      if (!value || seen.has(value)) return acc
+      seen.add(value)
+      const item = {
+        value,
+        label: String(chip?.dataset?.label || chip.textContent || value).trim() || value,
+      }
+      const chipColor = chip.style?.getPropertyValue?.('--chip-color') || ''
+      if (chipColor) item.hex = chipColor.trim()
+      acc.push(item)
+      return acc
+    }, [])
+  }
+
+  function syncChoiceInputOptions(scope, inputName, items, { preserveExistingOnEmpty = false } = {}) {
     if (!scope || !inputName) return
     const wrap = qs(`[data-chip-input="${inputName}"]`, scope)
     if (!wrap) return
-    renderChoiceChips(wrap, items || [])
+    const nextItems = Array.isArray(items) ? items : []
+    const safeItems = nextItems.length || !preserveExistingOnEmpty
+      ? nextItems
+      : readRenderedChoiceChipItems(wrap)
+    renderChoiceChips(wrap, safeItems)
     const input = qs(`input[name="${inputName}"]`, scope)
     if (!input) return
-    const allowed = new Set((items || []).map((item) => item.value))
+    const allowed = new Set((safeItems || []).map((item) => item.value))
     const selected = parseSelectedCsvValues(input)
     if (!selected.length) return
     const nextSelected = selected.filter((value) => allowed.has(value))
@@ -2053,8 +2075,9 @@
         setSelectOptions(qs('[data-multi-source-select="engine_type"]', filtersForm), data.engine_types || [], { emptyLabel: 'Любое' })
         setSelectOptions(qs('[data-multi-source-select="transmission"]', filtersForm), data.transmissions || [], { emptyLabel: 'Любая' })
         setSelectOptions(qs('[data-multi-source-select="drive_type"]', filtersForm), data.drive_types || [], { emptyLabel: 'Любой' })
-        syncChoiceInputOptions(filtersForm, 'interior_color', data.interior_color_options || [])
-        syncChoiceInputOptions(filtersForm, 'interior_material', data.interior_material_options || [])
+        const preserveChoiceChips = filtersForm.dataset.baseHydrated !== '1'
+        syncChoiceInputOptions(filtersForm, 'interior_color', data.interior_color_options || [], { preserveExistingOnEmpty: preserveChoiceChips })
+        syncChoiceInputOptions(filtersForm, 'interior_material', data.interior_material_options || [], { preserveExistingOnEmpty: preserveChoiceChips })
         setSelectOptions(qs('#reg-year-min'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         setSelectOptions(qs('#reg-year-max'), data.reg_years || [], { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
         const countrySelect = qs('#country')
@@ -3304,6 +3327,21 @@
       }
     }
 
+    const readCurrentSelectOptions = (select) => {
+      if (!select) return []
+      const seen = new Set()
+      return Array.from(select.options || []).reduce((acc, option) => {
+        const value = String(option?.value || '').trim()
+        if (!value || seen.has(value)) return acc
+        seen.add(value)
+        acc.push({
+          value,
+          label: String(option?.textContent || value).trim() || value,
+        })
+        return acc
+      }, [])
+    }
+
     const setRegionSelectOptions = (select, options) => {
       if (!select) return
       const current = select.value
@@ -3374,16 +3412,35 @@
     }
 
     const applyBasicOptions = (data) => {
-      if (!data) return
-      setSelectOptions(regionEuSelect, Array.isArray(data.countries) ? data.countries : [], { emptyLabel: 'Все страны' })
-      setSelectOptions(qs('[data-multi-source-select="body_type"]', form), Array.isArray(data.body_types) ? data.body_types : [], { emptyLabel: 'Любой' })
-      setSelectOptions(qs('select[name="generation"]', form), Array.isArray(data.generations) ? data.generations : [], { emptyLabel: 'Любое' })
-      setSelectOptions(qs('[data-multi-source-select="engine_type"]', form), Array.isArray(data.engine_types) ? data.engine_types : [], { emptyLabel: 'Любое' })
-      setSelectOptions(qs('[data-multi-source-select="transmission"]', form), Array.isArray(data.transmissions) ? data.transmissions : [], { emptyLabel: 'Любая' })
-      setSelectOptions(qs('[data-multi-source-select="drive_type"]', form), Array.isArray(data.drive_types) ? data.drive_types : [], { emptyLabel: 'Любой' })
-      if (Array.isArray(data.reg_years) && data.reg_years.length) {
-        setSelectOptions(qs('#reg-year-min', form), data.reg_years, { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
-        setSelectOptions(qs('#reg-year-max', form), data.reg_years, { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
+      if (!data) return false
+      const payloadHydrated = form.dataset.payloadHydrated === '1'
+      let hadLivePayload = false
+      const fallbackOptions = (items, fallback = []) => {
+        const next = Array.isArray(items) ? items : []
+        if (next.length) {
+          hadLivePayload = true
+          return next
+        }
+        return payloadHydrated ? next : fallback
+      }
+      const bodyTypeSelect = qs('[data-multi-source-select="body_type"]', form)
+      const generationSelect = qs('select[name="generation"]', form)
+      const engineTypeSelect = qs('[data-multi-source-select="engine_type"]', form)
+      const transmissionSelect = qs('[data-multi-source-select="transmission"]', form)
+      const driveTypeSelect = qs('[data-multi-source-select="drive_type"]', form)
+      const regYearMin = qs('#reg-year-min', form)
+      const regYearMax = qs('#reg-year-max', form)
+
+      setSelectOptions(regionEuSelect, fallbackOptions(data.countries, readCurrentSelectOptions(regionEuSelect)), { emptyLabel: 'Все страны' })
+      setSelectOptions(bodyTypeSelect, fallbackOptions(data.body_types, readCurrentSelectOptions(bodyTypeSelect)), { emptyLabel: 'Любой' })
+      setSelectOptions(generationSelect, fallbackOptions(data.generations, readCurrentSelectOptions(generationSelect)), { emptyLabel: 'Любое' })
+      setSelectOptions(engineTypeSelect, fallbackOptions(data.engine_types, readCurrentSelectOptions(engineTypeSelect)), { emptyLabel: 'Любое' })
+      setSelectOptions(transmissionSelect, fallbackOptions(data.transmissions, readCurrentSelectOptions(transmissionSelect)), { emptyLabel: 'Любая' })
+      setSelectOptions(driveTypeSelect, fallbackOptions(data.drive_types, readCurrentSelectOptions(driveTypeSelect)), { emptyLabel: 'Любой' })
+      const regYears = fallbackOptions(data.reg_years, readCurrentSelectOptions(regYearMin))
+      if (regYears.length) {
+        setSelectOptions(regYearMin, regYears, { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
+        setSelectOptions(regYearMax, regYears, { emptyLabel: 'Не важно', labelKey: 'value', valueKey: 'value' })
       }
       const colorInput = qs('input[name="color"]', form)
       const basicWrap = qs('.color-swatches--basic[data-color-chips]', form)
@@ -3391,6 +3448,7 @@
       const toggle = qs('[data-colors-toggle][data-target="colors-extra-search"]', form)
       const basic = Array.isArray(data.colors_basic) ? data.colors_basic : []
       const extra = Array.isArray(data.colors_other) ? data.colors_other : []
+      if (basic.length || extra.length) hadLivePayload = true
       if (basicWrap && (basic.length || !basicWrap.children.length)) rebuildColorChipGroup(basicWrap, basic)
       if (extraWrap && (extra.length || !extraWrap.children.length)) rebuildColorChipGroup(extraWrap, extra)
       if (toggle) {
@@ -3425,11 +3483,13 @@
       syncChoiceChips(form)
       syncMultiSelectMenus(form)
       syncAdvancedGenerationVisibility()
+      return hadLivePayload
     }
 
     const applyPayloadOptions = async (data, reqId = '') => {
       if (!data) return
-      applyBasicOptions(data)
+      let payloadHydrated = applyBasicOptions(data)
+      const isInitialPayloadMerge = form.dataset.payloadHydrated !== '1'
       await refreshSearchRowsOptions(Array.isArray(data.brands) ? data.brands : [], reqId)
       qsa('[data-region-options]', form).forEach((select) => {
         const name = select.getAttribute('name') || ''
@@ -3437,12 +3497,18 @@
         if (!base) return
         const eu = Array.isArray(data[`${base}_eu`]) ? data[`${base}_eu`] : []
         const kr = Array.isArray(data[`${base}_kr`]) ? data[`${base}_kr`] : []
-        select.dataset.optionsEu = JSON.stringify(eu)
-        select.dataset.optionsKr = JSON.stringify(kr)
+        const preserved = isInitialPayloadMerge && !eu.length && !kr.length
+        const existingEu = parseOptions(select.dataset.optionsEu)
+        const existingKr = parseOptions(select.dataset.optionsKr)
+        const nextEu = preserved ? (existingEu.length ? existingEu : readCurrentSelectOptions(select)) : eu
+        const nextKr = preserved ? existingKr : kr
+        if (eu.length || kr.length) payloadHydrated = true
+        select.dataset.optionsEu = JSON.stringify(nextEu)
+        select.dataset.optionsKr = JSON.stringify(nextKr)
         const label = select.closest('label')
         if (label) {
-          label.dataset.hasEu = eu.length ? '1' : '0'
-          label.dataset.hasKr = kr.length ? '1' : '0'
+          label.dataset.hasEu = nextEu.length ? '1' : '0'
+          label.dataset.hasKr = nextKr.length ? '1' : '0'
         }
       })
       qsa('[data-region-chip-options]', form).forEach((wrap) => {
@@ -3450,12 +3516,18 @@
         if (!base) return
         const eu = Array.isArray(data[`${base}_eu`]) ? data[`${base}_eu`] : []
         const kr = Array.isArray(data[`${base}_kr`]) ? data[`${base}_kr`] : []
-        wrap.dataset.optionsEu = JSON.stringify(eu)
-        wrap.dataset.optionsKr = JSON.stringify(kr)
+        const preserved = isInitialPayloadMerge && !eu.length && !kr.length
+        const existingEu = parseOptions(wrap.dataset.optionsEu)
+        const existingKr = parseOptions(wrap.dataset.optionsKr)
+        const nextEu = preserved ? (existingEu.length ? existingEu : readRenderedChoiceChipItems(wrap)) : eu
+        const nextKr = preserved ? existingKr : kr
+        if (eu.length || kr.length) payloadHydrated = true
+        wrap.dataset.optionsEu = JSON.stringify(nextEu)
+        wrap.dataset.optionsKr = JSON.stringify(nextKr)
         const field = wrap.closest('[data-has-eu]')
         if (field) {
-          field.dataset.hasEu = eu.length ? '1' : '0'
-          field.dataset.hasKr = kr.length ? '1' : '0'
+          field.dataset.hasEu = nextEu.length ? '1' : '0'
+          field.dataset.hasKr = nextKr.length ? '1' : '0'
         }
       })
       qsa('.advanced-section', form).forEach((section) => {
@@ -3476,6 +3548,9 @@
         section.dataset.hasEu = hasEu ? '1' : '0'
         section.dataset.hasKr = hasKr ? '1' : '0'
       })
+      if (payloadHydrated) {
+        form.dataset.payloadHydrated = '1'
+      }
       updateRegionFilters()
     }
 

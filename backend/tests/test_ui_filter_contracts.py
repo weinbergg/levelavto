@@ -55,6 +55,7 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "syncChoiceChips" in script
     assert "bindMultiSelectMenus" in script
     assert "syncMultiSelectMenus" in script
+    assert "readRenderedChoiceChipItems" in script
     assert 'className = \'multi-select-menu__apply\'' in script or 'className = "multi-select-menu__apply"' in script
     assert "container.classList.toggle('multi-select-menu--fuel', name === 'engine_type')" in script
     assert "clearBtn.textContent = 'Сбросить выбор'" in script
@@ -141,8 +142,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=106' in template
-    assert '/static/css/styles.css?v=65' in template
+    assert '/static/js/app.js?v=107' in template
+    assert '/static/css/styles.css?v=66' in template
 
 
 def test_main_enables_gzip_for_large_html_and_api_payloads():
@@ -744,7 +745,7 @@ def test_catalog_cards_stay_rub_only_and_detail_primary_prefers_thumb_with_orig_
     script = _read("app/static/js/app.js")
     pages = _read("app/routers/pages.py")
     assert "{% elif car.price %}" not in catalog_template
-    assert "primary_thumb_src = thumbs.thumb_src(primary_raw, 960, 5)" in detail_template
+    assert "primary_thumb_src = thumbs.thumb_src(primary_raw, 640, 5)" in detail_template
     assert "{% set primary_src = primary_thumb_src %}" in detail_template
     assert 'fetchpriority="high"' in detail_template
     assert "data-thumb=\"{{ primary_thumb_src or '' }}\"" in detail_template
@@ -752,6 +753,19 @@ def test_catalog_cards_stay_rub_only_and_detail_primary_prefers_thumb_with_orig_
     assert "if os.getenv(\"DETAIL_REFRESH_SIMILAR_PRICES\", \"0\") == \"1\":" in pages
     assert "applyThumbFallback(primary)" in script
     assert "ordered_images = sorted(" in pages
+    assert "detail_images = [resolved_thumb] + [u for u in detail_images if u != resolved_thumb]" in pages
+    assert "0 if (thumbnail_key and pair[1] == thumbnail_key) else 1" in pages
+
+
+def test_advanced_search_preserves_server_rendered_filter_options_until_first_live_payload():
+    script = _read("app/static/js/app.js")
+    assert "readCurrentSelectOptions" in script
+    assert "form.dataset.payloadHydrated === '1'" in script
+    assert "const isInitialPayloadMerge = form.dataset.payloadHydrated !== '1'" in script
+    assert "const preserved = isInitialPayloadMerge && !eu.length && !kr.length" in script
+    assert "readRenderedChoiceChipItems(wrap)" in script
+    assert "filtersForm.dataset.baseHydrated !== '1'" in script
+    assert "preserveExistingOnEmpty: preserveChoiceChips" in script
 
 
 def test_count_cars_keeps_interior_filters_in_count_path():

@@ -2238,7 +2238,9 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
                 car.thumbnail_url = resolved_thumb
                 if local_detail:
                     detail_images = [local_detail] + [u for u in detail_images if u != local_detail]
-                elif not detail_images:
+                elif detail_images:
+                    detail_images = [resolved_thumb] + [u for u in detail_images if u != resolved_thumb]
+                else:
                     detail_images.insert(0, resolved_thumb)
         except Exception:
             pass
@@ -2260,7 +2262,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
                     indexed_images,
                     key=lambda pair: (
                         0 if str(pair[1]).startswith("/media/") else 1,
-                        1 if (thumbnail_key and pair[1] == thumbnail_key and len(detail_images) > 1) else 0,
+                        0 if (thumbnail_key and pair[1] == thumbnail_key) else 1,
                         pair[0],
                     ),
                 )
