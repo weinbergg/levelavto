@@ -144,7 +144,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=108' in template
+    assert '/static/js/app.js?v=109' in template
     assert '/static/css/styles.css?v=66' in template
 
 
@@ -748,14 +748,16 @@ def test_catalog_cards_stay_rub_only_and_detail_primary_prefers_thumb_with_orig_
     pages = _read("app/routers/pages.py")
     assert "{% elif car.price %}" not in catalog_template
     assert "primary_thumb_src = thumbs.thumb_src(primary_raw, 640, 5)" in detail_template
-    assert "{% set primary_src = primary_raw or primary_thumb_src %}" in detail_template
+    assert "{% set primary_fast_src = (car.thumbnail_url or primary_thumb_src or '')|trim %}" in detail_template
+    assert "{% set primary_src = primary_fast_src or primary_raw %}" in detail_template
     assert 'fetchpriority="high"' in detail_template
-    assert "data-thumb=\"{{ primary_thumb_src or '' }}\"" in detail_template
+    assert "data-thumb=\"{{ primary_fast_src or primary_thumb_src or '' }}\"" in detail_template
     assert "if (!img.dataset.thumbFallbackTried" in script
     assert "if os.getenv(\"DETAIL_REFRESH_SIMILAR_PRICES\", \"0\") == \"1\":" in pages
-    assert "applyThumbFallback(primary, { thumbProxy: false })" in script
+    assert "applyThumbFallback(primary)" in script
     assert "img.src = nextOrig || nextThumb" in script
-    assert "applyThumbFallback(img, { thumbProxy: false })" in script
+    assert "applyThumbFallback(img)" in script
+    assert "const renderedSrc = img.getAttribute('src') || ''" in script
     assert "ordered_images = sorted(" in pages
     assert "detail_images = [resolved_thumb] + [u for u in detail_images if u != resolved_thumb]" in pages
     assert "0 if (thumbnail_key and pair[1] == thumbnail_key) else 1" in pages

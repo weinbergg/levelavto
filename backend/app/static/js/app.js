@@ -4334,8 +4334,11 @@
         if (i === idx) move(1)
       })
     })
-    setImageByIndex(idx)
-    applyThumbFallback(img, { thumbProxy: false })
+    if (isUsable(images[idx])) {
+      img.dataset.orig = images[idx]
+      img.dataset.thumb = normalizeThumbUrl(images[idx], { thumb: true, width: DETAIL_PRIMARY_WIDTH })
+    }
+    applyThumbFallback(img)
     refreshGalleryChrome()
     prevBtn?.addEventListener('click', (e) => {
       e.preventDefault()
@@ -4372,9 +4375,10 @@
     })
     syncActive()
     refreshGalleryChrome()
-    if (isUsable(images[idx])) {
+    const renderedSrc = img.getAttribute('src') || ''
+    if ((!renderedSrc || normalizeThumbUrl(renderedSrc) === '/static/img/no-photo.svg') && isUsable(images[idx])) {
       setImageByIndex(idx)
-    } else {
+    } else if (!renderedSrc || normalizeThumbUrl(renderedSrc) === '/static/img/no-photo.svg') {
       move(1)
     }
   }
@@ -4408,7 +4412,7 @@
   function initThumbFallbacks() {
     qsa('img.thumb').forEach((img) => applyThumbFallback(img))
     const primary = qs('#primaryImage')
-    if (primary) applyThumbFallback(primary, { thumbProxy: false })
+    if (primary) applyThumbFallback(primary)
   }
 
   function initAll() {
