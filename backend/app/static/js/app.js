@@ -3304,6 +3304,7 @@
     if (!form) return
     if (form.dataset.initialized === '1') return
     form.dataset.initialized = '1'
+    const enableDynamicPayload = form.dataset.dynamicPayload === '1'
     const rowsWrap = qs('#search-rows')
     const template = qs('#search-row-template')
     const addBtn = qs('#add-search-row')
@@ -3995,6 +3996,7 @@
     }
 
     const scheduleOptionsRefresh = () => {
+      if (!enableDynamicPayload) return
       clearTimeout(optionsDebounce)
       optionsDebounce = setTimeout(() => {
         loadPayloadOptions()
@@ -4122,7 +4124,9 @@
     }
     updateRegionSub()
     updateRegionFilters()
-    loadPayloadOptions()
+    if (enableDynamicPayload) {
+      loadPayloadOptions()
+    }
     syncAdvancedGenerationVisibility()
     bindRegMonthState(form)
     bindColorChips(form, () => {
@@ -4305,8 +4309,8 @@
       delete img.dataset.thumbRetried
       delete img.dataset.thumbFallbackTried
       delete img.dataset.fallbackApplied
-      img.src = nextThumb && nextThumb !== '/static/img/no-photo.svg' ? nextThumb : nextOrig
-      applyThumbFallback(img)
+      img.src = nextOrig || nextThumb
+      applyThumbFallback(img, { thumbProxy: false })
       syncActive()
     }
     const move = (step) => {
@@ -4331,7 +4335,7 @@
       })
     })
     setImageByIndex(idx)
-    applyThumbFallback(img)
+    applyThumbFallback(img, { thumbProxy: false })
     refreshGalleryChrome()
     prevBtn?.addEventListener('click', (e) => {
       e.preventDefault()
@@ -4404,7 +4408,7 @@
   function initThumbFallbacks() {
     qsa('img.thumb').forEach((img) => applyThumbFallback(img))
     const primary = qs('#primaryImage')
-    if (primary) applyThumbFallback(primary)
+    if (primary) applyThumbFallback(primary, { thumbProxy: false })
   }
 
   function initAll() {

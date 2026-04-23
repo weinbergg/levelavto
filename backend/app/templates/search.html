@@ -7,7 +7,7 @@
       <h1>Расширенный поиск</h1>
       <p class="muted">Настройте параметры и перейдите в каталог с примененными фильтрами.</p>
     </div>
-    <form id="advanced-search-form" method="get" action="/catalog">
+    <form id="advanced-search-form" method="get" action="/catalog" data-dynamic-payload="0">
       {% set params = request.query_params %}
       <div class="advanced-lines">
         <div class="search-filters search-filters--lines">
@@ -56,6 +56,23 @@
           </div>
         </div>
       </div>
+
+      <section class="advanced-section" id="advanced-keywords">
+        <h2 class="advanced-section__title">Поиск по ключевым словам</h2>
+        <div class="search-filters search-filters--base">
+          <div class="advanced-basic">
+            <label class="field field--full">Ключевые слова
+              <input
+                type="text"
+                name="q"
+                autocomplete="off"
+                placeholder="Например: дизель, 4x4, панорама"
+                value="{{ params.get('q','') }}"
+              >
+            </label>
+          </div>
+        </div>
+      </section>
 
       <section class="advanced-section" id="advanced-base">
         <h2 class="advanced-section__title">Основные данные</h2>
@@ -185,15 +202,6 @@
                 <option value="{{ g }}" {% if params.get('generation') == g %}selected{% endif %}>{{ g }}</option>
                 {% endfor %}
               </select>
-            </label>
-            <label class="field field--full">Ключевые слова
-              <input
-                type="text"
-                name="q"
-                autocomplete="off"
-                placeholder="Например: дизель, 4x4, панорама"
-                value="{{ params.get('q','') }}"
-              >
             </label>
           </div>
         </div>

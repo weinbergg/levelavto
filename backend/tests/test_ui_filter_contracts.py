@@ -41,6 +41,8 @@ def test_search_template_keeps_core_selects_clickable():
     assert 'data-has-eu="{{ 1 if payload_deferred or (seats_options_eu' in template
     assert '<div class="field field--multi-select"><span class="field-label">Кузов</span>' in template
     assert '<div class="field field--multi-select"><span class="field-label">Топливо</span>' in template
+    assert 'id="advanced-keywords"' in template
+    assert 'data-dynamic-payload="0"' in template
     assert template.index('name="q"') < template.index('id="advanced-tech"')
 
 
@@ -142,7 +144,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=107' in template
+    assert '/static/js/app.js?v=108' in template
     assert '/static/css/styles.css?v=66' in template
 
 
@@ -746,12 +748,14 @@ def test_catalog_cards_stay_rub_only_and_detail_primary_prefers_thumb_with_orig_
     pages = _read("app/routers/pages.py")
     assert "{% elif car.price %}" not in catalog_template
     assert "primary_thumb_src = thumbs.thumb_src(primary_raw, 640, 5)" in detail_template
-    assert "{% set primary_src = primary_thumb_src %}" in detail_template
+    assert "{% set primary_src = primary_raw or primary_thumb_src %}" in detail_template
     assert 'fetchpriority="high"' in detail_template
     assert "data-thumb=\"{{ primary_thumb_src or '' }}\"" in detail_template
     assert "if (!img.dataset.thumbFallbackTried" in script
     assert "if os.getenv(\"DETAIL_REFRESH_SIMILAR_PRICES\", \"0\") == \"1\":" in pages
-    assert "applyThumbFallback(primary)" in script
+    assert "applyThumbFallback(primary, { thumbProxy: false })" in script
+    assert "img.src = nextOrig || nextThumb" in script
+    assert "applyThumbFallback(img, { thumbProxy: false })" in script
     assert "ordered_images = sorted(" in pages
     assert "detail_images = [resolved_thumb] + [u for u in detail_images if u != resolved_thumb]" in pages
     assert "0 if (thumbnail_key and pair[1] == thumbnail_key) else 1" in pages
@@ -759,6 +763,7 @@ def test_catalog_cards_stay_rub_only_and_detail_primary_prefers_thumb_with_orig_
 
 def test_advanced_search_preserves_server_rendered_filter_options_until_first_live_payload():
     script = _read("app/static/js/app.js")
+    template = _read("app/templates/search.html")
     assert "readCurrentSelectOptions" in script
     assert "form.dataset.payloadHydrated === '1'" in script
     assert "const isInitialPayloadMerge = form.dataset.payloadHydrated !== '1'" in script
@@ -766,6 +771,9 @@ def test_advanced_search_preserves_server_rendered_filter_options_until_first_li
     assert "readRenderedChoiceChipItems(wrap)" in script
     assert "filtersForm.dataset.baseHydrated !== '1'" in script
     assert "preserveExistingOnEmpty: preserveChoiceChips" in script
+    assert "const enableDynamicPayload = form.dataset.dynamicPayload === '1'" in script
+    assert "if (!enableDynamicPayload) return" in script
+    assert 'data-dynamic-payload="0"' in template
 
 
 def test_count_cars_keeps_interior_filters_in_count_path():
