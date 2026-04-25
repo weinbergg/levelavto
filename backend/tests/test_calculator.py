@@ -47,3 +47,27 @@ def test_electric_example():
 
 def test_is_bev_ignores_dirty_engine_cc_for_real_evs_with_power():
     assert is_bev(10, 35.3, 48, "Electric") is True
+
+
+def test_is_bev_uses_bmw_ix_hint_when_fuel_string_is_garbage():
+    assert is_bev(
+        None,
+        239.77,
+        326,
+        "based on co₂ emissions (combined)",
+        brand="BMW",
+        model="iX",
+        variant="xDrive40",
+    ) is True
+
+
+def test_is_bev_does_not_treat_hyundai_ix35_as_electric():
+    assert is_bev(
+        None,
+        100.0,
+        136,
+        "",
+        brand="Hyundai",
+        model="ix35",
+        variant="2.0 CRDi",
+    ) is False

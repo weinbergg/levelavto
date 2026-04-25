@@ -3318,6 +3318,14 @@
     const regionKrSelect = qs('[data-kr-type]', form)
     const advancedGenerationSelect = qs('select[name="generation"]', form)
     const advancedGenerationField = advancedGenerationSelect ? advancedGenerationSelect.closest('.field') : null
+    let skipInitialCountFetch = Boolean(countEl?.dataset.count)
+
+    if (countEl && countEl.dataset.count) {
+      const initialCount = Number(countEl.dataset.count || '0')
+      if (Number.isFinite(initialCount) && initialCount >= 0) {
+        countEl.textContent = String(initialCount)
+      }
+    }
 
     const parseOptions = (raw) => {
       try {
@@ -3981,6 +3989,7 @@
     let optionsDebounce
     const scheduleCount = () => {
       if (!countEl) return
+      if (skipInitialCountFetch) return
       clearTimeout(debounce)
       debounce = setTimeout(async () => {
         try {
@@ -4156,6 +4165,9 @@
       syncAdvancedGenerationVisibility()
       scheduleCount()
     })
+    window.setTimeout(() => {
+      skipInitialCountFetch = false
+    }, 0)
     scheduleCount()
   }
 

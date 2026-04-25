@@ -9,6 +9,7 @@ from backend.app.models import Car
 from backend.app.services.calc_debug import build_calc_debug
 from backend.app.services.cars_service import (
     CarsService,
+    electric_vehicle_hint_text,
     effective_engine_cc_value,
     effective_power_hp_value,
     effective_power_kw_value,
@@ -49,6 +50,10 @@ def _classify(car: Car, debug_payload: dict[str, Any] | None, debug_error: str |
         float(effective_power_kw) if effective_power_kw is not None else None,
         float(effective_power_hp) if effective_power_hp is not None else None,
         car.engine_type,
+        brand=car.brand,
+        model=car.model,
+        variant=car.variant,
+        text_hint=electric_vehicle_hint_text(car),
     )
     fallback_marker = _has_fallback_marker(car)
     if car.total_price_rub_cached is None:

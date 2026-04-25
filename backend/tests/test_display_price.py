@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.models.source import Base, Source
 from backend.app.models.car import Car
+from backend.app.services.calculator_config_service import CalculatorConfigService
+from backend.app.services.customs_config import get_customs_config
 from backend.app.services.cars_service import CarsService
 from backend.app.utils.price_utils import display_price_rub
 
@@ -131,6 +133,58 @@ def test_sort_price_asc_includes_raw_price_fx_fallback(monkeypatch):
         items, _ = svc.list_cars(sort="price_asc", page=1, page_size=10, light=True, use_fast_count=False)
         ids = [item["id"] if isinstance(item, dict) else item.id for item in items]
         assert ids == [1, 2, 3]
+
+
+def test_sort_price_asc_treats_zero_price_as_missing(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.add_all(
+            [
+                Car(
+                    id=1,
+                    source_id=1,
+                    external_id="1",
+                    country="DE",
+                    is_available=True,
+                    price=0,
+                    currency="EUR",
+                    price_rub_cached=0,
+                    total_price_rub_cached=0,
+                ),
+                Car(
+                    id=2,
+                    source_id=1,
+                    external_id="2",
+                    country="DE",
+                    is_available=True,
+                    total_price_rub_cached=4_700_000,
+                    price_rub_cached=None,
+                ),
+                Car(
+                    id=3,
+                    source_id=1,
+                    external_id="3",
+                    country="DE",
+                    is_available=True,
+                    price=55_000,
+                    currency="EUR",
+                    price_rub_cached=None,
+                    total_price_rub_cached=None,
+                ),
+            ]
+        )
+        db.commit()
+        svc = CarsService(db)
+        monkeypatch.setattr(
+            svc,
+            "get_fx_rates",
+            lambda allow_fetch=True: {"EUR": 100.0, "USD": 90.0, "CNY": 12.0, "RUB": 1.0},
+        )
+        items, _ = svc.list_cars(sort="price_asc", page=1, page_size=10, light=True, use_fast_count=False)
+        ids = [item["id"] if isinstance(item, dict) else item.id for item in items]
+        assert ids == [2, 3, 1]
 
 
 def test_card_and_detail_use_same_field():
@@ -392,3 +446,64 @@ def test_maybe_infer_specs_for_calc_applies_inference(monkeypatch):
         assert car.inferred_engine_cc == 2993
         assert float(car.inferred_power_hp) == 352.0
         assert float(car.inferred_power_kw) == 258.9
+
+
+def test_ensure_calc_cache_recalculates_stale_equal_total_for_bmw_ix(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.commit()
+
+        svc = CarsService(db)
+        monkeypatch.setattr(
+            svc,
+            "get_fx_rates",
+            lambda allow_fetch=True: {"EUR": 100.0, "USD": 90.0, "CNY": 12.0},
+        )
+        cfg = CalculatorConfigService(db).ensure_default_from_yaml(
+            Path(__file__).resolve().parents[1] / "app" / "config" / "calculator.yml"
+        )
+        assert cfg is not None
+        fx_signature = svc._fx_signature({"EUR": 100.0, "USD": 90.0, "CNY": 12.0})
+        breakdown = [
+            {"title": "__config_version", "amount_rub": 0, "version": cfg.payload.get("meta", {}).get("version")},
+            {"title": "__customs_version", "amount_rub": 0, "version": get_customs_config().version},
+            {"title": "__fx_signature", "amount_rub": 0, "version": fx_signature},
+        ]
+        now = datetime.utcnow()
+        car = Car(
+            id=1,
+            source_id=1,
+            external_id="447996127",
+            country="DE",
+            brand="BMW",
+            model="iX",
+            variant="xDrive40",
+            price=31_512,
+            currency="EUR",
+            price_rub_cached=3_151_200,
+            total_price_rub_cached=3_151_200,
+            calc_breakdown_json=breakdown,
+            calc_updated_at=now,
+            updated_at=now - timedelta(minutes=1),
+            registration_year=2022,
+            registration_month=11,
+            engine_type="based on co₂ emissions (combined)",
+            engine_cc=None,
+            power_hp=326,
+            power_kw=239.77,
+            is_available=True,
+        )
+        db.add(car)
+        db.commit()
+
+        result = svc.ensure_calc_cache(car, force=False)
+
+        assert result is not None
+        assert float(car.total_price_rub_cached) > 3_151_200
+        assert result["total_rub"] == float(car.total_price_rub_cached)
+        assert not any(
+            isinstance(row, dict) and row.get("title") == "__without_util_fee"
+            for row in (car.calc_breakdown_json or [])
+        )

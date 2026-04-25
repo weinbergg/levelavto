@@ -312,6 +312,30 @@ def effective_power_kw_value(record: Any) -> Any:
     return _record_value(record, "inferred_power_kw")
 
 
+def electric_vehicle_hint_text(record: Any) -> str:
+    parts: list[str] = []
+    for field in ("brand", "model", "variant", "source_url", "engine_type"):
+        value = _record_value(record, field)
+        if value not in (None, ""):
+            parts.append(str(value))
+    payload = _record_value(record, "source_payload")
+    if isinstance(payload, dict):
+        for key in (
+            "title",
+            "sub_title",
+            "description",
+            "model",
+            "engine_type",
+            "envkv_engine_type",
+            "envkv_consumption_fuel",
+            "full_fuel_type",
+        ):
+            value = payload.get(key)
+            if value not in (None, ""):
+                parts.append(str(value))
+    return " | ".join(parts)
+
+
 class CarsService:
     _eu_model_donor_cache: TTLCache = TTLCache(maxsize=256, ttl=600)
 
@@ -1452,10 +1476,41 @@ class CarsService:
         return case(*clauses, else_=None)
 
     def _display_price_rub_expr(self):
+        total_expr = case(
+            (
+                and_(
+                    Car.total_price_rub_cached.is_not(None),
+                    Car.total_price_rub_cached > 0,
+                ),
+                Car.total_price_rub_cached,
+            ),
+            else_=None,
+        )
+        price_expr = case(
+            (
+                and_(
+                    Car.price_rub_cached.is_not(None),
+                    Car.price_rub_cached > 0,
+                ),
+                Car.price_rub_cached,
+            ),
+            else_=None,
+        )
+        raw_expr = self._raw_price_rub_expr()
+        raw_positive_expr = case(
+            (
+                and_(
+                    raw_expr.is_not(None),
+                    raw_expr > 0,
+                ),
+                raw_expr,
+            ),
+            else_=None,
+        )
         return func.coalesce(
-            Car.total_price_rub_cached,
-            Car.price_rub_cached,
-            self._raw_price_rub_expr(),
+            total_expr,
+            price_expr,
+            raw_positive_expr,
         )
 
     def _catalog_inline_price_refresh_enabled(self) -> bool:
@@ -2617,6 +2672,17 @@ class CarsService:
         spec_inferred_at = _record_value(record, "spec_inferred_at")
         if total_price_rub_cached is None or calc_breakdown_json is None:
             return True
+        try:
+            if float(total_price_rub_cached) <= 0:
+                raw_price = _record_value(record, "price")
+                price_rub_cached = _record_value(record, "price_rub_cached")
+                if (
+                    (raw_price is not None and float(raw_price) > 0)
+                    or (price_rub_cached is not None and float(price_rub_cached) > 0)
+                ):
+                    return True
+        except Exception:
+            return True
         if calc_updated_at is not None and updated_at is not None:
             if calc_updated_at < updated_at:
                 return True
@@ -2816,6 +2882,10 @@ class CarsService:
             float(effective_power_kw) if effective_power_kw is not None else None,
             float(effective_power_hp) if effective_power_hp is not None else None,
             _record_value(record, "engine_type"),
+            brand=_record_value(record, "brand"),
+            model=_record_value(record, "model"),
+            variant=_record_value(record, "variant"),
+            text_hint=electric_vehicle_hint_text(record),
         )
         if electric:
             return effective_power_hp is not None or effective_power_kw is not None
@@ -2973,6 +3043,14 @@ class CarsService:
                 return False
             if car.total_price_rub_cached is None or car.calc_breakdown_json is None:
                 return True
+            try:
+                if float(car.total_price_rub_cached) <= 0 and (
+                    (car.price is not None and float(car.price) > 0)
+                    or (car.price_rub_cached is not None and float(car.price_rub_cached) > 0)
+                ):
+                    return True
+            except Exception:
+                return True
             if car.calc_updated_at is not None and car.updated_at is not None:
                 if car.calc_updated_at < car.updated_at:
                     return True
@@ -2986,6 +3064,39 @@ class CarsService:
                 return True
             if fx_signature and _extract_version(breakdown, "__fx_signature") != fx_signature:
                 return True
+            try:
+                total_cached = float(car.total_price_rub_cached or 0)
+                price_cached = float(car.price_rub_cached or 0)
+            except Exception:
+                total_cached = 0
+                price_cached = 0
+            if (
+                total_cached > 0
+                and price_cached > 0
+                and abs(total_cached - price_cached) < 1
+                and not _has_without_util_marker(breakdown)
+            ):
+                effective_engine_cc_local = effective_engine_cc_value(car)
+                effective_power_hp_local = effective_power_hp_value(car)
+                effective_power_kw_local = effective_power_kw_value(car)
+                has_power_local = bool(
+                    (effective_power_hp_local is not None and float(effective_power_hp_local) > 0)
+                    or (effective_power_kw_local is not None and float(effective_power_kw_local) > 0)
+                )
+                if has_power_local and (
+                    effective_engine_cc_local is None
+                    or is_bev(
+                        effective_engine_cc_local,
+                        float(effective_power_kw_local) if effective_power_kw_local is not None else None,
+                        float(effective_power_hp_local) if effective_power_hp_local is not None else None,
+                        car.engine_type,
+                        brand=car.brand,
+                        model=car.model,
+                        variant=car.variant,
+                        text_hint=electric_vehicle_hint_text(car),
+                    )
+                ):
+                    return True
             return False
 
         def _fallback_total(reason: str) -> dict | None:
@@ -2996,7 +3107,7 @@ class CarsService:
             cny = fx_local.get("CNY") or 12.0
             total = None
             cur_local = str(car.currency or "EUR").strip().upper()
-            if car.price is not None:
+            if car.price is not None and float(car.price) > 0:
                 if cur_local == "EUR":
                     total = float(car.price) * float(eur)
                 elif cur_local == "USD":
@@ -3005,9 +3116,9 @@ class CarsService:
                     total = float(car.price) * float(cny)
                 elif cur_local in ("RUB", "₽"):
                     total = float(car.price)
-            elif car.price_rub_cached is not None:
+            elif car.price_rub_cached is not None and float(car.price_rub_cached) > 0:
                 total = float(car.price_rub_cached)
-            if total is None:
+            if total is None or total <= 0:
                 return None
             car.total_price_rub_cached = total
             if car.calc_breakdown_json is None:
@@ -3125,7 +3236,7 @@ class CarsService:
         else:
             used_price = car.price
             used_currency = car.currency or "EUR"
-        if not used_price:
+        if used_price is None or float(used_price) <= 0:
             self.logger.info("calc_skip_no_price car=%s src=%s", car.id, getattr(car.source, "key", None))
             return _fallback_total("no_price")
         reg_fallback_missing = False
@@ -3220,6 +3331,10 @@ class CarsService:
             float(effective_power_kw) if effective_power_kw is not None else None,
             float(effective_power_hp) if effective_power_hp is not None else None,
             car.engine_type,
+            brand=car.brand,
+            model=car.model,
+            variant=car.variant,
+            text_hint=electric_vehicle_hint_text(car),
         )
         is_korea = str(car.country or "").upper().startswith("KR")
         if is_korea:

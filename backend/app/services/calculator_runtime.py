@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 import math
+import re
 from decimal import Decimal, ROUND_CEILING
 
 from .customs_config import get_customs_config, calc_duty_eur, calc_util_fee_rub
 from ..utils.range_lookup import lookup_range
 from ..utils.price_utils import get_round_step_rub
+from ..utils.spec_inference import normalize_engine_type, normalize_spec_text
 
 
 @dataclass
@@ -48,17 +50,67 @@ def _calc_age_months(reg_year: Optional[int], reg_month: Optional[int]) -> Optio
         return None
 
 
-def is_bev(engine_cc: Optional[int], power_kw: Optional[float], power_hp: Optional[float], engine_type: Optional[str]) -> bool:
-    if not engine_type:
+_BMW_EV_HINT_RE = re.compile(r"\b(?:i3|i4|i5|i7|ix(?:1|2|3)?|ix)\b", re.IGNORECASE)
+_GENERIC_EV_HINT_RE = re.compile(
+    r"\b(?:e[\s-]?tron|taycan|model\s*(?:3|s|x|y)|eq[a-z0-9]+|ioniq\s*(?:5|6)|ev(?:6|9)|"
+    r"id\.?\s*(?:3|4|5|7)|id\s*buzz|leaf|ariya|i[\s-]?pace|kona\s+electric|niro\s+ev|"
+    r"e[\s-]?2008|e[\s-]?208)\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_bev_by_hint(
+    *,
+    brand: Optional[str] = None,
+    model: Optional[str] = None,
+    variant: Optional[str] = None,
+    text_hint: Optional[str] = None,
+) -> bool:
+    brand_norm = normalize_spec_text(brand)
+    model_norm = normalize_spec_text(model)
+    variant_norm = normalize_spec_text(variant)
+    hint_norm = normalize_spec_text(text_hint)
+    joined = " ".join(part for part in [model_norm, variant_norm, hint_norm] if part).strip()
+    if not joined:
         return False
-    fuel = engine_type.lower()
-    if "hybrid" in fuel or "plug-in" in fuel or "plug in" in fuel or "phev" in fuel:
+    if brand_norm == "bmw" and _BMW_EV_HINT_RE.search(joined):
+        return True
+    return bool(_GENERIC_EV_HINT_RE.search(joined))
+
+
+def is_bev(
+    engine_cc: Optional[int],
+    power_kw: Optional[float],
+    power_hp: Optional[float],
+    engine_type: Optional[str],
+    *,
+    brand: Optional[str] = None,
+    model: Optional[str] = None,
+    variant: Optional[str] = None,
+    text_hint: Optional[str] = None,
+) -> bool:
+    has_power = bool((power_kw and power_kw > 0) or (power_hp and power_hp > 0))
+    if not has_power:
         return False
-    if not (("electric" in fuel) or ("ev" in fuel)):
+    engine_type_norm = normalize_engine_type(engine_type)
+    if engine_type_norm == "hybrid":
         return False
-    if not ((power_kw and power_kw > 0) or (power_hp and power_hp > 0)):
+    if engine_type_norm == "electric":
+        return True
+    if engine_type_norm in {"diesel", "petrol", "lpg"}:
         return False
-    return True
+    try:
+        cc_val = int(engine_cc) if engine_cc is not None else None
+    except Exception:
+        cc_val = None
+    if cc_val is not None and cc_val > 0:
+        return False
+    return _looks_like_bev_by_hint(
+        brand=brand,
+        model=model,
+        variant=variant,
+        text_hint=text_hint,
+    )
 
 
 def choose_scenario(req: EstimateRequest, payload: Dict[str, Any]) -> str:

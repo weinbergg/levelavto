@@ -137,6 +137,8 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
     assert "row.dataset.initialSelectedModels = JSON.stringify(" in script
     assert "const currentSelectedModels = getRowEffectiveSelectedModels(row, modelSelect)" in script
     assert "const selectedModels = getRowEffectiveSelectedModels(row, modelSelect)" in script
+    assert "let skipInitialCountFetch = Boolean(countEl?.dataset.count)" in script
+    assert "if (skipInitialCountFetch) return" in script
     assert "scheduleCount()" in script
     assert "name=\"line_variant\"" not in template
     assert "<label>Вариант</label>" not in template
@@ -144,8 +146,18 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=109' in template
+    assert '/static/js/app.js?v=110' in template
     assert '/static/css/styles.css?v=66' in template
+
+
+def test_deploy_cron_has_midday_public_prewarm():
+    repo_root = Path(__file__).resolve().parents[2]
+    cron = (repo_root / "deploy" / "cron.mobilede").read_text(encoding="utf-8")
+    script = (repo_root / "scripts" / "prewarm_public_site.sh").read_text(encoding="utf-8")
+    assert "0 14 * * *" in cron
+    assert "scripts/prewarm_public_site.sh" in cron
+    assert 'python -m backend.app.scripts.prewarm_cache' in script
+    assert 'PREWARM_INCLUDE_PAYLOAD="${PREWARM_INCLUDE_PAYLOAD:-1}"' in script
 
 
 def test_main_enables_gzip_for_large_html_and_api_payloads():

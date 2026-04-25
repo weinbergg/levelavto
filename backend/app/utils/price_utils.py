@@ -35,7 +35,7 @@ def display_price_rub(
         raw = float(total_price_rub_cached)
     elif allow_price_fallback and price_rub_cached is not None:
         raw = float(price_rub_cached)
-    if raw is None:
+    if raw is None or raw <= 0:
         return None
     return ceil_to_step(raw, get_round_step_rub())
 
@@ -53,6 +53,8 @@ def raw_price_to_rub(
     try:
         amount = float(raw_price)
     except (TypeError, ValueError):
+        return None
+    if amount <= 0:
         return None
     cur = str(currency or "").strip().upper()
     if cur == "EUR" and fx_eur and fx_eur > 0:

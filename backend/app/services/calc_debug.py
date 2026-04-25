@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 
 from ..models.car import Car
-from ..services.cars_service import CarsService
+from ..services.cars_service import CarsService, electric_vehicle_hint_text
 from ..services.calculator_config_service import CalculatorConfigService
 from ..services.calculator_runtime import EstimateRequest, calculate, is_bev
 from ..utils.registration_defaults import get_missing_registration_default
@@ -38,22 +38,27 @@ def build_calc_debug(
     price_net_eur = None
     price_source = None
     if pricing.get("net_eur") is not None:
-        price_net_eur = float(pricing["net_eur"])
-        price_source = "payload.net_eur"
+        candidate = float(pricing["net_eur"])
+        if candidate > 0:
+            price_net_eur = candidate
+            price_source = "payload.net_eur"
     elif pricing.get("gross_eur") is not None:
-        price_net_eur = float(pricing["gross_eur"])
-        price_source = "payload.gross_eur"
+        candidate = float(pricing["gross_eur"])
+        if candidate > 0:
+            price_net_eur = candidate
+            price_source = "payload.gross_eur"
     elif car.price is not None and car.currency:
         cur = car.currency.lower()
-        if cur == "eur":
-            price_net_eur = float(car.price)
-            price_source = "car.price_eur"
-        elif cur == "usd":
-            price_net_eur = float(car.price) * (usd_rate_used / eur_rate_used)
-            price_source = "car.price_usd"
-        elif cur == "rub":
-            price_net_eur = float(car.price) / eur_rate_used
-            price_source = "car.price_rub"
+        if float(car.price) > 0:
+            if cur == "eur":
+                price_net_eur = float(car.price)
+                price_source = "car.price_eur"
+            elif cur == "usd":
+                price_net_eur = float(car.price) * (usd_rate_used / eur_rate_used)
+                price_source = "car.price_usd"
+            elif cur == "rub":
+                price_net_eur = float(car.price) / eur_rate_used
+                price_source = "car.price_rub"
 
     notes = []
     effective_engine_cc = car.engine_cc if car.engine_cc is not None else car.inferred_engine_cc
@@ -64,6 +69,10 @@ def build_calc_debug(
         float(effective_power_kw) if effective_power_kw is not None else None,
         float(effective_power_hp) if effective_power_hp is not None else None,
         car.engine_type,
+        brand=car.brand,
+        model=car.model,
+        variant=car.variant,
+        text_hint=electric_vehicle_hint_text(car),
     )
     if car.engine_type and "electric" in car.engine_type.lower() and car.engine_cc and car.engine_cc > 0:
         if is_electric:
@@ -73,18 +82,34 @@ def build_calc_debug(
 
     fallback_reg_year, fallback_reg_month = get_missing_registration_default()
 
-    req = EstimateRequest(
-        scenario=scenario,
-        price_net_eur=price_net_eur or 0,
-        eur_rate=eur_rate_used,
-        engine_cc=effective_engine_cc,
-        power_hp=float(effective_power_hp) if effective_power_hp is not None else None,
-        power_kw=float(effective_power_kw) if effective_power_kw is not None else None,
-        is_electric=is_electric,
-        reg_year=car.registration_year or fallback_reg_year,
-        reg_month=car.registration_month or fallback_reg_month,
-    )
-    result = calculate(cfg.payload, req)
+    result: Dict[str, Any] | None = None
+    if price_net_eur is not None and price_net_eur > 0:
+        req = EstimateRequest(
+            scenario=scenario,
+            price_net_eur=price_net_eur,
+            eur_rate=eur_rate_used,
+            engine_cc=effective_engine_cc,
+            power_hp=float(effective_power_hp) if effective_power_hp is not None else None,
+            power_kw=float(effective_power_kw) if effective_power_kw is not None else None,
+            is_electric=is_electric,
+            reg_year=car.registration_year or fallback_reg_year,
+            reg_month=car.registration_month or fallback_reg_month,
+        )
+        result = calculate(cfg.payload, req)
+    else:
+        notes.append("missing_or_nonpositive_price: calc skipped")
+        req = EstimateRequest(
+            scenario=scenario,
+            price_net_eur=0,
+            eur_rate=eur_rate_used,
+            engine_cc=effective_engine_cc,
+            power_hp=float(effective_power_hp) if effective_power_hp is not None else None,
+            power_kw=float(effective_power_kw) if effective_power_kw is not None else None,
+            is_electric=is_electric,
+            reg_year=car.registration_year or fallback_reg_year,
+            reg_month=car.registration_month or fallback_reg_month,
+        )
+        result = {"scenario": scenario, "total_rub": None, "euro_rate_used": eur_rate_used, "breakdown": []}
 
     steps = [
         {"name": "price_net_eur", "value": price_net_eur, "note": price_source},
@@ -191,6 +216,19 @@ def build_calc_compare(
             car.get("effective_power_kw"),
             car.get("effective_power_hp"),
             car.get("engine_type"),
+            brand=car.get("brand"),
+            model=car.get("model"),
+            variant=car.get("variant"),
+            text_hint=" ".join(
+                str(part or "").strip()
+                for part in (
+                    car.get("brand"),
+                    car.get("model"),
+                    car.get("variant"),
+                    car.get("source_url"),
+                )
+                if str(part or "").strip()
+            ),
         ),
         reg_year=car.get("registration_year"),
         reg_month=car.get("registration_month"),

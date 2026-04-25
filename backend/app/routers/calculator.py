@@ -6,7 +6,7 @@ from ..services.calculator import calculate_import_cost, get_eur_rate
 from ..services.calculator_config_service import CalculatorConfigService
 from ..services.calculator_runtime import is_bev
 from ..services.calculator_extractor import CalculatorExtractor
-from ..services.cars_service import CarsService
+from ..services.cars_service import CarsService, electric_vehicle_hint_text
 from ..services.calc_debug import build_calc_debug, build_calc_compare
 from fastapi import UploadFile, File
 import tempfile
@@ -82,6 +82,10 @@ def calc_endpoint(payload: CalcRequest, db: Session = Depends(get_db)):
                 float(effective_power_kw) if effective_power_kw is not None else None,
                 float(effective_power_hp) if effective_power_hp is not None else None,
                 car.engine_type,
+                brand=car.brand,
+                model=car.model,
+                variant=car.variant,
+                text_hint=electric_vehicle_hint_text(car),
             )
         data["is_electric"] = is_electric
 

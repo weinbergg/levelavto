@@ -22,6 +22,13 @@ def test_display_price_allows_price_fallback_for_kr_only():
     assert display_price_rub(None, 6_548_387.7, allow_price_fallback=False) is None
 
 
+def test_display_price_ignores_zero_and_negative_values():
+    assert display_price_rub(0, 8_000_000) is None
+    assert display_price_rub(-1, 8_000_000) is None
+    assert display_price_rub(None, 0, allow_price_fallback=True) is None
+    assert display_price_rub(None, -500, allow_price_fallback=True) is None
+
+
 def test_resolve_display_price_uses_raw_price_fx_fallback():
     assert raw_price_to_rub(50_000, "EUR", fx_eur=95.0) == 4_750_000
     assert resolve_display_price_rub(
@@ -31,6 +38,17 @@ def test_resolve_display_price_uses_raw_price_fx_fallback():
         currency="EUR",
         fx_eur=95.0,
     ) == 4_750_000
+
+
+def test_resolve_display_price_ignores_zero_raw_price():
+    assert raw_price_to_rub(0, "EUR", fx_eur=95.0) is None
+    assert resolve_display_price_rub(
+        None,
+        None,
+        raw_price=0,
+        currency="EUR",
+        fx_eur=95.0,
+    ) is None
 
 
 def test_sort_items_by_display_price_keeps_visible_order_consistent():
