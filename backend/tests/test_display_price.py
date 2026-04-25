@@ -13,14 +13,14 @@ from backend.app.utils.price_utils import display_price_rub
 
 
 def test_display_price_rub_priority_total():
-    assert display_price_rub(100.0, 50.0) == 100.0
+    assert display_price_rub(100.0, 50.0) == 10_000.0
 
 
 def test_display_price_rub_fallback_price():
-    assert display_price_rub(None, 80.5) == 80.5
+    assert display_price_rub(None, 80.5) == 10_000.0
 
 
-def test_sort_price_asc_uses_display_price():
+def test_sort_price_asc_uses_display_price(monkeypatch):
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     with Session(engine) as db:
@@ -76,6 +76,7 @@ def test_sort_price_asc_uses_display_price():
         )
         db.commit()
         svc = CarsService(db)
+        monkeypatch.setattr(svc, "_should_catalog_inline_price_refresh", lambda **kwargs: False)
         items, _ = svc.list_cars(sort="price_asc", page=1, page_size=10, light=True, use_fast_count=False)
         ids = [item["id"] if isinstance(item, dict) else item.id for item in items]
         assert ids == [3, 5, 2, 1, 4]

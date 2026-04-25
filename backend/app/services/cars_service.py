@@ -2741,6 +2741,9 @@ class CarsService:
         row["inferred_engine_cc"] = car.inferred_engine_cc
         row["inferred_power_hp"] = car.inferred_power_hp
         row["inferred_power_kw"] = car.inferred_power_kw
+        row["engine_cc"] = effective_engine_cc_value(row)
+        row["power_hp"] = effective_power_hp_value(row)
+        row["power_kw"] = effective_power_kw_value(row)
         row["total_price_rub_cached"] = car.total_price_rub_cached
         row["price_rub_cached"] = car.price_rub_cached
         row["calc_breakdown_json"] = car.calc_breakdown_json
