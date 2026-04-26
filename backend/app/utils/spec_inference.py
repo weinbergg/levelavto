@@ -20,6 +20,11 @@ _ENGINE_LITER_CONTEXT_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_ENGINE_LITER_COMPACT_SUFFIX_RE = re.compile(
+    r"\b([0-9](?:[.,][0-9])?)(?:tdi|tsi|tfsi|fsi|dci|cdi|mjt|hdi|crdi|crd|gdi|"
+    r"multijet|ecoboost|tce|diesel|petrol|benzin|benzina|gasoline|hybrid|turbo|d)\b",
+    re.IGNORECASE,
+)
 _POWER_KW_RE = re.compile(r"\b(\d{2,4})(?:[.,]\d+)?\s*k\s*w\b", re.IGNORECASE)
 _POWER_HP_RE = re.compile(r"\b(\d{2,4})(?:[.,]\d+)?\s*(?:cv|ps|hp)\b", re.IGNORECASE)
 _GENERIC_STOPWORDS = {
@@ -354,7 +359,7 @@ def infer_engine_cc_from_text(*values: Any) -> Optional[int]:
                 first_seen.append(candidate)
                 scored[candidate] = 0
             scored[candidate] += 3
-        for regex in (_ENGINE_LITER_RE, _ENGINE_LITER_CONTEXT_RE):
+        for regex in (_ENGINE_LITER_RE, _ENGINE_LITER_CONTEXT_RE, _ENGINE_LITER_COMPACT_SUFFIX_RE):
             for match in regex.finditer(text):
                 raw_value = str(match.group(1) or "").replace(",", ".")
                 try:

@@ -130,6 +130,10 @@ def test_infer_power_from_text_supports_kw_and_cv_tokens():
     assert infer_power_from_text("FORD Mustang mach-e standard range awd 269cv aut") == (269.0, 197.85)
 
 
+def test_infer_engine_cc_from_compact_suffix_variant():
+    assert infer_engine_cc_from_text("Landtrek 1.9D NO EU/KEIN EU/T1") == 1900
+
+
 def test_choose_reference_consensus_can_infer_engine_only_when_power_conflicts():
     candidates = [
         {

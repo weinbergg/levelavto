@@ -2988,11 +2988,46 @@ class CarsService:
                 value = payload.get(key)
                 if value not in (None, ""):
                     text_values.append(value)
+        engine_type_norm = normalize_engine_type(car.engine_type)
+        text_engine_cc = None
+        if car.engine_cc is None and engine_type_norm != "electric":
+            text_engine_cc = infer_engine_cc_from_text(*text_values)
+        text_power_hp = None
+        text_power_kw = None
+        if car.power_hp is None and car.power_kw is None:
+            text_power_hp, text_power_kw = infer_power_from_text(*text_values)
+        applied = False
+        if car.engine_cc is None and text_engine_cc is not None and car.inferred_engine_cc is None:
+            car.inferred_engine_cc = text_engine_cc
+            applied = True
+        if car.power_hp is None and car.power_kw is None and (text_power_hp is not None or text_power_kw is not None):
+            car.inferred_power_hp = text_power_hp
+            car.inferred_power_kw = text_power_kw
+            applied = True
+        if applied:
+            car.inferred_source_car_id = None
+            car.inferred_confidence = "low"
+            car.inferred_rule = "text_pattern"
+            car.spec_inferred_at = datetime.utcnow()
+            try:
+                self.db.commit()
+                self.logger.info(
+                    "calc_inferred_specs_text car=%s engine_cc=%s power_hp=%s power_kw=%s",
+                    getattr(car, "id", None),
+                    car.inferred_engine_cc,
+                    car.inferred_power_hp,
+                    car.inferred_power_kw,
+                )
+                return True
+            except Exception:
+                self.db.rollback()
+                self.logger.exception("calc_infer_text_apply_failed car=%s", getattr(car, "id", None))
+                return False
         try:
             from .car_spec_inference_service import CarSpecInferenceService
         except Exception:
             self.logger.exception("calc_infer_import_failed car=%s", getattr(car, "id", None))
-            inference_service = None
+            return False
         else:
             try:
                 year_window = max(0, int(os.getenv("SPEC_INFERENCE_YEAR_WINDOW", "2")))
@@ -3019,42 +3054,7 @@ class CarsService:
                     self.db.rollback()
                     self.logger.exception("calc_infer_apply_failed car=%s", getattr(car, "id", None))
                     return False
-        engine_type_norm = normalize_engine_type(car.engine_type)
-        text_engine_cc = None
-        if car.engine_cc is None and engine_type_norm != "electric":
-            text_engine_cc = infer_engine_cc_from_text(*text_values)
-        text_power_hp = None
-        text_power_kw = None
-        if car.power_hp is None and car.power_kw is None:
-            text_power_hp, text_power_kw = infer_power_from_text(*text_values)
-        applied = False
-        if car.engine_cc is None and text_engine_cc is not None and car.inferred_engine_cc is None:
-            car.inferred_engine_cc = text_engine_cc
-            applied = True
-        if car.power_hp is None and car.power_kw is None and (text_power_hp is not None or text_power_kw is not None):
-            car.inferred_power_hp = text_power_hp
-            car.inferred_power_kw = text_power_kw
-            applied = True
-        if not applied:
-            return False
-        car.inferred_source_car_id = None
-        car.inferred_confidence = "low"
-        car.inferred_rule = "text_pattern"
-        car.spec_inferred_at = datetime.utcnow()
-        try:
-            self.db.commit()
-            self.logger.info(
-                "calc_inferred_specs_text car=%s engine_cc=%s power_hp=%s power_kw=%s",
-                getattr(car, "id", None),
-                car.inferred_engine_cc,
-                car.inferred_power_hp,
-                car.inferred_power_kw,
-            )
-            return True
-        except Exception:
-            self.db.rollback()
-            self.logger.exception("calc_infer_text_apply_failed car=%s", getattr(car, "id", None))
-            return False
+        return False
 
     def ensure_calc_cache(self, car: Car, *, force: bool = False) -> dict | None:
         if not car:
