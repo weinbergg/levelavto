@@ -411,14 +411,14 @@ def test_home_search_stacks_above_partners_and_keeps_overlay_visible():
     assert "overflow: visible;" in css
 
 
-def test_text_query_input_only_lives_in_advanced_search():
+def test_text_query_input_is_available_in_search_and_catalog():
     home = _read("app/templates/home.html")
     search = _read("app/templates/search.html")
     catalog = _read("app/templates/catalog.html")
     css = _read("app/static/css/styles.css")
     assert 'name="q"' not in home
     assert 'name="q"' in search
-    assert 'name="q"' not in catalog
+    assert 'name="q"' in catalog
     assert ".advanced-search #advanced-keywords," in css or ".advanced-search #advanced-keywords {" in css
 
 

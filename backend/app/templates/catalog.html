@@ -63,6 +63,15 @@
                 <option value="used" {% if params.get('condition') == 'used' %}selected{% endif %}>С пробегом</option>
               </select>
             </label>
+            <label class="field field--full">Ключевые слова
+              <input
+                type="text"
+                name="q"
+                autocomplete="off"
+                placeholder="Например: дизель, 4x4, панорама"
+                value="{{ params.get('q','') }}"
+              >
+            </label>
             <div class="field">
               <label>Марка
                 <select name="brand" id="brand">
