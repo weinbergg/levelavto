@@ -54,7 +54,7 @@ _BMW_EV_HINT_RE = re.compile(r"\b(?:i3|i4|i5|i7|ix(?:1|2|3)?|ix)\b", re.IGNORECA
 _GENERIC_EV_HINT_RE = re.compile(
     r"\b(?:e[\s-]?tron|taycan|model\s*(?:3|s|x|y)|eq[a-z0-9]+|ioniq\s*(?:5|6)|ev(?:6|9)|"
     r"id\.?\s*(?:3|4|5|7)|id\s*buzz|leaf|ariya|i[\s-]?pace|kona\s+electric|niro\s+ev|"
-    r"e[\s-]?2008|e[\s-]?208)\b",
+    r"e[\s-]?2008|e[\s-]?208|mokka[\s-]?e|corsa[\s-]?e)\b",
     re.IGNORECASE,
 )
 

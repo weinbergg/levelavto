@@ -23,6 +23,7 @@ from ..utils.country_map import normalize_country_code
 from ..utils.redis_cache import build_cars_count_key, redis_get_json, redis_set_json
 from ..utils.registration_defaults import get_missing_registration_default
 from ..utils.filter_values import normalize_csv_values, split_csv_values
+from ..utils.spec_inference import infer_engine_cc_from_text, infer_power_from_text, normalize_engine_type
 from ..utils.taxonomy import (
     body_aliases,
     normalize_color,
@@ -2972,36 +2973,87 @@ class CarsService:
         effective_power_kw = effective_power_kw_value(car)
         if effective_engine_cc is not None and (effective_power_hp is not None or effective_power_kw is not None):
             return False
+        text_values: list[Any] = [car.brand, car.model, car.variant, car.source_url, car.engine_type]
+        payload = car.source_payload if isinstance(car.source_payload, dict) else {}
+        if payload:
+            for key in (
+                "title",
+                "sub_title",
+                "description",
+                "model",
+                "engine_type",
+                "displacement",
+                "displacement_orig",
+            ):
+                value = payload.get(key)
+                if value not in (None, ""):
+                    text_values.append(value)
         try:
             from .car_spec_inference_service import CarSpecInferenceService
         except Exception:
             self.logger.exception("calc_infer_import_failed car=%s", getattr(car, "id", None))
+            inference_service = None
+        else:
+            try:
+                year_window = max(0, int(os.getenv("SPEC_INFERENCE_YEAR_WINDOW", "2")))
+            except Exception:
+                year_window = 2
+            try:
+                inference_service = CarSpecInferenceService(self.db)
+                inference = inference_service.infer_specs_for_car(car, year_window=year_window)
+            except Exception:
+                self.logger.exception("calc_infer_lookup_failed car=%s", getattr(car, "id", None))
+                inference = None
+            if inference:
+                try:
+                    inference_service._apply_inferred_specs(car, inference)
+                    self.db.commit()
+                    self.logger.info(
+                        "calc_inferred_specs car=%s rule=%s confidence=%s",
+                        getattr(car, "id", None),
+                        inference.get("rule"),
+                        inference.get("confidence"),
+                    )
+                    return True
+                except Exception:
+                    self.db.rollback()
+                    self.logger.exception("calc_infer_apply_failed car=%s", getattr(car, "id", None))
+                    return False
+        engine_type_norm = normalize_engine_type(car.engine_type)
+        text_engine_cc = None
+        if car.engine_cc is None and engine_type_norm != "electric":
+            text_engine_cc = infer_engine_cc_from_text(*text_values)
+        text_power_hp = None
+        text_power_kw = None
+        if car.power_hp is None and car.power_kw is None:
+            text_power_hp, text_power_kw = infer_power_from_text(*text_values)
+        applied = False
+        if car.engine_cc is None and text_engine_cc is not None and car.inferred_engine_cc is None:
+            car.inferred_engine_cc = text_engine_cc
+            applied = True
+        if car.power_hp is None and car.power_kw is None and (text_power_hp is not None or text_power_kw is not None):
+            car.inferred_power_hp = text_power_hp
+            car.inferred_power_kw = text_power_kw
+            applied = True
+        if not applied:
             return False
+        car.inferred_source_car_id = None
+        car.inferred_confidence = "low"
+        car.inferred_rule = "text_pattern"
+        car.spec_inferred_at = datetime.utcnow()
         try:
-            year_window = max(0, int(os.getenv("SPEC_INFERENCE_YEAR_WINDOW", "2")))
-        except Exception:
-            year_window = 2
-        try:
-            inference_service = CarSpecInferenceService(self.db)
-            inference = inference_service.infer_specs_for_car(car, year_window=year_window)
-        except Exception:
-            self.logger.exception("calc_infer_lookup_failed car=%s", getattr(car, "id", None))
-            return False
-        if not inference:
-            return False
-        try:
-            inference_service._apply_inferred_specs(car, inference)
             self.db.commit()
             self.logger.info(
-                "calc_inferred_specs car=%s rule=%s confidence=%s",
+                "calc_inferred_specs_text car=%s engine_cc=%s power_hp=%s power_kw=%s",
                 getattr(car, "id", None),
-                inference.get("rule"),
-                inference.get("confidence"),
+                car.inferred_engine_cc,
+                car.inferred_power_hp,
+                car.inferred_power_kw,
             )
             return True
         except Exception:
             self.db.rollback()
-            self.logger.exception("calc_infer_apply_failed car=%s", getattr(car, "id", None))
+            self.logger.exception("calc_infer_text_apply_failed car=%s", getattr(car, "id", None))
             return False
 
     def ensure_calc_cache(self, car: Car, *, force: bool = False) -> dict | None:

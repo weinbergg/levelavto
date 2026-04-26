@@ -71,3 +71,15 @@ def test_is_bev_does_not_treat_hyundai_ix35_as_electric():
         model="ix35",
         variant="2.0 CRDi",
     ) is False
+
+
+def test_is_bev_uses_mokka_e_hint_when_fuel_string_is_garbage():
+    assert is_bev(
+        None,
+        114.74,
+        156,
+        "based on co₂ emissions (combined)",
+        brand="Opel",
+        model="Mokka-e",
+        variant="Ultimate Long Range",
+    ) is True

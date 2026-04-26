@@ -449,6 +449,92 @@ def test_maybe_infer_specs_for_calc_applies_inference(monkeypatch):
         assert float(car.inferred_power_kw) == 258.9
 
 
+def test_maybe_infer_specs_for_calc_uses_text_engine_cc_for_clear_ice_variant():
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        car = Car(
+            id=1,
+            source_id=1,
+            external_id="1",
+            country="NL",
+            brand="Peugeot",
+            model="Other",
+            variant="Landtrek 1.9D NO EU/KEIN EU/T1",
+            year=2024,
+            registration_year=2024,
+            registration_month=1,
+            engine_type="Diesel",
+            engine_cc=None,
+            power_hp=150,
+            power_kw=110.32,
+            price=10_990,
+            currency="EUR",
+            is_available=True,
+        )
+        db.add(car)
+        db.commit()
+        svc = CarsService(db)
+        applied = svc._maybe_infer_specs_for_calc(car)
+        assert applied is True
+        assert car.inferred_engine_cc == 1900
+        assert car.inferred_rule == "text_pattern"
+
+
+def test_ensure_calc_cache_uses_mokka_e_hint_for_dirty_feed_type(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.commit()
+
+        svc = CarsService(db)
+        monkeypatch.setattr(
+            svc,
+            "get_fx_rates",
+            lambda allow_fetch=True: {"EUR": 100.0, "USD": 90.0, "CNY": 12.0},
+        )
+        cfg = CalculatorConfigService(db).ensure_default_from_yaml(
+            Path(__file__).resolve().parents[1] / "app" / "config" / "calculator.yml"
+        )
+        assert cfg is not None
+        car = Car(
+            id=1,
+            source_id=1,
+            external_id="14955",
+            country="DE",
+            brand="Opel",
+            model="Mokka-e",
+            variant="Ultimate Long Range Navi Alcantara Massa",
+            price=26_926.74,
+            currency="EUR",
+            price_rub_cached=2_692_673.93,
+            total_price_rub_cached=2_692_673.93,
+            calc_breakdown_json=[],
+            calc_updated_at=datetime.utcnow(),
+            updated_at=datetime.utcnow() - timedelta(minutes=1),
+            registration_year=2025,
+            registration_month=1,
+            engine_type="based on co₂ emissions (combined)",
+            engine_cc=None,
+            power_hp=156,
+            power_kw=114.74,
+            is_available=True,
+        )
+        db.add(car)
+        db.commit()
+
+        result = svc.ensure_calc_cache(car, force=True)
+
+        assert result is not None
+        assert float(car.total_price_rub_cached) > 2_692_673.93
+        assert not any(
+            isinstance(row, dict) and row.get("title") == "__without_util_fee"
+            for row in (car.calc_breakdown_json or [])
+        )
+
+
 def test_ensure_calc_cache_recalculates_stale_equal_total_for_bmw_ix(monkeypatch):
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
