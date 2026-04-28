@@ -1426,7 +1426,7 @@ class CarsService:
             return self._fx_cache
         if not allow_fetch:
             return self._fx_cache or {}
-        fx_add_rub = float(os.environ.get("FX_ADD_RUB", "1.0"))
+        fx_add_rub = float(os.environ.get("FX_ADD_RUB", "4.0"))
         eur_env = float(os.environ.get("EURO_RATE", "95.0")) + fx_add_rub
         usd_env = float(os.environ.get("USD_RATE", "85.0")) + fx_add_rub
         cny_env = float(os.environ.get("CNY_RATE", "12.0")) + fx_add_rub

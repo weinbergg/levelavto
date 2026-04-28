@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+import backend.app.services.cars_service as cars_service_mod
 from backend.app.models.source import Base, Source
 from backend.app.models.car import Car
 from backend.app.services.calculator_config_service import CalculatorConfigService
@@ -18,6 +19,31 @@ def test_display_price_rub_priority_total():
 
 def test_display_price_rub_fallback_price():
     assert display_price_rub(None, 80.5) == 10_000.0
+
+
+def test_get_fx_rates_uses_plus_four_default_when_fetch_fails(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.commit()
+        svc = CarsService(db)
+        svc._fx_cache = None
+        svc._fx_cache_ts = None
+        monkeypatch.delenv("FX_ADD_RUB", raising=False)
+        monkeypatch.delenv("EURO_RATE", raising=False)
+        monkeypatch.delenv("USD_RATE", raising=False)
+        monkeypatch.delenv("CNY_RATE", raising=False)
+
+        def _boom(*args, **kwargs):
+            raise RuntimeError("offline")
+
+        monkeypatch.setattr(cars_service_mod.requests, "get", _boom)
+        rates = svc.get_fx_rates(allow_fetch=True) or {}
+        assert rates["EUR"] == 99.0
+        assert rates["USD"] == 89.0
+        assert rates["CNY"] == 16.0
+        assert rates["RUB"] == 1.0
 
 
 def test_sort_price_asc_uses_display_price(monkeypatch):
