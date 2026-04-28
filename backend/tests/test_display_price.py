@@ -1,7 +1,8 @@
 from pathlib import Path
 from datetime import datetime, timedelta
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session
 
 import backend.app.services.cars_service as cars_service_mod
@@ -620,3 +621,33 @@ def test_ensure_calc_cache_recalculates_stale_equal_total_for_bmw_ix(monkeypatch
             isinstance(row, dict) and row.get("title") == "__without_util_fee"
             for row in (car.calc_breakdown_json or [])
         )
+
+
+def test_effective_electric_fuel_filter_sql_uses_ev_hints_and_skips_bare_ev_like():
+    svc = CarsService(None)
+    stmt = select(Car.id).where(svc._fuel_filter_clause("electric"))
+    sql = str(
+        stmt.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    ).lower()
+    assert "mokka e" in sql
+    assert "ariya" in sql
+    assert " ix " in sql
+    assert "%ev%" not in sql
+
+
+def test_fuel_source_expr_promotes_hint_based_evs_to_electric_bucket():
+    svc = CarsService(None)
+    stmt = select(svc._fuel_source_expr().label("fuel")).select_from(Car)
+    sql = str(
+        stmt.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    ).lower()
+    assert "case when" in sql
+    assert "'electric'" in sql
+    assert "regexp_replace" in sql
+    assert "source_url" in sql

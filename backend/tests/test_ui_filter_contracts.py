@@ -610,13 +610,20 @@ def test_model_filters_normalize_whitespace_and_merge_overlapping_regions():
     assert "white-space: normal;" in css
 
 
-def test_engine_type_facets_use_raw_fuel_source_and_custom_filtering():
+def test_engine_type_facets_use_effective_fuel_source_and_custom_filtering():
     service = _read("app/services/cars_service.py")
     catalog = _read("app/routers/catalog.py")
     assert "def _fuel_source_expr(self):" in service
     assert 'func.jsonb_extract_path_text(payload_json, "full_fuel_type")' in service
     assert 'func.jsonb_extract_path_text(payload_json, "envkv_engine_type")' in service
     assert 'func.jsonb_extract_path_text(payload_json, "envkv_consumption_fuel")' in service
+    assert "def _fuel_hint_text_expr(self):" in service
+    assert "def _bev_hint_expr(self):" in service
+    assert "def _effective_electric_fuel_expr(self):" in service
+    assert 'literal("electric")' in service
+    assert '"электро": ["electric"]' in service
+    assert '"electric": ["electric"]' in service
+    assert '%ev%' not in service
     assert "def _fuel_filter_clause(self, raw_value: str):" in service
     assert 'if key == "hybrid_diesel":' in service
     assert 'if key == "phev":' in service

@@ -841,13 +841,17 @@ class CarsService:
 
     def _fuel_source_expr(self):
         payload_json = cast(Car.source_payload, JSONB)
-        return func.coalesce(
+        raw_expr = func.coalesce(
             func.nullif(func.jsonb_extract_path_text(payload_json, "full_fuel_type"), ""),
             func.nullif(func.jsonb_extract_path_text(payload_json, "envkv_engine_type"), ""),
             func.nullif(func.jsonb_extract_path_text(payload_json, "envkv_consumption_fuel"), ""),
             func.nullif(func.jsonb_extract_path_text(payload_json, "fuel_raw"), ""),
             func.nullif(func.jsonb_extract_path_text(payload_json, "engine_raw"), ""),
             func.nullif(Car.engine_type, ""),
+        )
+        return case(
+            (self._effective_electric_fuel_expr(), literal("electric")),
+            else_=raw_expr,
         )
 
     def _stored_fuel_expr(self):
@@ -871,6 +875,116 @@ class CarsService:
 
     def _fuel_like_any(self, expr, terms: List[str]):
         return or_(*[expr.like(f"%{term}%") for term in terms if term])
+
+    def _fuel_hint_text_expr(self):
+        payload_json = cast(Car.source_payload, JSONB)
+        parts = [
+            Car.brand,
+            Car.model,
+            Car.variant,
+            Car.source_url,
+            Car.engine_type,
+            func.jsonb_extract_path_text(payload_json, "title"),
+            func.jsonb_extract_path_text(payload_json, "sub_title"),
+            func.jsonb_extract_path_text(payload_json, "description"),
+            func.jsonb_extract_path_text(payload_json, "model"),
+            func.jsonb_extract_path_text(payload_json, "engine_type"),
+            func.jsonb_extract_path_text(payload_json, "envkv_engine_type"),
+            func.jsonb_extract_path_text(payload_json, "envkv_consumption_fuel"),
+            func.jsonb_extract_path_text(payload_json, "full_fuel_type"),
+        ]
+        joined = literal("")
+        for part in parts:
+            joined = joined + literal(" ") + func.coalesce(cast(part, String), "")
+        normalized = func.lower(
+            func.regexp_replace(
+                joined,
+                r"[^a-z0-9]+",
+                " ",
+                "g",
+            )
+        )
+        return literal(" ") + normalized + literal(" ")
+
+    def _bev_hint_expr(self):
+        text_expr = self._fuel_hint_text_expr()
+        brand_expr = func.lower(func.coalesce(Car.brand, ""))
+        bmw_patterns = [
+            " i3 ",
+            " i4 ",
+            " i5 ",
+            " i7 ",
+            " ix ",
+            " ix1 ",
+            " ix2 ",
+            " ix3 ",
+        ]
+        generic_patterns = [
+            " e tron ",
+            " taycan ",
+            " model 3 ",
+            " model s ",
+            " model x ",
+            " model y ",
+            " eqa ",
+            " eqb ",
+            " eqc ",
+            " eqe ",
+            " eqs ",
+            " eqv ",
+            " eqt ",
+            " ioniq 5 ",
+            " ioniq 6 ",
+            " ev6 ",
+            " ev9 ",
+            " id 3 ",
+            " id 4 ",
+            " id 5 ",
+            " id 7 ",
+            " id buzz ",
+            " leaf ",
+            " ariya ",
+            " i pace ",
+            " kona electric ",
+            " niro ev ",
+            " e 2008 ",
+            " e 208 ",
+            " mokka e ",
+            " corsa e ",
+        ]
+        bmw_clause = and_(
+            brand_expr == "bmw",
+            or_(*[text_expr.like(f"%{pattern}%") for pattern in bmw_patterns]),
+        )
+        generic_clause = or_(*[text_expr.like(f"%{pattern}%") for pattern in generic_patterns])
+        return or_(bmw_clause, generic_clause)
+
+    def _explicit_electric_fuel_expr(self):
+        stored_fuel_expr = self._stored_fuel_expr()
+        payload_fuel_expr = self._payload_fuel_search_expr()
+        stored_fuel_missing = or_(
+            Car.engine_type.is_(None),
+            func.trim(Car.engine_type) == "",
+            self._fuel_like_any(stored_fuel_expr, ["co2", "co₂", "emission", "combined"]),
+        )
+        stored_clause = or_(
+            stored_fuel_expr == "electric",
+            stored_fuel_expr == "elektro",
+            stored_fuel_expr == "электро",
+            stored_fuel_expr == "ev",
+        )
+        payload_clause = and_(
+            stored_fuel_missing,
+            self._fuel_like_any(payload_fuel_expr, ["electric", "elektro", "электро"]),
+            not_(self._fuel_like_any(payload_fuel_expr, ["hybrid", "гибрид", "plug-in", "phev"])),
+        )
+        return or_(stored_clause, payload_clause)
+
+    def _effective_electric_fuel_expr(self):
+        return or_(
+            self._explicit_electric_fuel_expr(),
+            self._bev_hint_expr(),
+        )
 
     def _fuel_filter_clause(self, raw_value: str):
         key = normalize_fuel(raw_value) or str(raw_value or "").strip().lower()
@@ -905,13 +1019,7 @@ class CarsService:
                 ),
             )
         if key == "electric":
-            return or_(
-                _stored_exact_any(["electric", "elektro", "электро", "ev"]),
-                _payload_branch(
-                    ["electric", "elektro", "электро"],
-                    ["hybrid", "гибрид", "plug-in", "phev"],
-                ),
-            )
+            return self._effective_electric_fuel_expr()
         if key == "ethanol":
             return self._fuel_like_any(fuel_expr, ["ethanol", "e85", "ffv", "flexfuel", "flex fuel", "этанол"])
         if key == "hybrid_diesel":
@@ -1725,9 +1833,9 @@ class CarsService:
                 "бенз": ["petrol", "gasoline", "benzin"],
                 "hybrid": ["hybrid"],
                 "гибрид": ["hybrid"],
-                "электро": ["electric", "ev"],
-                "электр": ["electric", "ev"],
-                "electric": ["electric", "ev"],
+                "электро": ["electric"],
+                "электр": ["electric"],
+                "electric": ["electric"],
             }
             drive_tokens = {"4x4", "4х4", "4wd", "awd", "full", "полный", "полныйпривод"}
             for token in tokens:
@@ -1735,8 +1843,11 @@ class CarsService:
                 if token in fuel_map or token.startswith("дизел"):
                     mapped = fuel_map.get(token, fuel_map["дизель"])
                     for item in mapped:
-                        conds.append(func.lower(Car.engine_type).like(f"%{item}%"))
-                        conds.append(payload_text.like(f"%{item}%"))
+                        if item == "electric":
+                            conds.append(self._effective_electric_fuel_expr())
+                        else:
+                            conds.append(func.lower(Car.engine_type).like(f"%{item}%"))
+                            conds.append(payload_text.like(f"%{item}%"))
                 elif token in drive_tokens:
                     conds.append(func.lower(Car.drive_type).like("%awd%"))
                     conds.append(func.lower(Car.drive_type).like("%4wd%"))
