@@ -1636,9 +1636,11 @@ class CarsService:
             return self._catalog_inline_price_refresh_enabled()
 
         try:
-            default_enabled = os.getenv("CATALOG_INLINE_PRICE_REFRESH_DEFAULT", "1") != "0"
+            # Request-path price recalculation is expensive on small shared VPS nodes.
+            # Keep it opt-in unless explicitly enabled via env.
+            default_enabled = os.getenv("CATALOG_INLINE_PRICE_REFRESH_DEFAULT", "0") != "0"
         except Exception:
-            default_enabled = True
+            default_enabled = False
         if not default_enabled:
             return False
 

@@ -205,11 +205,17 @@ def test_price_sensitive_catalog_paths_bypass_stale_cache():
     assert "def _catalog_inline_price_refresh_enabled(self) -> bool:" in service
     assert 'os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0"' in service
     assert "def _should_catalog_inline_price_refresh(" in service
+    assert 'CATALOG_INLINE_PRICE_REFRESH_DEFAULT", "0") != "0"' in service
     assert 'page_num <= max_page and size_num <= max_page_size' in service
     assert 'service._should_catalog_inline_price_refresh(page=page, page_size=page_size)' in catalog_router
     assert 'timing["initial_list_ms"]' in pages_router
     assert 'timing["initial_decorate_ms"]' in pages_router
     assert 'timing["initial_images_ms"]' in pages_router
+
+
+def test_home_price_refresh_is_opt_in():
+    pages_router = _read("app/routers/pages.py")
+    assert 'HOME_REFRESH_VISIBLE_PRICES", "0") == "1"' in pages_router
 
 
 def test_catalog_perf_path_canonicalizes_free_text_fuel_and_prewarms_engine_lists():
