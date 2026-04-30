@@ -1,8 +1,12 @@
 from urllib.parse import quote
+import json
+import logging
+import secrets
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 from pathlib import Path
 import tempfile
 
@@ -12,6 +16,7 @@ from ..services.admin_service import AdminService
 from ..services.cars_service import CarsService
 from ..services.calculator_config_service import CalculatorConfigService
 from ..services.calculator_extractor import CalculatorExtractor
+from ..services.content_service import ContentService
 from ..services.customs_config import reset_customs_config_cache
 from ..utils.recommended_config import load_config, save_config, DEFAULT_CONFIG
 from ..utils.home_content import build_home_content, default_home_content, serialize_home_content
@@ -22,10 +27,19 @@ from ..utils.customs_template import (
     build_util_template,
     apply_util_template,
 )
-from ..models import User
+from ..utils.brand_groups import (
+    BRAND_FILTER_PRIORITY,
+    TOP_BRANDS_CONTENT_KEY,
+    _coerce_priority_list,
+    _normalize_to_priority,
+    effective_priority,
+)
+from ..utils.redis_cache import bump_dataset_version, redis_delete_by_pattern
+from ..models import Car, Favorite, User
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _admin_redirect(message: str = "", *, error: str = "", path: str = "/admin") -> RedirectResponse:
@@ -141,33 +155,122 @@ def _render_coming_soon(
     )
 
 
+def _all_known_brands(db: Session) -> list[str]:
+    """Return the full list of brand names — DB facets ∪ default priority.
+
+    The default priority brands are always present even when no inventory
+    matches them yet (e.g. Lamborghini after a slow week), so the operator
+    can keep them in the "top" group. DB facets give the long tail.
+    """
+
+    rows = db.execute(
+        select(func.coalesce(Car.brand, "")).where(Car.brand.isnot(None)).distinct()
+    ).all()
+    seen: dict[str, str] = {}
+    for (raw,) in rows:
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        canon = _normalize_to_priority(text) or text
+        key = canon.casefold()
+        if key not in seen:
+            seen[key] = canon
+    for canon in BRAND_FILTER_PRIORITY:
+        key = canon.casefold()
+        if key not in seen:
+            seen[key] = canon
+    return sorted(seen.values(), key=lambda v: v.casefold())
+
+
+def _bump_filter_caches() -> None:
+    """Drop any cached filter contexts and bump the dataset version.
+
+    Called after editing the operator-controlled top-brands list so the
+    very next request rebuilds ``filter_ctx_base`` with the new ordering.
+    """
+
+    try:
+        redis_delete_by_pattern("filter_ctx_*")
+        bump_dataset_version()
+    except Exception:
+        logger.exception("admin: failed to bump filter caches after top-brands edit")
+
+
 @router.get("/admin/top-brands", response_class=None)
 def admin_top_brands_page(
     request: Request,
     user: User | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     if user is None:
         return RedirectResponse(url="/login?next=" + quote("/admin/top-brands"), status_code=302)
     if not user.is_admin:
         return RedirectResponse(url="/", status_code=302)
-    return _render_coming_soon(
-        request, user,
-        page_title="Топ-марки",
-        page_subtitle="Управление приоритетным списком брендов в фильтрах сайта.",
-        stub_title="Drag-and-drop редактор скоро откроется",
-        stub_description=(
-            "Сейчас приоритетный список зашит в коде (Mercedes-Benz, BMW, Audi, "
-            "Volkswagen, Porsche и др.). На этой странице появится визуальный "
-            "редактор с перетаскиванием — добавление/удаление марок и изменение "
-            "порядка сразу применятся ко всем формам поиска и инвалидируют кеш фильтров."
-        ),
-        stub_features=[
-            "Перетаскивание брендов мышью между «Топ-марками» и «Все марки»",
-            "Поиск-автокомплит по всем известным брендам",
-            "Сохранение в site_content.top_brands_json + автоматическая инвалидация Redis",
-            "Журнал изменений: кто и когда правил список",
-        ],
-        stub_eta="Релиз 1, День 2",
+
+    override_raw = ContentService(db).get(TOP_BRANDS_CONTENT_KEY)
+    override_list = _coerce_priority_list(override_raw)
+    active = effective_priority(override_raw)
+    all_brands = _all_known_brands(db)
+
+    active_keys = {brand.casefold() for brand in active}
+    other_brands = [name for name in all_brands if name.casefold() not in active_keys]
+
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "admin/top_brands.html",
+        {
+            "request": request,
+            "user": user,
+            "page_title": "Топ-марки",
+            "page_subtitle": (
+                "Перетащите бренды между колонками или поменяйте порядок. "
+                "Изменения применятся ко всем формам поиска сразу после сохранения."
+            ),
+            "breadcrumbs": [
+                ("Админка", "/admin"),
+                ("Топ-марки", None),
+            ],
+            "top_brands": active,
+            "other_brands": other_brands,
+            "default_brands": list(BRAND_FILTER_PRIORITY),
+            "is_overridden": override_list is not None,
+        },
+    )
+
+
+@router.post("/admin/top-brands")
+def admin_top_brands_save(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    brands: str = Form(""),
+    reset: str = Form(""),
+):
+    content = ContentService(db)
+    if reset == "1":
+        content.upsert_content(TOP_BRANDS_CONTENT_KEY, "", description="top brands override")
+        _bump_filter_caches()
+        return _admin_redirect(
+            "Список сброшен — используется набор по умолчанию",
+            path="/admin/top-brands",
+        )
+
+    requested = [item.strip() for item in brands.split(",") if item.strip()]
+    cleaned = _coerce_priority_list(requested)
+    if not cleaned:
+        return _admin_redirect(
+            error="Нужно выбрать хотя бы один бренд",
+            path="/admin/top-brands",
+        )
+    content.upsert_content(
+        TOP_BRANDS_CONTENT_KEY,
+        json.dumps(cleaned, ensure_ascii=False),
+        description="top brands override",
+    )
+    _bump_filter_caches()
+    return _admin_redirect(
+        f"Список сохранён ({len(cleaned)} марок)",
+        path="/admin/top-brands",
     )
 
 
@@ -175,28 +278,161 @@ def admin_top_brands_page(
 def admin_calculator_excel_page(
     request: Request,
     user: User | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     if user is None:
         return RedirectResponse(url="/login?next=" + quote("/admin/calculator/excel"), status_code=302)
     if not user.is_admin:
         return RedirectResponse(url="/", status_code=302)
-    return _render_coming_soon(
-        request, user,
-        page_title="Калькулятор · Excel",
-        page_subtitle="Импорт/экспорт настроек калькулятора в xlsx.",
-        stub_title="Загрузка xlsx уже работает на дашборде",
-        stub_description=(
-            "Импорт нового xlsx-конфига уже доступен во вкладке «Калькулятор» на сводке. "
-            "На этой странице добавится экспорт текущих настроек в xlsx, скачивание шаблона "
-            "и история версий с возможностью отката."
-        ),
-        stub_features=[
-            "Скачать актуальный конфиг как xlsx (с подписями полей по-русски)",
-            "Скачать пустой шаблон для заказчика",
-            "История версий: сравнение, откат, комментарии",
-            "Запуск пересчёта каталога после загрузки",
-        ],
-        stub_eta="Релиз 1, День 5 + Релиз 2",
+
+    svc = CalculatorConfigService(db)
+    latest = svc.latest()
+    versions = svc.all_versions(limit=10)
+
+    pending = request.session.get("calc_preview")
+    pending_summary: dict | None = None
+    if pending:
+        pending_summary = {
+            "filename": pending.get("filename", "файл.xlsx"),
+            "total_changes": len(pending.get("changes") or {}),
+            "changes": (pending.get("changes") or {}),
+            "token": pending.get("token"),
+        }
+
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "admin/calculator_excel.html",
+        {
+            "request": request,
+            "user": user,
+            "page_title": "Калькулятор · Excel",
+            "page_subtitle": (
+                "Скачайте текущий конфиг, отредактируйте в Excel, "
+                "загрузите для предпросмотра — изменения применятся только после подтверждения."
+            ),
+            "breadcrumbs": [
+                ("Админка", "/admin"),
+                ("Калькулятор · Excel", None),
+            ],
+            "latest": latest,
+            "versions": versions,
+            "pending": pending_summary,
+        },
+    )
+
+
+@router.get("/admin/calculator/export.xlsx")
+def admin_calculator_export_xlsx(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from ..utils.calculator_xlsx_export import render_calculator_payload
+
+    latest = CalculatorConfigService(db).latest()
+    if not latest:
+        return _admin_redirect(error="Конфиг не загружен", path="/admin/calculator/excel")
+    data = render_calculator_payload(latest.payload or {})
+    filename = f"calculator-config-v{latest.version}.xlsx"
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/admin/calculator/preview")
+async def admin_calculator_preview(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    if not file.filename.lower().endswith((".xlsx", ".xlsm", ".xls")):
+        return _admin_redirect(
+            error="Нужен файл .xlsx / .xlsm / .xls",
+            path="/admin/calculator/excel",
+        )
+    try:
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(await file.read())
+            tmp_path = Path(tmp.name)
+        payload = CalculatorExtractor(tmp_path).extract()
+    except Exception as exc:
+        logger.exception("calculator preview parse failed")
+        return _admin_redirect(
+            error=f"Не удалось прочитать файл: {exc}",
+            path="/admin/calculator/excel",
+        )
+
+    svc = CalculatorConfigService(db)
+    latest = svc.latest()
+    changes = svc.diff_payloads(latest.payload if latest else None, payload)
+    token = secrets.token_urlsafe(12)
+    request.session["calc_preview"] = {
+        "token": token,
+        "filename": file.filename,
+        "payload": payload,
+        "changes": changes,
+    }
+    if not changes:
+        return _admin_redirect(
+            "Файл прочитан, но он не отличается от текущего конфига",
+            path="/admin/calculator/excel",
+        )
+    return _admin_redirect(
+        f"Файл «{file.filename}» проанализирован — {len(changes)} изменений. Проверьте и подтвердите ниже.",
+        path="/admin/calculator/excel",
+    )
+
+
+@router.post("/admin/calculator/preview/apply")
+def admin_calculator_preview_apply(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    token: str = Form(""),
+):
+    pending = request.session.get("calc_preview")
+    if not pending or pending.get("token") != token:
+        return _admin_redirect(
+            error="Сессия предпросмотра истекла, загрузите файл заново",
+            path="/admin/calculator/excel",
+        )
+    payload = pending.get("payload")
+    filename = pending.get("filename") or "preview.xlsx"
+    if not payload:
+        return _admin_redirect(
+            error="Пустой payload — повторите загрузку",
+            path="/admin/calculator/excel",
+        )
+    try:
+        CalculatorConfigService(db).create(
+            payload=payload,
+            source="upload_xlsx_preview",
+            comment=f"preview→apply {filename}",
+        )
+    except Exception as exc:
+        logger.exception("calculator preview apply failed")
+        return _admin_redirect(
+            error=f"Не удалось сохранить конфиг: {exc}",
+            path="/admin/calculator/excel",
+        )
+    request.session.pop("calc_preview", None)
+    return _admin_redirect(
+        f"Конфиг калькулятора применён (источник: {filename})",
+        path="/admin/calculator/excel",
+    )
+
+
+@router.post("/admin/calculator/preview/discard")
+def admin_calculator_preview_discard(
+    request: Request,
+    user: User = Depends(require_admin),
+):
+    request.session.pop("calc_preview", None)
+    return _admin_redirect(
+        "Предпросмотр сброшен — изменения не применены",
+        path="/admin/calculator/excel",
     )
 
 
@@ -204,28 +440,136 @@ def admin_calculator_excel_page(
 def admin_users_page(
     request: Request,
     user: User | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    q: str = "",
+    verified: str = "",
+    period: str = "",
+    page: int = 1,
 ):
     if user is None:
         return RedirectResponse(url="/login?next=" + quote("/admin/users"), status_code=302)
     if not user.is_admin:
         return RedirectResponse(url="/", status_code=302)
-    return _render_coming_soon(
-        request, user,
-        page_title="Пользователи",
-        page_subtitle="Список зарегистрированных, контактные данные, избранные машины.",
-        stub_title="Раздел «Пользователи» откроется на следующем шаге",
-        stub_description=(
-            "Здесь будет таблица всех зарегистрированных пользователей с поиском по email/телефону, "
-            "фильтрами (верифицирован/нет, регистрация за период), экспортом в xlsx и переходом "
-            "к карточке пользователя — где видны контакты, избранные машины и кнопка «Отправить предложение»."
-        ),
-        stub_features=[
-            "Таблица: ФИО, email, телефон, дата регистрации, статус верификаций, число избранного",
-            "Фильтры по периоду регистрации и по верификациям",
-            "Экспорт всего списка/выборки в xlsx",
-            "Карточка пользователя с миниатюрами избранных машин и КП",
-        ],
-        stub_eta="Релиз 1, Дни 3-4",
+
+    page = max(int(page or 1), 1)
+    page_size = 25
+    offset = (page - 1) * page_size
+
+    fav_count_subq = (
+        select(Favorite.user_id, func.count(Favorite.id).label("fav_count"))
+        .group_by(Favorite.user_id)
+        .subquery()
+    )
+    base_stmt = select(User, func.coalesce(fav_count_subq.c.fav_count, 0).label("fav_count"))
+    base_stmt = base_stmt.outerjoin(
+        fav_count_subq, fav_count_subq.c.user_id == User.id
+    )
+    count_stmt = select(func.count(User.id))
+
+    if q:
+        like = f"%{q.strip()}%"
+        clause = (
+            User.email.ilike(like)
+            | User.full_name.ilike(like)
+            | User.phone.ilike(like)
+        )
+        base_stmt = base_stmt.where(clause)
+        count_stmt = count_stmt.where(clause)
+    if verified == "yes":
+        clause = (User.email_verified_at.is_not(None)) | (User.phone_verified_at.is_not(None))
+        base_stmt = base_stmt.where(clause)
+        count_stmt = count_stmt.where(clause)
+    elif verified == "no":
+        clause = (User.email_verified_at.is_(None)) & (User.phone_verified_at.is_(None))
+        base_stmt = base_stmt.where(clause)
+        count_stmt = count_stmt.where(clause)
+    if period:
+        from datetime import datetime as _dt, timedelta as _td
+
+        days = {"7": 7, "30": 30, "90": 90}.get(period)
+        if days:
+            since = _dt.utcnow() - _td(days=days)
+            base_stmt = base_stmt.where(User.created_at >= since)
+            count_stmt = count_stmt.where(User.created_at >= since)
+
+    total = db.execute(count_stmt).scalar_one() or 0
+    base_stmt = base_stmt.order_by(User.created_at.desc()).offset(offset).limit(page_size)
+    rows = db.execute(base_stmt).all()
+
+    pages = max(1, (total + page_size - 1) // page_size)
+
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "admin/users.html",
+        {
+            "request": request,
+            "user": user,
+            "page_title": "Пользователи",
+            "page_subtitle": "Зарегистрированные пользователи, их контакты и активность.",
+            "breadcrumbs": [
+                ("Админка", "/admin"),
+                ("Пользователи", None),
+            ],
+            "users": [
+                {"row": r._mapping["User"], "fav_count": int(r._mapping["fav_count"] or 0)}
+                for r in rows
+            ],
+            "total": total,
+            "page": page,
+            "pages": pages,
+            "page_size": page_size,
+            "q": q,
+            "verified": verified,
+            "period": period,
+        },
+    )
+
+
+@router.get("/admin/users/{user_id}", response_class=None)
+def admin_user_detail(
+    request: Request,
+    user_id: int,
+    user: User | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user is None:
+        return RedirectResponse(
+            url="/login?next=" + quote(f"/admin/users/{user_id}"),
+            status_code=302,
+        )
+    if not user.is_admin:
+        return RedirectResponse(url="/", status_code=302)
+
+    target = db.get(User, user_id)
+    if target is None:
+        return _admin_redirect(error="Пользователь не найден", path="/admin/users")
+
+    favs = (
+        db.execute(
+            select(Favorite, Car)
+            .join(Car, Car.id == Favorite.car_id)
+            .where(Favorite.user_id == user_id)
+            .order_by(Favorite.created_at.desc())
+        )
+        .all()
+    )
+
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "admin/user_detail.html",
+        {
+            "request": request,
+            "user": user,
+            "page_title": target.full_name or target.email,
+            "page_subtitle": f"Карточка пользователя #{target.id}",
+            "breadcrumbs": [
+                ("Админка", "/admin"),
+                ("Пользователи", "/admin/users"),
+                (target.email, None),
+            ],
+            "target": target,
+            "favorites": [{"fav": row[0], "car": row[1]} for row in favs],
+        },
     )
 
 
@@ -233,28 +577,31 @@ def admin_users_page(
 def admin_notifications_page(
     request: Request,
     user: User | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     if user is None:
         return RedirectResponse(url="/login?next=" + quote("/admin/notifications"), status_code=302)
     if not user.is_admin:
         return RedirectResponse(url="/", status_code=302)
-    return _render_coming_soon(
-        request, user,
-        page_title="Сообщения",
-        page_subtitle="Внутренние уведомления и предложения для пользователей.",
-        stub_title="Внутренние сообщения скоро появятся",
-        stub_description=(
-            "Здесь будет интерфейс для отправки сообщений пользователям прямо в их личный кабинет "
-            "и (опционально) дублирование в email/Telegram. Появится модель Notification, лента "
-            "сообщений в ЛК пользователя, шаблоны для рассылок."
-        ),
-        stub_features=[
-            "Адресная отправка одному пользователю с приложенными машинами",
-            "Массовая рассылка по сегменту (новые/верифицированные/добавлявшие в избранное)",
-            "Лента «Сообщения» в личном кабинете с пометкой прочитано/не прочитано",
-            "Журнал отправленных + статус доставки",
-        ],
-        stub_eta="Релиз 1, День 4",
+
+    stats = AdminService(db).overview_stats()
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "admin/notifications.html",
+        {
+            "request": request,
+            "user": user,
+            "page_title": "Сообщения",
+            "page_subtitle": (
+                "Уведомления пользователям. Сейчас доступны прямые каналы связи — "
+                "внутренние сообщения в ЛК подключатся в Релизе 1, День 4."
+            ),
+            "breadcrumbs": [
+                ("Админка", "/admin"),
+                ("Сообщения", None),
+            ],
+            "stats": stats,
+        },
     )
 
 
@@ -262,28 +609,34 @@ def admin_notifications_page(
 def admin_analytics_page(
     request: Request,
     user: User | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     if user is None:
         return RedirectResponse(url="/login?next=" + quote("/admin/analytics"), status_code=302)
     if not user.is_admin:
         return RedirectResponse(url="/", status_code=302)
-    return _render_coming_soon(
-        request, user,
-        page_title="Аналитика",
-        page_subtitle="Трафик, регистрации, конверсии в воронке заявок.",
-        stub_title="Сбор аналитики стартует на следующем шаге",
-        stub_description=(
-            "На сайте включится middleware page_visits с cookie-баннером согласия — данные начнут "
-            "копиться сразу же. Затем здесь появятся графики по дням/неделям, фильтры по периоду, "
-            "топ-страницы, и полная воронка: посещение → регистрация → избранное → заявка → продажа."
-        ),
-        stub_features=[
-            "Уникальные/всего посетителей за выбранный период",
-            "Регистрации за сегодня/неделю/месяц с переходом в карточку",
-            "Топ-страниц и источников трафика",
-            "Воронка конверсий: посещение → регистрация → избранное → заявка",
-        ],
-        stub_eta="Релиз 1, День 5 + Релиз 3",
+
+    stats = AdminService(db).overview_stats()
+    cars_total = CarsService(db).total_cars()
+
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "admin/analytics.html",
+        {
+            "request": request,
+            "user": user,
+            "page_title": "Аналитика",
+            "page_subtitle": (
+                "Базовая статистика по пользователям и базе. Подробный трафик "
+                "(посещения, источники, воронка) подключится после установки middleware."
+            ),
+            "breadcrumbs": [
+                ("Админка", "/admin"),
+                ("Аналитика", None),
+            ],
+            "stats": stats,
+            "cars_total": cars_total,
+        },
     )
 
 

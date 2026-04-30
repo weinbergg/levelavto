@@ -65,7 +65,7 @@ from ..utils.country_map import country_label_ru, resolve_display_country, norma
 from ..utils.color_groups import split_color_facets
 from ..utils.thumbs import local_media_exists, normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.home_content import build_home_content
-from ..utils.brand_groups import group_brands
+from ..utils.brand_groups import group_brands, load_priority_override
 from ..utils.telegram import send_telegram_message
 
 
@@ -1546,7 +1546,10 @@ def _home_context(
         "user": getattr(request.state, "user", None),
         "total_cars": total_cars,
         "brands": home_filter_ctx["brands"],
-        "brand_groups": group_brands(home_filter_ctx.get("brands") or []),
+        "brand_groups": group_brands(
+            home_filter_ctx.get("brands") or [],
+            priority=load_priority_override(db),
+        ),
         "regions": home_filter_ctx["regions"],
         "countries": countries_list,
         "countries_labeled": countries_with_labels,
@@ -2137,7 +2140,9 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "request": request,
             "user": getattr(request.state, "user", None),
             "brands": cached_brands,
-            "brand_groups": group_brands(cached_brands),
+            "brand_groups": group_brands(
+                cached_brands, priority=load_priority_override(db)
+            ),
             "regions": regions,
             "countries": countries,
             "country_labels": country_labels,
@@ -2219,7 +2224,10 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "user": getattr(request.state, "user", None),
             "total_cars": total_cars,
             "brands": filter_ctx["brands"],
-            "brand_groups": group_brands(filter_ctx.get("brands") or []),
+            "brand_groups": group_brands(
+                filter_ctx.get("brands") or [],
+                priority=load_priority_override(db),
+            ),
             "regions": filter_ctx["regions"],
             "countries": filter_ctx["countries"],
             "country_labels": filter_ctx["country_labels"],

@@ -1,0 +1,70 @@
+{% extends "admin/_layout.html" %}
+
+{% block page_content %}
+<div class="la-card-grid la-card-grid--4" style="margin-bottom: 24px">
+  <div class="la-stat">
+    <span class="la-stat__label">Машин в базе</span>
+    <span class="la-stat__value">{{ '{:,}'.format(cars_total).replace(',', ' ') }}</span>
+    <span class="la-stat__delta la-stat__delta--flat">активных предложений</span>
+  </div>
+  <div class="la-stat">
+    <span class="la-stat__label">Пользователей</span>
+    <span class="la-stat__value">{{ '{:,}'.format(stats.users_total).replace(',', ' ') }}</span>
+    <span class="la-stat__delta {% if stats.users_today > 0 %}la-stat__delta--up{% else %}la-stat__delta--flat{% endif %}">+{{ stats.users_today }} сегодня · +{{ stats.users_week }} за неделю</span>
+  </div>
+  <div class="la-stat">
+    <span class="la-stat__label">Верифицированных</span>
+    <span class="la-stat__value">{{ '{:,}'.format(stats.users_verified).replace(',', ' ') }}</span>
+    <span class="la-stat__delta la-stat__delta--flat">потенциальные адресаты КП</span>
+  </div>
+  <div class="la-stat">
+    <span class="la-stat__label">Избранных машин</span>
+    <span class="la-stat__value">{{ '{:,}'.format(stats.favorites_total).replace(',', ' ') }}</span>
+    <span class="la-stat__delta {% if stats.favorites_week > 0 %}la-stat__delta--up{% else %}la-stat__delta--flat{% endif %}">+{{ stats.favorites_week }} за неделю</span>
+  </div>
+</div>
+
+<div class="la-form-grid la-form-grid--2" style="align-items: stretch">
+  <div class="la-card la-card--inset" style="margin: 0">
+    <div class="la-card__header">
+      <div class="la-card__header-text">
+        <div class="la-card__title">Воронка прямо сейчас</div>
+        <div class="la-card__sub">Что мы можем посчитать без middleware page_visits.</div>
+      </div>
+    </div>
+    <div class="la-card__body">
+      <table class="la-table la-table--compact">
+        <tbody>
+          <tr><td>Регистрации сегодня</td><td class="col-num"><strong>{{ stats.users_today }}</strong></td></tr>
+          <tr><td>Регистрации за 7 дней</td><td class="col-num"><strong>{{ stats.users_week }}</strong></td></tr>
+          <tr><td>Регистрации всего</td><td class="col-num"><strong>{{ stats.users_total }}</strong></td></tr>
+          <tr><td>Верифицировано (email или телефон)</td><td class="col-num"><strong>{{ stats.users_verified }}</strong></td></tr>
+          <tr><td>Добавили в избранное (всего)</td><td class="col-num"><strong>{{ stats.favorites_total }}</strong></td></tr>
+          <tr><td>Добавили в избранное (7 дней)</td><td class="col-num"><strong>{{ stats.favorites_week }}</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="la-card la-card--inset" style="margin: 0">
+    <div class="la-card__header">
+      <div class="la-card__header-text">
+        <div class="la-card__title">Что подключим в Релизе 1, День 5</div>
+        <div class="la-card__sub">Полноценная статистика трафика с собственным сбором данных.</div>
+      </div>
+    </div>
+    <div class="la-card__body">
+      <ul class="la-text-muted" style="padding-left: 22px; margin: 0; line-height: 1.8">
+        <li>Middleware <code>page_visits</code> с cookie-баннером согласия.</li>
+        <li>Уникальные / всего посетителей за период.</li>
+        <li>Топ-страниц и источников трафика (referer, UTM).</li>
+        <li>Графики по дням / неделям / месяцам.</li>
+        <li>Полная воронка: посещение → регистрация → избранное → заявка → продажа.</li>
+        <li>Партиции по дням, ретеншн 180 дней.</li>
+      </ul>
+      <div class="la-divider"></div>
+      <a class="la-btn la-btn--secondary" href="/admin/users?period=7">Кто зарегистрировался за 7 дней →</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

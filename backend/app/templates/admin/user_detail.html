@@ -1,0 +1,144 @@
+{% extends "admin/_layout.html" %}
+
+{% block page_actions %}
+  <a class="la-btn la-btn--secondary la-btn--sm" href="/admin/users">← Все пользователи</a>
+{% endblock %}
+
+{% block page_content %}
+<div class="la-form-grid la-form-grid--2" style="align-items: stretch">
+
+  <div class="la-card la-card--inset" style="margin: 0">
+    <div class="la-card__header">
+      <div class="la-card__header-text">
+        <div class="la-card__title">Контакты</div>
+        <div class="la-card__sub">#{{ target.id }}</div>
+      </div>
+    </div>
+    <div class="la-card__body">
+      <div class="la-form-grid">
+        <div class="la-field">
+          <label class="la-field__label">ФИО</label>
+          <div>{{ target.full_name or '—' }}</div>
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Email</label>
+          <div>
+            <a href="mailto:{{ target.email }}">{{ target.email }}</a>
+            {% if target.email_verified_at %}<span class="la-badge la-badge--success" style="margin-left: 8px">верифицирован</span>{% endif %}
+          </div>
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Телефон</label>
+          <div>
+            {% if target.phone %}<a href="tel:{{ target.phone }}">{{ target.phone }}</a>{% else %}—{% endif %}
+            {% if target.phone_verified_at %}<span class="la-badge la-badge--success" style="margin-left: 8px">верифицирован</span>{% endif %}
+          </div>
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Зарегистрирован</label>
+          <div>{{ target.created_at.strftime('%d.%m.%Y %H:%M') if target.created_at else '—' }}</div>
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Последний вход</label>
+          <div>{{ target.last_login_at.strftime('%d.%m.%Y %H:%M') if target.last_login_at else '—' }}</div>
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Статус</label>
+          <div>
+            {% if target.is_active %}<span class="la-badge la-badge--success">активен</span>{% else %}<span class="la-badge la-badge--danger">деактивирован</span>{% endif %}
+            {% if target.is_admin %}<span class="la-badge la-badge--info">администратор</span>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="la-card la-card--inset" style="margin: 0">
+    <div class="la-card__header">
+      <div class="la-card__header-text">
+        <div class="la-card__title">Действия</div>
+        <div class="la-card__sub">Что можно сделать с этим пользователем сейчас.</div>
+      </div>
+    </div>
+    <div class="la-card__body">
+      <div class="la-vstack">
+        {% if target.email %}
+        <a class="la-btn la-btn--secondary" href="mailto:{{ target.email }}?subject=Предложение от Level Avto">Написать на email</a>
+        {% endif %}
+        {% if target.phone %}
+        <a class="la-btn la-btn--secondary" href="tel:{{ target.phone }}">Позвонить</a>
+        {% endif %}
+        {% if target.phone %}
+        <a class="la-btn la-btn--secondary" href="https://wa.me/{{ target.phone | replace('+', '') | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') }}" target="_blank" rel="noopener">Написать в WhatsApp</a>
+        {% endif %}
+        <button type="button" class="la-btn la-btn--primary is-disabled" disabled title="Релиз 1, День 4">
+          Отправить предложение в ЛК (скоро)
+        </button>
+      </div>
+      <div class="la-text-dim" style="margin-top: 14px; font-size: 12.5px">
+        Внутренние сообщения в ЛК пользователя добавятся вместе с моделью Notification (Релиз 1, День 4).
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="la-card" style="margin-top: 22px">
+  <div class="la-card__header">
+    <div class="la-card__header-text">
+      <div class="la-card__title">Избранные машины ({{ favorites | length }})</div>
+      <div class="la-card__sub">Машины, которые пользователь добавил в избранное.</div>
+    </div>
+  </div>
+  <div class="la-card__body">
+    {% if favorites %}
+    <div class="la-table-wrap">
+      <table class="la-table la-table--compact">
+        <thead>
+          <tr>
+            <th>Авто</th>
+            <th>Регион</th>
+            <th>Год</th>
+            <th>Пробег</th>
+            <th>Цена</th>
+            <th>Добавлено</th>
+            <th class="col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in favorites %}
+          {% set car = item.car %}
+          <tr>
+            <td>
+              <a href="/car/{{ car.id }}" target="_blank" rel="noopener">
+                <strong>{{ car.brand or '—' }} {{ car.model or '' }}</strong>
+              </a>
+              {% if car.variant %}<div class="la-text-dim">{{ car.variant }}</div>{% endif %}
+            </td>
+            <td>{{ car.country or '—' }}</td>
+            <td>{{ car.registration_year or car.year or '—' }}</td>
+            <td>{% if car.mileage %}{{ '{:,}'.format(car.mileage).replace(',', ' ') }} км{% else %}—{% endif %}</td>
+            <td>
+              {% if car.total_price_rub_cached %}
+                {{ '{:,.0f}'.format(car.total_price_rub_cached).replace(',', ' ') }} ₽
+              {% elif car.price_rub_cached %}
+                {{ '{:,.0f}'.format(car.price_rub_cached).replace(',', ' ') }} ₽
+              {% else %}—{% endif %}
+            </td>
+            <td class="la-text-dim">{{ item.fav.created_at.strftime('%d.%m.%Y') if item.fav.created_at else '—' }}</td>
+            <td class="col-actions">
+              <a class="la-btn la-btn--ghost la-btn--sm" href="/car/{{ car.id }}" target="_blank" rel="noopener">Открыть →</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="la-empty">
+      <div class="la-empty__icon">★</div>
+      <div class="la-empty__title">Пока ничего не добавлено</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

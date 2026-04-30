@@ -268,7 +268,7 @@ def test_admin_layout_uses_new_design_system():
     assert 'class="la-admin"' in layout
     assert 'class="la-admin-shell"' in layout
     assert 'data-sidebar-toggle' in layout
-    assert "/static/css/admin.css?v=2" in layout
+    assert "/static/css/admin.css?v=3" in layout
     assert "/static/js/admin.js?v=3" in layout
     assert 'grid-template-areas:\n    "topbar  sidebar"' in css
     assert "1fr var(--la-sidebar-w)" in css
@@ -318,8 +318,9 @@ def test_admin_router_uses_flash_redirects_for_user_feedback():
 def test_admin_router_has_get_handlers_for_every_sidebar_link():
     router = _read("app/routers/admin.py")
     js = _read("app/static/js/admin.js")
-    coming_soon = _read("app/templates/admin/_coming_soon.html")
-    # Future-feature stubs render a Coming-soon card.
+    # Every sidebar link has a real GET handler — either a fully functional
+    # page or a self-contained "what works now / what's planned" page that
+    # never points back to the dashboard.
     for path in (
         "/admin/top-brands",
         "/admin/calculator/excel",
@@ -327,14 +328,98 @@ def test_admin_router_has_get_handlers_for_every_sidebar_link():
         "/admin/notifications",
         "/admin/analytics",
     ):
-        assert f'@router.get("{path}"' in router, f"missing GET stub for {path}"
-    assert "_render_coming_soon(" in router
-    assert "{{ stub_title }}" in coming_soon
+        assert f'@router.get("{path}"' in router, f"missing GET handler for {path}"
     # Existing POST endpoints get a GET-redirect to the dashboard tab.
     for path in ("/admin/contacts", "/admin/recommended", "/admin/calculator", "/admin/customs", "/admin/home"):
         assert f'@router.get("{path}")' in router
     assert "activateTabFromHash" in js
     assert "/^#tab=([a-zA-Z0-9_-]+)/" in js
+
+
+def test_admin_top_brands_page_supports_save_and_reset():
+    router = _read("app/routers/admin.py")
+    template = _read("app/templates/admin/top_brands.html")
+    # Functional editor: save, reset, cache invalidation hooks.
+    assert '@router.post("/admin/top-brands")' in router
+    assert "TOP_BRANDS_CONTENT_KEY" in router
+    assert "_bump_filter_caches" in router
+    assert 'redis_delete_by_pattern("filter_ctx_*")' in router
+    # Drag-and-drop UI primitives in the template.
+    assert "la-brand-list" in template
+    assert "draggable = true" in template
+    assert "data-target=\"top\"" in template
+    assert "data-target=\"other\"" in template
+
+
+def test_brand_groups_override_threads_through_pages_and_catalog():
+    """Operator-edited top-brands list must reach every consumer.
+
+    The override is stored in site_content.top_brands_json and read via
+    load_priority_override(db). All public surfaces that build a brand
+    groups dict pass that override to group_brands so the home, search,
+    and catalog renders agree with the admin's edits.
+    """
+    pages = _read("app/routers/pages.py")
+    catalog = _read("app/routers/catalog.py")
+    brand_groups_module = _read("app/utils/brand_groups.py")
+    assert "load_priority_override(db)" in pages
+    assert "load_priority_override(db)" in catalog
+    assert "def load_priority_override" in brand_groups_module
+    assert "def effective_priority" in brand_groups_module
+    # The home, catalog SSR cache hit, and search renders all pass the
+    # override (three call sites in pages.py).
+    assert pages.count("load_priority_override(db)") >= 3
+
+
+def test_admin_calculator_excel_page_has_export_and_preview_apply():
+    router = _read("app/routers/admin.py")
+    template = _read("app/templates/admin/calculator_excel.html")
+    assert '@router.get("/admin/calculator/export.xlsx")' in router
+    assert '@router.post("/admin/calculator/preview")' in router
+    assert '@router.post("/admin/calculator/preview/apply")' in router
+    assert '@router.post("/admin/calculator/preview/discard")' in router
+    assert "diff_payloads" in router
+    assert "calc_preview" in router
+    # Preview UI shows old vs new diff, not just an upload button.
+    assert "Сейчас в БД" in template
+    assert "Из файла" in template
+    assert "{{ pending.token }}" in template
+
+
+def test_admin_users_page_lists_users_with_filters():
+    router = _read("app/routers/admin.py")
+    listing = _read("app/templates/admin/users.html")
+    detail = _read("app/templates/admin/user_detail.html")
+    assert '@router.get("/admin/users", response_class=None)' in router
+    assert '@router.get("/admin/users/{user_id}", response_class=None)' in router
+    # Search and filter parameters are wired to actual SQL.
+    assert "User.email.ilike" in router
+    assert "fav_count_subq" in router
+    # Detail page shows favorited cars.
+    assert "Избранные машины" in detail
+    assert 'href="mailto:' in detail
+    # Listing has filter controls.
+    assert 'name="q"' in listing
+    assert 'name="verified"' in listing
+    assert 'name="period"' in listing
+
+
+def test_admin_stubs_no_longer_redirect_to_dashboard():
+    """Per operator feedback: stub pages must not just link back to /admin.
+
+    Every page under the sidebar either does something useful or shows the
+    operator what the page will do without a "back to dashboard" link.
+    """
+    coming_soon = _read("app/templates/admin/_coming_soon.html")
+    notifications = _read("app/templates/admin/notifications.html")
+    analytics = _read("app/templates/admin/analytics.html")
+    # The shared "coming soon" template no longer ships a back-to-dashboard link.
+    assert "Вернуться на сводку" not in coming_soon
+    # Notifications page surfaces real contacts (mailto/tel/whatsapp via users page).
+    assert "/admin/users" in notifications
+    # Analytics page shows live stats, not a placeholder card.
+    assert "stats.users_today" in analytics
+    assert "stats.favorites_total" in analytics
 
 
 def test_filter_payload_can_defer_to_base_ctx_on_public_scope():

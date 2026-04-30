@@ -1,5 +1,7 @@
 from backend.app.utils.brand_groups import (
     BRAND_FILTER_PRIORITY,
+    _coerce_priority_list,
+    effective_priority,
     group_brands,
     ordered_brands,
 )
@@ -67,3 +69,36 @@ def test_priority_list_is_unique_and_in_expected_order():
     assert BRAND_FILTER_PRIORITY[-1] == "Volvo"
     assert "Ford" in BRAND_FILTER_PRIORITY
     assert len(BRAND_FILTER_PRIORITY) == len(set(BRAND_FILTER_PRIORITY))
+
+
+def test_group_brands_uses_runtime_priority_override():
+    brands = ["Audi", "BMW", "Mercedes-Benz", "Renault", "Volvo"]
+    override = ["Renault", "Volvo"]
+    groups = group_brands(brands, priority=override)
+    # Operator-supplied priority wins; everything else falls into "other"
+    # alphabetically — even priority brands from the default list.
+    assert groups["top"] == ["Renault", "Volvo"]
+    assert groups["other"] == ["Audi", "BMW", "Mercedes-Benz"]
+
+
+def test_effective_priority_falls_back_when_override_invalid():
+    assert effective_priority(None) == BRAND_FILTER_PRIORITY
+    assert effective_priority("") == BRAND_FILTER_PRIORITY
+    # Bad JSON falls back rather than crashing the public site.
+    assert effective_priority("{not json") == BRAND_FILTER_PRIORITY
+    # Empty list also falls back to the default.
+    assert effective_priority([]) == BRAND_FILTER_PRIORITY
+
+
+def test_effective_priority_accepts_json_string_and_normalizes_aliases():
+    assert effective_priority('["mercedes", "vw", "BMW"]') == [
+        "Mercedes-Benz",
+        "Volkswagen",
+        "BMW",
+    ]
+
+
+def test_coerce_priority_list_drops_duplicates_and_blanks():
+    assert _coerce_priority_list(["BMW", "", "bmw", "  ", "Audi"]) == ["BMW", "Audi"]
+    assert _coerce_priority_list(None) is None
+    assert _coerce_priority_list("   ") is None

@@ -1,0 +1,143 @@
+{% extends "admin/_layout.html" %}
+
+{% block page_actions %}
+  {% if latest %}
+  <a class="la-btn la-btn--secondary" href="/admin/calculator/export.xlsx">Скачать актуальный конфиг (xlsx)</a>
+  {% endif %}
+{% endblock %}
+
+{% block page_content %}
+<div class="la-form-grid la-form-grid--2" style="align-items: stretch">
+
+  <div class="la-card la-card--inset" style="margin: 0">
+    <div class="la-card__header">
+      <div class="la-card__header-text">
+        <div class="la-card__title">Текущая версия</div>
+        <div class="la-card__sub">
+          {% if latest %}
+          v{{ latest.version }} · источник: <strong>{{ latest.source }}</strong>{% if latest.comment %} · {{ latest.comment }}{% endif %}
+          {% else %}
+          Конфиг ещё не загружен — загрузите xlsx ниже.
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="la-card__body">
+      {% if versions %}
+      <div class="la-text-muted" style="margin-bottom: 8px">Последние {{ versions|length }} версий:</div>
+      <div class="la-table-wrap">
+        <table class="la-table la-table--compact">
+          <thead><tr><th>Версия</th><th>Источник</th><th>Комментарий</th><th>Создана</th></tr></thead>
+          <tbody>
+            {% for v in versions %}
+            <tr>
+              <td><strong>v{{ v.version }}</strong>{% if loop.first %} <span class="la-badge la-badge--success">актуальна</span>{% endif %}</td>
+              <td>{{ v.source or '—' }}</td>
+              <td class="la-text-dim">{{ v.comment or '—' }}</td>
+              <td class="la-text-dim">{{ v.created_at.strftime('%d.%m.%Y %H:%M') if v.created_at else '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="la-empty">
+        <div class="la-empty__title">История версий пуста</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="la-card la-card--inset" style="margin: 0">
+    <div class="la-card__header">
+      <div class="la-card__header-text">
+        <div class="la-card__title">Загрузить новый xlsx с предпросмотром</div>
+        <div class="la-card__sub">
+          Файл сначала прочитается и сравнится с текущим конфигом.
+          Изменения применятся только после вашего подтверждения.
+        </div>
+      </div>
+    </div>
+    <div class="la-card__body">
+      <form method="post" action="/admin/calculator/preview" enctype="multipart/form-data" class="la-form">
+        <div class="la-field">
+          <label class="la-field__label">Файл (.xlsx / .xlsm / .xls)</label>
+          <input class="la-input" type="file" name="file" accept=".xlsx,.xlsm,.xls" required>
+          <span class="la-field__hint">Форматирование шаблона как у файла «Калькулятор Авто под заказ.xlsx».</span>
+        </div>
+        <button type="submit" class="la-btn la-btn--primary">Анализ файла</button>
+      </form>
+      <div class="la-divider"></div>
+      <form method="post" action="/admin/calculator/upload" enctype="multipart/form-data" class="la-form">
+        <details>
+          <summary class="la-text-dim" style="cursor: pointer">Загрузить и применить сразу (без предпросмотра)</summary>
+          <div class="la-field" style="margin-top: 10px">
+            <label class="la-field__label">Файл (.xlsx / .xlsm / .xls)</label>
+            <input class="la-input" type="file" name="file" accept=".xlsx,.xlsm,.xls">
+          </div>
+          <button type="submit" class="la-btn la-btn--secondary la-btn--sm" data-confirm="Применить файл сразу, без предпросмотра?">Загрузить и применить</button>
+        </details>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if pending %}
+<div class="la-card" style="margin-top: 22px; border-color: var(--la-accent-strong)">
+  <div class="la-card__header" style="background: var(--la-accent-fade)">
+    <div class="la-card__header-text">
+      <div class="la-card__title">⚠ Ожидает подтверждения: {{ pending.filename }}</div>
+      <div class="la-card__sub">{{ pending.total_changes }} изменений. Изменения <strong>не применены</strong> — сохранить или отменить?</div>
+    </div>
+  </div>
+  <div class="la-card__body">
+
+    <div class="la-table-wrap" style="max-height: 480px; overflow: auto">
+      <table class="la-table la-table--compact">
+        <thead>
+          <tr>
+            <th style="min-width: 220px">Параметр</th>
+            <th>Сейчас в БД</th>
+            <th>Из файла</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for path, change in pending.changes.items() %}
+          <tr>
+            <td class="la-mono">{{ path }}</td>
+            <td class="la-text-dim">{{ change.old if change.old is not none else '—' }}</td>
+            <td><strong>{{ change.new if change.new is not none else '—' }}</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="la-hstack" style="margin-top: 18px">
+      <form method="post" action="/admin/calculator/preview/apply" style="display: inline">
+        <input type="hidden" name="token" value="{{ pending.token }}">
+        <button type="submit" class="la-btn la-btn--primary" data-confirm="Применить эти изменения? Будет создана новая версия конфига.">Применить ({{ pending.total_changes }} изменений)</button>
+      </form>
+      <form method="post" action="/admin/calculator/preview/discard" style="display: inline">
+        <button type="submit" class="la-btn la-btn--secondary">Отменить предпросмотр</button>
+      </form>
+      <span class="la-text-dim">Конфиг текущей сессии хранится 1 час. После применения создастся новая версия (откат — через скрипт).</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="la-card" style="margin-top: 22px">
+  <div class="la-card__body">
+    <h2 style="margin-bottom: 8px">Что есть и чего ещё нет</h2>
+    <ul class="la-text-muted" style="padding-left: 22px; margin: 0; line-height: 1.7">
+      <li>✅ Скачивание актуального конфига как xlsx (по сценариям).</li>
+      <li>✅ Предпросмотр изменений перед применением (diff построчно).</li>
+      <li>✅ История версий — каждая загрузка создаёт новую версию.</li>
+      <li>⏳ Откат к предыдущей версии одним кликом — Релиз 2.</li>
+      <li>⏳ Шаблон-болванка для заказчика без данных — Релиз 2.</li>
+      <li>⏳ Кнопка пересчёта каталога после применения — пересчёт пока запускается отдельным скриптом.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,273 @@
+{% extends "admin/_layout.html" %}
+
+{% block page_actions %}
+  <form method="post" action="/admin/top-brands" data-confirm="Сбросить список к набору по умолчанию?" style="margin: 0">
+    <input type="hidden" name="reset" value="1">
+    <button type="submit" class="la-btn la-btn--ghost la-btn--sm">Сбросить к стандартному списку</button>
+  </form>
+{% endblock %}
+
+{% block page_content %}
+<div class="la-card">
+  <div class="la-card__body">
+    <p class="la-text-muted" style="margin-bottom: 14px">
+      В колонке <strong>«Топ»</strong> — бренды, которые показываются в группе
+      <em>«Топ-марки»</em> на главной, в каталоге и в расширенном поиске. Порядок
+      сверху вниз отражает порядок в выпадающем списке. В колонке
+      <strong>«Все остальные»</strong> — бренды, доступные в нашей базе, но не
+      попавшие в топ.
+      {% if is_overridden %}
+      <span class="la-badge la-badge--info" style="margin-left: 6px">оператор переопределил список</span>
+      {% else %}
+      <span class="la-badge la-badge--muted" style="margin-left: 6px">используется список по умолчанию</span>
+      {% endif %}
+    </p>
+
+    <div class="la-form-grid la-form-grid--2" style="align-items: stretch">
+      <div class="la-card la-card--inset" style="margin: 0">
+        <div class="la-card__header">
+          <div class="la-card__header-text">
+            <div class="la-card__title">★ Топ-марки</div>
+            <div class="la-card__sub" id="top-counter">{{ top_brands|length }} в списке</div>
+          </div>
+        </div>
+        <div class="la-card__body" style="min-height: 360px">
+          <input type="text" class="la-input" id="filter-top" placeholder="Фильтр по названию…">
+          <ul class="la-brand-list" id="list-top" data-target="top">
+            {% for brand in top_brands %}
+            <li class="la-brand-chip" data-brand="{{ brand }}">
+              <span class="la-brand-chip__handle">⋮⋮</span>
+              <span class="la-brand-chip__name">{{ brand }}</span>
+              <button type="button" class="la-brand-chip__remove" data-action="move-other" title="Убрать из топа">×</button>
+            </li>
+            {% endfor %}
+          </ul>
+          {% if not top_brands %}
+          <div class="la-text-dim" id="top-empty" style="text-align: center; padding: 22px">Пусто. Перетащите бренды сюда.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="la-card la-card--inset" style="margin: 0">
+        <div class="la-card__header">
+          <div class="la-card__header-text">
+            <div class="la-card__title">Все остальные</div>
+            <div class="la-card__sub" id="other-counter">{{ other_brands|length }} в базе</div>
+          </div>
+        </div>
+        <div class="la-card__body" style="min-height: 360px">
+          <input type="text" class="la-input" id="filter-other" placeholder="Фильтр по названию…">
+          <ul class="la-brand-list la-brand-list--alt" id="list-other" data-target="other">
+            {% for brand in other_brands %}
+            <li class="la-brand-chip la-brand-chip--alt" data-brand="{{ brand }}">
+              <span class="la-brand-chip__handle">⋮⋮</span>
+              <span class="la-brand-chip__name">{{ brand }}</span>
+              <button type="button" class="la-brand-chip__add" data-action="move-top" title="Добавить в топ">+</button>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <form method="post" action="/admin/top-brands" id="top-brands-form" style="margin-top: 22px">
+      <input type="hidden" name="brands" id="top-brands-input" value="{{ top_brands | join(',') }}">
+      <div class="la-hstack">
+        <button type="submit" class="la-btn la-btn--primary">Сохранить</button>
+        <a class="la-btn la-btn--ghost" href="/admin/top-brands">Отменить изменения</a>
+        <span class="la-text-dim" id="dirty-flag" hidden>есть несохранённые изменения</span>
+      </div>
+    </form>
+
+    <div class="la-divider"></div>
+    <div class="la-text-dim" style="font-size: 12.5px">
+      Стандартный набор (используется при сбросе): {{ default_brands | join(', ') }}
+    </div>
+  </div>
+</div>
+
+<style>
+  .la-brand-list {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 280px;
+  }
+  .la-brand-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--la-border);
+    border-radius: var(--la-radius-md);
+    background: var(--la-surface);
+    cursor: grab;
+    user-select: none;
+    transition: background 0.1s ease, border-color 0.1s ease;
+  }
+  .la-brand-chip:hover { border-color: var(--la-border-strong); }
+  .la-brand-chip.is-dragging { opacity: 0.4; cursor: grabbing; }
+  .la-brand-chip.is-hidden { display: none; }
+  .la-brand-chip__handle {
+    color: var(--la-text-dim);
+    cursor: grab;
+    font-family: var(--la-font-mono);
+    font-size: 14px;
+    user-select: none;
+  }
+  .la-brand-chip__name {
+    flex: 1;
+    color: var(--la-text);
+    font-size: 13.5px;
+  }
+  .la-brand-chip__remove,
+  .la-brand-chip__add {
+    border: none;
+    background: transparent;
+    color: var(--la-text-dim);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .la-brand-chip__remove:hover { color: var(--la-danger); background: var(--la-danger-soft); }
+  .la-brand-chip__add:hover { color: var(--la-success); background: var(--la-success-soft); }
+  .la-brand-list.is-dragover {
+    background: var(--la-accent-fade);
+    border-radius: var(--la-radius-md);
+  }
+</style>
+
+<script>
+(function() {
+  const listTop = document.getElementById('list-top');
+  const listOther = document.getElementById('list-other');
+  const hidden = document.getElementById('top-brands-input');
+  const dirty = document.getElementById('dirty-flag');
+  const topCounter = document.getElementById('top-counter');
+  const otherCounter = document.getElementById('other-counter');
+  const topEmpty = document.getElementById('top-empty');
+  let isDirty = false;
+
+  function syncForm() {
+    const items = Array.from(listTop.querySelectorAll('.la-brand-chip'))
+      .map(li => li.dataset.brand)
+      .filter(Boolean);
+    hidden.value = items.join(',');
+    if (topCounter) topCounter.textContent = items.length + ' в списке';
+    if (otherCounter) {
+      const otherCount = listOther.querySelectorAll('.la-brand-chip').length;
+      otherCounter.textContent = otherCount + ' в базе';
+    }
+    if (topEmpty) topEmpty.hidden = items.length > 0;
+    if (!isDirty) {
+      isDirty = true;
+      if (dirty) dirty.hidden = false;
+    }
+  }
+
+  function refreshActionButtons(li, target) {
+    const removeBtn = li.querySelector('.la-brand-chip__remove');
+    const addBtn = li.querySelector('.la-brand-chip__add');
+    if (target === 'top') {
+      li.classList.remove('la-brand-chip--alt');
+      if (removeBtn) removeBtn.style.display = '';
+      if (addBtn) addBtn.style.display = 'none';
+    } else {
+      li.classList.add('la-brand-chip--alt');
+      if (removeBtn) removeBtn.style.display = 'none';
+      if (addBtn) addBtn.style.display = '';
+    }
+  }
+
+  function moveTo(li, list) {
+    list.appendChild(li);
+    refreshActionButtons(li, list.dataset.target);
+    syncForm();
+  }
+
+  document.body.addEventListener('click', function(e) {
+    const t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+    const li = t.closest('.la-brand-chip');
+    if (!li) return;
+    if (t.dataset.action === 'move-top') moveTo(li, listTop);
+    else if (t.dataset.action === 'move-other') moveTo(li, listOther);
+  });
+
+  let dragged = null;
+
+  function attachDrag(li) {
+    li.draggable = true;
+    li.addEventListener('dragstart', function(e) {
+      dragged = li;
+      li.classList.add('is-dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', li.dataset.brand || ''); } catch (_) {}
+      }
+    });
+    li.addEventListener('dragend', function() {
+      li.classList.remove('is-dragging');
+      dragged = null;
+    });
+  }
+
+  document.querySelectorAll('.la-brand-chip').forEach(attachDrag);
+
+  [listTop, listOther].forEach(function(list) {
+    list.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      list.classList.add('is-dragover');
+      const after = getDragAfterElement(list, e.clientY);
+      if (!dragged) return;
+      if (!after) {
+        list.appendChild(dragged);
+      } else {
+        list.insertBefore(dragged, after);
+      }
+    });
+    list.addEventListener('dragleave', function() {
+      list.classList.remove('is-dragover');
+    });
+    list.addEventListener('drop', function(e) {
+      e.preventDefault();
+      list.classList.remove('is-dragover');
+      if (dragged) refreshActionButtons(dragged, list.dataset.target);
+      syncForm();
+    });
+  });
+
+  function getDragAfterElement(list, y) {
+    const items = Array.from(list.querySelectorAll('.la-brand-chip:not(.is-dragging)'));
+    return items.reduce(function(closest, child) {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      }
+      return closest;
+    }, { offset: -Infinity, element: null }).element;
+  }
+
+  function attachFilter(inputId, listEl) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener('input', function() {
+      const q = input.value.trim().toLowerCase();
+      listEl.querySelectorAll('.la-brand-chip').forEach(function(li) {
+        const name = (li.dataset.brand || '').toLowerCase();
+        li.classList.toggle('is-hidden', q && name.indexOf(q) === -1);
+      });
+    });
+  }
+
+  attachFilter('filter-top', listTop);
+  attachFilter('filter-other', listOther);
+})();
+</script>
+{% endblock %}

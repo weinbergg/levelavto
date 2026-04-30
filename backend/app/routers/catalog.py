@@ -36,7 +36,7 @@ from ..utils.price_utils import (
     sort_items_by_display_price,
 )
 from ..utils.color_groups import split_color_facets
-from ..utils.brand_groups import group_brands
+from ..utils.brand_groups import group_brands, load_priority_override
 from ..utils.thumbs import normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.redis_cache import (
     redis_get_json,
@@ -1645,7 +1645,10 @@ def filter_ctx_base(
             if b.get("value")
         ]
     )
-    brand_groups = group_brands([item.get("value") for item in brands if item.get("value")])
+    brand_groups = group_brands(
+        [item.get("value") for item in brands if item.get("value")],
+        priority=load_priority_override(db),
+    )
     reg_years = sorted(
         [int(r["value"]) for r in service.facet_counts(field="reg_year", filters=base_filters) if r.get("value")],
         reverse=True,

@@ -1,0 +1,116 @@
+{% extends "admin/_layout.html" %}
+
+{% block page_actions %}
+  <span class="la-text-muted">Всего: <strong>{{ total }}</strong></span>
+{% endblock %}
+
+{% block page_content %}
+<div class="la-card">
+  <div class="la-card__body">
+    <form method="get" action="/admin/users" class="la-form" style="margin-bottom: 18px">
+      <div class="la-form-grid la-form-grid--3">
+        <div class="la-field">
+          <label class="la-field__label">Поиск (email / телефон / имя)</label>
+          <input class="la-input" type="text" name="q" value="{{ q }}" placeholder="например, ivan@ или +7911">
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Верификация</label>
+          <select class="la-select" name="verified">
+            <option value="" {% if not verified %}selected{% endif %}>Не важно</option>
+            <option value="yes" {% if verified == 'yes' %}selected{% endif %}>Только верифицированные</option>
+            <option value="no" {% if verified == 'no' %}selected{% endif %}>Только без верификации</option>
+          </select>
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Регистрация за период</label>
+          <select class="la-select" name="period">
+            <option value="" {% if not period %}selected{% endif %}>За всё время</option>
+            <option value="7" {% if period == '7' %}selected{% endif %}>Последние 7 дней</option>
+            <option value="30" {% if period == '30' %}selected{% endif %}>Последние 30 дней</option>
+            <option value="90" {% if period == '90' %}selected{% endif %}>Последние 90 дней</option>
+          </select>
+        </div>
+      </div>
+      <div class="la-hstack">
+        <button type="submit" class="la-btn la-btn--primary">Применить</button>
+        <a class="la-btn la-btn--ghost" href="/admin/users">Сбросить</a>
+      </div>
+    </form>
+
+    {% if users %}
+    <div class="la-table-wrap">
+      <table class="la-table">
+        <thead>
+          <tr>
+            <th>Пользователь</th>
+            <th>Email</th>
+            <th>Телефон</th>
+            <th>Регистрация</th>
+            <th>Верификация</th>
+            <th class="col-num">Избранное</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in users %}
+          {% set u = item.row %}
+          <tr style="cursor: pointer" onclick="window.location='/admin/users/{{ u.id }}'">
+            <td>
+              <div style="display: flex; align-items: center; gap: 10px">
+                <span class="la-avatar">{{ (u.full_name or u.email)[:1] | upper }}</span>
+                <div>
+                  <div><strong>{{ u.full_name or '—' }}</strong></div>
+                  <div class="la-text-dim">#{{ u.id }}</div>
+                </div>
+              </div>
+            </td>
+            <td><a href="/admin/users/{{ u.id }}">{{ u.email }}</a></td>
+            <td>{{ u.phone or '—' }}</td>
+            <td class="la-text-dim">{{ u.created_at.strftime('%d.%m.%Y %H:%M') if u.created_at else '—' }}</td>
+            <td>
+              {% if u.email_verified_at %}<span class="la-badge la-badge--success">email</span>{% endif %}
+              {% if u.phone_verified_at %}<span class="la-badge la-badge--success">телефон</span>{% endif %}
+              {% if not u.email_verified_at and not u.phone_verified_at %}
+              <span class="la-badge la-badge--muted">нет</span>
+              {% endif %}
+              {% if u.is_admin %}<span class="la-badge la-badge--info">admin</span>{% endif %}
+            </td>
+            <td class="col-num">{{ item.fav_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pages > 1 %}
+    <div class="la-hstack" style="margin-top: 14px; justify-content: center">
+      {% set base_qs %}q={{ q | urlencode }}&verified={{ verified | urlencode }}&period={{ period | urlencode }}{% endset %}
+      {% if page > 1 %}
+      <a class="la-btn la-btn--secondary la-btn--sm" href="/admin/users?{{ base_qs }}&page={{ page - 1 }}">← Назад</a>
+      {% endif %}
+      <span class="la-text-dim">Страница {{ page }} из {{ pages }}</span>
+      {% if page < pages %}
+      <a class="la-btn la-btn--secondary la-btn--sm" href="/admin/users?{{ base_qs }}&page={{ page + 1 }}">Вперёд →</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="la-empty">
+      <div class="la-empty__icon">∅</div>
+      <div class="la-empty__title">По текущим фильтрам ничего не найдено</div>
+      <div>Попробуйте сбросить фильтры или поискать по другим параметрам.</div>
+    </div>
+    {% endif %}
+
+    <div class="la-divider"></div>
+    <h2 style="margin-bottom: 8px">Что есть и чего ещё нет</h2>
+    <ul class="la-text-muted" style="padding-left: 22px; margin: 0; line-height: 1.7">
+      <li>✅ Поиск по email / телефону / ФИО.</li>
+      <li>✅ Фильтры по верификации и периоду регистрации.</li>
+      <li>✅ Карточка пользователя с избранными машинами (клик по строке).</li>
+      <li>⏳ Экспорт в xlsx — Релиз 1 День 3.</li>
+      <li>⏳ Кнопка «Отправить предложение» — Релиз 1 День 4 (после модели Notification).</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

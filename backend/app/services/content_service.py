@@ -18,6 +18,12 @@ class ContentService:
         rows = self.db.execute(query).scalars().all()
         return {row.key: row.value for row in rows}
 
+    def get(self, key: str) -> Optional[str]:
+        row = self.db.execute(
+            select(SiteContent).where(SiteContent.key == key)
+        ).scalar_one_or_none()
+        return row.value if row else None
+
     def upsert_content(self, key: str, value: str, description: str | None = None) -> SiteContent:
         existing = (
             self.db.execute(

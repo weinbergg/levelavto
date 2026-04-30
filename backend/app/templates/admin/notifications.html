@@ -1,0 +1,60 @@
+{% extends "admin/_layout.html" %}
+
+{% block page_content %}
+<div class="la-card-grid la-card-grid--3" style="margin-bottom: 22px">
+  <div class="la-stat">
+    <span class="la-stat__label">Всего пользователей</span>
+    <span class="la-stat__value">{{ '{:,}'.format(stats.users_total).replace(',', ' ') }}</span>
+    <span class="la-stat__delta la-stat__delta--flat">потенциальные адресаты</span>
+  </div>
+  <div class="la-stat">
+    <span class="la-stat__label">Верифицировано</span>
+    <span class="la-stat__value">{{ '{:,}'.format(stats.users_verified).replace(',', ' ') }}</span>
+    <span class="la-stat__delta la-stat__delta--flat">подтвердили email или телефон</span>
+  </div>
+  <div class="la-stat">
+    <span class="la-stat__label">Добавляли в избранное</span>
+    <span class="la-stat__value">{{ '{:,}'.format(stats.favorites_total).replace(',', ' ') }}</span>
+    <span class="la-stat__delta {% if stats.favorites_week > 0 %}la-stat__delta--up{% else %}la-stat__delta--flat{% endif %}">+{{ stats.favorites_week }} за неделю</span>
+  </div>
+</div>
+
+<div class="la-form-grid la-form-grid--2" style="align-items: stretch">
+  <div class="la-card la-card--inset" style="margin: 0">
+    <div class="la-card__header">
+      <div class="la-card__header-text">
+        <div class="la-card__title">Что работает сейчас</div>
+        <div class="la-card__sub">Прямые каналы связи доступны из карточки пользователя.</div>
+      </div>
+    </div>
+    <div class="la-card__body">
+      <ul class="la-text-muted" style="padding-left: 22px; margin: 0; line-height: 1.8">
+        <li>📞 <strong>Звонок</strong> — ссылка <code>tel:</code> в карточке пользователя.</li>
+        <li>💬 <strong>WhatsApp</strong> — открывает чат с номером пользователя.</li>
+        <li>✉ <strong>Email</strong> — открывает почтовый клиент с готовой темой.</li>
+        <li>👀 <strong>Избранные машины</strong> — в карточке видны все авто, которые пользователь сохранил, чтобы вы могли подготовить персональное предложение.</li>
+      </ul>
+      <div class="la-divider"></div>
+      <a class="la-btn la-btn--primary" href="/admin/users">Открыть список пользователей →</a>
+    </div>
+  </div>
+
+  <div class="la-card la-card--inset" style="margin: 0">
+    <div class="la-card__header">
+      <div class="la-card__header-text">
+        <div class="la-card__title">Что подключим в Релизе 1, День 4</div>
+        <div class="la-card__sub">Полноценная переписка внутри сайта с лентой в ЛК.</div>
+      </div>
+    </div>
+    <div class="la-card__body">
+      <ul class="la-text-muted" style="padding-left: 22px; margin: 0; line-height: 1.8">
+        <li>Модель <code>Notification</code> + миграция Alembic.</li>
+        <li>Виджет «Сообщения» в личном кабинете с пометкой «прочитано».</li>
+        <li>Адресная отправка одному пользователю с прикреплёнными машинами.</li>
+        <li>Сегментные рассылки: новые / верифицированные / добавлявшие в избранное.</li>
+        <li>Журнал отправленных + статус доставки + email-дубль (опционально).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
