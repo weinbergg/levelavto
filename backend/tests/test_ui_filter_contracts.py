@@ -266,6 +266,10 @@ def test_similar_cars_avoids_bare_numeric_order_by_constants():
     service = _read("app/services/cars_service.py")
     assert "def _sort_const(value: int | float):" in service
     assert "interprets as select-list ordinals" in service
+    assert 'SIMILAR_CARS_CANDIDATE_POOL' in service
+    assert 'SIMILAR_CARS_MODEL_POOL' in service
+    assert "First collect a recent candidate pool cheaply" in service
+    assert ".where(Car.id.in_(candidate_ids))" in service
     assert "else _sort_const(1)" in service
     assert "else _sort_const(999)" in service
     assert "else _sort_const(999999)" in service
@@ -803,7 +807,11 @@ def test_catalog_cards_stay_rub_only_and_detail_primary_prefers_thumb_with_orig_
     assert 'fetchpriority="high"' in detail_template
     assert "data-thumb=\"{{ primary_fast_src or primary_thumb_src or '' }}\"" in detail_template
     assert "if (!img.dataset.thumbFallbackTried" in script
-    assert "if os.getenv(\"DETAIL_REFRESH_SIMILAR_PRICES\", \"0\") == \"1\":" in pages
+    assert "def _detail_similar_offers_enabled() -> bool:" in pages
+    assert 'DETAIL_SIMILAR_OFFERS_ENABLED", "1") != "0"' in pages
+    assert 'os.getenv("DETAIL_REFRESH_SIMILAR_PRICES", "0") == "1"' in pages
+    assert "if similar_offers and os.getenv" in pages
+    assert 'logger.exception("detail_similar_offers_failed car=%s"' in pages
     assert "applyThumbFallback(primary)" in script
     assert "img.src = nextOrig || nextThumb" in script
     assert "applyThumbFallback(img)" in script

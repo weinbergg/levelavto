@@ -81,6 +81,10 @@ def _detail_inline_calc_enabled() -> bool:
     return os.getenv("DETAIL_INLINE_CALC", "0") == "1"
 
 
+def _detail_similar_offers_enabled() -> bool:
+    return os.getenv("DETAIL_SIMILAR_OFFERS_ENABLED", "1") != "0"
+
+
 def _home_dataset_version() -> str:
     try:
         return build_filter_ctx_base_key({}).rsplit(":v", 1)[-1]
@@ -2315,9 +2319,14 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         )
         payload = car.source_payload or {}
         pricing = service.price_info(car)
-        similar_offers = service.similar_cars(car, limit=10)
-        if os.getenv("DETAIL_REFRESH_SIMILAR_PRICES", "0") == "1":
-            service.refresh_visible_price_cache(similar_offers)
+        if _detail_similar_offers_enabled():
+            try:
+                similar_offers = service.similar_cars(car, limit=10)
+            except Exception:
+                logger.exception("detail_similar_offers_failed car=%s", getattr(car, "id", None))
+                similar_offers = []
+            if similar_offers and os.getenv("DETAIL_REFRESH_SIMILAR_PRICES", "0") == "1":
+                service.refresh_visible_price_cache(similar_offers)
         detail_fx_rates = service.get_fx_rates() or {}
         for item in similar_offers:
             _decorate_showcase_car(item, fx_rates=detail_fx_rates)

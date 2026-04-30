@@ -4317,11 +4317,18 @@ class CarsService:
         engine_key = normalize_fuel(car.engine_type) or str(car.engine_type or "").strip().lower()
         if not brand_keys and not model_key:
             return []
+        limit_num = max(1, min(int(limit or 10), 24))
 
         def _sort_const(value: int | float):
             # Avoid bare numeric ORDER BY items like `ORDER BY 999999`, which PostgreSQL
             # interprets as select-list ordinals instead of constant expressions.
             return literal(value) + literal(0)
+
+        def _candidate_pool_size(env_name: str, default: int) -> int:
+            try:
+                return max(limit_num, int(os.getenv(env_name, str(default)) or default))
+            except Exception:
+                return max(limit_num, default)
 
         conditions = [self._available_expr(), Car.id != car.id]
         if brand_keys:
@@ -4404,10 +4411,52 @@ class CarsService:
             if target_mileage is not None
             else _sort_const(999999999)
         )
+        model_pool_cap = _candidate_pool_size("SIMILAR_CARS_MODEL_POOL", max(limit_num * 12, 120))
+        broad_pool_cap = _candidate_pool_size("SIMILAR_CARS_CANDIDATE_POOL", max(limit_num * 24, 240))
+
+        # Detail pages should not full-scan an entire brand just to rank a handful of similar rows.
+        # First collect a recent candidate pool cheaply, then apply the expensive distance ranking only
+        # inside that shortlist.
+        def _load_candidate_ids(*extra_conditions: Any, cap: int) -> List[int]:
+            stmt = (
+                select(Car.id)
+                .where(and_(*conditions, *extra_conditions))
+                .order_by(
+                    Car.listing_sort_ts.desc().nullslast(),
+                    Car.created_at.desc(),
+                    Car.id.desc(),
+                )
+                .limit(max(limit_num, cap))
+            )
+            return [
+                int(candidate_id)
+                for candidate_id in self.db.execute(stmt).scalars().all()
+                if candidate_id is not None
+            ]
+
+        candidate_ids: List[int] = []
+        seen_candidate_ids: set[int] = set()
+
+        def _extend_candidates(extra_conditions: List[Any], cap: int) -> None:
+            for candidate_id in _load_candidate_ids(*extra_conditions, cap=cap):
+                if candidate_id in seen_candidate_ids:
+                    continue
+                seen_candidate_ids.add(candidate_id)
+                candidate_ids.append(candidate_id)
+
+        if model_key:
+            _extend_candidates([func.lower(func.coalesce(Car.model, "")) == model_key], model_pool_cap)
+        if len(candidate_ids) < limit_num:
+            broader_conditions: List[Any] = []
+            if candidate_ids:
+                broader_conditions.append(not_(Car.id.in_(candidate_ids)))
+            _extend_candidates(broader_conditions, broad_pool_cap)
+        if not candidate_ids:
+            return []
 
         stmt = (
             select(Car)
-            .where(and_(*conditions))
+            .where(Car.id.in_(candidate_ids))
             .order_by(
                 model_rank.asc(),
                 generation_rank.asc(),
@@ -4422,7 +4471,7 @@ class CarsService:
                 Car.listing_sort_ts.desc().nullslast(),
                 Car.created_at.desc(),
             )
-            .limit(max(1, min(int(limit or 10), 24)))
+            .limit(limit_num)
         )
         return list(self.db.execute(stmt).scalars().all())
 
