@@ -225,13 +225,30 @@ def main() -> None:
                 cid, country, year, reg_year, mileage, fuel, url = r
                 print(f"  #{cid:>7}  {country}  reg={reg_year or year}  km={mileage}  fuel='{fuel}'  {url}")
 
-        # ─── 11. Что на mobile.de мы должны бы догнать
-        _print_section("Возможные причины расхождения 680 vs наши цифры")
+        # ─── 11. Детектор «мусорных» значений engine_type
+        polluted_fragments = ("based on", "co2", "co₂", "emission", "consumption", "combined")
+        polluted_clauses = [
+            func.lower(Car.engine_type).like(f"%{frag}%") for frag in polluted_fragments
+        ]
+        polluted_in_slice = db.execute(
+            select(func.count(Car.id)).where(and_(*base_filters, or_(*polluted_clauses)))
+        ).scalar_one()
+
+        # ─── 12. Возможные причины расхождения
+        _print_section("Возможные причины расхождения с внешним источником")
         causes = []
+        if polluted_in_slice > 0:
+            causes.append(
+                f"{polluted_in_slice} машин в срезе имеют 'мусорный' engine_type "
+                f"(disclaimer-текст 'Based on CO₂ emissions...' и т.п.) — они невидимы "
+                f"для фильтра топлива. Запустите чистку: "
+                f"`python -m backend.app.scripts.cleanup_bad_engine_type --report` "
+                f"и затем `--apply`."
+            )
         if empty_engine > 0:
             causes.append(
-                f"{empty_engine} машин в срезе вообще без stored engine_type — они не попадают "
-                f"под текущий быстрый фильтр (включить deep-mode флагом FUEL_FILTER_DEEP_SCAN=1)"
+                f"{empty_engine} машин в срезе вообще без stored engine_type — попадают "
+                f"только в deep-mode (FUEL_FILTER_DEEP_SCAN=1), который дороже."
             )
         kr_in_slice = db.execute(
             select(func.count(Car.id)).where(
@@ -241,7 +258,7 @@ def main() -> None:
         if kr_in_slice:
             causes.append(f"{kr_in_slice} машин в срезе из Кореи — они не показываются в EU-каталоге")
         if not causes:
-            causes.append("по нашим данным разрыв реально большой — проверьте свежесть парсера mobile.de")
+            causes.append("по нашим данным разрыв реально большой — проверьте свежесть парсера")
         for c in causes:
             print(f"  • {c}")
 

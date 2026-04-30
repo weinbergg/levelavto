@@ -9,6 +9,7 @@ from .base import CarParsed
 from .config import SiteConfig
 from ..importing.mobilede_csv import MobileDeCsvRow
 from ..services.cars_service import CarsService, normalize_brand, normalize_model_label
+from ..utils.spec_inference import normalize_engine_type as _normalize_engine_type_canonical
 
 
 class MobileDeFeedParser:
@@ -95,20 +96,46 @@ class MobileDeFeedParser:
         return mapping.get(r, raw)
 
     def _normalize_engine(self, raw: Optional[str], full: Optional[str]) -> Optional[str]:
-        val = (full or raw or "").lower()
-        if not val:
-            return None
-        if "diesel" in val:
-            return "Diesel"
-        if "hybrid" in val or "plug-in" in val or "plug in" in val:
-            return "Hybrid"
-        if "electric" in val or "ev" in val:
-            return "Electric"
-        if "petrol" in val or "benzin" in val or "gasoline" in val:
-            return "Petrol"
-        if "lpg" in val or "gas" in val:
-            return "LPG"
-        return full or raw
+        """Normalize the mobile.de fuel-type fields into one of our canonical labels.
+
+        mobile.de's CSV ships ``envkv.consumption_fuel`` and ``full_fuel_type``
+        which sometimes contain disclaimer text instead of a real fuel type
+        (e.g. ``"Based on CO₂ emissions (combined)"``). We must not pass
+        such text through verbatim — it ends up in :attr:`Car.engine_type`
+        and breaks every downstream filter that matches on the canonical
+        ``hybrid|diesel|petrol|electric`` set.
+
+        Strategy:
+
+        1. Try ``full`` first, then ``raw``: pick whichever yields a
+           recognised canonical label.
+        2. If neither yields a canonical label, return ``None`` — better an
+           empty cell than disclaimer noise.
+        """
+
+        for source in (full, raw):
+            val = (source or "").strip().lower()
+            if not val:
+                continue
+            if "diesel" in val:
+                return "Diesel"
+            if "hybrid" in val or "plug-in" in val or "plug in" in val or "phev" in val:
+                return "Hybrid"
+            if "electric" in val or re.search(r"\bev\b", val) or "elektro" in val:
+                return "Electric"
+            if "petrol" in val or "benzin" in val or "gasoline" in val:
+                return "Petrol"
+            if "lpg" in val or re.search(r"\bgpl\b", val) or "autogas" in val:
+                return "LPG"
+            if "cng" in val or "natural gas" in val or "erdgas" in val:
+                return "CNG"
+            # Last-chance: hand off to the canonical normaliser. It returns
+            # an empty string for disclaimer/co₂/numeric noise — exactly the
+            # input we want to drop.
+            canonical = _normalize_engine_type_canonical(val)
+            if canonical:
+                return canonical.capitalize()
+        return None
 
     def _resolve_engine_cc(self, row: MobileDeCsvRow) -> Optional[int]:
         raw_cc = row.displacement_orig
