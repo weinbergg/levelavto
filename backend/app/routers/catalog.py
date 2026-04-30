@@ -68,6 +68,73 @@ logger = logging.getLogger(__name__)
 def _detail_inline_calc_enabled() -> bool:
     return os.getenv("DETAIL_INLINE_CALC", "0") == "1"
 
+
+def _build_deferred_filter_payload_from_base_ctx(base_ctx: dict, *, region: Optional[str]) -> dict:
+    base_interior_design_options = base_ctx.get("interior_design_options") or []
+    base_interior_color_options = base_ctx.get("interior_color_options") or []
+    base_interior_material_options = base_ctx.get("interior_material_options") or []
+    region_key = str(region or "").upper()
+    if region_key == "KR":
+        interior_design_options_eu = []
+        interior_color_options_eu = []
+        interior_material_options_eu = []
+        interior_design_options_kr = base_interior_design_options
+        interior_color_options_kr = base_interior_color_options
+        interior_material_options_kr = base_interior_material_options
+    elif region_key == "EU":
+        interior_design_options_eu = base_interior_design_options
+        interior_color_options_eu = base_interior_color_options
+        interior_material_options_eu = base_interior_material_options
+        interior_design_options_kr = []
+        interior_color_options_kr = []
+        interior_material_options_kr = []
+    else:
+        interior_design_options_eu = base_interior_design_options
+        interior_color_options_eu = base_interior_color_options
+        interior_material_options_eu = base_interior_material_options
+        interior_design_options_kr = base_interior_design_options
+        interior_color_options_kr = base_interior_color_options
+        interior_material_options_kr = base_interior_material_options
+
+    return {
+        "_engine_type_source": "normalized",
+        "brands": base_ctx.get("brands") or [],
+        "countries": base_ctx.get("countries") or [],
+        "body_types": base_ctx.get("body_types") or [],
+        "generations": [],
+        "engine_types": base_ctx.get("engine_types") or [],
+        "transmissions": base_ctx.get("transmissions") or [],
+        "drive_types": base_ctx.get("drive_types") or [],
+        "colors_basic": base_ctx.get("colors_basic") or [],
+        "colors_other": base_ctx.get("colors_other") or [],
+        "reg_years": base_ctx.get("reg_years") or [],
+        "reg_months": base_ctx.get("reg_months")
+        or [{"value": i + 1, "label": m} for i, m in enumerate(["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"])],
+        "seats_options_eu": [],
+        "doors_options_eu": [],
+        "owners_options_eu": [],
+        "emission_classes_eu": [],
+        "efficiency_classes_eu": [],
+        "climatisation_options_eu": [],
+        "airbags_options_eu": [],
+        "interior_design_options_eu": interior_design_options_eu,
+        "interior_color_options_eu": interior_color_options_eu,
+        "interior_material_options_eu": interior_material_options_eu,
+        "price_rating_labels_eu": [],
+        "seats_options_kr": [],
+        "doors_options_kr": [],
+        "owners_options_kr": [],
+        "emission_classes_kr": [],
+        "efficiency_classes_kr": [],
+        "climatisation_options_kr": [],
+        "airbags_options_kr": [],
+        "interior_design_options_kr": interior_design_options_kr,
+        "interior_color_options_kr": interior_color_options_kr,
+        "interior_material_options_kr": interior_material_options_kr,
+        "price_rating_labels_kr": [],
+        "payload_deferred": True,
+    }
+
 TOP_BRANDS = [
     "BMW",
     "Mercedes-Benz",
@@ -1925,12 +1992,6 @@ def filter_payload(
             "price_rating_label": qp.get("price_rating_label"),
             "owners_count": qp.get("owners_count"),
         }
-        eu_filters = {**common_filters, "region": "EU", "country": canon.get("country") if canon.get("country") not in (None, "KR") else None, "kr_type": None}
-        kr_filters = {**common_filters, "region": "KR", "country": "KR", "kr_type": canon.get("kr_type")}
-
-        eu_payload = service.payload_values_bulk_filtered(payload_keys, **eu_filters)
-        kr_payload = service.payload_values_bulk_filtered(payload_keys, **kr_filters)
-
         base_scope_params = normalize_count_params(
             {
                 "region": canon.get("region"),
@@ -1967,6 +2028,23 @@ def filter_payload(
                 and "reg_years" in base_ctx
             ):
                 base_ctx = None
+
+        if params == base_scope_params and base_ctx is not None:
+            data = _build_deferred_filter_payload_from_base_ctx(
+                base_ctx,
+                region=canon.get("region"),
+            )
+            redis_set_json(cache_key, data, ttl_sec=3600)
+            total_ms = (time.perf_counter() - start) * 1000
+            if timing_enabled:
+                print(f"FILTER_PAYLOAD_CACHE hit=0 source=base_ctx_deferred payload_total_ms={total_ms:.2f}", flush=True)
+            return data
+
+        eu_filters = {**common_filters, "region": "EU", "country": canon.get("country") if canon.get("country") not in (None, "KR") else None, "kr_type": None}
+        kr_filters = {**common_filters, "region": "KR", "country": "KR", "kr_type": canon.get("kr_type")}
+
+        eu_payload = service.payload_values_bulk_filtered(payload_keys, **eu_filters)
+        kr_payload = service.payload_values_bulk_filtered(payload_keys, **kr_filters)
 
         if base_ctx is not None:
             brands = base_ctx.get("brands", [])

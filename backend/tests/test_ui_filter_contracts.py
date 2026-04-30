@@ -224,6 +224,14 @@ def test_engine_type_facets_can_use_aggregated_counts_fast_path():
     assert 'return self.facet_counts(field="engine_type", filters=fast_engine_filters)' in service
 
 
+def test_filter_payload_can_defer_to_base_ctx_on_public_scope():
+    catalog_router = _read("app/routers/catalog.py")
+    assert "def _build_deferred_filter_payload_from_base_ctx(" in catalog_router
+    assert "if params == base_scope_params and base_ctx is not None:" in catalog_router
+    assert "source=base_ctx_deferred" in catalog_router
+    assert '"payload_deferred": True' in catalog_router
+
+
 def test_catalog_perf_path_canonicalizes_free_text_fuel_and_prewarms_engine_lists():
     catalog_router = _read("app/routers/catalog.py")
     service = _read("app/services/cars_service.py")
