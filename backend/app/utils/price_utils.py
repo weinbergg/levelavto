@@ -99,20 +99,34 @@ def resolve_display_price_rub(
     return display_price_rub(None, raw_rub, allow_price_fallback=True)
 
 
+def has_without_util_marker(calc_breakdown: Optional[list]) -> bool:
+    return any(
+        isinstance(row, dict) and row.get("title") == "__without_util_fee"
+        for row in (calc_breakdown or [])
+    )
+
+
 def public_price_fallback_enabled() -> bool:
     return os.getenv("PUBLIC_PRICE_ALLOW_SOURCE_FALLBACK", "0") == "1"
+
+
+def public_price_allow_without_util() -> bool:
+    return os.getenv("PUBLIC_PRICE_ALLOW_WITHOUT_UTIL", "0") == "1"
 
 
 def resolve_public_display_price_rub(
     total_price_rub_cached: Optional[float],
     price_rub_cached: Optional[float],
     *,
+    calc_breakdown: Optional[list] = None,
     raw_price: Optional[float] = None,
     currency: Optional[str] = None,
     fx_eur: Optional[float] = None,
     fx_usd: Optional[float] = None,
     fx_cny: Optional[float] = None,
 ) -> Optional[float]:
+    if has_without_util_marker(calc_breakdown) and not public_price_allow_without_util():
+        return None
     allow_fallback = public_price_fallback_enabled()
     return resolve_display_price_rub(
         total_price_rub_cached,
@@ -167,18 +181,15 @@ def price_without_util_note(
 ) -> Optional[str]:
     if display_price is None:
         return None
-    has_without_util_marker = any(
-        isinstance(row, dict) and row.get("title") == "__without_util_fee"
-        for row in (calc_breakdown or [])
-    )
+    has_without_util = has_without_util_marker(calc_breakdown)
     reg = str(region or "").upper()
     c = str(country or "").upper()
     is_korea = reg == "KR" or c.startswith("KR")
     if is_korea:
-        if has_without_util_marker or total_price_rub_cached is None:
+        if has_without_util or total_price_rub_cached is None:
             return PRICE_NOTE_WITHOUT_UTIL
         return PRICE_NOTE_MOSCOW
-    if has_without_util_marker:
+    if has_without_util:
         if c == "CN":
             return PRICE_NOTE_CHINA
         return PRICE_NOTE_EUROPE

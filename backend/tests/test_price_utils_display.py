@@ -1,6 +1,8 @@
 from backend.app.utils.price_utils import (
     display_price_rub,
+    has_without_util_marker,
     raw_price_to_rub,
+    public_price_allow_without_util,
     resolve_public_display_price_rub,
     resolve_display_price_rub,
     sort_items_by_display_price,
@@ -72,6 +74,26 @@ def test_public_display_price_can_opt_in_to_source_fallback(monkeypatch):
         currency="EUR",
         fx_eur=95.0,
     ) == 6_550_000
+
+
+def test_public_display_price_hides_without_util_rows_by_default(monkeypatch):
+    monkeypatch.delenv("PUBLIC_PRICE_ALLOW_WITHOUT_UTIL", raising=False)
+    assert has_without_util_marker([{"title": "__without_util_fee", "amount_rub": 0}]) is True
+    assert public_price_allow_without_util() is False
+    assert resolve_public_display_price_rub(
+        2_504_321,
+        2_300_000,
+        calc_breakdown=[{"title": "__without_util_fee", "amount_rub": 0}],
+    ) is None
+
+
+def test_public_display_price_can_allow_without_util_rows(monkeypatch):
+    monkeypatch.setenv("PUBLIC_PRICE_ALLOW_WITHOUT_UTIL", "1")
+    assert resolve_public_display_price_rub(
+        2_504_321,
+        2_300_000,
+        calc_breakdown=[{"title": "__without_util_fee", "amount_rub": 0}],
+    ) == 2_510_000
 
 
 def test_sort_items_by_display_price_keeps_visible_order_consistent():

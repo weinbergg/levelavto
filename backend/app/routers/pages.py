@@ -159,6 +159,7 @@ def _decorate_showcase_car(car: Car, *, fx_rates: Optional[dict[str, float]] = N
     car.display_price_rub = resolve_public_display_price_rub(
         car.total_price_rub_cached,
         car.price_rub_cached,
+        calc_breakdown=car.calc_breakdown_json,
         raw_price=getattr(car, "price", None),
         currency=getattr(car, "currency", None),
         fx_eur=float(fx_rates.get("EUR") or 0),
@@ -1885,6 +1886,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     c["display_price_rub"] = resolve_public_display_price_rub(
                         c.get("total_price_rub_cached"),
                         c.get("price_rub_cached"),
+                        calc_breakdown=c.get("calc_breakdown_json"),
                         raw_price=c.get("price"),
                         currency=c.get("currency"),
                         fx_eur=fx_eur,
@@ -2174,6 +2176,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         car.display_price_rub = resolve_public_display_price_rub(
             car.total_price_rub_cached,
             car.price_rub_cached,
+            calc_breakdown=car.calc_breakdown_json,
             raw_price=getattr(car, "price", None),
             currency=getattr(car, "currency", None),
             fx_eur=float(detail_fx_rates.get("EUR") or 0),
@@ -2296,6 +2299,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         car.display_price_rub = resolve_public_display_price_rub(
             car.total_price_rub_cached,
             car.price_rub_cached,
+            calc_breakdown=car.calc_breakdown_json,
             raw_price=getattr(car, "price", None),
             currency=getattr(car, "currency", None),
             fx_eur=float(detail_fx_rates.get("EUR") or 0),

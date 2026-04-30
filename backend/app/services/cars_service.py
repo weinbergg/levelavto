@@ -1627,12 +1627,20 @@ class CarsService:
     def _public_price_fallback_enabled(self) -> bool:
         return os.getenv("PUBLIC_PRICE_ALLOW_SOURCE_FALLBACK", "0") == "1"
 
+    def _public_price_allow_without_util(self) -> bool:
+        return os.getenv("PUBLIC_PRICE_ALLOW_WITHOUT_UTIL", "0") == "1"
+
     def _public_display_price_rub_expr(self):
+        without_util_marker_expr = cast(
+            func.coalesce(Car.calc_breakdown_json, "[]"),
+            String,
+        ).like("%__without_util_fee%")
         total_expr = case(
             (
                 and_(
                     Car.total_price_rub_cached.is_not(None),
                     Car.total_price_rub_cached > 0,
+                    self._public_price_allow_without_util() or not_(without_util_marker_expr),
                 ),
                 Car.total_price_rub_cached,
             ),
@@ -1640,7 +1648,15 @@ class CarsService:
         )
         if not self._public_price_fallback_enabled():
             return total_expr
-        return self._display_price_rub_expr()
+        if self._public_price_allow_without_util():
+            return self._display_price_rub_expr()
+        return case(
+            (
+                not_(without_util_marker_expr),
+                self._display_price_rub_expr(),
+            ),
+            else_=None,
+        )
 
     def _catalog_inline_price_refresh_enabled(self) -> bool:
         return os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0"

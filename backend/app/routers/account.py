@@ -38,6 +38,7 @@ def _prepare_favorites(service: CarsService, favorites: list) -> list:
         car.display_price_rub = resolve_public_display_price_rub(
             getattr(car, "total_price_rub_cached", None),
             getattr(car, "price_rub_cached", None),
+            calc_breakdown=getattr(car, "calc_breakdown_json", None),
             raw_price=getattr(car, "price", None),
             currency=getattr(car, "currency", None),
         )

@@ -494,6 +494,7 @@ def _serialize_catalog_payload_items(
         display_rub = resolve_public_display_price_rub(
             total_cached,
             price_cached,
+            calc_breakdown=c.get("calc_breakdown_json"),
             raw_price=c.get("price"),
             currency=c.get("currency"),
             fx_eur=fx_eur,
@@ -1463,6 +1464,7 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     detail.display_price_rub = resolve_public_display_price_rub(
         car.total_price_rub_cached,
         car.price_rub_cached,
+        calc_breakdown=car.calc_breakdown_json,
         raw_price=getattr(car, "price", None),
         currency=getattr(car, "currency", None),
         fx_eur=float(fx_rates.get("EUR") or 0),

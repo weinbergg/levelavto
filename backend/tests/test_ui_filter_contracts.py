@@ -724,6 +724,10 @@ def test_che168_supports_cny_and_china_country_label():
     assert "resolve_public_display_price_rub" in pages_router
     assert 'def public_price_fallback_enabled() -> bool:' in price_utils
     assert 'PUBLIC_PRICE_ALLOW_SOURCE_FALLBACK", "0") == "1"' in price_utils
+    assert 'def public_price_allow_without_util() -> bool:' in price_utils
+    assert 'PUBLIC_PRICE_ALLOW_WITHOUT_UTIL", "0") == "1"' in price_utils
+    assert "calc_breakdown=" in catalog_router
+    assert "calc_breakdown=" in pages_router
     assert 'DETAIL_INLINE_CALC", "0") == "1"' in catalog_router
     assert 'DETAIL_INLINE_CALC", "0") == "1"' in pages_router
     assert 'PRICE_NOTE_CHINA = "Цена в Китае"' in price_utils
