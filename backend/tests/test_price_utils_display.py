@@ -1,6 +1,7 @@
 from backend.app.utils.price_utils import (
     display_price_rub,
     has_without_util_marker,
+    public_display_price_group,
     raw_price_to_rub,
     public_price_allow_without_util,
     resolve_public_display_price_rub,
@@ -76,7 +77,7 @@ def test_public_display_price_can_opt_in_to_source_fallback(monkeypatch):
     ) == 6_550_000
 
 
-def test_public_display_price_hides_without_util_rows_by_default(monkeypatch):
+def test_public_display_price_keeps_without_util_rows_visible_by_default(monkeypatch):
     monkeypatch.delenv("PUBLIC_PRICE_ALLOW_WITHOUT_UTIL", raising=False)
     assert has_without_util_marker([{"title": "__without_util_fee", "amount_rub": 0}]) is True
     assert public_price_allow_without_util() is False
@@ -84,7 +85,7 @@ def test_public_display_price_hides_without_util_rows_by_default(monkeypatch):
         2_504_321,
         2_300_000,
         calc_breakdown=[{"title": "__without_util_fee", "amount_rub": 0}],
-    ) is None
+    ) == 2_510_000
 
 
 def test_public_display_price_can_allow_without_util_rows(monkeypatch):
@@ -94,6 +95,36 @@ def test_public_display_price_can_allow_without_util_rows(monkeypatch):
         2_300_000,
         calc_breakdown=[{"title": "__without_util_fee", "amount_rub": 0}],
     ) == 2_510_000
+
+
+def test_public_display_price_uses_europe_fallback_when_without_util_row_lacks_total(monkeypatch):
+    monkeypatch.delenv("PUBLIC_PRICE_ALLOW_SOURCE_FALLBACK", raising=False)
+    assert resolve_public_display_price_rub(
+        None,
+        None,
+        calc_breakdown=[{"title": "__without_util_fee", "amount_rub": 0}],
+        raw_price=299,
+        currency="EUR",
+        fx_eur=100.0,
+    ) == 30_000
+
+
+def test_sort_items_by_display_price_keeps_fallback_rows_after_moscow_prices():
+    items = [
+        {"id": 1, "display_price_rub": 30_000, "price_note": "Цена в Европе"},
+        {"id": 2, "display_price_rub": 50_000, "price_note": "Цена в Москве"},
+        {"id": 3, "display_price_rub": None, "price_note": None},
+        {"id": 4, "display_price_rub": 40_000, "price_note": "Цена в Москве"},
+    ]
+    sort_items_by_display_price(items, sort="price_asc")
+    assert [item["id"] for item in items] == [4, 2, 1, 3]
+
+    sort_items_by_display_price(items, sort="price_desc")
+    assert [item["id"] for item in items] == [2, 4, 1, 3]
+
+    assert public_display_price_group(50_000, price_note="Цена в Москве") == 0
+    assert public_display_price_group(30_000, price_note="Цена в Европе") == 1
+    assert public_display_price_group(None, price_note=None) == 2
 
 
 def test_sort_items_by_display_price_keeps_visible_order_consistent():

@@ -125,9 +125,11 @@ def resolve_public_display_price_rub(
     fx_usd: Optional[float] = None,
     fx_cny: Optional[float] = None,
 ) -> Optional[float]:
-    if has_without_util_marker(calc_breakdown) and not public_price_allow_without_util():
-        return None
-    allow_fallback = public_price_fallback_enabled()
+    # Public catalog/detail should keep fallback rows visible when calculator
+    # explicitly marked the result as missing util fee. Those rows remain
+    # second-tier in sorting, but they should not degrade into "—".
+    has_without_util = has_without_util_marker(calc_breakdown)
+    allow_fallback = public_price_fallback_enabled() or has_without_util
     return resolve_display_price_rub(
         total_price_rub_cached,
         price_rub_cached,
@@ -139,6 +141,21 @@ def resolve_public_display_price_rub(
         allow_price_fallback=allow_fallback,
         allow_raw_price_fallback=allow_fallback,
     )
+
+
+def public_display_price_group(
+    display_price: Optional[float],
+    *,
+    calc_breakdown: Optional[list] = None,
+    price_note: Optional[str] = None,
+) -> int:
+    if display_price is None:
+        return 2
+    if price_note in {PRICE_NOTE_EUROPE, PRICE_NOTE_CHINA, PRICE_NOTE_WITHOUT_UTIL}:
+        return 1
+    if has_without_util_marker(calc_breakdown):
+        return 1
+    return 0
 
 
 def sort_items_by_display_price(items: list[Any], *, sort: Optional[str]) -> list[Any]:
@@ -161,9 +178,24 @@ def sort_items_by_display_price(items: list[Any], *, sort: Optional[str]) -> lis
         except (TypeError, ValueError):
             return 0
 
+    def _group(item: Any) -> int:
+        if isinstance(item, dict):
+            display_price = item.get("display_price_rub")
+            calc_breakdown = item.get("calc_breakdown_json")
+            price_note = item.get("price_note")
+        else:
+            display_price = getattr(item, "display_price_rub", None)
+            calc_breakdown = getattr(item, "calc_breakdown_json", None)
+            price_note = getattr(item, "price_note", None)
+        return public_display_price_group(
+            display_price,
+            calc_breakdown=calc_breakdown,
+            price_note=price_note,
+        )
+
     items.sort(
         key=lambda item: (
-            _value(item) is None,
+            _group(item),
             -(_value(item) or 0.0) if descending else (_value(item) or 0.0),
             _id(item),
         )

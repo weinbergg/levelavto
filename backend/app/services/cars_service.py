@@ -1640,22 +1640,32 @@ class CarsService:
                 and_(
                     Car.total_price_rub_cached.is_not(None),
                     Car.total_price_rub_cached > 0,
-                    self._public_price_allow_without_util() or not_(without_util_marker_expr),
                 ),
                 Car.total_price_rub_cached,
             ),
             else_=None,
         )
-        if not self._public_price_fallback_enabled():
-            return total_expr
-        if self._public_price_allow_without_util():
-            return self._display_price_rub_expr()
+        full_expr = self._display_price_rub_expr()
+        if self._public_price_fallback_enabled():
+            return full_expr
         return case(
             (
-                not_(without_util_marker_expr),
-                self._display_price_rub_expr(),
+                without_util_marker_expr,
+                full_expr,
             ),
-            else_=None,
+            else_=total_expr,
+        )
+
+    def _public_display_price_group_expr(self):
+        without_util_marker_expr = cast(
+            func.coalesce(Car.calc_breakdown_json, "[]"),
+            String,
+        ).like("%__without_util_fee%")
+        price_expr = self._public_display_price_rub_expr()
+        return case(
+            (price_expr.is_(None), 2),
+            (without_util_marker_expr, 1),
+            else_=0,
         )
 
     def _catalog_inline_price_refresh_enabled(self) -> bool:
@@ -2588,17 +2598,17 @@ class CarsService:
         order_clause = []
         if sort == "price_asc":
             price_expr = self._public_display_price_rub_expr()
-            missing_price = price_expr.is_(None)
+            price_group_expr = self._public_display_price_group_expr()
             order_clause = [
-                missing_price.asc(),
+                price_group_expr.asc(),
                 price_expr.asc().nullslast(),
                 Car.id.asc(),
             ]
         elif sort == "price_desc":
             price_expr = self._public_display_price_rub_expr()
-            missing_price = price_expr.is_(None)
+            price_group_expr = self._public_display_price_group_expr()
             order_clause = [
-                missing_price.asc(),
+                price_group_expr.asc(),
                 price_expr.desc().nullslast(),
                 Car.id.asc(),
             ]
@@ -2621,7 +2631,8 @@ class CarsService:
         else:
             # default: цена сначала дешевые
             price_expr = self._public_display_price_rub_expr()
-            order_clause = [price_expr.asc().nullslast(), Car.id.desc()]
+            price_group_expr = self._public_display_price_group_expr()
+            order_clause = [price_group_expr.asc(), price_expr.asc().nullslast(), Car.id.desc()]
 
         thumb_rank = case(
             (
@@ -3071,10 +3082,11 @@ class CarsService:
         except Exception:
             batch_size = max(120, max(1, int(page or 1)) * max(1, int(page_size or 20)))
         price_expr = self._public_display_price_rub_expr()
+        price_group_expr = self._public_display_price_group_expr()
         if sort == "price_desc":
-            order_clause = [price_expr.desc().nullslast(), Car.id.asc()]
+            order_clause = [price_group_expr.asc(), price_expr.desc().nullslast(), Car.id.asc()]
         else:
-            order_clause = [price_expr.asc().nullslast(), Car.id.asc()]
+            order_clause = [price_group_expr.asc(), price_expr.asc().nullslast(), Car.id.asc()]
         candidate_ids = [
             int(car_id)
             for car_id in self.db.execute(

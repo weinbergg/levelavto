@@ -215,6 +215,53 @@ def test_sort_price_asc_treats_zero_price_as_missing(monkeypatch):
         assert ids == [2, 1, 3]
 
 
+def test_sort_price_asc_keeps_without_util_rows_after_moscow_prices(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.add_all(
+            [
+                Car(
+                    id=1,
+                    source_id=1,
+                    external_id="1",
+                    country="DE",
+                    is_available=True,
+                    total_price_rub_cached=30_000,
+                    price_rub_cached=29_900,
+                    calc_breakdown_json=[{"title": "__without_util_fee", "amount_rub": 0}],
+                ),
+                Car(
+                    id=2,
+                    source_id=1,
+                    external_id="2",
+                    country="DE",
+                    is_available=True,
+                    total_price_rub_cached=40_000,
+                    price_rub_cached=39_900,
+                    calc_breakdown_json=[{"title": "Итого (RUB)", "amount_rub": 40_000}],
+                ),
+                Car(
+                    id=3,
+                    source_id=1,
+                    external_id="3",
+                    country="DE",
+                    is_available=True,
+                    total_price_rub_cached=50_000,
+                    price_rub_cached=49_900,
+                    calc_breakdown_json=[{"title": "Итого (RUB)", "amount_rub": 50_000}],
+                ),
+            ]
+        )
+        db.commit()
+        svc = CarsService(db)
+        monkeypatch.setattr(svc, "_should_catalog_inline_price_refresh", lambda **kwargs: False)
+        items, _ = svc.list_cars(sort="price_asc", page=1, page_size=10, light=True, use_fast_count=False)
+        ids = [item["id"] if isinstance(item, dict) else item.id for item in items]
+        assert ids == [2, 3, 1]
+
+
 def test_card_and_detail_use_same_field():
     base = Path(__file__).resolve().parents[1]
     catalog_tpl = (base / "app" / "templates" / "catalog.html").read_text(encoding="utf-8")

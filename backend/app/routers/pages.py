@@ -1703,7 +1703,7 @@ def _catalog_should_defer_initial_items(
         return False
     region_norm = normalize_country_code(region) if region else None
     country_norm = normalize_country_code(country) if country else None
-    return region_norm == "KR" or country_norm in {"KR", "DE"}
+    return region_norm == "KR" or country_norm == "KR"
 
 
 @router.get("/catalog")

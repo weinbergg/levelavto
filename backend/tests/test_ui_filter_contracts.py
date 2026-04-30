@@ -91,6 +91,12 @@ def test_home_count_keeps_server_total_until_user_changes_filters():
     assert "if (!homeCountDirty && !hasInitialHomeQuery) return" in script
 
 
+def test_catalog_ssr_keeps_germany_initial_items_and_does_not_defer_de():
+    router = _read("app/routers/pages.py")
+    assert 'return region_norm == "KR" or country_norm == "KR"' in router
+    assert 'country_norm in {"KR", "DE"}' not in router
+
+
 def test_filter_payload_includes_dynamic_brand_options():
     router = _read("app/routers/catalog.py")
     assert 'field="brand"' in router
