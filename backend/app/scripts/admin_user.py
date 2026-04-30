@@ -1,24 +1,27 @@
 """Manage admin users from the command line.
 
+The container WORKDIR is /app and the package lives at /app/backend/app,
+so the import path is ``backend.app.scripts.admin_user``.
+
 Examples:
 
   # List all admin accounts:
-  docker compose exec -T web python -m app.scripts.admin_user list
+  docker compose exec -T web python -m backend.app.scripts.admin_user list
 
   # Show one user (any email, admin or not):
-  docker compose exec -T web python -m app.scripts.admin_user show user@example.com
+  docker compose exec -T web python -m backend.app.scripts.admin_user show user@example.com
 
   # Promote an existing user to admin:
-  docker compose exec -T web python -m app.scripts.admin_user grant user@example.com
+  docker compose exec -T web python -m backend.app.scripts.admin_user grant user@example.com
 
   # Revoke admin rights:
-  docker compose exec -T web python -m app.scripts.admin_user revoke user@example.com
+  docker compose exec -T web python -m backend.app.scripts.admin_user revoke user@example.com
 
-  # Reset password (a new password is read from --password or stdin if absent):
-  docker compose exec -T web python -m app.scripts.admin_user set-password user@example.com --password "NewS3cret!"
+  # Reset password (read from --password or interactively if missing):
+  docker compose exec -T web python -m backend.app.scripts.admin_user set-password user@example.com --password "NewS3cret!"
 
-  # Create a fresh admin in one shot (use this if there is no admin yet):
-  docker compose exec -T web python -m app.scripts.admin_user create user@example.com --password "Init12345" --name "Owner"
+  # Create a fresh admin in one shot (use this when there is no admin yet):
+  docker compose exec -T web python -m backend.app.scripts.admin_user create user@example.com --password "Init12345" --name "Owner"
 """
 
 from __future__ import annotations
