@@ -3010,9 +3010,12 @@
       const bv = String(b?.label || b?.value || b || '').toLowerCase()
       return av.localeCompare(bv, 'ru')
     })
+    const initialHomeQuery = new URLSearchParams(window.location.search)
+    const hasInitialHomeQuery = Array.from(initialHomeQuery.keys()).length > 0
     normalizeBrandOptions(brandSelect)
     let initialAnimation = true
     let pendingController = null
+    let homeCountDirty = false
 
     const getHomeSelectedModels = () => {
       const selected = getAccordionSelectedModels(modelSelect)
@@ -3033,6 +3036,20 @@
           modelSelect.__modelAccordionSync?.()
         }
         initialAnimation = true
+        homeCountDirty = false
+        if (!hasInitialHomeQuery) {
+          const initialTotal = Number(countEl?.dataset.count || 0)
+          if (countEl) countEl.textContent = initialTotal.toLocaleString('ru-RU')
+          if (badgeCountEl) badgeCountEl.textContent = initialTotal.toLocaleString('ru-RU')
+          if (countEls.length) {
+            countEls.forEach((el) => {
+              const base = Number(el.dataset.count || initialTotal || 0)
+              el.textContent = base.toLocaleString('ru-RU')
+            })
+          }
+          updateAdvancedLink()
+          return
+        }
         updateCount()
       })
     }
@@ -3162,6 +3179,10 @@
     let debounce
     const updateCount = () => {
       if (!countEl) return
+      if (!homeCountDirty && !hasInitialHomeQuery) {
+        updateAdvancedLink()
+        return
+      }
       clearTimeout(debounce)
       debounce = setTimeout(async () => {
         pendingController?.abort()
@@ -3260,16 +3281,24 @@
     ctrls.forEach((el) => {
       const tag = el.tagName.toLowerCase()
       if (tag === 'select') {
-        el.addEventListener('change', updateCount)
+        el.addEventListener('change', () => {
+          homeCountDirty = true
+          updateCount()
+        })
       } else {
-        el.addEventListener('input', updateCount)
+        el.addEventListener('input', () => {
+          homeCountDirty = true
+          updateCount()
+        })
       }
     })
     regionSelect?.addEventListener('change', () => {
+      homeCountDirty = true
       updateRegionSlot()
       updateHomeModels().then(() => updateCount())
     })
     regionSlotSelect?.addEventListener('change', () => {
+      homeCountDirty = true
       updateHomeModels().then(() => updateCount())
     })
     form.addEventListener('submit', (event) => {
@@ -3283,6 +3312,7 @@
     })
     window.addEventListener('pageshow', () => {
       initialAnimation = true
+      if (!homeCountDirty && !hasInitialHomeQuery) return
       updateCount()
     })
     if (regionSelect && regionSelect.value) {

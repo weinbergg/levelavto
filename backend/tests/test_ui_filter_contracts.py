@@ -81,6 +81,16 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "contentWrap.className = 'model-accordion__content'" in script or 'contentWrap.className = "model-accordion__content"' in script
 
 
+def test_home_count_keeps_server_total_until_user_changes_filters():
+    script = _read("app/static/js/app.js")
+    assert "const initialHomeQuery = new URLSearchParams(window.location.search)" in script
+    assert "const hasInitialHomeQuery = Array.from(initialHomeQuery.keys()).length > 0" in script
+    assert "let homeCountDirty = false" in script
+    assert "if (!homeCountDirty && !hasInitialHomeQuery) {" in script
+    assert "homeCountDirty = true" in script
+    assert "if (!homeCountDirty && !hasInitialHomeQuery) return" in script
+
+
 def test_filter_payload_includes_dynamic_brand_options():
     router = _read("app/routers/catalog.py")
     assert 'field="brand"' in router
