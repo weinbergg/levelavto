@@ -249,6 +249,15 @@ def test_engine_type_facets_can_use_aggregated_counts_fast_path():
     assert 'return self.facet_counts(field="engine_type", filters=fast_engine_filters)' in service
 
 
+def test_fuel_filter_uses_indexed_engine_type_column_by_default():
+    service = _read("app/services/cars_service.py")
+    assert 'FUEL_FILTER_DEEP_SCAN", "0") != "0"' in service
+    assert "deep_scan = os.getenv(" in service
+    assert "if not deep_scan:" in service
+    assert "self._effective_electric_fuel_expr()" in service
+    assert "_stored_exact_any([\"electric\", \"elektro\", \"электро\", \"ev\"])" in service
+
+
 def test_filter_payload_can_defer_to_base_ctx_on_public_scope():
     catalog_router = _read("app/routers/catalog.py")
     assert "def _build_deferred_filter_payload_from_base_ctx(" in catalog_router

@@ -988,52 +988,78 @@ class CarsService:
 
     def _fuel_filter_clause(self, raw_value: str):
         key = normalize_fuel(raw_value) or str(raw_value or "").strip().lower()
-        fuel_expr = self._fuel_search_expr()
+        # Default to the fast path that only inspects the indexed
+        # ``lower(trim(cars.engine_type))`` column. The legacy "deep" path
+        # additionally peers into JSONB payload fields and runs the BEV-hint
+        # regex, which fully scans the cars table on multi-million row datasets
+        # and is what produced the 30s+/504 timeouts in the catalog. Set
+        # ``FUEL_FILTER_DEEP_SCAN=1`` to opt back into that slow behaviour.
+        deep_scan = os.getenv("FUEL_FILTER_DEEP_SCAN", "0") != "0"
         stored_fuel_expr = self._stored_fuel_expr()
-        payload_fuel_expr = self._payload_fuel_search_expr()
+        payload_fuel_expr = self._payload_fuel_search_expr() if deep_scan else None
         stored_fuel_missing = or_(Car.engine_type.is_(None), func.trim(Car.engine_type) == "")
 
         def _stored_exact_any(values: List[str]):
             return or_(*[stored_fuel_expr == value for value in values if value])
 
+        def _stored_like_any(values: List[str]):
+            return or_(*[stored_fuel_expr.like(f"%{value}%") for value in values if value])
+
         def _payload_branch(positive: List[str], negative: Optional[List[str]] = None):
+            assert payload_fuel_expr is not None
             clauses = [stored_fuel_missing, self._fuel_like_any(payload_fuel_expr, positive)]
             if negative:
                 clauses.append(not_(self._fuel_like_any(payload_fuel_expr, negative)))
             return and_(*clauses)
 
         if key == "petrol":
+            stored_match = _stored_exact_any(
+                ["petrol", "gasoline", "benzin", "benzina", "бензин"]
+            )
+            if not deep_scan:
+                return stored_match
             return or_(
-                _stored_exact_any(["petrol", "gasoline", "benzin", "benzina", "бензин"]),
+                stored_match,
                 _payload_branch(
                     ["petrol", "gasoline", "benzin", "benzina", "бензин"],
                     ["hybrid", "гибрид", "plug-in", "phev", "electric", "электро"],
                 ),
             )
         if key == "diesel":
+            stored_match = _stored_exact_any(["diesel", "дизель"])
+            if not deep_scan:
+                return stored_match
             return or_(
-                _stored_exact_any(["diesel", "дизель"]),
+                stored_match,
                 _payload_branch(
                     ["diesel", "дизель"],
                     ["hybrid", "гибрид", "plug-in", "phev", "electric", "электро"],
                 ),
             )
         if key == "electric":
+            if not deep_scan:
+                return _stored_exact_any(["electric", "elektro", "электро", "ev"])
             return self._effective_electric_fuel_expr()
         if key == "ethanol":
-            return self._fuel_like_any(fuel_expr, ["ethanol", "e85", "ffv", "flexfuel", "flex fuel", "этанол"])
+            return _stored_like_any(["ethanol", "e85", "ffv", "flexfuel", "flex fuel", "этанол"])
         if key == "hybrid_diesel":
-            return or_(
-                self._fuel_like_any(fuel_expr, ["hybrid (diesel/electric)", "дизель + электро"]),
-                and_(
-                    self._fuel_like_any(fuel_expr, ["hybrid", "гибрид"]),
-                    self._fuel_like_any(fuel_expr, ["diesel", "дизель"]),
-                    not_(self._fuel_like_any(fuel_expr, ["plug-in", "phev"])),
-                ),
+            return and_(
+                _stored_like_any(["hybrid", "гибрид"]),
+                _stored_like_any(["diesel", "дизель"]),
+                not_(_stored_like_any(["plug-in", "plug in", "plugin", "phev"])),
             )
         if key == "hybrid":
-            return or_(
+            stored_hybrid = or_(
                 _stored_exact_any(["hybrid", "гибрид"]),
+                and_(
+                    _stored_like_any(["hybrid", "гибрид"]),
+                    not_(_stored_like_any(["plug-in", "plug in", "plugin", "phev", "diesel", "дизель"])),
+                ),
+            )
+            if not deep_scan:
+                return stored_hybrid
+            return or_(
+                stored_hybrid,
                 _payload_branch(["hybrid (petrol/electric)", "бензин + электро", "vollhybrid"]),
                 and_(
                     stored_fuel_missing,
@@ -1042,22 +1068,21 @@ class CarsService:
                 ),
             )
         if key == "hydrogen":
-            return self._fuel_like_any(fuel_expr, ["hydrogen", "fuel cell", "водород"])
+            return _stored_like_any(["hydrogen", "fuel cell", "водород"])
         if key == "lpg":
-            return self._fuel_like_any(fuel_expr, ["lpg", "propane", "propan", "пропан"])
+            return _stored_like_any(["lpg", "propane", "propan", "пропан"])
         if key == "cng":
-            return self._fuel_like_any(
-                fuel_expr,
-                ["natural gas", "cng", "methane", "metano", "erdgas", "природный газ", "метан"],
+            return _stored_like_any(
+                ["natural gas", "cng", "methane", "metano", "erdgas", "природный газ", "метан"]
             )
         if key == "phev":
-            return self._fuel_like_any(fuel_expr, ["plug-in hybrid", "plug in hybrid", "plugin hybrid", "phev", "подключаем"])
+            return _stored_like_any(["plug-in hybrid", "plug in hybrid", "plugin hybrid", "phev", "подключаем"])
         if key == "other":
-            return or_(fuel_expr == "other", fuel_expr.like("other,%"), fuel_expr.like("другое%"))
+            return or_(stored_fuel_expr == "other", stored_fuel_expr.like("other,%"), stored_fuel_expr.like("другое%"))
         aliases = fuel_aliases(raw_value)
         if aliases:
-            return or_(*[fuel_expr.like(f"%{alias.lower()}%") for alias in aliases])
-        return fuel_expr == str(raw_value or "").strip().lower()
+            return _stored_like_any([alias.lower() for alias in aliases])
+        return stored_fuel_expr == str(raw_value or "").strip().lower()
 
     EU_COUNTRIES = {
         "DE", "AT", "FR", "IT", "ES", "NL", "BE", "PL", "CZ", "SE", "FI",
