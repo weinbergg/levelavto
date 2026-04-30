@@ -9,6 +9,7 @@
     </div>
     <form id="advanced-search-form" method="get" action="/catalog" data-dynamic-payload="0">
       {% set params = request.query_params %}
+      {%- from "_brand_options.html" import brand_options -%}
       <div class="advanced-lines">
         <div class="search-filters search-filters--lines">
           <div class="search-rows" id="search-rows">
@@ -17,9 +18,7 @@
                 <label>Марка</label>
                 <select name="line_brand" data-line-brand>
                   <option value="">Неважно</option>
-                  {% for b in brands|sort %}
-                  <option value="{{ b }}">{{ b }}</option>
-                  {% endfor %}
+                  {{ brand_options(brand_groups, brands) }}
                 </select>
               </div>
               <div class="field">
@@ -37,9 +36,7 @@
                 <label>Марка</label>
                 <select name="line_brand" data-line-brand>
                   <option value="">Неважно</option>
-                  {% for b in brands|sort %}
-                  <option value="{{ b }}">{{ b }}</option>
-                  {% endfor %}
+                  {{ brand_options(brand_groups, brands) }}
                 </select>
               </div>
               <div class="field">

@@ -1,0 +1,35 @@
+{# Renders <option>/<optgroup> entries for a brand <select>.
+
+Args:
+  brand_groups: optional dict {"top": [..], "other": [..]} produced by
+    :func:`backend.app.utils.brand_groups.group_brands`. When provided, the
+    options are rendered inside two ``<optgroup>`` blocks (Топ-марки / Все
+    марки). When ``None`` or empty, the macro falls back to the legacy flat
+    alphabetic list using ``brands``.
+  brands: fallback iterable of brand names (used when ``brand_groups`` is empty).
+  selected: currently selected brand value (optional).
+#}
+{% macro brand_options(brand_groups, brands, selected=None) -%}
+  {%- set top = brand_groups.top if brand_groups and brand_groups.top else [] -%}
+  {%- set other = brand_groups.other if brand_groups and brand_groups.other else [] -%}
+  {%- if top or other -%}
+    {%- if top -%}
+      <optgroup label="Топ-марки">
+        {%- for b in top %}
+        <option value="{{ b }}"{% if selected and selected == b %} selected{% endif %}>{{ b }}</option>
+        {%- endfor %}
+      </optgroup>
+    {%- endif -%}
+    {%- if other -%}
+      <optgroup label="Все марки">
+        {%- for b in other %}
+        <option value="{{ b }}"{% if selected and selected == b %} selected{% endif %}>{{ b }}</option>
+        {%- endfor %}
+      </optgroup>
+    {%- endif -%}
+  {%- else -%}
+    {%- for b in (brands or [])|sort %}
+    <option value="{{ b }}"{% if selected and selected == b %} selected{% endif %}>{{ b }}</option>
+    {%- endfor -%}
+  {%- endif -%}
+{%- endmacro %}

@@ -163,7 +163,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=111' in template
+    assert '/static/js/app.js?v=112' in template
     assert '/static/css/styles.css?v=66' in template
 
 

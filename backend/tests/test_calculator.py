@@ -45,6 +45,28 @@ def test_electric_example():
     assert result["total_rub"] > 0
 
 
+def test_electric_without_power_returns_partial_total_without_util_fee():
+    payload = load_runtime_payload(Path(__file__).resolve().parents[2] / "backend" / "app" / "config" / "calculator.yml")
+    req = EstimateRequest(
+        scenario=None,
+        price_net_eur=20000,
+        eur_rate=95.0796,
+        engine_cc=None,
+        power_hp=None,
+        power_kw=None,
+        is_electric=True,
+        reg_year=2023,
+        reg_month=1,
+    )
+    result = calculate(payload, req)
+    assert result["scenario"] == "electric"
+    assert result["total_rub"] > 0
+    assert result.get("without_util_fee") is True
+    titles = {row.get("title") for row in result.get("breakdown", [])}
+    assert "Утилизационный сбор" not in titles
+    assert "Акциз" not in titles
+
+
 def test_is_bev_ignores_dirty_engine_cc_for_real_evs_with_power():
     assert is_bev(10, 35.3, 48, "Electric") is True
 

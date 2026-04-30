@@ -74,11 +74,10 @@
             </label>
             <div class="field">
               <label>Марка
+                {%- from "_brand_options.html" import brand_options -%}
                 <select name="brand" id="brand">
                   <option value="">Все</option>
-                  {% for b in brands|sort %}
-                  <option value="{{ b }}" {% if params.get('brand') == b %}selected{% endif %}>{{ b }}</option>
-                  {% endfor %}
+                  {{ brand_options(brand_groups, brands, params.get('brand')) }}
                 </select>
               </label>
             </div>

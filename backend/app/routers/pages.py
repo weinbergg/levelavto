@@ -30,6 +30,7 @@ from ..utils.redis_cache import (
     redis_set_json,
     build_filter_ctx_key,
     build_filter_ctx_base_key,
+    build_cars_list_key,
     normalize_filter_params,
     build_cars_count_key,
     normalize_count_params,
@@ -64,6 +65,7 @@ from ..utils.country_map import country_label_ru, resolve_display_country, norma
 from ..utils.color_groups import split_color_facets
 from ..utils.thumbs import local_media_exists, normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.home_content import build_home_content
+from ..utils.brand_groups import group_brands
 from ..utils.telegram import send_telegram_message
 
 
@@ -1540,6 +1542,7 @@ def _home_context(
         "user": getattr(request.state, "user", None),
         "total_cars": total_cars,
         "brands": home_filter_ctx["brands"],
+        "brand_groups": group_brands(home_filter_ctx.get("brands") or []),
         "regions": home_filter_ctx["regions"],
         "countries": countries_list,
         "countries_labeled": countries_with_labels,
@@ -1822,7 +1825,100 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
         source_list = qp.getlist("source") if hasattr(qp, "getlist") else []
         source_value: Optional[str | List[str]] = source_list if source_list else params.get("source")
         timing["initial_items_deferred"] = 1.0 if defer_initial_items else 0.0
-        if not defer_initial_items:
+        cache_hit_used = False
+        if not defer_initial_items and current_page == 1:
+            line_values = qp.getlist("line") if hasattr(qp, "getlist") else []
+            advanced_signals = (
+                params.get("q"),
+                params.get("model"),
+                params.get("generation"),
+                params.get("color"),
+                params.get("body_type"),
+                params.get("engine_type"),
+                params.get("transmission"),
+                params.get("drive_type"),
+                params.get("num_seats"),
+                params.get("doors_count"),
+                params.get("emission_class"),
+                params.get("efficiency_class"),
+                params.get("climatisation"),
+                params.get("airbags"),
+                params.get("interior_design"),
+                params.get("interior_color"),
+                params.get("interior_material"),
+                params.get("vat_reclaimable"),
+                params.get("price_rating_label"),
+                params.get("owners_count"),
+                params.get("condition"),
+                canon_kr_type,
+                _float_val("price_min"),
+                _float_val("price_max"),
+                _float_val("power_hp_min"),
+                _float_val("power_hp_max"),
+                _int_val("engine_cc_min"),
+                _int_val("engine_cc_max"),
+                _int_val("year_min"),
+                _int_val("year_max"),
+                _int_val("mileage_min"),
+                _int_val("mileage_max"),
+                _int_val("reg_year_min"),
+                _int_val("reg_month_min"),
+                _int_val("reg_year_max"),
+                _int_val("reg_month_max"),
+                _bool_val("air_suspension"),
+                line_values or None,
+                source_list or None,
+            )
+            no_advanced_filters = not any(value for value in advanced_signals)
+            sort_eligible = (sort_value or "price_asc") in {
+                "price_asc",
+                "price_desc",
+                "listing_desc",
+                "listing_asc",
+                "mileage_asc",
+                "mileage_desc",
+                "reg_desc",
+                "reg_asc",
+            }
+            if no_advanced_filters and sort_eligible:
+                ssr_cache_key = build_cars_list_key(
+                    canon_region,
+                    canon_country,
+                    canon_brand,
+                    sort_value,
+                    current_page,
+                    12,
+                    "0",
+                )
+                try:
+                    t_cache = time.perf_counter()
+                    cached_resp = redis_get_json(ssr_cache_key)
+                    timing["initial_cache_ms"] = (time.perf_counter() - t_cache) * 1000
+                except Exception:
+                    cached_resp = None
+                cached_items = (
+                    cached_resp.get("items") if isinstance(cached_resp, dict) else None
+                )
+                if isinstance(cached_items, list) and cached_items:
+                    initial_items = [
+                        dict(item) for item in cached_items if isinstance(item, dict)
+                    ]
+                    initial_total = int(cached_resp.get("total") or 0)
+                    cache_hit_used = True
+                    timing["initial_list_ms"] = 0.0
+                    timing["initial_decorate_ms"] = 0.0
+                    timing["initial_images_ms"] = 0.0
+                    timing["initial_cache_hit"] = 1.0
+                    print(
+                        f"CATALOG_SSR_CACHE hit=1 key={ssr_cache_key}",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"CATALOG_SSR_CACHE hit=0 key={ssr_cache_key}",
+                        flush=True,
+                    )
+        if not defer_initial_items and not cache_hit_used:
             t0 = time.perf_counter()
             items, initial_total = service.list_cars(
                 region=canon_region,
@@ -2004,6 +2100,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
             "request": request,
             "user": getattr(request.state, "user", None),
             "brands": cached_brands,
+            "brand_groups": group_brands(cached_brands),
             "regions": regions,
             "countries": countries,
             "country_labels": country_labels,
@@ -2085,6 +2182,7 @@ def search_page(request: Request, db=Depends(get_db), user=Depends(get_current_u
             "user": getattr(request.state, "user", None),
             "total_cars": total_cars,
             "brands": filter_ctx["brands"],
+            "brand_groups": group_brands(filter_ctx.get("brands") or []),
             "regions": filter_ctx["regions"],
             "countries": filter_ctx["countries"],
             "country_labels": filter_ctx["country_labels"],

@@ -3560,10 +3560,6 @@ class CarsService:
                 return _fallback_total("kr_no_base_price")
         else:
             result = None
-        if is_electric and not (effective_power_hp or effective_power_kw):
-            if result is None:
-                self.logger.info("calc_skip_no_power car=%s src=%s", car.id, getattr(car.source, "key", None))
-                return _fallback_total("no_power")
         if not is_electric and not effective_engine_cc:
             if result is None:
                 self.logger.info("calc_skip_no_cc car=%s src=%s", car.id, getattr(car.source, "key", None))

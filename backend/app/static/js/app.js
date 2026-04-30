@@ -284,6 +284,48 @@
     select.appendChild(opt)
   }
 
+  function setBrandSelectOptions(select, items, brandGroups, options = {}) {
+    if (!select) return
+    const groups = brandGroups && typeof brandGroups === 'object' ? brandGroups : null
+    const top = Array.isArray(groups?.top) ? groups.top : []
+    const other = Array.isArray(groups?.other) ? groups.other : []
+    if (!top.length && !other.length) {
+      setSelectOptions(select, items, { emptyLabel: 'Все', labelKey: 'label', valueKey: 'value', ...options })
+      return
+    }
+    const previous = select.value
+    select.innerHTML = ''
+    const empty = document.createElement('option')
+    empty.value = ''
+    empty.textContent = options.emptyLabel || 'Все'
+    select.appendChild(empty)
+    const seen = new Set()
+    const appendGroup = (label, values) => {
+      if (!values || !values.length) return
+      const og = document.createElement('optgroup')
+      og.label = label
+      values.forEach((value) => {
+        const text = String(value || '').trim()
+        if (!text) return
+        const key = text.toLowerCase()
+        if (seen.has(key)) return
+        seen.add(key)
+        const opt = document.createElement('option')
+        opt.value = text
+        opt.textContent = text
+        og.appendChild(opt)
+      })
+      if (og.children.length) select.appendChild(og)
+    }
+    appendGroup(options.topLabel || 'Топ-марки', top)
+    appendGroup(options.otherLabel || 'Все марки', other)
+    if (previous) {
+      const match = Array.from(select.options).find((opt) => opt.value === previous)
+      if (match) select.value = previous
+    }
+    select.disabled = top.length === 0 && other.length === 0
+  }
+
   function renderColorChips(container, colors) {
     if (!container) return
     container.innerHTML = ''
@@ -2070,7 +2112,7 @@
         const res = await fetch(`/api/filter_ctx_base?${params.toString()}`)
         if (!res.ok) return
         const data = await res.json()
-        setSelectOptions(qs('#brand'), data.brands || [], { emptyLabel: 'Все', labelKey: 'label', valueKey: 'value' })
+        setBrandSelectOptions(qs('#brand'), data.brands || [], data.brand_groups, { emptyLabel: 'Все' })
         normalizeBrandOptions(qs('#brand'))
         setSelectOptions(qs('#body_type'), data.body_types || [], { emptyLabel: 'Любой' })
         setSelectOptions(qs('[data-multi-source-select="engine_type"]', filtersForm), data.engine_types || [], { emptyLabel: 'Любое' })
@@ -3530,7 +3572,11 @@
       if (!data) return
       let payloadHydrated = applyBasicOptions(data)
       const isInitialPayloadMerge = form.dataset.payloadHydrated !== '1'
-      await refreshSearchRowsOptions(Array.isArray(data.brands) ? data.brands : [], reqId)
+      await refreshSearchRowsOptions(
+        Array.isArray(data.brands) ? data.brands : [],
+        reqId,
+        data && typeof data.brand_groups === 'object' ? data.brand_groups : null,
+      )
       qsa('[data-region-options]', form).forEach((select) => {
         const name = select.getAttribute('name') || ''
         const base = payloadMap[name]
@@ -3795,9 +3841,10 @@
       modelSelect.__modelAccordionSync?.()
     }
 
-    const setLineBrandOptions = (select, items) => {
+    const setLineBrandOptions = (select, items, brandGroups = null) => {
       if (!select) return
-      setSelectOptions(select, items, { emptyLabel: 'Неважно', labelKey: 'label', valueKey: 'value' })
+      const groups = brandGroups || form.__brandGroups || null
+      setBrandSelectOptions(select, items, groups, { emptyLabel: 'Неважно' })
       normalizeBrandOptions(select)
     }
 
@@ -3821,9 +3868,15 @@
       return getRowInitialSelectedModels(row)
     }
 
-    const refreshSearchRowsOptions = async (brandOptions = [], reqId = '') => {
+    const refreshSearchRowsOptions = async (brandOptions = [], reqId = '', brandGroups = null) => {
       if (!rowsWrap) return
       form.dataset.lineBrandOptions = JSON.stringify(Array.isArray(brandOptions) ? brandOptions : [])
+      if (brandGroups && typeof brandGroups === 'object') {
+        form.__brandGroups = brandGroups
+        try {
+          form.dataset.lineBrandGroups = JSON.stringify(brandGroups)
+        } catch {}
+      }
       const rows = qsa('[data-search-row]', rowsWrap)
       for (const row of rows) {
         if (reqId && form.dataset.payloadReqId !== reqId) return
@@ -3853,8 +3906,16 @@
       const removeBtn = qs('[data-line-remove]', row)
       if (brandSelect) {
         const dynamicBrandOptions = parseOptions(form.dataset.lineBrandOptions || '[]')
-        if (dynamicBrandOptions.length) {
-          setLineBrandOptions(brandSelect, dynamicBrandOptions)
+        let groups = form.__brandGroups || null
+        if (!groups && form.dataset.lineBrandGroups) {
+          try {
+            groups = JSON.parse(form.dataset.lineBrandGroups)
+          } catch {
+            groups = null
+          }
+        }
+        if (dynamicBrandOptions.length || (groups && (groups.top?.length || groups.other?.length))) {
+          setLineBrandOptions(brandSelect, dynamicBrandOptions, groups)
         } else {
           normalizeBrandOptions(brandSelect)
         }

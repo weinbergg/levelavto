@@ -36,6 +36,7 @@ from ..utils.price_utils import (
     sort_items_by_display_price,
 )
 from ..utils.color_groups import split_color_facets
+from ..utils.brand_groups import group_brands
 from ..utils.thumbs import normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.redis_cache import (
     redis_get_json,
@@ -96,9 +97,17 @@ def _build_deferred_filter_payload_from_base_ctx(base_ctx: dict, *, region: Opti
         interior_color_options_kr = base_interior_color_options
         interior_material_options_kr = base_interior_material_options
 
+    base_brands = base_ctx.get("brands") or []
     return {
         "_engine_type_source": "normalized",
-        "brands": base_ctx.get("brands") or [],
+        "brands": base_brands,
+        "brand_groups": base_ctx.get("brand_groups")
+        or group_brands(
+            [
+                item.get("value") if isinstance(item, dict) else item
+                for item in base_brands
+            ]
+        ),
         "countries": base_ctx.get("countries") or [],
         "body_types": base_ctx.get("body_types") or [],
         "generations": [],
@@ -1631,6 +1640,7 @@ def filter_ctx_base(
             if b.get("value")
         ]
     )
+    brand_groups = group_brands([item.get("value") for item in brands if item.get("value")])
     reg_years = sorted(
         [int(r["value"]) for r in service.facet_counts(field="reg_year", filters=base_filters) if r.get("value")],
         reverse=True,
@@ -1669,6 +1679,7 @@ def filter_ctx_base(
         "country_labels": country_labels,
         "kr_types": kr_types,
         "brands": brands,
+        "brand_groups": brand_groups,
         "body_types": body_types,
         "engine_types": engine_types,
         "transmissions": transmissions,

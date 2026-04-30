@@ -302,8 +302,7 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
     # electric (BEV only)
     power_kw = d(req.power_kw) if req.power_kw is not None else None
     power_hp = d(req.power_hp) if req.power_hp is not None else None
-    if not ((power_kw and power_kw > 0) or (power_hp and power_hp > 0)):
-        raise ValueError("power_kw or power_hp required for electric")
+    has_power = bool((power_kw and power_kw > 0) or (power_hp and power_hp > 0))
 
     net_eur = d(req.price_net_eur)
     bank_transfer_eu = _percent_fixed(net_eur, cfg["bank_transfer_eu"])
@@ -327,18 +326,27 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
     subtotal_eur = net_eur + sum(eur_fields.values(), Decimal("0"))
     subtotal_rub = subtotal_eur * eur_rate
     import_duty_rub = net_eur * d(cfg.get("import_duty_percent")) * eur_rate
-    excise_rub = _calc_excise_rub(float(power_kw) if power_kw is not None else None, float(power_hp) if power_hp is not None else None, cfg)
+    if has_power:
+        excise_rub = _calc_excise_rub(
+            float(power_kw) if power_kw is not None else None,
+            float(power_hp) if power_hp is not None else None,
+            cfg,
+        )
+    else:
+        excise_rub = Decimal("0")
     vat_base = (net_eur * eur_rate) + excise_rub
     vat_rub = vat_base * d(cfg.get("vat_percent"))
 
-    customs_cfg = get_customs_config()
-    util_rub = calc_util_fee_rub(
-        engine_cc=req.engine_cc or 0,
-        kw=float(power_kw) if power_kw is not None else None,
-        hp=int(power_hp) if power_hp is not None else None,
-        cfg=customs_cfg,
-        age_bucket="electric",
-    )
+    util_rub: int | None = None
+    if has_power:
+        customs_cfg = get_customs_config()
+        util_rub = calc_util_fee_rub(
+            engine_cc=req.engine_cc or 0,
+            kw=float(power_kw) if power_kw is not None else None,
+            hp=int(power_hp) if power_hp is not None else None,
+            cfg=customs_cfg,
+            age_bucket="electric",
+        )
 
     breakdown.extend([{"title": LABELS.get(k, k), "amount": out(v), "currency": "EUR"} for k, v in eur_fields.items()])
     breakdown.extend(
@@ -349,11 +357,21 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
         ]
     )
     breakdown.append({"title": LABELS["import_duty"], "amount": out(import_duty_rub), "currency": "RUB"})
-    breakdown.append({"title": LABELS["excise"], "amount": out(excise_rub), "currency": "RUB"})
+    if has_power:
+        breakdown.append({"title": LABELS["excise"], "amount": out(excise_rub), "currency": "RUB"})
     breakdown.append({"title": LABELS["vat"], "amount": out(vat_rub), "currency": "RUB"})
-    breakdown.append({"title": LABELS["util_fee"], "amount": int(util_rub), "currency": "RUB"})
+    if util_rub is not None:
+        breakdown.append({"title": LABELS["util_fee"], "amount": int(util_rub), "currency": "RUB"})
 
-    total_rub = subtotal_rub + import_duty_rub + excise_rub + vat_rub + Decimal(str(util_rub)) + sum(rub_fields.values(), Decimal("0"))
+    util_component = Decimal(str(util_rub)) if util_rub is not None else Decimal("0")
+    total_rub = (
+        subtotal_rub
+        + import_duty_rub
+        + excise_rub
+        + vat_rub
+        + util_component
+        + sum(rub_fields.values(), Decimal("0"))
+    )
     total_rub = _ceil_rub(total_rub)
     breakdown.append({"title": LABELS["total_rub"], "amount": total_rub, "currency": "RUB"})
     return {
@@ -361,4 +379,5 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
         "total_rub": total_rub,
         "breakdown": breakdown,
         "euro_rate_used": float(eur_rate),
+        "without_util_fee": not has_power,
     }

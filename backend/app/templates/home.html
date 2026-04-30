@@ -66,11 +66,10 @@
           </div>
           <div class="field">
             <label for="home-brand">Марка</label>
+            {%- from "_brand_options.html" import brand_options -%}
             <select id="home-brand" name="brand">
               <option value="">Все</option>
-              {% for b in brands|sort %}
-              <option value="{{ b }}">{{ b }}</option>
-              {% endfor %}
+              {{ brand_options(brand_groups, brands) }}
             </select>
           </div>
           <div class="field">
