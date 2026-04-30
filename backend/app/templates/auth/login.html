@@ -8,6 +8,7 @@
       <div class="alert alert-danger">{{ error }}</div>
       {% endif %}
       <form method="post" action="/login" class="form-vertical">
+        <input type="hidden" name="next" value="{{ next_path or '/' }}" />
         <label
           >Email
           <input type="email" name="email" required />

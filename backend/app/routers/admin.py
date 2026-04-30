@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 import tempfile
 
-from ..auth import require_admin
+from ..auth import get_current_user, require_admin
 from ..db import get_db
 from ..services.admin_service import AdminService
 from ..services.cars_service import CarsService
@@ -58,9 +58,20 @@ LEGACY_HOME_KEYS = ("hero_title", "hero_subtitle", "hero_note")
 @router.get("/admin")
 def admin_dashboard(
     request: Request,
-    user: User = Depends(require_admin),
+    user: User | None = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # On the HTML entry-point we replace the generic 401/403 JSON errors
+    # with friendly redirects so the operator gets a login form instead of
+    # a raw {"detail": …} response when the session has expired or when a
+    # non-admin user lands on /admin by mistake.
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin"), status_code=302)
+    if not user.is_admin:
+        return RedirectResponse(
+            url="/?" + "flash_error=" + quote("Доступ к админке только у администраторов"),
+            status_code=302,
+        )
     templates = request.app.state.templates
     admin_svc = AdminService(db)
     cars_svc = CarsService(db)

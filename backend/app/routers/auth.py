@@ -55,13 +55,28 @@ class VerifyEmailCodePayload(BaseModel):
     code: str
 
 
+def _safe_next_path(value: str | None) -> str:
+    """Only allow same-site relative paths to prevent open-redirect."""
+    if not value:
+        return "/"
+    candidate = str(value).strip()
+    if not candidate.startswith("/"):
+        return "/"
+    if candidate.startswith("//"):
+        return "/"
+    return candidate
+
+
 @router.get("/login")
-def login_page(request: Request):
-    # если уже авторизован — сразу на главную
+def login_page(request: Request, next: str | None = None):
+    next_path = _safe_next_path(next)
     if request.session.get("user_id"):
-        return RedirectResponse(url="/", status_code=302)
+        return RedirectResponse(url=next_path, status_code=302)
     templates = request.app.state.templates
-    return templates.TemplateResponse("auth/login.html", {"request": request, "error": None})
+    return templates.TemplateResponse(
+        "auth/login.html",
+        {"request": request, "error": None, "next_path": next_path},
+    )
 
 
 @router.post("/login")
@@ -69,19 +84,21 @@ def login(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    next: str = Form(default="/"),
     db: Session = Depends(get_db),
 ):
     templates = request.app.state.templates
     auth = AuthService(db)
     user = auth.authenticate(email, password)
+    next_path = _safe_next_path(next)
     if not user:
         return templates.TemplateResponse(
             "auth/login.html",
-            {"request": request, "error": "Неверная пара email/пароль"},
+            {"request": request, "error": "Неверная пара email/пароль", "next_path": next_path},
             status_code=400,
         )
     request.session["user_id"] = user.id
-    return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url=next_path, status_code=303)
 
 
 @router.get("/register")
