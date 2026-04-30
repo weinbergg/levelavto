@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
@@ -24,6 +26,17 @@ from ..models import User
 
 
 router = APIRouter()
+
+
+def _admin_redirect(message: str = "", *, error: str = "", path: str = "/admin") -> RedirectResponse:
+    """Build a 302 redirect back to the admin with a toast hint."""
+    parts = []
+    if error:
+        parts.append("flash_error=" + quote(error))
+    if message:
+        parts.append("flash=" + quote(message))
+    suffix = ("?" + "&".join(parts)) if parts else ""
+    return RedirectResponse(url=path + suffix, status_code=302)
 
 CONTACT_KEYS = {
     "contact_phone": "Телефон",
@@ -59,6 +72,7 @@ def admin_dashboard(
     recommended_cfg = load_config()
     calc_cfg = CalculatorConfigService(db).latest()
     total_cars = cars_svc.total_cars()
+    overview_stats = admin_svc.overview_stats()
     customs_data = load_customs_dict()
     cc_tables = set()
     for key in ("util_tables_under3", "util_tables_3_5", "util_tables_electric", "util_tables"):
@@ -77,7 +91,11 @@ def admin_dashboard(
             "featured_recommended": featured_recommended,
             "calc_cfg": calc_cfg,
             "total_cars": total_cars,
+            "overview_stats": overview_stats,
             "customs_cc_tables": customs_cc_tables,
+            "page_title": "Сводка",
+            "page_subtitle": "Общая статистика и быстрый доступ к разделам админки.",
+            "breadcrumbs": [("Админка", None)],
         },
     )
 
@@ -117,7 +135,7 @@ def update_contacts(
             "contact_map_link": contact_map_link,
         }
     )
-    return RedirectResponse(url="/admin", status_code=302)
+    return _admin_redirect("Контакты сохранены")
 
 
 @router.post("/admin/recommended")
@@ -138,7 +156,7 @@ def update_recommended(
             "mileage_max": mileage_max,
         }
     )
-    return RedirectResponse(url="/admin", status_code=302)
+    return _admin_redirect("Параметры рекомендуемых сохранены")
 
 
 @router.post("/admin/featured")
@@ -151,7 +169,8 @@ def update_featured(
 ):
     ids = [int(x) for x in car_ids.replace(",", " ").split() if x.strip().isdigit()]
     AdminService(db).set_featured(placement, ids)
-    return RedirectResponse(url="/admin", status_code=302)
+    msg = f"Закреплено машин: {len(ids)}" if ids else "Список очищен — используется автоподбор"
+    return _admin_redirect(msg)
 
 
 @router.get("/admin/featured/template")
@@ -179,11 +198,11 @@ async def upload_featured_template(
     file: UploadFile = File(...),
 ):
     if not file.filename.lower().endswith((".txt", ".csv")):
-        return RedirectResponse(url="/admin?error=badfile", status_code=302)
+        return _admin_redirect(error="Неподдерживаемый формат — нужен .txt или .csv")
     raw = (await file.read()).decode("utf-8", errors="ignore")
     ids = [int(x) for x in raw.replace(",", " ").split() if x.strip().isdigit()]
     AdminService(db).set_featured("recommended", ids)
-    return RedirectResponse(url="/admin?featured_updated=1", status_code=302)
+    return _admin_redirect(f"Загружено {len(ids)} ID")
 
 
 @router.get("/admin/customs/template")
@@ -207,14 +226,17 @@ async def upload_customs_template(
     file: UploadFile = File(...),
 ):
     if not file.filename.lower().endswith((".txt", ".csv")):
-        return RedirectResponse(url="/admin?error=badfile", status_code=302)
+        return _admin_redirect(error="Неподдерживаемый формат — нужен .txt или .csv")
     raw = (await file.read()).decode("utf-8", errors="ignore")
     data = load_customs_dict()
     stats = apply_util_template(data, raw)
     bump_customs_version(data)
     save_customs_dict(data)
     reset_customs_config_cache()
-    return RedirectResponse(url=f"/admin?customs_updated=1&customs_updated_cnt={stats.updated}&customs_errors={stats.errors}", status_code=302)
+    msg = f"Обновлено строк: {stats.updated}"
+    if stats.errors:
+        msg += f", ошибок: {stats.errors}"
+    return _admin_redirect(msg)
 
 
 @router.post("/admin/customs/edit")
@@ -235,10 +257,9 @@ def edit_customs_row(
     bump_customs_version(data)
     save_customs_dict(data)
     reset_customs_config_cache()
-    return RedirectResponse(
-        url=f"/admin?customs_updated=1&customs_updated_cnt={stats.updated}&customs_errors={stats.errors}",
-        status_code=302,
-    )
+    if stats.errors:
+        return _admin_redirect(error=f"Не удалось применить строку (ошибок: {stats.errors})")
+    return _admin_redirect("Строка утильсбора обновлена")
 
 
 @router.post("/admin/home_content")
@@ -335,7 +356,7 @@ async def update_home_content(
 
     admin_svc = AdminService(db)
     admin_svc.set_site_content({"home_content": serialize_home_content(home)})
-    return RedirectResponse(url="/admin", status_code=302)
+    return _admin_redirect("Тексты главной страницы сохранены")
 
 
 @router.post("/admin/calculator/upload")
@@ -346,7 +367,7 @@ async def upload_calculator_config(
     file: UploadFile = File(...),
 ):
     if not file.filename.lower().endswith((".xlsx", ".xlsm", ".xls")):
-        return RedirectResponse(url="/admin?error=badfile", status_code=302)
+        return _admin_redirect(error="Нужен файл .xlsx / .xlsm / .xls")
     try:
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
             tmp.write(await file.read())
@@ -355,5 +376,5 @@ async def upload_calculator_config(
         svc = CalculatorConfigService(db)
         svc.create(payload=payload, source="upload_xlsx", comment=f"upload {file.filename}")
     except Exception:
-        return RedirectResponse(url="/admin?error=calc_upload", status_code=302)
-    return RedirectResponse(url="/admin", status_code=302)
+        return _admin_redirect(error="Не удалось прочитать файл — проверьте структуру шаблона")
+    return _admin_redirect(f"Файл «{file.filename}» загружен, новая версия калькулятора сохранена")

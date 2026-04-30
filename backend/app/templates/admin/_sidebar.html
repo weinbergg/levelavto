@@ -1,0 +1,89 @@
+{#
+  Default admin sidebar. Sections that are not implemented yet still appear
+  greyed-out so the navigation reads as a roadmap to the operator. Active
+  state is set client-side by admin.js based on the current URL.
+#}
+<aside class="la-admin-sidebar" aria-label="Навигация админки">
+  <div class="la-admin-sidebar__brand">
+    <span class="la-admin-sidebar__brand-mark">LA</span>
+    <span class="la-admin-sidebar__brand-text">Level Avto</span>
+  </div>
+
+  <nav class="la-admin-nav">
+    <div class="la-admin-nav__group">
+      <div class="la-admin-nav__group-title">Обзор</div>
+      <a class="la-admin-nav__item" href="/admin">
+        <span class="la-admin-nav__icon">⌂</span>
+        <span class="la-admin-nav__label">Сводка</span>
+      </a>
+    </div>
+
+    <div class="la-admin-nav__group">
+      <div class="la-admin-nav__group-title">Главная</div>
+      <a class="la-admin-nav__item" href="/admin/home">
+        <span class="la-admin-nav__icon">✎</span>
+        <span class="la-admin-nav__label">Тексты и баннеры</span>
+      </a>
+      <a class="la-admin-nav__item" href="/admin/top-brands">
+        <span class="la-admin-nav__icon">★</span>
+        <span class="la-admin-nav__label">Топ-марки</span>
+      </a>
+      <a class="la-admin-nav__item" href="/admin/recommended">
+        <span class="la-admin-nav__icon">⌘</span>
+        <span class="la-admin-nav__label">Рекомендуемые</span>
+      </a>
+    </div>
+
+    <div class="la-admin-nav__group">
+      <div class="la-admin-nav__group-title">Калькулятор</div>
+      <a class="la-admin-nav__item" href="/admin/calculator">
+        <span class="la-admin-nav__icon">≡</span>
+        <span class="la-admin-nav__label">Настройки</span>
+      </a>
+      <a class="la-admin-nav__item" href="/admin/calculator/excel">
+        <span class="la-admin-nav__icon">⇕</span>
+        <span class="la-admin-nav__label">Импорт / экспорт Excel</span>
+      </a>
+      <a class="la-admin-nav__item" href="/admin/customs">
+        <span class="la-admin-nav__icon">▤</span>
+        <span class="la-admin-nav__label">Утильсбор</span>
+      </a>
+    </div>
+
+    <div class="la-admin-nav__group">
+      <div class="la-admin-nav__group-title">Пользователи</div>
+      <a class="la-admin-nav__item" href="/admin/users">
+        <span class="la-admin-nav__icon">☻</span>
+        <span class="la-admin-nav__label">Все пользователи</span>
+      </a>
+      <a class="la-admin-nav__item" href="/admin/notifications">
+        <span class="la-admin-nav__icon">✉</span>
+        <span class="la-admin-nav__label">Сообщения</span>
+      </a>
+    </div>
+
+    <div class="la-admin-nav__group">
+      <div class="la-admin-nav__group-title">Аналитика</div>
+      <a class="la-admin-nav__item" href="/admin/analytics">
+        <span class="la-admin-nav__icon">∿</span>
+        <span class="la-admin-nav__label">Трафик и конверсии</span>
+      </a>
+    </div>
+
+    <div class="la-admin-nav__group">
+      <div class="la-admin-nav__group-title">Настройки</div>
+      <a class="la-admin-nav__item" href="/admin/contacts">
+        <span class="la-admin-nav__icon">☎</span>
+        <span class="la-admin-nav__label">Контакты сайта</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="la-admin-sidebar__footer">
+    <div class="la-admin-sidebar__footer-text">
+      <span class="la-admin-sidebar__footer-name">{{ user.full_name or user.email }}</span>
+      <span>Администратор</span>
+    </div>
+    <a class="la-admin-sidebar__toggle" href="/account" title="Личный кабинет">↗</a>
+  </div>
+</aside>

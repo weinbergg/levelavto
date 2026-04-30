@@ -1,0 +1,72 @@
+{#
+  Admin layout shell. Use as a wrapper for every page under /admin/*.
+
+  Required block: page_content — main content area.
+  Optional block: page_actions — right side of the page header (buttons).
+  Optional block: page_header — fully replaces the default header.
+
+  Required vars from the route:
+    page_title    — string shown as <h1> and in the breadcrumb.
+    page_subtitle — optional string under the title.
+    breadcrumbs   — list of [(label, url|None)]; url=None for current page.
+    user          — authenticated User row (for the sidebar footer).
+
+  Use `nav_groups` to pass a custom navigation tree if needed; otherwise
+  the default sidebar (defined in _sidebar.html) renders all known sections.
+#}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>{% block title %}{{ page_title or 'Админка' }} — Level Avto{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+  <link rel="stylesheet" href="/static/css/admin.css?v=1">
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="la-admin">
+  <div class="la-admin-shell" data-sidebar="open">
+    {% include "admin/_sidebar.html" %}
+
+    <header class="la-admin-topbar">
+      <button type="button" class="la-btn la-btn--ghost la-btn--icon" data-sidebar-toggle aria-label="Свернуть меню">☰</button>
+      <nav class="la-admin-topbar__crumbs" aria-label="Хлебные крошки">
+        {% set crumb_list = breadcrumbs or [(page_title or 'Админка', None)] %}
+        {% for label, href in crumb_list %}
+          {% if not loop.last and href %}
+            <a href="{{ href }}">{{ label }}</a>
+            <span class="sep">›</span>
+          {% else %}
+            <span class="current">{{ label }}</span>
+          {% endif %}
+        {% endfor %}
+      </nav>
+      <div class="la-admin-topbar__actions">
+        <a class="la-admin-topbar__view-site" href="/" target="_blank" rel="noopener">Открыть сайт →</a>
+      </div>
+    </header>
+
+    <main class="la-admin-main">
+      {% block page_header %}
+      <div class="la-admin-page-header">
+        <div class="la-admin-page-header__title">
+          <h1>{{ page_title or 'Админка' }}</h1>
+          {% if page_subtitle %}
+          <p class="la-admin-page-header__sub">{{ page_subtitle }}</p>
+          {% endif %}
+        </div>
+        <div class="la-admin-page-header__actions">
+          {% block page_actions %}{% endblock %}
+        </div>
+      </div>
+      {% endblock %}
+
+      {% block page_content %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="/static/js/admin.js?v=1"></script>
+  {% block body_extra %}{% endblock %}
+</body>
+</html>

@@ -1,15 +1,63 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Iterable, List
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from ..models import FeaturedCar, Car, SiteContent
+from ..models import FeaturedCar, Car, SiteContent, User, Favorite
 
 
 class AdminService:
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    def overview_stats(self) -> Dict[str, int]:
+        """Lightweight summary numbers shown on the admin dashboard.
+
+        Each row touches a single small index/aggregate, so the call stays
+        well under the SSR budget even on the production DB.
+        """
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        today_start = datetime(now.year, now.month, now.day)
+        week_start = now - timedelta(days=7)
+
+        users_total = self.db.execute(select(func.count(User.id))).scalar_one() or 0
+        users_today = (
+            self.db.execute(
+                select(func.count(User.id)).where(User.created_at >= today_start)
+            ).scalar_one()
+            or 0
+        )
+        users_week = (
+            self.db.execute(
+                select(func.count(User.id)).where(User.created_at >= week_start)
+            ).scalar_one()
+            or 0
+        )
+        users_verified = (
+            self.db.execute(
+                select(func.count(User.id)).where(
+                    (User.email_verified_at.is_not(None)) | (User.phone_verified_at.is_not(None))
+                )
+            ).scalar_one()
+            or 0
+        )
+        favorites_total = self.db.execute(select(func.count(Favorite.id))).scalar_one() or 0
+        favorites_week = (
+            self.db.execute(
+                select(func.count(Favorite.id)).where(Favorite.created_at >= week_start)
+            ).scalar_one()
+            or 0
+        )
+        return {
+            "users_total": int(users_total),
+            "users_today": int(users_today),
+            "users_week": int(users_week),
+            "users_verified": int(users_verified),
+            "favorites_total": int(favorites_total),
+            "favorites_week": int(favorites_week),
+        }
 
     def set_site_content(self, values: Dict[str, str]) -> None:
         from .content_service import ContentService  # lazy import to avoid cycles

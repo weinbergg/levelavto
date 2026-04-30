@@ -258,6 +258,57 @@ def test_fuel_filter_uses_indexed_engine_type_column_by_default():
     assert "_stored_exact_any([\"electric\", \"elektro\", \"электро\", \"ev\"])" in service
 
 
+def test_admin_layout_uses_new_design_system():
+    layout = _read("app/templates/admin/_layout.html")
+    sidebar = _read("app/templates/admin/_sidebar.html")
+    css = _read("app/static/css/admin.css")
+    js = _read("app/static/js/admin.js")
+    dashboard = _read("app/templates/admin/dashboard.html")
+
+    assert 'class="la-admin"' in layout
+    assert 'class="la-admin-shell"' in layout
+    assert 'data-sidebar-toggle' in layout
+    assert "/static/css/admin.css?v=" in layout
+    assert "/static/js/admin.js?v=" in layout
+
+    assert 'class="la-admin-sidebar"' in sidebar
+    assert 'href="/admin"' in sidebar
+    assert 'href="/admin/users"' in sidebar
+    assert 'href="/admin/top-brands"' in sidebar
+    assert 'href="/admin/recommended"' in sidebar
+    assert 'href="/admin/calculator"' in sidebar
+    assert 'href="/admin/notifications"' in sidebar
+    assert 'href="/admin/analytics"' in sidebar
+
+    assert "--la-accent: #e14b3a" in css
+    assert ".la-stat__value" in css
+    assert ".la-card" in css
+    assert ".la-btn--primary" in css
+    assert ".la-tab.is-active" in css
+
+    assert "data-sidebar-toggle" in js
+    assert "window.adminToast" in js
+    assert "flash_error" in js
+
+    assert '{% extends "admin/_layout.html" %}' in dashboard
+    assert "la-stat__value" in dashboard
+    assert "la-tab" in dashboard
+    assert 'data-tab-panel="contacts"' in dashboard
+    assert 'data-tab-panel="home"' in dashboard
+    assert 'data-tab-panel="recommended"' in dashboard
+    assert 'data-tab-panel="customs"' in dashboard
+    assert 'data-tab-panel="calculator"' in dashboard
+
+
+def test_admin_router_uses_flash_redirects_for_user_feedback():
+    router = _read("app/routers/admin.py")
+    assert "def _admin_redirect(" in router
+    assert "_admin_redirect(\"Контакты сохранены\")" in router
+    assert "_admin_redirect(\"Параметры рекомендуемых сохранены\")" in router
+    assert "_admin_redirect(\"Тексты главной страницы сохранены\")" in router
+    assert "overview_stats" in router
+
+
 def test_filter_payload_can_defer_to_base_ctx_on_public_scope():
     catalog_router = _read("app/routers/catalog.py")
     assert "def _build_deferred_filter_payload_from_base_ctx(" in catalog_router
