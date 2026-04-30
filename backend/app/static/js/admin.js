@@ -100,23 +100,64 @@
 
   function initActiveNav() {
     const path = window.location.pathname
+    const hash = window.location.hash || ''
     document.querySelectorAll('.la-admin-nav__item').forEach((link) => {
-      const target = link.getAttribute('href')
+      const target = link.getAttribute('href') || ''
       if (!target) return
-      if (target === '/admin' && path === '/admin') {
+      const targetPath = target.split('#')[0]
+      const targetHash = target.includes('#') ? '#' + target.split('#').slice(1).join('#') : ''
+      if (targetPath !== path) return
+      if (targetHash) {
+        if (hash && hash === targetHash) link.classList.add('is-active')
+        return
+      }
+      if (path === '/admin' && !hash) {
         link.classList.add('is-active')
         return
       }
-      if (target !== '/admin' && path.startsWith(target)) {
+      if (target !== '/admin' && path.startsWith(targetPath)) {
         link.classList.add('is-active')
       }
     })
+  }
+
+  function activateTabFromHash() {
+    const hash = window.location.hash || ''
+    const match = /^#tab=([a-zA-Z0-9_-]+)/.exec(hash)
+    if (!match) return
+    const key = match[1]
+    const tabs = document.querySelectorAll('.la-tab')
+    if (!tabs.length) return
+    let found = false
+    tabs.forEach((tab) => {
+      const isMatch = tab.dataset.tab === key
+      tab.classList.toggle('is-active', isMatch)
+      if (isMatch) found = true
+    })
+    document.querySelectorAll('.la-tab-panel').forEach((panel) => {
+      panel.hidden = panel.dataset.tabPanel !== key
+    })
+    if (found) {
+      const card = document.querySelector('.la-tabs')
+      if (card && typeof card.scrollIntoView === 'function') {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     initSidebar()
     initFlashFromQuery()
     initConfirmForms()
+    initActiveNav()
+    activateTabFromHash()
+  })
+
+  window.addEventListener('hashchange', () => {
+    activateTabFromHash()
+    document.querySelectorAll('.la-admin-nav__item.is-active').forEach((el) => {
+      el.classList.remove('is-active')
+    })
     initActiveNav()
   })
 

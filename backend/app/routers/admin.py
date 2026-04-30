@@ -111,6 +111,217 @@ def admin_dashboard(
     )
 
 
+def _render_coming_soon(
+    request: Request,
+    user: User,
+    *,
+    page_title: str,
+    page_subtitle: str,
+    stub_title: str,
+    stub_description: str,
+    stub_features: list[str] | None = None,
+    stub_eta: str = "",
+    breadcrumbs: list[tuple[str, str | None]] | None = None,
+):
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "admin/_coming_soon.html",
+        {
+            "request": request,
+            "user": user,
+            "page_title": page_title,
+            "page_subtitle": page_subtitle,
+            "stub_title": stub_title,
+            "stub_description": stub_description,
+            "stub_features": stub_features or [],
+            "stub_eta": stub_eta,
+            "breadcrumbs": breadcrumbs
+            or [("Админка", "/admin"), (page_title, None)],
+        },
+    )
+
+
+@router.get("/admin/top-brands", response_class=None)
+def admin_top_brands_page(
+    request: Request,
+    user: User | None = Depends(get_current_user),
+):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin/top-brands"), status_code=302)
+    if not user.is_admin:
+        return RedirectResponse(url="/", status_code=302)
+    return _render_coming_soon(
+        request, user,
+        page_title="Топ-марки",
+        page_subtitle="Управление приоритетным списком брендов в фильтрах сайта.",
+        stub_title="Drag-and-drop редактор скоро откроется",
+        stub_description=(
+            "Сейчас приоритетный список зашит в коде (Mercedes-Benz, BMW, Audi, "
+            "Volkswagen, Porsche и др.). На этой странице появится визуальный "
+            "редактор с перетаскиванием — добавление/удаление марок и изменение "
+            "порядка сразу применятся ко всем формам поиска и инвалидируют кеш фильтров."
+        ),
+        stub_features=[
+            "Перетаскивание брендов мышью между «Топ-марками» и «Все марки»",
+            "Поиск-автокомплит по всем известным брендам",
+            "Сохранение в site_content.top_brands_json + автоматическая инвалидация Redis",
+            "Журнал изменений: кто и когда правил список",
+        ],
+        stub_eta="Релиз 1, День 2",
+    )
+
+
+@router.get("/admin/calculator/excel", response_class=None)
+def admin_calculator_excel_page(
+    request: Request,
+    user: User | None = Depends(get_current_user),
+):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin/calculator/excel"), status_code=302)
+    if not user.is_admin:
+        return RedirectResponse(url="/", status_code=302)
+    return _render_coming_soon(
+        request, user,
+        page_title="Калькулятор · Excel",
+        page_subtitle="Импорт/экспорт настроек калькулятора в xlsx.",
+        stub_title="Загрузка xlsx уже работает на дашборде",
+        stub_description=(
+            "Импорт нового xlsx-конфига уже доступен во вкладке «Калькулятор» на сводке. "
+            "На этой странице добавится экспорт текущих настроек в xlsx, скачивание шаблона "
+            "и история версий с возможностью отката."
+        ),
+        stub_features=[
+            "Скачать актуальный конфиг как xlsx (с подписями полей по-русски)",
+            "Скачать пустой шаблон для заказчика",
+            "История версий: сравнение, откат, комментарии",
+            "Запуск пересчёта каталога после загрузки",
+        ],
+        stub_eta="Релиз 1, День 5 + Релиз 2",
+    )
+
+
+@router.get("/admin/users", response_class=None)
+def admin_users_page(
+    request: Request,
+    user: User | None = Depends(get_current_user),
+):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin/users"), status_code=302)
+    if not user.is_admin:
+        return RedirectResponse(url="/", status_code=302)
+    return _render_coming_soon(
+        request, user,
+        page_title="Пользователи",
+        page_subtitle="Список зарегистрированных, контактные данные, избранные машины.",
+        stub_title="Раздел «Пользователи» откроется на следующем шаге",
+        stub_description=(
+            "Здесь будет таблица всех зарегистрированных пользователей с поиском по email/телефону, "
+            "фильтрами (верифицирован/нет, регистрация за период), экспортом в xlsx и переходом "
+            "к карточке пользователя — где видны контакты, избранные машины и кнопка «Отправить предложение»."
+        ),
+        stub_features=[
+            "Таблица: ФИО, email, телефон, дата регистрации, статус верификаций, число избранного",
+            "Фильтры по периоду регистрации и по верификациям",
+            "Экспорт всего списка/выборки в xlsx",
+            "Карточка пользователя с миниатюрами избранных машин и КП",
+        ],
+        stub_eta="Релиз 1, Дни 3-4",
+    )
+
+
+@router.get("/admin/notifications", response_class=None)
+def admin_notifications_page(
+    request: Request,
+    user: User | None = Depends(get_current_user),
+):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin/notifications"), status_code=302)
+    if not user.is_admin:
+        return RedirectResponse(url="/", status_code=302)
+    return _render_coming_soon(
+        request, user,
+        page_title="Сообщения",
+        page_subtitle="Внутренние уведомления и предложения для пользователей.",
+        stub_title="Внутренние сообщения скоро появятся",
+        stub_description=(
+            "Здесь будет интерфейс для отправки сообщений пользователям прямо в их личный кабинет "
+            "и (опционально) дублирование в email/Telegram. Появится модель Notification, лента "
+            "сообщений в ЛК пользователя, шаблоны для рассылок."
+        ),
+        stub_features=[
+            "Адресная отправка одному пользователю с приложенными машинами",
+            "Массовая рассылка по сегменту (новые/верифицированные/добавлявшие в избранное)",
+            "Лента «Сообщения» в личном кабинете с пометкой прочитано/не прочитано",
+            "Журнал отправленных + статус доставки",
+        ],
+        stub_eta="Релиз 1, День 4",
+    )
+
+
+@router.get("/admin/analytics", response_class=None)
+def admin_analytics_page(
+    request: Request,
+    user: User | None = Depends(get_current_user),
+):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin/analytics"), status_code=302)
+    if not user.is_admin:
+        return RedirectResponse(url="/", status_code=302)
+    return _render_coming_soon(
+        request, user,
+        page_title="Аналитика",
+        page_subtitle="Трафик, регистрации, конверсии в воронке заявок.",
+        stub_title="Сбор аналитики стартует на следующем шаге",
+        stub_description=(
+            "На сайте включится middleware page_visits с cookie-баннером согласия — данные начнут "
+            "копиться сразу же. Затем здесь появятся графики по дням/неделям, фильтры по периоду, "
+            "топ-страницы, и полная воронка: посещение → регистрация → избранное → заявка → продажа."
+        ),
+        stub_features=[
+            "Уникальные/всего посетителей за выбранный период",
+            "Регистрации за сегодня/неделю/месяц с переходом в карточку",
+            "Топ-страниц и источников трафика",
+            "Воронка конверсий: посещение → регистрация → избранное → заявка",
+        ],
+        stub_eta="Релиз 1, День 5 + Релиз 3",
+    )
+
+
+@router.get("/admin/contacts")
+def admin_contacts_redirect(user: User | None = Depends(get_current_user)):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin#tab=contacts"), status_code=302)
+    return RedirectResponse(url="/admin#tab=contacts", status_code=302)
+
+
+@router.get("/admin/recommended")
+def admin_recommended_redirect(user: User | None = Depends(get_current_user)):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin#tab=recommended"), status_code=302)
+    return RedirectResponse(url="/admin#tab=recommended", status_code=302)
+
+
+@router.get("/admin/calculator")
+def admin_calculator_redirect(user: User | None = Depends(get_current_user)):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin#tab=calculator"), status_code=302)
+    return RedirectResponse(url="/admin#tab=calculator", status_code=302)
+
+
+@router.get("/admin/customs")
+def admin_customs_redirect(user: User | None = Depends(get_current_user)):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin#tab=customs"), status_code=302)
+    return RedirectResponse(url="/admin#tab=customs", status_code=302)
+
+
+@router.get("/admin/home")
+def admin_home_redirect(user: User | None = Depends(get_current_user)):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin#tab=home"), status_code=302)
+    return RedirectResponse(url="/admin#tab=home", status_code=302)
+
+
 @router.post("/admin/contacts")
 def update_contacts(
     request: Request,

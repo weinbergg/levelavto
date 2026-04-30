@@ -1,0 +1,26 @@
+{% extends "admin/_layout.html" %}
+
+{% block page_content %}
+<div class="la-card">
+  <div class="la-card__body">
+    <div class="la-empty">
+      <div class="la-empty__icon">🚧</div>
+      <div class="la-empty__title">{{ stub_title }}</div>
+      <div style="max-width: 560px">{{ stub_description }}</div>
+      {% if stub_eta %}
+      <div class="la-text-dim" style="margin-top: 6px">Запланировано: <strong>{{ stub_eta }}</strong></div>
+      {% endif %}
+      {% if stub_features %}
+      <ul style="text-align: left; margin: 18px 0 0; padding-left: 22px; color: var(--la-text-muted); display: inline-block">
+        {% for item in stub_features %}
+        <li style="margin-bottom: 4px">{{ item }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <div class="la-hstack" style="margin-top: 22px; justify-content: center">
+        <a class="la-btn la-btn--secondary" href="/admin">← Вернуться на сводку</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

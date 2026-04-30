@@ -269,7 +269,7 @@ def test_admin_layout_uses_new_design_system():
     assert 'class="la-admin-shell"' in layout
     assert 'data-sidebar-toggle' in layout
     assert "/static/css/admin.css?v=2" in layout
-    assert "/static/js/admin.js?v=2" in layout
+    assert "/static/js/admin.js?v=3" in layout
     assert 'grid-template-areas:\n    "topbar  sidebar"' in css
     assert "1fr var(--la-sidebar-w)" in css
     assert "--la-bg: #0b0e13" in css
@@ -278,8 +278,11 @@ def test_admin_layout_uses_new_design_system():
     assert 'href="/admin"' in sidebar
     assert 'href="/admin/users"' in sidebar
     assert 'href="/admin/top-brands"' in sidebar
-    assert 'href="/admin/recommended"' in sidebar
-    assert 'href="/admin/calculator"' in sidebar
+    assert 'href="/admin#tab=recommended"' in sidebar
+    assert 'href="/admin#tab=calculator"' in sidebar
+    assert 'href="/admin#tab=customs"' in sidebar
+    assert 'href="/admin#tab=contacts"' in sidebar
+    assert 'href="/admin#tab=home"' in sidebar
     assert 'href="/admin/notifications"' in sidebar
     assert 'href="/admin/analytics"' in sidebar
 
@@ -310,6 +313,28 @@ def test_admin_router_uses_flash_redirects_for_user_feedback():
     assert "_admin_redirect(\"Параметры рекомендуемых сохранены\")" in router
     assert "_admin_redirect(\"Тексты главной страницы сохранены\")" in router
     assert "overview_stats" in router
+
+
+def test_admin_router_has_get_handlers_for_every_sidebar_link():
+    router = _read("app/routers/admin.py")
+    js = _read("app/static/js/admin.js")
+    coming_soon = _read("app/templates/admin/_coming_soon.html")
+    # Future-feature stubs render a Coming-soon card.
+    for path in (
+        "/admin/top-brands",
+        "/admin/calculator/excel",
+        "/admin/users",
+        "/admin/notifications",
+        "/admin/analytics",
+    ):
+        assert f'@router.get("{path}"' in router, f"missing GET stub for {path}"
+    assert "_render_coming_soon(" in router
+    assert "{{ stub_title }}" in coming_soon
+    # Existing POST endpoints get a GET-redirect to the dashboard tab.
+    for path in ("/admin/contacts", "/admin/recommended", "/admin/calculator", "/admin/customs", "/admin/home"):
+        assert f'@router.get("{path}")' in router
+    assert "activateTabFromHash" in js
+    assert "/^#tab=([a-zA-Z0-9_-]+)/" in js
 
 
 def test_filter_payload_can_defer_to_base_ctx_on_public_scope():
