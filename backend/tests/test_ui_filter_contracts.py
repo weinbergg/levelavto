@@ -218,6 +218,12 @@ def test_home_price_refresh_is_opt_in():
     assert 'HOME_REFRESH_VISIBLE_PRICES", "0") == "1"' in pages_router
 
 
+def test_engine_type_facets_can_use_aggregated_counts_fast_path():
+    service = _read("app/services/cars_service.py")
+    assert 'ENGINE_TYPE_FACET_RAW_SCAN", "0") == "1"' in service
+    assert 'return self.facet_counts(field="engine_type", filters=fast_engine_filters)' in service
+
+
 def test_catalog_perf_path_canonicalizes_free_text_fuel_and_prewarms_engine_lists():
     catalog_router = _read("app/routers/catalog.py")
     service = _read("app/services/cars_service.py")
@@ -633,7 +639,8 @@ def test_engine_type_facets_use_effective_fuel_source_and_custom_filtering():
     assert "def _fuel_filter_clause(self, raw_value: str):" in service
     assert 'if key == "hybrid_diesel":' in service
     assert 'if key == "phev":' in service
-    assert 'if field in {"color_group", "engine_type"}:' in service
+    assert 'if field == "engine_type" and os.getenv("ENGINE_TYPE_FACET_RAW_SCAN", "0") == "1":' in service
+    assert 'if field == "color_group":' in service
     assert 'int(x.get("sort_order", 999))' in catalog
 
 

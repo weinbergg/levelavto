@@ -1430,7 +1430,9 @@ class CarsService:
     def facet_counts(self, *, field: str, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         if filters.get("model"):
             return self._facet_counts_from_cars(field=field, filters=filters)
-        if field in {"color_group", "engine_type"}:
+        if field == "engine_type" and os.getenv("ENGINE_TYPE_FACET_RAW_SCAN", "0") == "1":
+            return self._facet_counts_from_cars(field=field, filters=filters)
+        if field == "color_group":
             return self._facet_counts_from_cars(field=field, filters=filters)
         table_map = {
             "region": ("car_counts_core", "region", {"region"}),
@@ -3780,6 +3782,61 @@ class CarsService:
         limit: int = 120,
         **filters: Any,
     ) -> List[Dict[str, Any]]:
+        if field == "engine_type":
+            fast_engine_filters = {
+                "region": filters.get("region"),
+                "country": filters.get("country"),
+                "brand": filters.get("brand"),
+            }
+            heavy_filter_values = [
+                filters.get("model"),
+                filters.get("generation"),
+                filters.get("color"),
+                filters.get("body_type"),
+                filters.get("transmission"),
+                filters.get("drive_type"),
+                filters.get("kr_type"),
+                filters.get("q"),
+                filters.get("lines"),
+                filters.get("source_key"),
+                filters.get("num_seats"),
+                filters.get("doors_count"),
+                filters.get("emission_class"),
+                filters.get("efficiency_class"),
+                filters.get("climatisation"),
+                filters.get("airbags"),
+                filters.get("interior_design"),
+                filters.get("interior_color"),
+                filters.get("interior_material"),
+                filters.get("vat_reclaimable"),
+                filters.get("price_rating_label"),
+                filters.get("owners_count"),
+                filters.get("condition"),
+            ]
+            heavy_filter_flags = [
+                filters.get("price_min") is not None,
+                filters.get("price_max") is not None,
+                filters.get("power_hp_min") is not None,
+                filters.get("power_hp_max") is not None,
+                filters.get("engine_cc_min") is not None,
+                filters.get("engine_cc_max") is not None,
+                filters.get("year_min") is not None,
+                filters.get("year_max") is not None,
+                filters.get("mileage_min") is not None,
+                filters.get("mileage_max") is not None,
+                filters.get("reg_year_min") is not None,
+                filters.get("reg_month_min") is not None,
+                filters.get("reg_year_max") is not None,
+                filters.get("reg_month_max") is not None,
+                filters.get("air_suspension") is True,
+            ]
+            if (
+                os.getenv("ENGINE_TYPE_FACET_RAW_SCAN", "0") != "1"
+                and not any(heavy_filter_values)
+                and not any(heavy_filter_flags)
+            ):
+                return self.facet_counts(field="engine_type", filters=fast_engine_filters)
+
         col_map = {
             "brand": Car.brand,
             "country": func.upper(Car.country),
