@@ -268,8 +268,11 @@ def test_admin_layout_uses_new_design_system():
     assert 'class="la-admin"' in layout
     assert 'class="la-admin-shell"' in layout
     assert 'data-sidebar-toggle' in layout
-    assert "/static/css/admin.css?v=" in layout
-    assert "/static/js/admin.js?v=" in layout
+    assert "/static/css/admin.css?v=2" in layout
+    assert "/static/js/admin.js?v=2" in layout
+    assert 'grid-template-areas:\n    "topbar  sidebar"' in css
+    assert "1fr var(--la-sidebar-w)" in css
+    assert "--la-bg: #0b0e13" in css
 
     assert 'class="la-admin-sidebar"' in sidebar
     assert 'href="/admin"' in sidebar
