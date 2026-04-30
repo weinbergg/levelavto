@@ -1185,10 +1185,14 @@ def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
 
 def _apply_public_catalog_default_scope(params: Dict[str, Any]) -> Dict[str, Any]:
     normalized = dict(params or {})
+    raw_region = str(normalized.get("region") or "").strip().upper()
+    explicit_all = raw_region == "ALL"
+    if explicit_all:
+        normalized.pop("region", None)
     region = normalize_country_code(normalized.get("region")) if normalized.get("region") else None
     country = normalize_country_code(normalized.get("country")) if normalized.get("country") else None
     kr_type = str(normalized.get("kr_type") or "").strip().upper() or None
-    if not region and not country and not kr_type:
+    if not region and not country and not kr_type and not explicit_all:
         normalized["region"] = "EU"
     return normalized
 
@@ -1909,6 +1913,39 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     timing["initial_decorate_ms"] = 0.0
                     timing["initial_images_ms"] = 0.0
                     timing["initial_cache_hit"] = 1.0
+                    if os.getenv("CATALOG_SSR_REFRESH_PRICES", "1") != "0":
+                        try:
+                            t_sync = time.perf_counter()
+                            service.sync_light_rows_from_db(
+                                initial_items, refresh_prices=False
+                            )
+                            timing["initial_sync_ms"] = (time.perf_counter() - t_sync) * 1000
+                            fx_rates = service.get_fx_rates() or {}
+                            fx_eur = float(fx_rates.get("EUR") or 0)
+                            fx_usd = float(fx_rates.get("USD") or 0)
+                            fx_cny = float(fx_rates.get("CNY") or 0)
+                            for it in initial_items:
+                                recomputed = resolve_public_display_price_rub(
+                                    it.get("total_price_rub_cached"),
+                                    it.get("price_rub_cached"),
+                                    calc_breakdown=it.get("calc_breakdown_json"),
+                                    raw_price=it.get("price"),
+                                    currency=it.get("currency"),
+                                    fx_eur=fx_eur,
+                                    fx_usd=fx_usd,
+                                    fx_cny=fx_cny,
+                                )
+                                if recomputed is not None:
+                                    it["display_price_rub"] = recomputed
+                                it["price_note"] = price_without_util_note(
+                                    display_price=it.get("display_price_rub"),
+                                    total_price_rub_cached=it.get("total_price_rub_cached"),
+                                    calc_breakdown=it.get("calc_breakdown_json"),
+                                    region=it.get("region"),
+                                    country=it.get("country"),
+                                )
+                        except Exception:
+                            logger.exception("catalog_ssr_cache_refresh_failed")
                     print(
                         f"CATALOG_SSR_CACHE hit=1 key={ssr_cache_key}",
                         flush=True,

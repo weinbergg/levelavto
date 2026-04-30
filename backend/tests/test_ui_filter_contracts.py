@@ -163,7 +163,15 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=112' in template
+    assert '/static/js/app.js?v=113' in template
+
+
+def test_catalog_ssr_cache_hit_refreshes_prices_and_recomputes_display_price():
+    pages_router = _read("app/routers/pages.py")
+    assert 'CATALOG_SSR_REFRESH_PRICES' in pages_router
+    assert 'service.sync_light_rows_from_db(' in pages_router
+    assert 'resolve_public_display_price_rub(' in pages_router
+    assert 'catalog_ssr_cache_refresh_failed' in pages_router
     assert '/static/css/styles.css?v=66' in template
 
 
@@ -271,6 +279,19 @@ def test_public_catalog_scope_defaults_to_eu_without_explicit_region_or_country(
     assert 'build_filter_ctx_base_key({"region": "EU"})' in pages_router
     assert 'filters={"region": "EU"}' in pages_router
     assert 'href="/catalog?region=EU&brand={{ item.brand }}"' in home_template
+
+
+def test_public_catalog_scope_respects_explicit_all_sentinel():
+    catalog_router = _read("app/routers/catalog.py")
+    pages_router = _read("app/routers/pages.py")
+    js_bundle = _read("app/static/js/app.js")
+    for body in (catalog_router, pages_router):
+        assert 'raw_region = str(normalized.get("region") or "").strip().upper()' in body
+        assert 'explicit_all = raw_region == "ALL"' in body
+        assert "if explicit_all:" in body
+        assert 'normalized.pop("region", None)' in body
+        assert "and not explicit_all" in body
+    assert "params.set('region', 'ALL')" in js_bundle
 
 
 def test_eu_registration_filters_ignore_legacy_generic_default_flag():

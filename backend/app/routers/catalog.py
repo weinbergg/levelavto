@@ -412,10 +412,14 @@ def _canonicalize_params(
 
 def _apply_public_catalog_default_scope(params: dict) -> dict:
     normalized = dict(params or {})
+    raw_region = str(normalized.get("region") or "").strip().upper()
+    explicit_all = raw_region == "ALL"
+    if explicit_all:
+        normalized.pop("region", None)
     region = normalize_country_code(normalized.get("region")) if normalized.get("region") else None
     country = normalize_country_code(normalized.get("country")) if normalized.get("country") else None
     kr_type = str(normalized.get("kr_type") or "").strip().upper() or None
-    if not region and not country and not kr_type:
+    if not region and not country and not kr_type and not explicit_all:
         normalized["region"] = "EU"
     return normalized
 
@@ -1597,6 +1601,7 @@ def filter_ctx_base(
             or "interior_design_options" not in cached
             or "interior_color_options" not in cached
             or "interior_material_options" not in cached
+            or "brand_groups" not in cached
             or cached.get("_color_source") != "color_group"
             or cached.get("_engine_type_source") != "normalized"
         ):

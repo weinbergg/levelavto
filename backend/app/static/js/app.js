@@ -3196,6 +3196,9 @@
         else if (slotVal === 'KR_IMPORT') params.set('kr_type', 'KR_IMPORT')
         else params.delete('kr_type')
       }
+      if (!regionVal && !params.get('country') && !params.get('kr_type')) {
+        params.set('region', 'ALL')
+      }
       if (withPaging) {
         params.set('page', '1')
         params.set('page_size', '1')

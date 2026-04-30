@@ -105,3 +105,27 @@ def test_is_bev_uses_mokka_e_hint_when_fuel_string_is_garbage():
         model="Mokka-e",
         variant="Ultimate Long Range",
     ) is True
+
+
+def test_is_bev_recognizes_mercedes_g580_as_electric():
+    assert is_bev(
+        None,
+        432.0,
+        587,
+        "based on co₂ emissions (combined)",
+        brand="Mercedes-Benz",
+        model="G 580",
+        variant="EQ EDITION 1/AMG-L/360/CARBON/NIGHT-PAKET",
+    ) is True
+
+
+def test_is_bev_recognizes_mercedes_eqe_as_electric():
+    assert is_bev(
+        None,
+        215.0,
+        292,
+        "",
+        brand="Mercedes-Benz",
+        model="EQE 350",
+        variant="4MATIC",
+    ) is True

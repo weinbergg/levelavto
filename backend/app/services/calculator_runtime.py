@@ -51,10 +51,16 @@ def _calc_age_months(reg_year: Optional[int], reg_month: Optional[int]) -> Optio
 
 
 _BMW_EV_HINT_RE = re.compile(r"\b(?:i3|i4|i5|i7|ix(?:1|2|3)?|ix)\b", re.IGNORECASE)
+_MERCEDES_EV_HINT_RE = re.compile(
+    r"\b(?:eqa|eqb|eqc|eqe|eqg|eqs|eqt|eqv|"
+    r"g\s*580|g580|"
+    r"eq\s*(?:edition|technology|boost\s*ev|power\s*ev))\b",
+    re.IGNORECASE,
+)
 _GENERIC_EV_HINT_RE = re.compile(
     r"\b(?:e[\s-]?tron|taycan|model\s*(?:3|s|x|y)|eq[a-z0-9]+|ioniq\s*(?:5|6)|ev(?:6|9)|"
     r"id\.?\s*(?:3|4|5|7)|id\s*buzz|leaf|ariya|i[\s-]?pace|kona\s+electric|niro\s+ev|"
-    r"e[\s-]?2008|e[\s-]?208|mokka[\s-]?e|corsa[\s-]?e)\b",
+    r"e[\s-]?2008|e[\s-]?208|mokka[\s-]?e|corsa[\s-]?e|g\s*580|g580|eqg)\b",
     re.IGNORECASE,
 )
 
@@ -74,6 +80,11 @@ def _looks_like_bev_by_hint(
     if not joined:
         return False
     if brand_norm == "bmw" and _BMW_EV_HINT_RE.search(joined):
+        return True
+    if (
+        brand_norm in {"mercedes-benz", "mercedes benz", "mercedes"}
+        and _MERCEDES_EV_HINT_RE.search(joined)
+    ):
         return True
     return bool(_GENERIC_EV_HINT_RE.search(joined))
 
