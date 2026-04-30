@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterable, List
 
 BRAND_FILTER_PRIORITY: List[str] = [
     "Mercedes-Benz",
+    "BMW",
     "Audi",
     "Volkswagen",
     "Porsche",
