@@ -77,6 +77,7 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "const ssrHydrated = hydrateCatalogFromSSR()" in script
     assert "if (!ssrHydrated) {" in script
     assert "void loadCars(initialPage)" in script
+    assert script.count("cards.dataset.ssr = '0'") >= 2
     assert "contentWrap.className = 'model-accordion__content'" in script or 'contentWrap.className = "model-accordion__content"' in script
 
 

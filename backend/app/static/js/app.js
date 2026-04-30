@@ -1687,6 +1687,7 @@
       renderCatalogMeta(data.page, data.page_size, data.total)
 
       if (!reuseSSR) {
+        cards.dataset.ssr = '0'
         cards.innerHTML = ''
       }
       if (!Array.isArray(data.items) || !data.items.length) {
