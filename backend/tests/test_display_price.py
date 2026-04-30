@@ -106,14 +106,14 @@ def test_sort_price_asc_uses_display_price(monkeypatch):
         monkeypatch.setattr(svc, "_should_catalog_inline_price_refresh", lambda **kwargs: False)
         items, _ = svc.list_cars(sort="price_asc", page=1, page_size=10, light=True, use_fast_count=False)
         ids = [item["id"] if isinstance(item, dict) else item.id for item in items]
-        assert ids == [3, 5, 2, 1, 4]
+        assert ids == [3, 5, 1, 2, 4]
 
         items_desc, _ = svc.list_cars(sort="price_desc", page=1, page_size=10, light=True, use_fast_count=False)
         ids_desc = [item["id"] if isinstance(item, dict) else item.id for item in items_desc]
-        assert ids_desc == [1, 2, 3, 5, 4]
+        assert ids_desc == [1, 3, 5, 2, 4]
 
 
-def test_sort_price_asc_includes_raw_price_fx_fallback(monkeypatch):
+def test_sort_price_asc_treats_source_only_prices_as_missing_by_default(monkeypatch):
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     Base.metadata.create_all(engine)
     with Session(engine) as db:
@@ -212,7 +212,7 @@ def test_sort_price_asc_treats_zero_price_as_missing(monkeypatch):
         )
         items, _ = svc.list_cars(sort="price_asc", page=1, page_size=10, light=True, use_fast_count=False)
         ids = [item["id"] if isinstance(item, dict) else item.id for item in items]
-        assert ids == [2, 3, 1]
+        assert ids == [2, 1, 3]
 
 
 def test_card_and_detail_use_same_field():

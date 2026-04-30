@@ -10,7 +10,7 @@ from ..services.cars_service import CarsService
 from ..services.favorites_service import FavoritesService
 from ..utils.country_map import resolve_display_country
 from ..utils.localization import display_body, display_color
-from ..utils.price_utils import display_price_rub, price_without_util_note
+from ..utils.price_utils import price_without_util_note, resolve_public_display_price_rub
 from ..utils.taxonomy import ru_body, translate_payload_value, normalize_color, ru_color
 from ..utils.thumbs import resolve_thumbnail_url
 
@@ -35,10 +35,11 @@ def _prepare_favorites(service: CarsService, favorites: list) -> list:
             or (display_color(normalized_color) if normalized_color else None)
             or car.color
         )
-        car.display_price_rub = display_price_rub(
+        car.display_price_rub = resolve_public_display_price_rub(
             getattr(car, "total_price_rub_cached", None),
             getattr(car, "price_rub_cached", None),
-            allow_price_fallback=True,
+            raw_price=getattr(car, "price", None),
+            currency=getattr(car, "currency", None),
         )
         car.price_note = price_without_util_note(
             display_price=car.display_price_rub,

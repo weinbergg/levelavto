@@ -56,7 +56,7 @@ from ..utils.taxonomy import (
 )
 from ..utils.price_utils import (
     price_without_util_note,
-    resolve_display_price_rub,
+    resolve_public_display_price_rub,
     sort_items_by_display_price,
 )
 normalize_color = _normalize_color
@@ -75,6 +75,10 @@ _HOME_FILTER_CTX_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
 _HOME_MEDIA_CACHE: TTLCache = TTLCache(maxsize=2, ttl=3600)
 _HOME_RECOMMENDED_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
 _HOME_MORE_OFFERS_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
+
+
+def _detail_inline_calc_enabled() -> bool:
+    return os.getenv("DETAIL_INLINE_CALC", "0") == "1"
 
 
 def _home_dataset_version() -> str:
@@ -152,7 +156,7 @@ def _decorate_showcase_car(car: Car, *, fx_rates: Optional[dict[str, float]] = N
         or car.color
     )
     fx_rates = fx_rates or {}
-    car.display_price_rub = resolve_display_price_rub(
+    car.display_price_rub = resolve_public_display_price_rub(
         car.total_price_rub_cached,
         car.price_rub_cached,
         raw_price=getattr(car, "price", None),
@@ -1878,7 +1882,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                 for c in initial_items:
                     if not isinstance(c, dict):
                         continue
-                    c["display_price_rub"] = resolve_display_price_rub(
+                    c["display_price_rub"] = resolve_public_display_price_rub(
                         c.get("total_price_rub_cached"),
                         c.get("price_rub_cached"),
                         raw_price=c.get("price"),
@@ -1886,8 +1890,6 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                         fx_eur=fx_eur,
                         fx_usd=fx_usd,
                         fx_cny=fx_cny,
-                        allow_price_fallback=True,
-                        allow_raw_price_fallback=True,
                     )
                     c["price_note"] = price_without_util_note(
                         display_price=c.get("display_price_rub"),
@@ -2169,7 +2171,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         car.display_country_code = code
         car.display_country_label = label
         detail_fx_rates = service.get_fx_rates() or {}
-        car.display_price_rub = resolve_display_price_rub(
+        car.display_price_rub = resolve_public_display_price_rub(
             car.total_price_rub_cached,
             car.price_rub_cached,
             raw_price=getattr(car, "price", None),
@@ -2177,8 +2179,6 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             fx_eur=float(detail_fx_rates.get("EUR") or 0),
             fx_usd=float(detail_fx_rates.get("USD") or 0),
             fx_cny=float(detail_fx_rates.get("CNY") or 0),
-            allow_price_fallback=True,
-            allow_raw_price_fallback=True,
         )
         car.price_note = price_without_util_note(
             display_price=car.display_price_rub,
@@ -2275,7 +2275,8 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
     pricing = None
     similar_offers: list[Car] = []
     if car:
-        calc = service.ensure_calc_cache(car)
+        if _detail_inline_calc_enabled() and os.getenv("LAZY_RECALC_ENABLED", "1") != "0":
+            calc = service.ensure_calc_cache(car)
         car.engine_cc = effective_engine_cc_value(car)
         car.power_hp = effective_power_hp_value(car)
         car.power_kw = effective_power_kw_value(car)
@@ -2292,7 +2293,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         car.display_transmission = translate_payload_value("transmission", getattr(car, "transmission", None)) or car.transmission
         car.display_drive_type = translate_payload_value("drive_type", getattr(car, "drive_type", None)) or car.drive_type
         detail_fx_rates = service.get_fx_rates() or {}
-        car.display_price_rub = resolve_display_price_rub(
+        car.display_price_rub = resolve_public_display_price_rub(
             car.total_price_rub_cached,
             car.price_rub_cached,
             raw_price=getattr(car, "price", None),
@@ -2300,8 +2301,6 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
             fx_eur=float(detail_fx_rates.get("EUR") or 0),
             fx_usd=float(detail_fx_rates.get("USD") or 0),
             fx_cny=float(detail_fx_rates.get("CNY") or 0),
-            allow_price_fallback=True,
-            allow_raw_price_fallback=True,
         )
         car.price_note = price_without_util_note(
             display_price=car.display_price_rub,

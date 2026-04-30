@@ -32,7 +32,7 @@ from ..utils.taxonomy import (
 from ..utils.localization import display_body, display_color
 from ..utils.price_utils import (
     price_without_util_note,
-    resolve_display_price_rub,
+    resolve_public_display_price_rub,
     sort_items_by_display_price,
 )
 from ..utils.color_groups import split_color_facets
@@ -63,6 +63,10 @@ import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _detail_inline_calc_enabled() -> bool:
+    return os.getenv("DETAIL_INLINE_CALC", "0") == "1"
 
 TOP_BRANDS = [
     "BMW",
@@ -420,7 +424,7 @@ def _serialize_catalog_payload_items(
             thumb_replaced += 1
         total_cached = c.get("total_price_rub_cached")
         price_cached = c.get("price_rub_cached")
-        display_rub = resolve_display_price_rub(
+        display_rub = resolve_public_display_price_rub(
             total_cached,
             price_cached,
             raw_price=c.get("price"),
@@ -428,8 +432,6 @@ def _serialize_catalog_payload_items(
             fx_eur=fx_eur,
             fx_usd=fx_usd,
             fx_cny=fx_cny,
-            allow_price_fallback=True,
-            allow_raw_price_fallback=True,
         )
         effective_engine_cc = effective_engine_cc_value(c)
         effective_power_hp = effective_power_hp_value(c)
@@ -1379,7 +1381,7 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     car = service.get_car(car_id)
     if not car:
         raise HTTPException(status_code=404, detail="Car not found")
-    if os.getenv("LAZY_RECALC_ENABLED", "1") != "0":
+    if _detail_inline_calc_enabled() and os.getenv("LAZY_RECALC_ENABLED", "1") != "0":
         try:
             service.ensure_calc_cache(car)
         except Exception:
@@ -1391,7 +1393,7 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
     detail.power_kw = effective_power_kw_value(car)
     if car.images:
         detail.images = [im.url for im in car.images if im.url]
-    detail.display_price_rub = resolve_display_price_rub(
+    detail.display_price_rub = resolve_public_display_price_rub(
         car.total_price_rub_cached,
         car.price_rub_cached,
         raw_price=getattr(car, "price", None),
@@ -1399,8 +1401,6 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
         fx_eur=float(fx_rates.get("EUR") or 0),
         fx_usd=float(fx_rates.get("USD") or 0),
         fx_cny=float(fx_rates.get("CNY") or 0),
-        allow_price_fallback=True,
-        allow_raw_price_fallback=True,
     )
     detail.price_note = price_without_util_note(
         display_price=detail.display_price_rub,

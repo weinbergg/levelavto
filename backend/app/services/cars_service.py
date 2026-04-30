@@ -1624,6 +1624,24 @@ class CarsService:
             raw_positive_expr,
         )
 
+    def _public_price_fallback_enabled(self) -> bool:
+        return os.getenv("PUBLIC_PRICE_ALLOW_SOURCE_FALLBACK", "0") == "1"
+
+    def _public_display_price_rub_expr(self):
+        total_expr = case(
+            (
+                and_(
+                    Car.total_price_rub_cached.is_not(None),
+                    Car.total_price_rub_cached > 0,
+                ),
+                Car.total_price_rub_cached,
+            ),
+            else_=None,
+        )
+        if not self._public_price_fallback_enabled():
+            return total_expr
+        return self._display_price_rub_expr()
+
     def _catalog_inline_price_refresh_enabled(self) -> bool:
         return os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0"
 
@@ -2047,7 +2065,7 @@ class CarsService:
                     conditions.append(Car.source_id.in_(src_ids))
 
         if (price_min is not None or price_max is not None) and "price" not in exclude:
-            price_expr = self._display_price_rub_expr()
+            price_expr = self._public_display_price_rub_expr()
             conditions.append(price_expr.is_not(None))
             if price_min is not None:
                 conditions.append(price_expr >= price_min)
@@ -2553,7 +2571,7 @@ class CarsService:
 
         order_clause = []
         if sort == "price_asc":
-            price_expr = self._display_price_rub_expr()
+            price_expr = self._public_display_price_rub_expr()
             missing_price = price_expr.is_(None)
             order_clause = [
                 missing_price.asc(),
@@ -2561,7 +2579,7 @@ class CarsService:
                 Car.id.asc(),
             ]
         elif sort == "price_desc":
-            price_expr = self._display_price_rub_expr()
+            price_expr = self._public_display_price_rub_expr()
             missing_price = price_expr.is_(None)
             order_clause = [
                 missing_price.asc(),
@@ -2586,7 +2604,7 @@ class CarsService:
             order_clause = [Car.listing_sort_ts.asc().nullslast(), Car.id.desc()]
         else:
             # default: цена сначала дешевые
-            price_expr = self._display_price_rub_expr()
+            price_expr = self._public_display_price_rub_expr()
             order_clause = [price_expr.asc().nullslast(), Car.id.desc()]
 
         thumb_rank = case(
@@ -3036,7 +3054,7 @@ class CarsService:
             )
         except Exception:
             batch_size = max(120, max(1, int(page or 1)) * max(1, int(page_size or 20)))
-        price_expr = self._display_price_rub_expr()
+        price_expr = self._public_display_price_rub_expr()
         if sort == "price_desc":
             order_clause = [price_expr.desc().nullslast(), Car.id.asc()]
         else:
@@ -4235,7 +4253,7 @@ class CarsService:
         reg_month_expr = self._effective_registration_month_ceil_expr()
         power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)
         engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)
-        price_expr = self._display_price_rub_expr()
+        price_expr = self._public_display_price_rub_expr()
 
         if max_age_years is not None:
             # возраст в месяцах
@@ -4303,7 +4321,7 @@ class CarsService:
         reg_year_expr = self._effective_registration_year_expr()
         power_hp_expr = func.coalesce(Car.power_hp, Car.inferred_power_hp)
         engine_cc_expr = func.coalesce(Car.engine_cc, Car.inferred_engine_cc)
-        price_expr = self._display_price_rub_expr()
+        price_expr = self._public_display_price_rub_expr()
 
         model_rank = (
             case(

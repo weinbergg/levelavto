@@ -99,6 +99,34 @@ def resolve_display_price_rub(
     return display_price_rub(None, raw_rub, allow_price_fallback=True)
 
 
+def public_price_fallback_enabled() -> bool:
+    return os.getenv("PUBLIC_PRICE_ALLOW_SOURCE_FALLBACK", "0") == "1"
+
+
+def resolve_public_display_price_rub(
+    total_price_rub_cached: Optional[float],
+    price_rub_cached: Optional[float],
+    *,
+    raw_price: Optional[float] = None,
+    currency: Optional[str] = None,
+    fx_eur: Optional[float] = None,
+    fx_usd: Optional[float] = None,
+    fx_cny: Optional[float] = None,
+) -> Optional[float]:
+    allow_fallback = public_price_fallback_enabled()
+    return resolve_display_price_rub(
+        total_price_rub_cached,
+        price_rub_cached,
+        raw_price=raw_price,
+        currency=currency,
+        fx_eur=fx_eur,
+        fx_usd=fx_usd,
+        fx_cny=fx_cny,
+        allow_price_fallback=allow_fallback,
+        allow_raw_price_fallback=allow_fallback,
+    )
+
+
 def sort_items_by_display_price(items: list[Any], *, sort: Optional[str]) -> list[Any]:
     if sort not in {"price_asc", "price_desc"}:
         return items

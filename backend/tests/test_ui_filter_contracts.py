@@ -311,6 +311,8 @@ def test_recalc_scripts_support_engine_type_targeting_and_daily_ev_recovery():
     assert 'ap.add_argument("--engine-type"' in recalc_cache
     assert '--engine-type electric \\' in pipeline
     assert 'step=recalc_electric_recoverable_fallbacks' in pipeline
+    assert 'step=analyze_post_recalc' in pipeline
+    assert 'ANALYZE cars;' in pipeline
 
 
 def test_catalog_template_marks_hidden_line_inputs_as_catalog_state():
@@ -710,8 +712,12 @@ def test_che168_supports_cny_and_china_country_label():
     assert 'payload.get("country") or ""' in parsing_service
     assert 'payload.get("country") and getattr(existing, "country", None) != payload.get("country")' in parsing_service
     assert '"CNY": cny' in cars_service
-    assert "resolve_display_price_rub" in catalog_router
-    assert "resolve_display_price_rub" in pages_router
+    assert "resolve_public_display_price_rub" in catalog_router
+    assert "resolve_public_display_price_rub" in pages_router
+    assert 'def public_price_fallback_enabled() -> bool:' in price_utils
+    assert 'PUBLIC_PRICE_ALLOW_SOURCE_FALLBACK", "0") == "1"' in price_utils
+    assert 'DETAIL_INLINE_CALC", "0") == "1"' in catalog_router
+    assert 'DETAIL_INLINE_CALC", "0") == "1"' in pages_router
     assert 'PRICE_NOTE_CHINA = "Цена в Китае"' in price_utils
     assert 'elif car.currency == "CNY" and car.price is not None:' in fx_script
     assert "def _is_retryable_write_error(exc: Exception) -> bool:" in fx_script

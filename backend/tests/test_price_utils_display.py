@@ -1,6 +1,7 @@
 from backend.app.utils.price_utils import (
     display_price_rub,
     raw_price_to_rub,
+    resolve_public_display_price_rub,
     resolve_display_price_rub,
     sort_items_by_display_price,
 )
@@ -49,6 +50,28 @@ def test_resolve_display_price_ignores_zero_raw_price():
         currency="EUR",
         fx_eur=95.0,
     ) is None
+
+
+def test_public_display_price_defaults_to_total_only(monkeypatch):
+    monkeypatch.delenv("PUBLIC_PRICE_ALLOW_SOURCE_FALLBACK", raising=False)
+    assert resolve_public_display_price_rub(
+        None,
+        6_548_387.7,
+        raw_price=50_000,
+        currency="EUR",
+        fx_eur=95.0,
+    ) is None
+
+
+def test_public_display_price_can_opt_in_to_source_fallback(monkeypatch):
+    monkeypatch.setenv("PUBLIC_PRICE_ALLOW_SOURCE_FALLBACK", "1")
+    assert resolve_public_display_price_rub(
+        None,
+        6_548_387.7,
+        raw_price=50_000,
+        currency="EUR",
+        fx_eur=95.0,
+    ) == 6_550_000
 
 
 def test_sort_items_by_display_price_keeps_visible_order_consistent():

@@ -159,6 +159,20 @@ if [ "${ELECTRIC_RECOVERABLE_FALLBACK_ENABLED:-1}" = "1" ]; then
     --batch "${ELECTRIC_RECOVERABLE_FALLBACK_BATCH:-2000}"
 fi
 
+echo "[mobilede_pipeline] step=analyze_post_recalc"
+docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "
+ANALYZE cars;
+ANALYZE car_counts_core;
+ANALYZE car_counts_brand;
+ANALYZE car_counts_model;
+ANALYZE car_counts_engine_type;
+ANALYZE car_counts_body_type;
+ANALYZE car_counts_transmission;
+ANALYZE car_counts_drive_type;
+ANALYZE car_counts_color;
+ANALYZE car_counts_reg_year;
+"'
+
 if [ "${MOBILEDE_PRUNE_UNUSED_MEDIA:-1}" = "1" ]; then
   echo "[mobilede_pipeline] step=prune_unused_local_media"
   docker compose exec -T web python -m backend.app.scripts.prune_unused_local_media \
