@@ -1326,7 +1326,9 @@ def update_featured(
     placement: str = Form("recommended"),
     car_ids: str = Form(""),
 ):
-    ids = [int(x) for x in car_ids.replace(",", " ").split() if x.strip().isdigit()]
+    from ..utils.featured_template import parse_featured_template
+
+    ids = parse_featured_template(car_ids)
     AdminService(db).set_featured(placement, ids)
     _bump_home_caches()
     msg = f"Закреплено машин: {len(ids)}" if ids else "Список очищен — используется автоподбор"
@@ -1339,13 +1341,13 @@ def download_featured_template(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    from ..utils.featured_template import build_featured_template
+
     items = AdminService(db).list_featured("recommended")
-    lines = ["# featured_template v1", "# один ID на строку"]
-    lines.extend([str(fc.car_id) for fc in items])
-    content = "\n".join(lines) + "\n"
+    content = build_featured_template(items)
     return Response(
         content,
-        media_type="text/plain",
+        media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=featured_template.txt"},
     )
 
@@ -1357,10 +1359,12 @@ async def upload_featured_template(
     db: Session = Depends(get_db),
     file: UploadFile = File(...),
 ):
+    from ..utils.featured_template import parse_featured_template
+
     if not file.filename.lower().endswith((".txt", ".csv")):
         return _admin_redirect(error="Неподдерживаемый формат — нужен .txt или .csv")
     raw = (await file.read()).decode("utf-8", errors="ignore")
-    ids = [int(x) for x in raw.replace(",", " ").split() if x.strip().isdigit()]
+    ids = parse_featured_template(raw)
     AdminService(db).set_featured("recommended", ids)
     _bump_home_caches()
     return _admin_redirect(f"Загружено {len(ids)} ID")

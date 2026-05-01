@@ -56,24 +56,96 @@ def _iter_tables(data: Dict[str, Any], age_bucket: str) -> Dict[str, Any]:
     return tables
 
 
+_AGE_LABELS_RU = {
+    "under_3": "ДО 3 ЛЕТ (новые автомобили)",
+    "3_5": "3–5 ЛЕТ (бывшие в употреблении)",
+    "electric": "ЭЛЕКТРО / ГИБРИД (любой возраст)",
+}
+
+_TABLE_LABELS_RU = {
+    "personal": "Физ. лица (для личного пользования)",
+    "commercial": "Юр. лица / коммерческое использование",
+    "import": "Юр. лица / импорт под перепродажу",
+}
+
+_POWER_LABELS_RU = {
+    "kw": "кВт",
+    "hp": "л.с.",
+}
+
+
+def _table_label_ru(name: str) -> str:
+    return _TABLE_LABELS_RU.get(name, name)
+
+
 def build_util_template(data: Dict[str, Any]) -> str:
-    lines = [
-        "# util_fee_template v1",
-        "# columns: age_bucket,cc_table,power_type,from,to,price_rub",
-        "# age_bucket: under_3 | 3_5 | electric",
-        "# power_type: kw | hp",
+    """Build a TXT template that the operator's bookkeeper can edit in Excel.
+
+    The schema (5-tuple key + price) is kept the same — :func:`apply_util_template`
+    parses it back — but each section gets a human-readable Russian heading
+    so the operator does not need to remember what ``under_3,personal,kw,…``
+    means.
+    """
+
+    lines: List[str] = [
+        "# ════════════════════════════════════════════════════════════════════",
+        "# Шаблон ставок утилизационного сбора",
+        "#",
+        "# Что заполнять:",
+        "#   1. Меняйте только ПОСЛЕДНЕЕ число в строке (сумма в рублях).",
+        "#   2. Не трогайте первые пять полей — это идентификатор ставки.",
+        "#   3. Любая строка, начинающаяся с #, — комментарий, она игнорируется.",
+        "#   4. Можно открыть в Excel: разделители — запятая, точка с запятой",
+        "#      или табуляция. Файл не зашифрован, можно править блокнотом.",
+        "#",
+        "# Формат строки (всего 6 значений):",
+        "#   age_bucket , cc_table , power_type , от , до , сумма_руб",
+        "#",
+        "# Возможные значения:",
+        "#   age_bucket  : under_3   = до 3 лет (новые)",
+        "#                 3_5       = 3–5 лет (б/у)",
+        "#                 electric  = электро/гибрид",
+        "#   cc_table    : название категории (personal / commercial / …) ",
+        "#                 — задаётся в customs.yml, новые названия не появятся",
+        "#                 при загрузке этого файла, добавляйте их через ИТ.",
+        "#   power_type  : kw  = киловатты",
+        "#                 hp  = лошадиные силы",
+        "#",
+        "# После загрузки изменения попадают в каталог через 1–2 минуты",
+        "# (сбрасывается кэш и пересчитывается стоимость).",
+        "# ════════════════════════════════════════════════════════════════════",
+        "",
     ]
+
     for age_bucket in ("under_3", "3_5", "electric"):
         tables = _iter_tables(data, age_bucket)
+        if not tables:
+            continue
+        lines.append("")
+        lines.append(f"# ─── {_AGE_LABELS_RU.get(age_bucket, age_bucket)} ───")
         for table_name, table in tables.items():
+            lines.append(f"#   • Категория: {_table_label_ru(table_name)}")
             for power_type in ("kw", "hp"):
                 rows = (table or {}).get(power_type) or []
+                if not rows:
+                    continue
+                lines.append(f"#     ↳ Мощность в {_POWER_LABELS_RU.get(power_type, power_type)}:")
                 for row in rows:
                     lines.append(
-                        f"{age_bucket},{table_name},{power_type},{row.get('from',0)},{row.get('to')},{row.get('price_rub')}"
+                        f"{age_bucket},{table_name},{power_type},"
+                        f"{row.get('from', 0)},{row.get('to')},{row.get('price_rub')}"
                     )
     lines.append("")
     return "\n".join(lines)
+
+
+def _strip_inline_comment(line: str) -> str:
+    """Drop any ``# …`` tail so operators can annotate rows in the file."""
+
+    hash_idx = line.find("#")
+    if hash_idx == -1:
+        return line.strip()
+    return line[:hash_idx].strip()
 
 
 def _split_line(line: str) -> List[str]:
@@ -87,8 +159,12 @@ def _split_line(line: str) -> List[str]:
 
 def apply_util_template(data: Dict[str, Any], content: str) -> ApplyStats:
     stats = ApplyStats()
-    lines = [ln.strip() for ln in content.splitlines() if ln.strip() and not ln.strip().startswith("#")]
-    for ln in lines:
+    cleaned_lines: List[str] = []
+    for raw in content.splitlines():
+        stripped = _strip_inline_comment(raw)
+        if stripped:
+            cleaned_lines.append(stripped)
+    for ln in cleaned_lines:
         try:
             parts = _split_line(ln)
             if len(parts) < 6:

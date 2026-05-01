@@ -606,11 +606,13 @@ async def set_chunks_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def apply_featured_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    from ..utils.featured_template import parse_featured_template
+
     text = (update.message.text or "").strip() if update.message else ""
     if not text:
         await reply(update, "Пусто. Введите ID через пробел или запятую.")
         return 0
-    ids = [int(x) for x in text.replace(",", " ").split() if x.strip().isdigit()]
+    ids = parse_featured_template(text)
     db = SessionLocal()
     try:
         AdminService(db).set_featured("recommended", ids)
@@ -967,13 +969,11 @@ def main() -> None:
         elif data == "featured_template":
             import tempfile
             import os
+            from ..utils.featured_template import build_featured_template
             db = SessionLocal()
             try:
                 items = AdminService(db).list_featured("recommended")
-                lines = ["# featured_template v1", "# один ID на строку"]
-                for fc in items:
-                    lines.append(str(fc.car_id))
-                content = "\n".join(lines) + "\n"
+                content = build_featured_template(items)
             finally:
                 db.close()
             with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp:
