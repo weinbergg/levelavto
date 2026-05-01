@@ -71,12 +71,12 @@
         {% if target.phone %}
         <a class="la-btn la-btn--secondary" href="https://wa.me/{{ target.phone | replace('+', '') | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') }}" target="_blank" rel="noopener">Написать в WhatsApp</a>
         {% endif %}
-        <button type="button" class="la-btn la-btn--primary is-disabled" disabled title="Релиз 1, День 4">
-          Отправить предложение в ЛК (скоро)
-        </button>
+        <a class="la-btn la-btn--primary" href="/admin/notifications?user_id={{ target.id }}">
+          Отправить предложение в ЛК
+        </a>
       </div>
       <div class="la-text-dim" style="margin-top: 14px; font-size: 12.5px">
-        Внутренние сообщения в ЛК пользователя добавятся вместе с моделью Notification (Релиз 1, День 4).
+        Сообщение появится в личном кабинете пользователя (раздел «Сообщения») и сохранится в истории.
       </div>
     </div>
   </div>

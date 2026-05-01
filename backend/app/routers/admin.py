@@ -1,4 +1,5 @@
 from urllib.parse import quote
+from datetime import datetime, timedelta
 import json
 import logging
 import secrets
@@ -30,12 +31,17 @@ from ..utils.customs_template import (
 from ..utils.brand_groups import (
     BRAND_FILTER_PRIORITY,
     TOP_BRANDS_CONTENT_KEY,
+    TOP_MODELS_CONTENT_KEY,
+    _coerce_models_override,
     _coerce_priority_list,
     _normalize_to_priority,
     effective_priority,
+    load_models_priority,
 )
 from ..utils.redis_cache import bump_dataset_version, redis_delete_by_pattern
-from ..models import Car, Favorite, User
+from ..models import Car, CalculatorConfig, Favorite, Notification, PageVisit, User
+from ..services.notification_service import NotificationService
+import time
 
 
 router = APIRouter()
@@ -274,6 +280,118 @@ def admin_top_brands_save(
     )
 
 
+@router.get("/admin/top-models", response_class=None)
+def admin_top_models_page(
+    request: Request,
+    user: User | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    brand: str = "",
+):
+    if user is None:
+        return RedirectResponse(url="/login?next=" + quote("/admin/top-models"), status_code=302)
+    if not user.is_admin:
+        return RedirectResponse(url="/", status_code=302)
+
+    overrides = load_models_priority(db)
+    all_brands = _all_known_brands(db)
+
+    brand_pick = (brand or "").strip()
+    selected_brand = None
+    selected_groups: list[dict] = []
+    selected_priority: list[str] = []
+    if brand_pick:
+        for candidate in all_brands:
+            if candidate.casefold() == brand_pick.casefold():
+                selected_brand = candidate
+                break
+        if selected_brand is None:
+            selected_brand = brand_pick
+        cars_svc = CarsService(db)
+        models = cars_svc.models_for_brand_filtered(
+            region=None, country=None, kr_type=None, brand=selected_brand,
+        )
+        groups = cars_svc.build_model_groups(brand=selected_brand, models=models)
+        selected_groups = [
+            {"label": g.get("label") or "", "count": int(g.get("count") or 0)}
+            for g in groups if g.get("label")
+        ]
+        selected_priority = list(overrides.get(selected_brand.casefold(), []))
+
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "admin/top_models.html",
+        {
+            "request": request,
+            "user": user,
+            "page_title": "Топ-модели",
+            "page_subtitle": (
+                "Перетащите модели в левую колонку, чтобы они появлялись "
+                "первыми в фильтре «Модель» для выбранной марки."
+            ),
+            "breadcrumbs": [
+                ("Админка", "/admin"),
+                ("Топ-модели", None),
+            ],
+            "all_brands": all_brands,
+            "selected_brand": selected_brand,
+            "selected_groups": selected_groups,
+            "selected_priority": selected_priority,
+            "overrides_summary": [
+                {"brand": brand_name, "count": len(items)}
+                for brand_name, items in overrides.items()
+                if items
+            ],
+        },
+    )
+
+
+@router.post("/admin/top-models")
+def admin_top_models_save(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    brand: str = Form(""),
+    models: str = Form(""),
+    reset: str = Form(""),
+):
+    brand_clean = (brand or "").strip()
+    if not brand_clean:
+        return _admin_redirect(error="Не указана марка", path="/admin/top-models")
+
+    content = ContentService(db)
+    current_raw = content.get(TOP_MODELS_CONTENT_KEY)
+    overrides = _coerce_models_override(current_raw)
+    canonical_keyed: dict[str, list[str]] = {**overrides}
+
+    if reset == "1":
+        canonical_keyed.pop(brand_clean.casefold(), None)
+    else:
+        items = [item.strip() for item in models.split(",") if item.strip()]
+        if not items:
+            canonical_keyed.pop(brand_clean.casefold(), None)
+        else:
+            canonical_keyed[brand_clean.casefold()] = items
+
+    save_payload = {brand_name: items for brand_name, items in canonical_keyed.items() if items}
+
+    pretty: dict[str, list[str]] = {}
+    for key, items in save_payload.items():
+        pretty[brand_clean if key == brand_clean.casefold() else key] = items
+    content.upsert_content(
+        TOP_MODELS_CONTENT_KEY,
+        json.dumps(pretty, ensure_ascii=False),
+        description="top models override",
+    )
+    _bump_filter_caches()
+    if reset == "1":
+        msg = f"Список моделей сброшен для «{brand_clean}»"
+    else:
+        msg = f"Сохранено приоритетных моделей для «{brand_clean}»: {len(save_payload.get(brand_clean.casefold(), save_payload.get(brand_clean, [])))}"
+    return _admin_redirect(
+        msg, path="/admin/top-models?brand=" + quote(brand_clean)
+    )
+
+
 @router.get("/admin/calculator/excel", response_class=None)
 def admin_calculator_excel_page(
     request: Request,
@@ -436,6 +554,186 @@ def admin_calculator_preview_discard(
     )
 
 
+@router.post("/admin/calculator/rollback")
+def admin_calculator_rollback(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    version: int = Form(...),
+):
+    """Roll back to an older calculator config in one click.
+
+    We do not destroy history — instead we copy the chosen version's
+    payload into a new row, so the rollback itself becomes auditable.
+    """
+
+    svc = CalculatorConfigService(db)
+    target = db.execute(
+        select(CalculatorConfig).where(CalculatorConfig.version == version)
+    ).scalar_one_or_none()
+    if target is None:
+        return _admin_redirect(
+            error=f"Версия v{version} не найдена",
+            path="/admin/calculator/excel",
+        )
+    latest = svc.latest()
+    if latest and latest.version == version:
+        return _admin_redirect(
+            "Эта версия уже актуальна, откат не требуется",
+            path="/admin/calculator/excel",
+        )
+    new_cfg = svc.create(
+        payload=target.payload or {},
+        source="rollback",
+        comment=f"rollback to v{version} (by {user.email})",
+    )
+    return _admin_redirect(
+        f"Откат к v{version} выполнен — теперь актуальна v{new_cfg.version}",
+        path="/admin/calculator/excel",
+    )
+
+
+@router.get("/admin/calculator/template.xlsx")
+def admin_calculator_template(user: User = Depends(require_admin)):
+    """Download an empty (zeroed) calculator template for the customer.
+
+    The structure mirrors the live config, but every numeric value is
+    set to 0 / empty so the customer can fill it in from scratch
+    without seeing existing rates. Built off the in-code DEFAULT_CONFIG
+    skeleton — never the production payload.
+    """
+
+    from ..utils.calculator_xlsx_export import render_calculator_payload
+
+    expenses_blank = {
+        "bank": 0,
+        "purchase": 0,
+        "inspection": 0,
+        "delivery_eu_minsk": 0,
+        "delivery_eu_msk": 0,
+        "delivery_msk": 0,
+        "customs_by": 0,
+        "transfer_fee": 0,
+        "elpts": 0,
+        "insurance": 0,
+        "investor": 0,
+        "broker_elpts": 0,
+        "customs_fee": 0,
+    }
+    duty_rows = [
+        {"from": 0, "to": 1000, "eur_per_cc": 0},
+        {"from": 1000, "to": 1500, "eur_per_cc": 0},
+        {"from": 1500, "to": 1800, "eur_per_cc": 0},
+        {"from": 1800, "to": 2300, "eur_per_cc": 0},
+        {"from": 2300, "to": 3000, "eur_per_cc": 0},
+        {"from": 3000, "to": 99999, "eur_per_cc": 0},
+    ]
+    util_rows = [
+        {"from": 0, "to": 1000, "rub": 0},
+        {"from": 1000, "to": 2000, "rub": 0},
+        {"from": 2000, "to": 3000, "rub": 0},
+        {"from": 3000, "to": 99999, "rub": 0},
+    ]
+    skeleton = {
+        "meta": {
+            "version": "template",
+            "source": "blank",
+            "eur_rate_default": 0,
+            "usd_rate_default": 0,
+        },
+        "scenarios": {
+            "under_3": {
+                "expenses": dict(expenses_blank),
+                "duty_by_cc": [dict(row) for row in duty_rows],
+                "util_by_cc": [dict(row) for row in util_rows],
+            },
+            "3_5": {
+                "expenses": dict(expenses_blank),
+                "duty_by_cc": [dict(row) for row in duty_rows],
+                "util_by_cc": [dict(row) for row in util_rows],
+                "customs_fee_rub": 0,
+                "broker_elpts_rub": 0,
+            },
+            "electric": {
+                "expenses": dict(expenses_blank),
+                "duty_percent": 0,
+                "vat_percent": 0,
+                "util_rub": 0,
+                "customs_fee_rub": 0,
+                "broker_elpts_rub": 0,
+                "excise_by_hp": [
+                    {"from_hp": 0, "to_hp": 90, "rub_per_hp": 0},
+                    {"from_hp": 90, "to_hp": 150, "rub_per_hp": 0},
+                    {"from_hp": 150, "to_hp": 200, "rub_per_hp": 0},
+                    {"from_hp": 200, "to_hp": 9999, "rub_per_hp": 0},
+                ],
+                "power_fee": [],
+            },
+        },
+    }
+    data = render_calculator_payload(skeleton)
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="calculator-template-blank.xlsx"'},
+    )
+
+
+@router.post("/admin/calculator/recalc")
+def admin_calculator_recalc(
+    user: User = Depends(require_admin),
+):
+    """Kick off the full price-cache rebuild as a background subprocess.
+
+    The actual heavy work happens in ``backend.app.scripts.recalc_calc_cache``
+    which already supports retries and chunked commits. We launch it
+    detached so the admin page returns instantly; progress can be
+    inspected through the container logs (or via the marker file below).
+    """
+
+    import subprocess
+    import sys
+
+    marker = Path("/tmp/la_recalc_in_progress")
+    if marker.exists():
+        try:
+            age = time.time() - marker.stat().st_mtime
+        except FileNotFoundError:
+            age = 0
+        if age < 7200:  # 2-hour safety window
+            return _admin_redirect(
+                error="Пересчёт уже запущен. Дождитесь завершения или удалите /tmp/la_recalc_in_progress в контейнере.",
+                path="/admin/calculator/excel",
+            )
+
+    wrapper = (
+        "import sys, pathlib;"
+        " sys.argv = ['recalc_calc_cache'];"
+        " from backend.app.scripts.recalc_calc_cache import main;"
+        " marker = pathlib.Path('/tmp/la_recalc_in_progress');"
+        " try:\n    main()\nfinally:\n    marker.unlink(missing_ok=True)"
+    )
+    try:
+        marker.write_text(datetime.utcnow().isoformat())
+        subprocess.Popen(  # noqa: S603 — admin-only, no shell interpolation
+            [sys.executable, "-c", wrapper],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+        )
+    except Exception as exc:  # pragma: no cover — surfaces in flash
+        logger.exception("recalc launch failed")
+        marker.unlink(missing_ok=True)
+        return _admin_redirect(
+            error=f"Не удалось запустить пересчёт: {exc}",
+            path="/admin/calculator/excel",
+        )
+
+    return _admin_redirect(
+        "Пересчёт запущен в фоне. Это займёт несколько минут — следите за «Машин в базе» на сводке.",
+        path="/admin/calculator/excel",
+    )
+
+
 @router.get("/admin/users", response_class=None)
 def admin_users_page(
     request: Request,
@@ -578,6 +876,7 @@ def admin_notifications_page(
     request: Request,
     user: User | None = Depends(get_current_user),
     db: Session = Depends(get_db),
+    user_id: int | None = None,
 ):
     if user is None:
         return RedirectResponse(url="/login?next=" + quote("/admin/notifications"), status_code=302)
@@ -585,6 +884,32 @@ def admin_notifications_page(
         return RedirectResponse(url="/", status_code=302)
 
     stats = AdminService(db).overview_stats()
+    sent_stmt = (
+        select(Notification, User)
+        .join(User, User.id == Notification.user_id)
+        .order_by(Notification.created_at.desc())
+        .limit(100)
+    )
+    sent_rows = db.execute(sent_stmt).all()
+    sent = [{"notif": row[0], "user": row[1]} for row in sent_rows]
+
+    target_user = None
+    target_favorites: list = []
+    if user_id:
+        target_user = db.get(User, user_id)
+        if target_user:
+            target_favorites = list(
+                db.execute(
+                    select(Car)
+                    .join(Favorite, Favorite.car_id == Car.id)
+                    .where(Favorite.user_id == target_user.id)
+                    .order_by(Favorite.created_at.desc())
+                    .limit(20)
+                )
+                .scalars()
+                .all()
+            )
+
     templates = request.app.state.templates
     return templates.TemplateResponse(
         "admin/notifications.html",
@@ -593,16 +918,209 @@ def admin_notifications_page(
             "user": user,
             "page_title": "Сообщения",
             "page_subtitle": (
-                "Уведомления пользователям. Сейчас доступны прямые каналы связи — "
-                "внутренние сообщения в ЛК подключатся в Релизе 1, День 4."
+                "Отправляйте предложения зарегистрированным пользователям. "
+                "Сообщение появляется в их личном кабинете и сохраняется как история."
             ),
             "breadcrumbs": [
                 ("Админка", "/admin"),
                 ("Сообщения", None),
             ],
             "stats": stats,
+            "sent": sent,
+            "target_user": target_user,
+            "target_favorites": target_favorites,
         },
     )
+
+
+@router.post("/admin/notifications/send")
+def admin_notifications_send(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    user_id: int = Form(...),
+    title: str = Form(""),
+    body: str = Form(""),
+    car_ids: str = Form(""),
+):
+    target = db.get(User, user_id)
+    if target is None:
+        return _admin_redirect(error="Пользователь не найден", path="/admin/notifications")
+    body_clean = (body or "").strip()
+    if not body_clean:
+        return _admin_redirect(
+            error="Текст сообщения не может быть пустым",
+            path=f"/admin/notifications?user_id={user_id}",
+        )
+
+    attached: list[int] = []
+    for piece in (car_ids or "").replace(",", " ").split():
+        try:
+            attached.append(int(piece))
+        except ValueError:
+            continue
+    if attached:
+        # Drop ids that no longer point at a real car so the inbox view
+        # never renders broken thumbnails.
+        existing = {
+            cid
+            for (cid,) in db.execute(
+                select(Car.id).where(Car.id.in_(attached))
+            ).all()
+        }
+        attached = [cid for cid in attached if cid in existing]
+
+    try:
+        NotificationService(db).send(
+            user_id=target.id,
+            sender=user,
+            title=title,
+            body=body_clean,
+            attached_car_ids=attached,
+        )
+    except ValueError as exc:
+        return _admin_redirect(
+            error=str(exc),
+            path=f"/admin/notifications?user_id={user_id}",
+        )
+    return _admin_redirect(
+        f"Сообщение отправлено: {target.email}",
+        path=f"/admin/users/{user_id}",
+    )
+
+
+@router.get("/admin/users.xlsx")
+def admin_users_export_xlsx(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    q: str = "",
+    verified: str = "",
+    period: str = "",
+):
+    """Export the users table (with current filter state) as an XLSX."""
+
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+
+    fav_count_subq = (
+        select(Favorite.user_id, func.count(Favorite.id).label("fav_count"))
+        .group_by(Favorite.user_id)
+        .subquery()
+    )
+    stmt = (
+        select(User, func.coalesce(fav_count_subq.c.fav_count, 0).label("fav_count"))
+        .outerjoin(fav_count_subq, fav_count_subq.c.user_id == User.id)
+        .order_by(User.created_at.desc())
+    )
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            User.email.ilike(like) | User.full_name.ilike(like) | User.phone.ilike(like)
+        )
+    if verified == "yes":
+        stmt = stmt.where(
+            User.email_verified_at.is_not(None) | User.phone_verified_at.is_not(None)
+        )
+    elif verified == "no":
+        stmt = stmt.where(
+            User.email_verified_at.is_(None) & User.phone_verified_at.is_(None)
+        )
+    if period:
+        from datetime import datetime as _dt, timedelta as _td
+
+        days = {"7": 7, "30": 30, "90": 90}.get(period)
+        if days:
+            stmt = stmt.where(User.created_at >= _dt.utcnow() - _td(days=days))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Пользователи"
+    headers = ["ID", "Email", "Имя", "Телефон", "Зарегистрирован", "Email подтверждён", "Телефон подтверждён", "Админ", "Избранных машин"]
+    ws.append(headers)
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="1f2533")
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = header_font
+        cell.fill = header_fill
+
+    for row in db.execute(stmt).all():
+        u = row._mapping["User"]
+        fav_count = int(row._mapping["fav_count"] or 0)
+        ws.append([
+            u.id,
+            u.email,
+            u.full_name or "",
+            u.phone or "",
+            u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "",
+            "да" if u.email_verified_at else "нет",
+            "да" if u.phone_verified_at else "нет",
+            "да" if u.is_admin else "нет",
+            fav_count,
+        ])
+
+    widths = [6, 30, 26, 18, 18, 18, 18, 8, 14]
+    for col_idx, width in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = width
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"users-{datetime.utcnow().strftime('%Y%m%d-%H%M')}.xlsx"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/admin/api/cars/search", response_class=None)
+def admin_cars_search(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    q: str = "",
+    limit: int = 20,
+):
+    """Lightweight typeahead for the admin compose form.
+
+    Matches by exact id (when ``q`` is numeric) or by brand/model/variant
+    substring. Returns just enough to render a label + thumbnail in the UI.
+    """
+
+    from ..utils.thumbs import resolve_thumbnail_url
+
+    q_clean = (q or "").strip()
+    stmt = select(Car).limit(max(1, min(int(limit or 20), 50)))
+    if q_clean.isdigit():
+        stmt = stmt.where(Car.id == int(q_clean))
+    elif q_clean:
+        like = f"%{q_clean}%"
+        stmt = stmt.where(
+            Car.brand.ilike(like)
+            | Car.model.ilike(like)
+            | Car.variant.ilike(like)
+        ).order_by(Car.id.desc())
+    else:
+        stmt = stmt.order_by(Car.id.desc())
+
+    cars = list(db.execute(stmt).scalars().all())
+    out = []
+    for car in cars:
+        thumb = resolve_thumbnail_url(
+            getattr(car, "thumbnail_url", None),
+            getattr(car, "thumbnail_local_path", None),
+        )
+        label_parts = [car.brand or "", car.model or ""]
+        title = " ".join(p for p in label_parts if p).strip() or f"#{car.id}"
+        out.append({
+            "id": car.id,
+            "title": title,
+            "subtitle": car.variant or "",
+            "year": car.year,
+            "thumbnail_url": thumb or "/static/img/no-photo.svg",
+        })
+    return {"results": out}
 
 
 @router.get("/admin/analytics", response_class=None)
@@ -610,13 +1128,17 @@ def admin_analytics_page(
     request: Request,
     user: User | None = Depends(get_current_user),
     db: Session = Depends(get_db),
+    days: int = 30,
 ):
     if user is None:
         return RedirectResponse(url="/login?next=" + quote("/admin/analytics"), status_code=302)
     if not user.is_admin:
         return RedirectResponse(url="/", status_code=302)
 
-    stats = AdminService(db).overview_stats()
+    admin_svc = AdminService(db)
+    stats = admin_svc.overview_stats()
+    traffic = admin_svc.traffic_overview(days=days)
+    recent = admin_svc.recent_users(days=traffic["days"], limit=20)
     cars_total = CarsService(db).total_cars()
 
     templates = request.app.state.templates
@@ -627,8 +1149,8 @@ def admin_analytics_page(
             "user": user,
             "page_title": "Аналитика",
             "page_subtitle": (
-                "Базовая статистика по пользователям и базе. Подробный трафик "
-                "(посещения, источники, воронка) подключится после установки middleware."
+                "Посещения сайта (после согласия на cookies), регистрации "
+                "и активность пользователей."
             ),
             "breadcrumbs": [
                 ("Админка", "/admin"),
@@ -636,6 +1158,8 @@ def admin_analytics_page(
             ],
             "stats": stats,
             "cars_total": cars_total,
+            "traffic": traffic,
+            "recent_users": recent,
         },
     )
 
@@ -722,6 +1246,10 @@ def update_recommended(
     price_min: int = Form(DEFAULT_CONFIG["price_min"]),
     price_max: int = Form(DEFAULT_CONFIG["price_max"]),
     mileage_max: int = Form(DEFAULT_CONFIG["mileage_max"]),
+    reg_year_min: int = Form(DEFAULT_CONFIG["reg_year_min"]),
+    reg_year_max: int = Form(DEFAULT_CONFIG["reg_year_max"]),
+    power_hp_max: int = Form(DEFAULT_CONFIG["power_hp_max"]),
+    engine_cc_max: int = Form(DEFAULT_CONFIG["engine_cc_max"]),
 ):
     save_config(
         {
@@ -729,8 +1257,18 @@ def update_recommended(
             "price_min": price_min,
             "price_max": price_max,
             "mileage_max": mileage_max,
+            "reg_year_min": reg_year_min,
+            "reg_year_max": reg_year_max,
+            "power_hp_max": power_hp_max,
+            "engine_cc_max": engine_cc_max,
         }
     )
+    # Drop the cached SSR home payload so the new config takes effect on
+    # the next refresh — otherwise the recommended block can stay stale.
+    try:
+        redis_delete_by_pattern("home_*")
+    except Exception:
+        logger.exception("admin: failed to bump home cache after recommended save")
     return _admin_redirect("Параметры рекомендуемых сохранены")
 
 

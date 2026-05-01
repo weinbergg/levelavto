@@ -2634,6 +2634,33 @@ def debug_parsing_page(
     )
 
 
+@router.post("/cookie-consent")
+def set_cookie_consent(accept: str = Form("1")):
+    """Persist the visitor's analytics-cookie decision.
+
+    Sets ``la_consent=1`` for ~6 months when the user accepts; clears it
+    immediately when they decline. The PageVisitMiddleware reads this on
+    every subsequent request to decide whether to log a row.
+    """
+    from fastapi.responses import JSONResponse
+
+    accepted = (accept or "").strip().lower() in {"1", "yes", "true", "accept"}
+    response = JSONResponse({"ok": True, "accepted": accepted})
+    if accepted:
+        response.set_cookie(
+            "la_consent",
+            "1",
+            max_age=15_552_000,
+            samesite="lax",
+            httponly=False,
+            path="/",
+        )
+    else:
+        response.delete_cookie("la_consent", path="/")
+        response.delete_cookie("la_vid", path="/")
+    return response
+
+
 @router.get("/debug/catalog/{source_key}")
 def debug_catalog_alias(
     source_key: str,

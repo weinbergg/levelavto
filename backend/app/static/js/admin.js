@@ -145,12 +145,154 @@
     }
   }
 
+  /* ──────────────────────────────────────────────────────────────────
+     Cars picker — typeahead used in the notifications composer and in
+     the "featured cars" form. Auto-attaches to any element with
+     ``data-cars-picker`` so templates only need to drop the markup.
+     ────────────────────────────────────────────────────────────────── */
+  function initCarsPickers() {
+    document.querySelectorAll('[data-cars-picker]').forEach((root) => {
+      if (root.dataset.carsPickerReady === '1') return
+      root.dataset.carsPickerReady = '1'
+
+      const input = root.querySelector('.la-cars-picker__search')
+      const sugg = root.querySelector('.la-cars-picker__suggestions')
+      const chipsBox = root.querySelector('[data-cars-picker-chips]')
+      const hidden = root.querySelector('[data-cars-picker-input]')
+      if (!input || !sugg || !chipsBox || !hidden) return
+
+      // Seed selected map from any prefilled chips left by the server.
+      const selected = new Map()
+      chipsBox.querySelectorAll('.la-chip[data-prefilled]').forEach((chip) => {
+        const id = chip.dataset.prefilled
+        if (id) selected.set(String(id), { title: '' })
+      })
+
+      function syncHidden() {
+        hidden.value = Array.from(selected.keys()).join(',')
+      }
+
+      function addChip(id, info) {
+        if (selected.has(String(id))) return
+        selected.set(String(id), info || { title: '' })
+        const chip = document.createElement('span')
+        chip.className = 'la-chip la-chip--with-action'
+        chip.dataset.carId = String(id)
+        chip.innerHTML = '<span>#' + id + ' ' + (info && info.title ? info.title : '') + '</span>'
+        const rm = document.createElement('button')
+        rm.type = 'button'
+        rm.className = 'la-chip__remove'
+        rm.textContent = '×'
+        rm.addEventListener('click', () => {
+          selected.delete(String(id))
+          chip.remove()
+          syncHidden()
+        })
+        chip.appendChild(rm)
+        chipsBox.appendChild(chip)
+        syncHidden()
+      }
+
+      // Wire up any × on prefilled chips (server-rendered).
+      chipsBox.querySelectorAll('.la-chip[data-prefilled]').forEach((chip) => {
+        const rm = chip.querySelector('.la-chip__remove')
+        if (!rm || rm.dataset.bound === '1') return
+        rm.dataset.bound = '1'
+        rm.addEventListener('click', () => {
+          const id = chip.dataset.prefilled
+          if (id) selected.delete(String(id))
+          chip.remove()
+          syncHidden()
+        })
+      })
+      syncHidden()
+
+      function showSuggestions(items) {
+        sugg.innerHTML = ''
+        if (!items || !items.length) {
+          sugg.hidden = true
+          return
+        }
+        items.forEach((item) => {
+          const row = document.createElement('button')
+          row.type = 'button'
+          row.className = 'la-cars-picker__row'
+          row.innerHTML =
+            '<img src="' + (item.thumbnail_url || '/static/img/no-photo.svg') + '" alt="">' +
+            '<span class="la-cars-picker__title">' +
+            '<strong>#' + item.id + ' · ' + (item.title || '') + '</strong>' +
+            (item.year ? ' · ' + item.year : '') +
+            (item.subtitle ? '<br><span class="la-text-dim">' + item.subtitle + '</span>' : '') +
+            '</span>'
+          row.addEventListener('mousedown', (event) => {
+            event.preventDefault()
+          })
+          row.addEventListener('click', (event) => {
+            event.preventDefault()
+            addChip(item.id, { title: item.title || '', subtitle: item.subtitle || '' })
+            input.value = ''
+            sugg.hidden = true
+            input.focus()
+          })
+          sugg.appendChild(row)
+        })
+        sugg.hidden = false
+      }
+
+      let timer = null
+      input.addEventListener('input', () => {
+        clearTimeout(timer)
+        const q = input.value.trim()
+        if (!q) {
+          sugg.hidden = true
+          return
+        }
+        timer = setTimeout(() => {
+          fetch('/admin/api/cars/search?q=' + encodeURIComponent(q) + '&limit=10')
+            .then((r) => (r.ok ? r.json() : { results: [] }))
+            .then((data) => showSuggestions(data.results || []))
+            .catch(() => { sugg.hidden = true })
+        }, 180)
+      })
+      input.addEventListener('blur', () => {
+        setTimeout(() => { sugg.hidden = true }, 200)
+      })
+
+      // Quick-add buttons (e.g. "from favorites" in the compose form).
+      root.querySelectorAll('[data-cars-picker-quickadd]').forEach((btn) => {
+        if (btn.dataset.bound === '1') return
+        btn.dataset.bound = '1'
+        btn.addEventListener('click', (event) => {
+          event.preventDefault()
+          addChip(btn.dataset.carId, {
+            title: btn.dataset.carTitle || '',
+            subtitle: btn.dataset.carSubtitle || '',
+          })
+        })
+      })
+      // The favorites quick-add buttons in the compose form sit inside
+      // the field hint *outside* the picker root, so re-bind them by id.
+      document.querySelectorAll('[data-cars-picker-quickadd]').forEach((btn) => {
+        if (btn.dataset.bound === '1') return
+        btn.dataset.bound = '1'
+        btn.addEventListener('click', (event) => {
+          event.preventDefault()
+          addChip(btn.dataset.carId, {
+            title: btn.dataset.carTitle || '',
+            subtitle: btn.dataset.carSubtitle || '',
+          })
+        })
+      })
+    })
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     initSidebar()
     initFlashFromQuery()
     initConfirmForms()
     initActiveNav()
     activateTabFromHash()
+    initCarsPickers()
   })
 
   window.addEventListener('hashchange', () => {

@@ -74,3 +74,58 @@ def test_normalize_engine_phev_and_electric_synonyms():
     assert p._normalize_engine(None, "Elektro") == "Electric"
     assert p._normalize_engine(None, "Autogas LPG") == "LPG"
     assert p._normalize_engine(None, "Erdgas (CNG)") == "CNG"
+
+
+def test_normalize_engine_recovers_hybrid_from_variant_when_full_is_disclaimer():
+    """Real-world Cayenne 2026: envkv_consumption_fuel = disclaimer text but
+    the variant title and URL slug always contain `e-hybrid` / `e-hyb`."""
+    p = _parser()
+    assert (
+        p._normalize_engine(
+            None,
+            "Based on CO₂ emissions (combined)",
+            hint_texts=("Cayenne E-Hybrid Platinum Edition", None),
+        )
+        == "Hybrid"
+    )
+    # URL slug fallback
+    assert (
+        p._normalize_engine(
+            "Based on CO₂ emissions (combined)",
+            "Based on CO₂ emissions (combined)",
+            hint_texts=(None, None, None,
+                        "https://suchen.mobile.de/auto-inserat/porsche-cayenne-e-hybrid-platinum/420659370.html"),
+        )
+        == "Hybrid"
+    )
+    # Variant containing "diesel" wins over disclaimer.
+    assert (
+        p._normalize_engine(
+            None,
+            "Based on CO₂ emissions (combined)",
+            hint_texts=("X5 xDrive 30d Diesel", None),
+        )
+        == "Diesel"
+    )
+
+
+def test_normalize_engine_orders_hybrid_before_electric_for_e_hybrid():
+    """`Cayenne E-Hybrid` must NOT be misclassified as Electric."""
+    p = _parser()
+    assert p._normalize_engine(None, "E-Hybrid") == "Hybrid"
+    assert p._normalize_engine(None, "Cayenne E-Hyb Coupé") == "Hybrid"
+    # But pure EV still maps to Electric.
+    assert p._normalize_engine(None, "Taycan EV") == "Electric"
+    assert p._normalize_engine(None, "EQE 350+") == "Electric"
+
+
+def test_normalize_engine_returns_none_when_no_hint_anywhere():
+    p = _parser()
+    assert (
+        p._normalize_engine(
+            None,
+            "Based on CO₂ emissions (combined)",
+            hint_texts=("Cayenne S", "Porsche Cayenne S"),
+        )
+        is None
+    )

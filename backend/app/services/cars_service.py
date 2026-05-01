@@ -4220,8 +4220,20 @@ class CarsService:
         return min(candidates, key=lambda value: (len(value), self._natural_text_key(value)))
 
     def build_model_groups(
-        self, *, brand: Optional[str], models: List[Dict[str, Any]]
+        self,
+        *,
+        brand: Optional[str],
+        models: List[Dict[str, Any]],
+        priority: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
+        """Group ``models`` by family/series and sort the result.
+
+        When ``priority`` is supplied, groups whose label matches one of
+        the priority entries (case-insensitive) appear first in the order
+        defined by ``priority``; everything else falls back to the legacy
+        alpha sort.
+        """
+
         norm_brand = normalize_brand(brand).strip() if brand else ""
         grouped: Dict[str, Dict[str, Any]] = {}
         for item in models:
@@ -4247,10 +4259,17 @@ class CarsService:
                 str(group.get("key") or ""),
                 group["models"],
             )
+
+        priority_labels = [p.strip().casefold() for p in (priority or []) if p and p.strip()]
+        priority_order = {label: idx for idx, label in enumerate(priority_labels)}
+
         def group_sort_key(item: Dict[str, Any]) -> tuple:
             label = str(item.get("label") or "")
             key = str(item.get("key") or "")
             models_count = len(item.get("models") or [])
+            label_low = label.strip().casefold()
+            if label_low in priority_order:
+                return (-1, priority_order[label_low])
             if key == "other" or label.casefold() == "прочее":
                 bucket = 3
             elif models_count > 1:

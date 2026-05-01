@@ -36,7 +36,11 @@ from ..utils.price_utils import (
     sort_items_by_display_price,
 )
 from ..utils.color_groups import split_color_facets
-from ..utils.brand_groups import group_brands, load_priority_override
+from ..utils.brand_groups import (
+    group_brands,
+    load_priority_override,
+    models_priority_for_brand,
+)
 from ..utils.thumbs import normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.redis_cache import (
     redis_get_json,
@@ -1778,7 +1782,11 @@ def filter_ctx_brand(
         kr_type=canon.get("kr_type"),
         brand=brand_norm,
     )
-    model_groups = service.build_model_groups(brand=brand_norm, models=models)
+    model_groups = service.build_model_groups(
+        brand=brand_norm,
+        models=models,
+        priority=models_priority_for_brand(db, brand_norm),
+    )
     payload = {"models": models, "model_groups": model_groups}
     redis_set_json(cache_key, payload, ttl_sec=86400)
     if os.getenv("FILTER_CTX_DEBUG") == "1":

@@ -61,9 +61,55 @@ def _looks_polluted(value: Optional[str]) -> bool:
     return canonical == "" and val not in {"hybrid", "diesel", "petrol", "electric", "lpg", "cng"}
 
 
-def _derive_from_payload(payload: dict | None) -> Optional[str]:
-    if not isinstance(payload, dict):
+def _classify_text(text: Optional[str]) -> Optional[str]:
+    """Same canonical-label mapping the patched parser uses."""
+
+    val = (text or "").strip().lower()
+    if not val:
         return None
+    if any(noise in val for noise in _DISCLAIMER_FRAGMENTS):
+        return None
+    if "diesel" in val or re.search(r"\btdi\b", val):
+        return "Diesel"
+    if (
+        "e-hybrid" in val
+        or "e-hyb" in val
+        or "e-hibri" in val
+        or "phev" in val
+        or "plug-in" in val
+        or "plug in" in val
+        or "hybrid" in val
+    ):
+        return "Hybrid"
+    if (
+        "electric" in val
+        or "elektro" in val
+        or re.search(r"\bev\b", val)
+        or re.search(r"\beq[a-z]\b", val)
+    ):
+        return "Electric"
+    if "petrol" in val or "benzin" in val or "gasoline" in val:
+        return "Petrol"
+    if "lpg" in val or re.search(r"\bgpl\b", val) or "autogas" in val:
+        return "LPG"
+    if "cng" in val or "natural gas" in val or "erdgas" in val:
+        return "CNG"
+    canonical = normalize_engine_type(val)
+    if canonical:
+        return canonical.capitalize()
+    return None
+
+
+def _derive_from_car(car: Car) -> Optional[str]:
+    """Try every available text field on the car to find a real fuel hint.
+
+    Looks first at the structured payload columns (the same ones the parser
+    consults), then at the human-readable variant / model / URL slug —
+    Porsche's Cayenne 2026 listings carry the e-hybrid hint in the URL
+    even when ``envkv.consumption_fuel`` is the disclaimer.
+    """
+
+    payload = car.source_payload if isinstance(car.source_payload, dict) else {}
     for key in (
         "envkv_consumption_fuel",
         "full_fuel_type",
@@ -71,27 +117,22 @@ def _derive_from_payload(payload: dict | None) -> Optional[str]:
         "fuel_raw",
         "engine_raw",
     ):
-        raw = payload.get(key)
-        if not isinstance(raw, str):
-            continue
-        val = raw.strip().lower()
-        if not val:
-            continue
-        if "diesel" in val:
-            return "Diesel"
-        if "hybrid" in val or "plug-in" in val or "plug in" in val or "phev" in val:
-            return "Hybrid"
-        if "electric" in val or re.search(r"\bev\b", val) or "elektro" in val:
-            return "Electric"
-        if "petrol" in val or "benzin" in val or "gasoline" in val:
-            return "Petrol"
-        if "lpg" in val or re.search(r"\bgpl\b", val) or "autogas" in val:
-            return "LPG"
-        if "cng" in val or "natural gas" in val or "erdgas" in val:
-            return "CNG"
-        canonical = normalize_engine_type(val)
-        if canonical:
-            return canonical.capitalize()
+        label = _classify_text(payload.get(key))
+        if label:
+            return label
+
+    hint_sources = [
+        car.variant,
+        payload.get("sub_title"),
+        car.model,
+        payload.get("title"),
+        car.source_url,
+        car.description,
+    ]
+    for source in hint_sources:
+        label = _classify_text(source)
+        if label:
+            return label
     return None
 
 
@@ -106,6 +147,9 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=0, help="Stop after N rows (0 = all)")
     args = parser.parse_args()
 
+    mode = "APPLY (writes will be committed)" if args.apply else "DRY-RUN (no writes)"
+    print(f">>> Cleanup engine_type — {mode}", flush=True)
+
     with SessionLocal() as db:
         # Cheap pre-filter: every disclaimer fragment ends up containing
         # "based on", "co2", "co₂", "emission", "consumption", or "combined".
@@ -116,6 +160,11 @@ def main() -> None:
         # Also catch pure-numeric noise.
         like_clauses.append(Car.engine_type.op("~")(r"^[ \t]*[0-9]+([.,][0-9]+)?[ \t]*$"))
         candidates_stmt = select(Car).where(or_(*like_clauses))
+
+        total_count = db.execute(
+            select(func.count()).select_from(Car).where(or_(*like_clauses))
+        ).scalar_one()
+        print(f">>> Кандидатов в БД: {total_count}", flush=True)
 
         total_seen = 0
         total_polluted = 0
@@ -130,7 +179,7 @@ def main() -> None:
                 continue
             total_polluted += 1
             per_value[(car.engine_type or "").strip().lower()] += 1
-            new_value = _derive_from_payload(car.source_payload)
+            new_value = _derive_from_car(car)
             if new_value:
                 total_recovered += 1
                 recovered_into[new_value] += 1
@@ -138,29 +187,40 @@ def main() -> None:
                 total_blanked += 1
             if args.apply:
                 car.engine_type = new_value
+            if total_seen % 500 == 0:
+                print(
+                    f"   ... осмотрено {total_seen}, обновлено {total_polluted} "
+                    f"(восстановлено {total_recovered}, в NULL {total_blanked})",
+                    flush=True,
+                )
             if args.limit and total_seen >= args.limit:
                 break
 
-        if args.report or not args.apply:
-            print(f"Кандидатов осмотрено: {total_seen}")
-            print(f"Признаны загрязнёнными: {total_polluted}")
-            print(f"Восстановлено из payload: {total_recovered}")
-            print(f"Сброшено в NULL: {total_blanked}")
-            print()
-            print("Топ загрязнённых значений:")
-            for value, n in per_value.most_common(20):
-                print(f"  {n:>6}  '{value}'")
-            print()
-            print("Распределение восстановленных:")
-            for value, n in recovered_into.most_common():
-                print(f"  {n:>6}  {value}")
+        print(f"\nКандидатов осмотрено: {total_seen}")
+        print(f"Признаны загрязнёнными: {total_polluted}")
+        print(f"Восстановлено из payload/variant: {total_recovered}")
+        print(f"Сброшено в NULL: {total_blanked}")
+        print()
+        print("Топ загрязнённых значений:")
+        for value, n in per_value.most_common(20):
+            print(f"  {n:>6}  '{value}'")
+        print()
+        print("Распределение восстановленных:")
+        for value, n in recovered_into.most_common():
+            print(f"  {n:>6}  {value}")
 
         if args.apply:
             db.commit()
-            print(f"\n✅ Применено: {total_polluted} строк обновлено "
-                  f"({total_recovered} восстановлено, {total_blanked} -> NULL).")
+            print(
+                f"\n✅ Применено: {total_polluted} строк обновлено "
+                f"({total_recovered} восстановлено, {total_blanked} -> NULL).",
+                flush=True,
+            )
         else:
-            print("\n⚠ Это был dry-run. Запустите с --apply, чтобы сохранить изменения.")
+            print(
+                "\n⚠ Это был dry-run. Запустите с --apply, чтобы сохранить изменения.",
+                flush=True,
+            )
 
 
 if __name__ == "__main__":

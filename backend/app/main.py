@@ -17,6 +17,7 @@ from .routers.favorites import router as favorites_router
 from .routers.calculator import router as calc_router
 from .routers.thumbs import router as thumbs_router
 from .schema_bootstrap import ensure_runtime_schema
+from .middleware import PageVisitMiddleware
 from pathlib import Path
 
 
@@ -34,6 +35,8 @@ def create_app() -> FastAPI:
     app.state.templates = Jinja2Templates(directory=str(templates_dir))
     app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
     app.add_middleware(SessionMiddleware, secret_key=settings.APP_SECRET)
+    if os.getenv("ANALYTICS_DISABLED", "0") != "1":
+        app.add_middleware(PageVisitMiddleware)
 
     @app.on_event("startup")
     def _bootstrap_runtime_schema() -> None:

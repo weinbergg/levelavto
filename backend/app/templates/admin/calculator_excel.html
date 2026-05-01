@@ -2,8 +2,9 @@
 
 {% block page_actions %}
   {% if latest %}
-  <a class="la-btn la-btn--secondary" href="/admin/calculator/export.xlsx">Скачать актуальный конфиг (xlsx)</a>
+  <a class="la-btn la-btn--secondary" href="/admin/calculator/export.xlsx">Скачать актуальный (xlsx)</a>
   {% endif %}
+  <a class="la-btn la-btn--ghost" href="/admin/calculator/template.xlsx">Болванка (пустой шаблон)</a>
 {% endblock %}
 
 {% block page_content %}
@@ -27,7 +28,7 @@
       <div class="la-text-muted" style="margin-bottom: 8px">Последние {{ versions|length }} версий:</div>
       <div class="la-table-wrap">
         <table class="la-table la-table--compact">
-          <thead><tr><th>Версия</th><th>Источник</th><th>Комментарий</th><th>Создана</th></tr></thead>
+          <thead><tr><th>Версия</th><th>Источник</th><th>Комментарий</th><th>Создана</th><th class="col-actions"></th></tr></thead>
           <tbody>
             {% for v in versions %}
             <tr>
@@ -35,6 +36,14 @@
               <td>{{ v.source or '—' }}</td>
               <td class="la-text-dim">{{ v.comment or '—' }}</td>
               <td class="la-text-dim">{{ v.created_at.strftime('%d.%m.%Y %H:%M') if v.created_at else '—' }}</td>
+              <td class="col-actions">
+                {% if not loop.first %}
+                <form method="post" action="/admin/calculator/rollback" style="display: inline" data-confirm="Откатиться к v{{ v.version }}? Будет создана новая версия с этими данными.">
+                  <input type="hidden" name="version" value="{{ v.version }}">
+                  <button type="submit" class="la-btn la-btn--ghost la-btn--sm">↶ Откатить</button>
+                </form>
+                {% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -128,16 +137,22 @@
 {% endif %}
 
 <div class="la-card" style="margin-top: 22px">
+  <div class="la-card__header">
+    <div class="la-card__header-text">
+      <div class="la-card__title">Применить новую конфигурацию к каталогу</div>
+      <div class="la-card__sub">
+        После загрузки нового xlsx цены пересчитываются не сразу — нажмите кнопку ниже, чтобы запустить пересчёт по всем странам.
+        Пересчёт идёт в фоне, может занять несколько минут.
+      </div>
+    </div>
+  </div>
   <div class="la-card__body">
-    <h2 style="margin-bottom: 8px">Что есть и чего ещё нет</h2>
-    <ul class="la-text-muted" style="padding-left: 22px; margin: 0; line-height: 1.7">
-      <li>✅ Скачивание актуального конфига как xlsx (по сценариям).</li>
-      <li>✅ Предпросмотр изменений перед применением (diff построчно).</li>
-      <li>✅ История версий — каждая загрузка создаёт новую версию.</li>
-      <li>⏳ Откат к предыдущей версии одним кликом — Релиз 2.</li>
-      <li>⏳ Шаблон-болванка для заказчика без данных — Релиз 2.</li>
-      <li>⏳ Кнопка пересчёта каталога после применения — пересчёт пока запускается отдельным скриптом.</li>
-    </ul>
+    <form method="post" action="/admin/calculator/recalc" style="display: inline" data-confirm="Запустить полный пересчёт каталога? Это может занять до 10 минут на больших базах.">
+      <button type="submit" class="la-btn la-btn--primary">⟳ Пересчитать каталог</button>
+    </form>
+    <span class="la-text-dim" style="margin-left: 12px; font-size: 12.5px">
+      Запускает <code>recalc_calc_cache</code> по всем регионам. Прогресс — в логах контейнера web.
+    </span>
   </div>
 </div>
 {% endblock %}

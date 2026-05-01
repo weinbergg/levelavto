@@ -298,8 +298,15 @@
                 <div class="la-field"><label class="la-field__label">Цена от, ₽</label><input class="la-input" type="number" name="price_min" value="{{ recommended_cfg.price_min }}"></div>
                 <div class="la-field"><label class="la-field__label">Цена до, ₽</label><input class="la-input" type="number" name="price_max" value="{{ recommended_cfg.price_max }}"></div>
                 <div class="la-field"><label class="la-field__label">Пробег до, км</label><input class="la-input" type="number" name="mileage_max" value="{{ recommended_cfg.mileage_max }}"></div>
+                <div class="la-field"><label class="la-field__label">Год регистрации от</label><input class="la-input" type="number" name="reg_year_min" value="{{ recommended_cfg.reg_year_min }}"></div>
+                <div class="la-field"><label class="la-field__label">Год регистрации до</label><input class="la-input" type="number" name="reg_year_max" value="{{ recommended_cfg.reg_year_max }}"></div>
+                <div class="la-field"><label class="la-field__label">Мощность до, л.с.</label><input class="la-input" type="number" name="power_hp_max" value="{{ recommended_cfg.power_hp_max }}"></div>
+                <div class="la-field"><label class="la-field__label">Объём двигателя до, см³</label><input class="la-input" type="number" name="engine_cc_max" value="{{ recommended_cfg.engine_cc_max }}"></div>
               </div>
               <button type="submit" class="la-btn la-btn--primary">Сохранить параметры</button>
+              <span class="la-text-dim" style="margin-left: 12px; font-size: 12.5px">
+                По этим фильтрам автоматически отбираются машины, если ниже список «Закреплённых» пуст.
+              </span>
             </form>
           </div>
         </div>
@@ -319,16 +326,29 @@
               {% endfor %}
             </div>
             {% endif %}
-            <form method="post" action="/admin/featured" class="la-form">
+            <form method="post" action="/admin/featured" class="la-form" id="featured-form">
               <input type="hidden" name="placement" value="recommended">
               <div class="la-field">
-                <label class="la-field__label">ID автомобилей (через пробел или запятую)</label>
-                <textarea class="la-textarea" name="car_ids" rows="2" placeholder="123 456 789"></textarea>
-                <span class="la-field__hint">Машины подгружаются в указанном порядке. Оставьте поле пустым и нажмите «Очистить», чтобы вернуться к автоподбору.</span>
+                <label class="la-field__label">Поиск машины по бренду / модели / id</label>
+                <div class="la-cars-picker" data-cars-picker>
+                  <input class="la-input la-cars-picker__search" type="text" placeholder="например, Mercedes E300 или 12345" autocomplete="off">
+                  <div class="la-cars-picker__suggestions" hidden></div>
+                  <div class="la-cars-picker__chips" data-cars-picker-chips>
+                    {% for item in featured_recommended %}
+                    {% set car = item.car %}
+                    <span class="la-chip la-chip--with-action" data-prefilled="{{ car.id }}">
+                      <span>#{{ car.id }} {{ car.brand or '' }} {{ car.model or '' }}</span>
+                      <button type="button" class="la-chip__remove" aria-label="Убрать">×</button>
+                    </span>
+                    {% endfor %}
+                  </div>
+                  <input type="hidden" name="car_ids" value="{% for item in featured_recommended %}{{ item.car.id }}{% if not loop.last %},{% endif %}{% endfor %}" data-cars-picker-input>
+                </div>
+                <span class="la-field__hint">Машины подгружаются в порядке добавления. Очистите все чипы и сохраните, чтобы вернуться к автоподбору по фильтрам выше.</span>
               </div>
               <div class="la-hstack">
                 <button type="submit" class="la-btn la-btn--primary">Сохранить список</button>
-                <a class="la-btn la-btn--secondary" href="/admin/featured/template">Скачать шаблон</a>
+                <a class="la-btn la-btn--secondary" href="/admin/featured/template">Скачать текстовый шаблон</a>
               </div>
             </form>
             <div class="la-divider"></div>

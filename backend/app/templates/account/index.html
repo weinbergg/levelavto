@@ -40,6 +40,59 @@ content %}
   </div>
 </section>
 
+<section class="section" id="messages">
+  <div class="la-container">
+    <div class="section-header" style="margin-bottom: 12px">
+      <div>
+        <p class="eyebrow">Сообщения</p>
+        <h2 class="section-title">
+          От менеджера
+          {% if notifications_unread and notifications_unread > 0 %}
+          <span class="badge badge-accent">{{ notifications_unread }} новых</span>
+          {% endif %}
+        </h2>
+        <p class="muted">Здесь появляются предложения подобранных машин и обновления по вашему запросу.</p>
+      </div>
+      {% if notifications_unread and notifications_unread > 0 %}
+      <form method="post" action="/account/notifications/read" style="margin: 0">
+        <button type="submit" class="btn btn-secondary">Отметить всё прочитанным</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if notifications and notifications|length > 0 %}
+    <div class="messages-list">
+      {% for entry in notifications %}
+      {% set notif = entry.row %}
+      <article class="message-card {% if not notif.is_read %}message-card--unread{% endif %}">
+        <header class="message-card__header">
+          <h3 class="message-card__title">{{ notif.title }}</h3>
+          <time class="message-card__date">{{ notif.created_at.strftime('%d.%m.%Y %H:%M') }}</time>
+        </header>
+        <div class="message-card__body">
+          {{ notif.body | replace('\n', '<br>') | safe }}
+        </div>
+        {% if entry.cars %}
+        <div class="message-card__cars">
+          {% for car in entry.cars %}
+          <a class="message-car-chip" href="{{ car.url }}">
+            <span class="message-car-chip__title">{{ car.title }}{% if car.year %} · {{ car.year }}{% endif %}</span>
+            {% if car.subtitle %}<span class="message-car-chip__subtitle">{{ car.subtitle }}</span>{% endif %}
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <p>Сообщений пока нет. Когда менеджер подберёт машину, она придёт сюда.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
 <section class="section" id="favorites">
   <div class="la-container">
     <div class="section-header" style="margin-bottom: 12px">

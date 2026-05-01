@@ -19,42 +19,114 @@
   </div>
 </div>
 
-<div class="la-form-grid la-form-grid--2" style="align-items: stretch">
-  <div class="la-card la-card--inset" style="margin: 0">
-    <div class="la-card__header">
-      <div class="la-card__header-text">
-        <div class="la-card__title">Что работает сейчас</div>
-        <div class="la-card__sub">Прямые каналы связи доступны из карточки пользователя.</div>
+<div class="la-card" style="margin-bottom: 22px">
+  <div class="la-card__header">
+    <div class="la-card__header-text">
+      <div class="la-card__title">Новое сообщение</div>
+      <div class="la-card__sub">
+        {% if target_user %}
+          Адресат: <strong>{{ target_user.full_name or target_user.email }}</strong> · {{ target_user.email }}
+        {% else %}
+          Откройте карточку пользователя и нажмите «Отправить предложение», или впишите id ниже.
+        {% endif %}
       </div>
-    </div>
-    <div class="la-card__body">
-      <ul class="la-text-muted" style="padding-left: 22px; margin: 0; line-height: 1.8">
-        <li>📞 <strong>Звонок</strong> — ссылка <code>tel:</code> в карточке пользователя.</li>
-        <li>💬 <strong>WhatsApp</strong> — открывает чат с номером пользователя.</li>
-        <li>✉ <strong>Email</strong> — открывает почтовый клиент с готовой темой.</li>
-        <li>👀 <strong>Избранные машины</strong> — в карточке видны все авто, которые пользователь сохранил, чтобы вы могли подготовить персональное предложение.</li>
-      </ul>
-      <div class="la-divider"></div>
-      <a class="la-btn la-btn--primary" href="/admin/users">Открыть список пользователей →</a>
     </div>
   </div>
-
-  <div class="la-card la-card--inset" style="margin: 0">
-    <div class="la-card__header">
-      <div class="la-card__header-text">
-        <div class="la-card__title">Что подключим в Релизе 1, День 4</div>
-        <div class="la-card__sub">Полноценная переписка внутри сайта с лентой в ЛК.</div>
+  <div class="la-card__body">
+    <form method="post" action="/admin/notifications/send" class="la-form" id="notif-compose-form">
+      <div class="la-form-grid la-form-grid--3">
+        <div class="la-field">
+          <label class="la-field__label">ID пользователя</label>
+          <input class="la-input" type="number" name="user_id" required value="{{ target_user.id if target_user else '' }}">
+        </div>
+        <div class="la-field" style="grid-column: span 2">
+          <label class="la-field__label">Заголовок</label>
+          <input class="la-input" type="text" name="title" maxlength="255" placeholder="Подобрал авто под ваш запрос" value="">
+        </div>
       </div>
-    </div>
-    <div class="la-card__body">
-      <ul class="la-text-muted" style="padding-left: 22px; margin: 0; line-height: 1.8">
-        <li>Модель <code>Notification</code> + миграция Alembic.</li>
-        <li>Виджет «Сообщения» в личном кабинете с пометкой «прочитано».</li>
-        <li>Адресная отправка одному пользователю с прикреплёнными машинами.</li>
-        <li>Сегментные рассылки: новые / верифицированные / добавлявшие в избранное.</li>
-        <li>Журнал отправленных + статус доставки + email-дубль (опционально).</li>
-      </ul>
-    </div>
+      <div class="la-field">
+        <label class="la-field__label">Текст сообщения</label>
+        <textarea class="la-textarea" name="body" rows="6" required placeholder="Здравствуйте! Подобрал для вас несколько вариантов…"></textarea>
+        <span class="la-field__hint">Простой текст с переводами строк. HTML не вставится — это специально, чтобы не сломать вёрстку у пользователя.</span>
+      </div>
+
+      <div class="la-field">
+        <label class="la-field__label">Прикрепить машины</label>
+        <div class="la-cars-picker" data-cars-picker>
+          <input class="la-input la-cars-picker__search" type="text" placeholder="Найти по бренду / модели / id" autocomplete="off">
+          <div class="la-cars-picker__suggestions" hidden></div>
+          <div class="la-cars-picker__chips" data-cars-picker-chips></div>
+          <input type="hidden" name="car_ids" value="" data-cars-picker-input>
+        </div>
+        <span class="la-field__hint">
+          Выбранные машины появятся карточками внутри сообщения в ЛК.
+          {% if target_favorites %}
+          Можно быстро добавить из избранного:
+          {% for car in target_favorites %}
+          <button type="button" class="la-chip la-chip--clickable" data-cars-picker-quickadd
+                  data-car-id="{{ car.id }}"
+                  data-car-title="{{ car.brand or '' }} {{ car.model or '' }}"
+                  data-car-subtitle="{{ car.variant or '' }}{% if car.year %} · {{ car.year }}{% endif %}">
+            ★ #{{ car.id }} {{ car.brand or '' }} {{ car.model or '' }}
+          </button>
+          {% endfor %}
+          {% endif %}
+        </span>
+      </div>
+
+      <div class="la-hstack">
+        <button type="submit" class="la-btn la-btn--primary">Отправить</button>
+        <a class="la-btn la-btn--ghost" href="/admin/notifications">Очистить</a>
+      </div>
+    </form>
   </div>
 </div>
+
+<div class="la-card">
+  <div class="la-card__header">
+    <div class="la-card__header-text">
+      <div class="la-card__title">История отправленных</div>
+      <div class="la-card__sub">Последние 100 сообщений (новые сверху).</div>
+    </div>
+  </div>
+  <div class="la-card__body">
+    {% if sent and sent|length > 0 %}
+    <table class="la-table">
+      <thead>
+        <tr>
+          <th>Когда</th>
+          <th>Адресат</th>
+          <th>Заголовок</th>
+          <th>Прикреплено</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in sent %}
+        {% set notif = entry.notif %}
+        {% set u = entry.user %}
+        <tr>
+          <td>{{ notif.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td><a href="/admin/users/{{ u.id }}">{{ u.full_name or u.email }}</a><br><span class="la-text-dim">{{ u.email }}</span></td>
+          <td>{{ notif.title or '—' }}</td>
+          <td>{% if notif.attached_car_ids %}{{ notif.attached_car_ids|length }} машин{% else %}—{% endif %}</td>
+          <td>
+            {% if notif.is_read %}
+            <span class="la-badge la-badge--muted">прочитано</span>
+            {% else %}
+            <span class="la-badge la-badge--info">не прочитано</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="la-text-dim" style="padding: 22px; text-align: center">
+      Пока ничего не отправляли. Заполните форму выше или зайдите в карточку пользователя.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
 {% endblock %}

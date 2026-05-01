@@ -2,6 +2,10 @@
 
 {% block page_actions %}
   <span class="la-text-muted">Всего: <strong>{{ total }}</strong></span>
+  <a class="la-btn la-btn--secondary la-btn--sm"
+     href="/admin/users.xlsx?q={{ q | urlencode }}&verified={{ verified | urlencode }}&period={{ period | urlencode }}">
+    ⤓ Скачать xlsx
+  </a>
 {% endblock %}
 
 {% block page_content %}
@@ -102,15 +106,6 @@
     </div>
     {% endif %}
 
-    <div class="la-divider"></div>
-    <h2 style="margin-bottom: 8px">Что есть и чего ещё нет</h2>
-    <ul class="la-text-muted" style="padding-left: 22px; margin: 0; line-height: 1.7">
-      <li>✅ Поиск по email / телефону / ФИО.</li>
-      <li>✅ Фильтры по верификации и периоду регистрации.</li>
-      <li>✅ Карточка пользователя с избранными машинами (клик по строке).</li>
-      <li>⏳ Экспорт в xlsx — Релиз 1 День 3.</li>
-      <li>⏳ Кнопка «Отправить предложение» — Релиз 1 День 4 (после модели Notification).</li>
-    </ul>
   </div>
 </div>
 {% endblock %}

@@ -1,21 +1,31 @@
 {% extends "admin/_layout.html" %}
 
+{% block page_actions %}
+  <form method="get" action="/admin/analytics" style="margin: 0">
+    <select class="la-select" name="days" onchange="this.form.submit()">
+      <option value="7"  {% if traffic.days == 7 %}selected{% endif %}>За 7 дней</option>
+      <option value="30" {% if traffic.days == 30 %}selected{% endif %}>За 30 дней</option>
+      <option value="90" {% if traffic.days == 90 %}selected{% endif %}>За 90 дней</option>
+    </select>
+  </form>
+{% endblock %}
+
 {% block page_content %}
 <div class="la-card-grid la-card-grid--4" style="margin-bottom: 24px">
   <div class="la-stat">
-    <span class="la-stat__label">Машин в базе</span>
-    <span class="la-stat__value">{{ '{:,}'.format(cars_total).replace(',', ' ') }}</span>
-    <span class="la-stat__delta la-stat__delta--flat">активных предложений</span>
+    <span class="la-stat__label">Посещений за {{ traffic.days }} дн.</span>
+    <span class="la-stat__value">{{ '{:,}'.format(traffic.visits_total).replace(',', ' ') }}</span>
+    <span class="la-stat__delta {% if traffic.visits_today > 0 %}la-stat__delta--up{% else %}la-stat__delta--flat{% endif %}">+{{ traffic.visits_today }} сегодня · +{{ traffic.visits_week }} за неделю</span>
   </div>
   <div class="la-stat">
-    <span class="la-stat__label">Пользователей</span>
+    <span class="la-stat__label">Уникальных посетителей</span>
+    <span class="la-stat__value">{{ '{:,}'.format(traffic.visitors_unique).replace(',', ' ') }}</span>
+    <span class="la-stat__delta la-stat__delta--flat">{{ traffic.visitors_unique_today }} сегодня</span>
+  </div>
+  <div class="la-stat">
+    <span class="la-stat__label">Зарегистрированных</span>
     <span class="la-stat__value">{{ '{:,}'.format(stats.users_total).replace(',', ' ') }}</span>
     <span class="la-stat__delta {% if stats.users_today > 0 %}la-stat__delta--up{% else %}la-stat__delta--flat{% endif %}">+{{ stats.users_today }} сегодня · +{{ stats.users_week }} за неделю</span>
-  </div>
-  <div class="la-stat">
-    <span class="la-stat__label">Верифицированных</span>
-    <span class="la-stat__value">{{ '{:,}'.format(stats.users_verified).replace(',', ' ') }}</span>
-    <span class="la-stat__delta la-stat__delta--flat">потенциальные адресаты КП</span>
   </div>
   <div class="la-stat">
     <span class="la-stat__label">Избранных машин</span>
@@ -24,47 +34,130 @@
   </div>
 </div>
 
+{% if traffic.visits_total == 0 %}
+<div class="la-card" style="margin-bottom: 22px">
+  <div class="la-card__body">
+    <div class="la-empty">
+      <div class="la-empty__icon">∿</div>
+      <div class="la-empty__title">Пока нет данных за выбранный период</div>
+      <div>Учёт начинается, когда посетители принимают cookie-баннер. Попросите коллегу зайти на сайт и нажать «Принять» — данные появятся здесь.</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="la-form-grid la-form-grid--2" style="align-items: stretch">
   <div class="la-card la-card--inset" style="margin: 0">
     <div class="la-card__header">
       <div class="la-card__header-text">
-        <div class="la-card__title">Воронка прямо сейчас</div>
-        <div class="la-card__sub">Что мы можем посчитать без middleware page_visits.</div>
+        <div class="la-card__title">Активность по дням</div>
+        <div class="la-card__sub">Просмотры и уникальные посетители (последние {{ traffic.days }} дней).</div>
       </div>
     </div>
     <div class="la-card__body">
+      {% if traffic.timeline %}
       <table class="la-table la-table--compact">
+        <thead>
+          <tr>
+            <th>День</th>
+            <th class="col-num">Посещений</th>
+            <th class="col-num">Уникальных</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr><td>Регистрации сегодня</td><td class="col-num"><strong>{{ stats.users_today }}</strong></td></tr>
-          <tr><td>Регистрации за 7 дней</td><td class="col-num"><strong>{{ stats.users_week }}</strong></td></tr>
-          <tr><td>Регистрации всего</td><td class="col-num"><strong>{{ stats.users_total }}</strong></td></tr>
-          <tr><td>Верифицировано (email или телефон)</td><td class="col-num"><strong>{{ stats.users_verified }}</strong></td></tr>
-          <tr><td>Добавили в избранное (всего)</td><td class="col-num"><strong>{{ stats.favorites_total }}</strong></td></tr>
-          <tr><td>Добавили в избранное (7 дней)</td><td class="col-num"><strong>{{ stats.favorites_week }}</strong></td></tr>
+          {% for row in traffic.timeline %}
+          <tr>
+            <td>{{ row.day }}</td>
+            <td class="col-num">{{ '{:,}'.format(row.visits).replace(',', ' ') }}</td>
+            <td class="col-num">{{ '{:,}'.format(row.unique).replace(',', ' ') }}</td>
+          </tr>
+          {% endfor %}
         </tbody>
       </table>
+      {% else %}
+      <div class="la-text-dim" style="padding: 22px; text-align: center">Нет данных за период.</div>
+      {% endif %}
     </div>
   </div>
 
   <div class="la-card la-card--inset" style="margin: 0">
     <div class="la-card__header">
       <div class="la-card__header-text">
-        <div class="la-card__title">Что подключим в Релизе 1, День 5</div>
-        <div class="la-card__sub">Полноценная статистика трафика с собственным сбором данных.</div>
+        <div class="la-card__title">Топ-страницы</div>
+        <div class="la-card__sub">Куда чаще всего заходят (за {{ traffic.days }} дней).</div>
       </div>
     </div>
     <div class="la-card__body">
-      <ul class="la-text-muted" style="padding-left: 22px; margin: 0; line-height: 1.8">
-        <li>Middleware <code>page_visits</code> с cookie-баннером согласия.</li>
-        <li>Уникальные / всего посетителей за период.</li>
-        <li>Топ-страниц и источников трафика (referer, UTM).</li>
-        <li>Графики по дням / неделям / месяцам.</li>
-        <li>Полная воронка: посещение → регистрация → избранное → заявка → продажа.</li>
-        <li>Партиции по дням, ретеншн 180 дней.</li>
-      </ul>
-      <div class="la-divider"></div>
-      <a class="la-btn la-btn--secondary" href="/admin/users?period=7">Кто зарегистрировался за 7 дней →</a>
+      {% if traffic.top_pages %}
+      <table class="la-table la-table--compact">
+        <thead>
+          <tr>
+            <th>Страница</th>
+            <th class="col-num">Просмотров</th>
+            <th class="col-num">Уникальных</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in traffic.top_pages %}
+          <tr>
+            <td><code>{{ row.path }}</code></td>
+            <td class="col-num">{{ '{:,}'.format(row.visits).replace(',', ' ') }}</td>
+            <td class="col-num">{{ '{:,}'.format(row.unique).replace(',', ' ') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="la-text-dim" style="padding: 22px; text-align: center">Нет данных за период.</div>
+      {% endif %}
     </div>
+  </div>
+</div>
+
+<div class="la-card" style="margin-top: 22px">
+  <div class="la-card__header">
+    <div class="la-card__header-text">
+      <div class="la-card__title">Новые пользователи за период</div>
+      <div class="la-card__sub">Кто зарегистрировался за последние {{ traffic.days }} дней.</div>
+    </div>
+  </div>
+  <div class="la-card__body">
+    {% if recent_users %}
+    <table class="la-table la-table--compact">
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>Email</th>
+          <th>ФИО</th>
+          <th>Телефон</th>
+          <th>Верификация</th>
+          <th class="col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in recent_users %}
+        <tr>
+          <td>{{ u.created_at.strftime('%d.%m.%Y %H:%M') if u.created_at else '—' }}</td>
+          <td><a href="/admin/users/{{ u.id }}">{{ u.email }}</a></td>
+          <td>{{ u.full_name or '—' }}</td>
+          <td>{{ u.phone or '—' }}</td>
+          <td>
+            {% if u.email_verified_at %}<span class="la-badge la-badge--success">email</span>{% endif %}
+            {% if u.phone_verified_at %}<span class="la-badge la-badge--success">телефон</span>{% endif %}
+            {% if not u.email_verified_at and not u.phone_verified_at %}
+            <span class="la-badge la-badge--muted">нет</span>
+            {% endif %}
+          </td>
+          <td class="col-actions">
+            <a class="la-btn la-btn--ghost la-btn--sm" href="/admin/notifications?user_id={{ u.id }}">Написать →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="la-text-dim" style="padding: 22px; text-align: center">За период никто не регистрировался.</div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

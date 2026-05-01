@@ -5,7 +5,7 @@ from typing import Dict, Iterable, List
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from ..models import FeaturedCar, Car, SiteContent, User, Favorite
+from ..models import FeaturedCar, Car, PageVisit, SiteContent, User, Favorite
 
 
 class AdminService:
@@ -58,6 +58,106 @@ class AdminService:
             "favorites_total": int(favorites_total),
             "favorites_week": int(favorites_week),
         }
+
+    def traffic_overview(self, *, days: int = 30) -> Dict[str, object]:
+        """Aggregate ``page_visits`` rows for the analytics dashboard.
+
+        Returns counts for the requested window plus a per-day timeline
+        and a breakdown by top routes. The middleware drops anything
+        without cookie consent, so these numbers reflect only visitors
+        who opted in to analytics — that matches the legal expectation.
+        """
+
+        days = max(1, min(int(days or 30), 90))
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        since = now - timedelta(days=days)
+        today_start = datetime(now.year, now.month, now.day)
+        week_start = now - timedelta(days=7)
+
+        def _count(stmt) -> int:
+            return int(self.db.execute(stmt).scalar_one() or 0)
+
+        visits_total = _count(
+            select(func.count(PageVisit.id)).where(PageVisit.created_at >= since)
+        )
+        visits_today = _count(
+            select(func.count(PageVisit.id)).where(PageVisit.created_at >= today_start)
+        )
+        visits_week = _count(
+            select(func.count(PageVisit.id)).where(PageVisit.created_at >= week_start)
+        )
+        visitors_unique = _count(
+            select(func.count(func.distinct(PageVisit.visitor_id))).where(
+                PageVisit.created_at >= since
+            )
+        )
+        visitors_unique_today = _count(
+            select(func.count(func.distinct(PageVisit.visitor_id))).where(
+                PageVisit.created_at >= today_start
+            )
+        )
+
+        # Per-day timeline (most recent first), trimmed to the window.
+        day_col = func.date_trunc("day", PageVisit.created_at).label("d")
+        timeline_rows = self.db.execute(
+            select(
+                day_col,
+                func.count(PageVisit.id).label("visits"),
+                func.count(func.distinct(PageVisit.visitor_id)).label("uniq"),
+            )
+            .where(PageVisit.created_at >= since)
+            .group_by(day_col)
+            .order_by(day_col.desc())
+        ).all()
+        timeline = [
+            {
+                "day": row.d.strftime("%Y-%m-%d") if row.d else "",
+                "visits": int(row.visits or 0),
+                "unique": int(row.uniq or 0),
+            }
+            for row in timeline_rows
+        ]
+
+        top_pages_rows = self.db.execute(
+            select(
+                PageVisit.path,
+                func.count(PageVisit.id).label("visits"),
+                func.count(func.distinct(PageVisit.visitor_id)).label("uniq"),
+            )
+            .where(PageVisit.created_at >= since)
+            .group_by(PageVisit.path)
+            .order_by(func.count(PageVisit.id).desc())
+            .limit(15)
+        ).all()
+        top_pages = [
+            {
+                "path": row.path or "/",
+                "visits": int(row.visits or 0),
+                "unique": int(row.uniq or 0),
+            }
+            for row in top_pages_rows
+        ]
+
+        return {
+            "days": days,
+            "visits_total": visits_total,
+            "visits_today": visits_today,
+            "visits_week": visits_week,
+            "visitors_unique": visitors_unique,
+            "visitors_unique_today": visitors_unique_today,
+            "timeline": timeline,
+            "top_pages": top_pages,
+        }
+
+    def recent_users(self, *, days: int = 7, limit: int = 20) -> List[User]:
+        since = datetime.utcnow() - timedelta(days=max(1, days))
+        stmt = (
+            select(User)
+            .where(User.created_at >= since)
+            .order_by(User.created_at.desc())
+            .limit(max(1, limit))
+        )
+        return list(self.db.execute(stmt).scalars().all())
 
     def set_site_content(self, values: Dict[str, str]) -> None:
         from .content_service import ContentService  # lazy import to avoid cycles

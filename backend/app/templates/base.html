@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Автокаталог{% endblock %}</title>
     <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/css/styles.css?v=66" />
+    <link rel="stylesheet" href="/static/css/styles.css?v=68" />
     {% block head_extra %}{% endblock %}
   </head>
   <body data-auth="{{ 1 if user else 0 }}">
@@ -222,8 +222,51 @@
       </div>
     </footer>
     <button id="backToTop" class="back-to-top" type="button" aria-label="Наверх">↑</button>
+
+    <div id="cookieBanner" class="cookie-banner" hidden role="dialog" aria-live="polite" aria-label="Согласие на cookies">
+      <div class="cookie-banner__inner la-container">
+        <div class="cookie-banner__text">
+          Мы используем cookies, чтобы считать посещения и улучшать сайт. Это анонимно — мы не храним IP или личные данные.
+          Подробнее в <a href="/privacy">политике конфиденциальности</a>.
+        </div>
+        <div class="cookie-banner__actions">
+          <button type="button" class="btn btn-secondary" id="cookieDecline">Отклонить</button>
+          <button type="button" class="btn btn-primary" id="cookieAccept">Принять</button>
+        </div>
+      </div>
+    </div>
+
     <script>window.ENABLE_MODEL_ACCORDION = true;</script>
-    <script src="/static/js/app.js?v=113"></script>
+    <script src="/static/js/app.js?v=114"></script>
+    <script>
+    (function () {
+      function readCookie(name) {
+        var m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[-.+*]/g, '\\$&') + '=([^;]*)'));
+        return m ? decodeURIComponent(m[1]) : null;
+      }
+      var banner = document.getElementById('cookieBanner');
+      if (!banner) return;
+      var consent = readCookie('la_consent');
+      if (consent === '1' || consent === '0') return;
+      banner.hidden = false;
+      function send(accept) {
+        var fd = new FormData();
+        fd.append('accept', accept ? '1' : '0');
+        fetch('/cookie-consent', { method: 'POST', body: fd, credentials: 'same-origin' })
+          .catch(function () {})
+          .finally(function () {
+            // Persist on the client too so the banner does not flash again
+            // even if the network request failed.
+            document.cookie = 'la_consent=' + (accept ? '1' : '0') + '; Path=/; Max-Age=15552000; SameSite=Lax';
+            banner.hidden = true;
+          });
+      }
+      var acc = document.getElementById('cookieAccept');
+      var dec = document.getElementById('cookieDecline');
+      if (acc) acc.addEventListener('click', function () { send(true); });
+      if (dec) dec.addEventListener('click', function () { send(false); });
+    })();
+    </script>
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>

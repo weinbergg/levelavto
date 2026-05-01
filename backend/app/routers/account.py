@@ -8,6 +8,7 @@ from ..models import User
 from ..services.auth_service import AuthService
 from ..services.cars_service import CarsService
 from ..services.favorites_service import FavoritesService
+from ..services.notification_service import NotificationService
 from ..utils.country_map import resolve_display_country
 from ..utils.localization import display_body, display_color
 from ..utils.price_utils import price_without_util_note, resolve_public_display_price_rub
@@ -59,12 +60,68 @@ def _prepare_favorites(service: CarsService, favorites: list) -> list:
     return favorites
 
 
+def _account_context(request: Request, user: User, db: Session, status=None) -> dict:
+    service = CarsService(db)
+    favs = _prepare_favorites(service, FavoritesService(db).list_cars(user))
+    notif_svc = NotificationService(db)
+    notifications = notif_svc.list_for_user(user.id, limit=20)
+    notifications_by_id = {n.id: n for n in notifications}
+    car_lookup: dict[int, dict] = {}
+    car_ids: set[int] = set()
+    for n in notifications:
+        for cid in (n.attached_car_ids or []):
+            try:
+                car_ids.add(int(cid))
+            except (TypeError, ValueError):
+                continue
+    if car_ids:
+        from sqlalchemy import select as _select
+        from ..models import Car as _Car
+
+        for car in db.execute(_select(_Car).where(_Car.id.in_(car_ids))).scalars():
+            title_parts = [car.brand or "", car.model or ""]
+            car_lookup[car.id] = {
+                "id": car.id,
+                "title": " ".join(p for p in title_parts if p).strip() or f"#{car.id}",
+                "subtitle": car.variant or "",
+                "year": car.year,
+                "url": f"/car/{car.id}",
+            }
+    notification_views = []
+    for n in notifications:
+        cars_for_n = []
+        for cid in (n.attached_car_ids or []):
+            try:
+                info = car_lookup.get(int(cid))
+            except (TypeError, ValueError):
+                info = None
+            if info:
+                cars_for_n.append(info)
+        notification_views.append({"row": n, "cars": cars_for_n})
+    unread_count = sum(1 for n in notifications if not n.is_read)
+    return {
+        "request": request,
+        "user": user,
+        "status": status,
+        "favorites": favs,
+        "notifications": notification_views,
+        "notifications_unread": unread_count,
+    }
+
+
 @router.get("/account")
 def account_page(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
     templates = request.app.state.templates
-    service = CarsService(db)
-    favs = _prepare_favorites(service, FavoritesService(db).list_cars(user))
-    return templates.TemplateResponse("account/index.html", {"request": request, "user": user, "status": None, "favorites": favs})
+    return templates.TemplateResponse("account/index.html", _account_context(request, user, db))
+
+
+@router.post("/account/notifications/read")
+def account_notifications_read(
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    NotificationService(db).mark_read(user_id=user.id)
+    return RedirectResponse(url="/account#messages", status_code=302)
 
 
 @router.post("/account/profile")
@@ -79,9 +136,7 @@ def update_profile(
     db.add(user)
     db.commit()
     status = {"success": True, "message": "Профиль обновлён"}
-    service = CarsService(db)
-    favs = _prepare_favorites(service, FavoritesService(db).list_cars(user))
-    return templates.TemplateResponse("account/index.html", {"request": request, "user": user, "status": status, "favorites": favs})
+    return templates.TemplateResponse("account/index.html", _account_context(request, user, db, status=status))
 
 
 @router.post("/account/password")
@@ -98,13 +153,11 @@ def update_password(
         status = {"success": False, "message": "Текущий пароль неверный"}
         return templates.TemplateResponse(
             "account/index.html",
-            {"request": request, "user": user, "status": status},
+            _account_context(request, user, db, status=status),
             status_code=400,
         )
     user.password_hash = auth._hash(new_password)
     db.add(user)
     db.commit()
     status = {"success": True, "message": "Пароль обновлён"}
-    service = CarsService(db)
-    favs = _prepare_favorites(service, FavoritesService(db).list_cars(user))
-    return templates.TemplateResponse("account/index.html", {"request": request, "user": user, "status": status, "favorites": favs})
+    return templates.TemplateResponse("account/index.html", _account_context(request, user, db, status=status))

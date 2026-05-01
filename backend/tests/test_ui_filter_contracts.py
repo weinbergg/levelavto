@@ -163,7 +163,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=113' in template
+    assert '/static/js/app.js?v=114' in template
 
 
 def test_catalog_ssr_cache_hit_refreshes_prices_and_recomputes_display_price():
@@ -172,7 +172,8 @@ def test_catalog_ssr_cache_hit_refreshes_prices_and_recomputes_display_price():
     assert 'service.sync_light_rows_from_db(' in pages_router
     assert 'resolve_public_display_price_rub(' in pages_router
     assert 'catalog_ssr_cache_refresh_failed' in pages_router
-    assert '/static/css/styles.css?v=66' in template
+    base_template = _read("app/templates/base.html")
+    assert '/static/css/styles.css?v=68' in base_template
 
 
 def test_deploy_cron_has_midday_public_prewarm():
@@ -268,8 +269,8 @@ def test_admin_layout_uses_new_design_system():
     assert 'class="la-admin"' in layout
     assert 'class="la-admin-shell"' in layout
     assert 'data-sidebar-toggle' in layout
-    assert "/static/css/admin.css?v=3" in layout
-    assert "/static/js/admin.js?v=3" in layout
+    assert "/static/css/admin.css?v=4" in layout
+    assert "/static/js/admin.js?v=4" in layout
     assert 'grid-template-areas:\n    "topbar  sidebar"' in css
     assert "1fr var(--la-sidebar-w)" in css
     assert "--la-bg: #0b0e13" in css
@@ -349,6 +350,41 @@ def test_admin_top_brands_page_supports_save_and_reset():
     assert "draggable = true" in template
     assert "data-target=\"top\"" in template
     assert "data-target=\"other\"" in template
+
+
+def test_admin_top_models_editor_is_wired_end_to_end():
+    """Top-models editor mirrors top-brands UX and threads override into catalog.
+
+    The operator picks a brand and reorders its model groups. The new
+    priority is stored in ``site_content.top_models_json`` and reaches
+    /api/filter_ctx_brand via ``models_priority_for_brand``.
+    """
+    router = _read("app/routers/admin.py")
+    template = _read("app/templates/admin/top_models.html")
+    sidebar = _read("app/templates/admin/_sidebar.html")
+    catalog = _read("app/routers/catalog.py")
+    brand_groups_module = _read("app/utils/brand_groups.py")
+    cars_service = _read("app/services/cars_service.py")
+
+    assert '@router.get("/admin/top-models"' in router
+    assert '@router.post("/admin/top-models")' in router
+    assert "TOP_MODELS_CONTENT_KEY" in router
+    assert "_bump_filter_caches" in router
+
+    assert "/admin/top-models" in sidebar
+    assert "Топ-модели" in sidebar
+
+    assert "data-target=\"top\"" in template
+    assert "data-target=\"other\"" in template
+    assert "name=\"models\"" in template
+    assert "name=\"brand\"" in template
+
+    # build_model_groups now accepts an explicit priority list.
+    assert "priority: Optional[List[str]] = None" in cars_service
+    assert "priority_order" in cars_service
+    # And catalog endpoint passes it through.
+    assert "models_priority_for_brand(db" in catalog
+    assert "def models_priority_for_brand" in brand_groups_module
 
 
 def test_brand_groups_override_threads_through_pages_and_catalog():
@@ -1151,6 +1187,79 @@ def test_price_sorted_cache_can_be_enabled_and_base_selects_dedupe_values():
     assert 'os.getenv("CATALOG_PRICE_SORT_CACHE_BYPASS", "0") != "1"' in router
     assert "const seenValues = new Set()" in script
     assert "if (loadCatalogFilterBase.__pending) return loadCatalogFilterBase.__pending" in script
+
+
+def test_admin_notifications_send_endpoint_is_wired():
+    admin = _read("app/routers/admin.py")
+    template = _read("app/templates/admin/notifications.html")
+    user_detail = _read("app/templates/admin/user_detail.html")
+    account_router = _read("app/routers/account.py")
+    account_template = _read("app/templates/account/index.html")
+
+    assert 'router.post("/admin/notifications/send")' in admin
+    assert 'NotificationService(db).send(' in admin
+    assert 'router.get("/admin/api/cars/search"' in admin
+    assert 'data-cars-picker' in template
+    assert 'name="user_id"' in template
+    assert 'data-cars-picker-input' in template
+    assert '/admin/notifications?user_id={{ target.id }}' in user_detail
+
+    assert 'NotificationService(db)' in account_router
+    assert 'list_for_user(user.id' in account_router
+    assert 'router.post("/account/notifications/read")' in account_router
+    assert 'id="messages"' in account_template
+    assert 'message-card' in account_template
+
+
+def test_admin_users_xlsx_export_route_exists():
+    admin = _read("app/routers/admin.py")
+    template = _read("app/templates/admin/users.html")
+    assert 'router.get("/admin/users.xlsx")' in admin
+    assert 'from openpyxl import Workbook' in admin
+    assert '/admin/users.xlsx?' in template
+
+
+def test_recommended_form_exposes_all_default_config_fields():
+    template = _read("app/templates/admin/dashboard.html")
+    admin = _read("app/routers/admin.py")
+    for field in (
+        "max_age_years",
+        "price_min",
+        "price_max",
+        "mileage_max",
+        "reg_year_min",
+        "reg_year_max",
+        "power_hp_max",
+        "engine_cc_max",
+    ):
+        assert f'name="{field}"' in template, f"missing field {field} in dashboard form"
+        assert f'{field}: int = Form' in admin, f"missing {field} in update_recommended"
+
+
+def test_calculator_page_has_rollback_template_and_recalc_buttons():
+    template = _read("app/templates/admin/calculator_excel.html")
+    admin = _read("app/routers/admin.py")
+    assert '/admin/calculator/rollback' in template
+    assert '/admin/calculator/template.xlsx' in template
+    assert '/admin/calculator/recalc' in template
+    assert 'router.post("/admin/calculator/rollback")' in admin
+    assert 'router.get("/admin/calculator/template.xlsx")' in admin
+    assert 'router.post("/admin/calculator/recalc")' in admin
+
+
+def test_analytics_page_uses_real_traffic_data():
+    template = _read("app/templates/admin/analytics.html")
+    service = _read("app/services/admin_service.py")
+    middleware = _read("app/middleware/analytics.py")
+    base = _read("app/templates/base.html")
+    assert "traffic_overview" in service
+    assert "func.count(func.distinct(PageVisit.visitor_id))" in service
+    assert "Топ-страницы" in template
+    assert "{% for row in traffic.timeline %}" in template
+    assert "_VISITOR_COOKIE = \"la_vid\"" in middleware
+    assert "_CONSENT_COOKIE = \"la_consent\"" in middleware
+    assert 'id="cookieBanner"' in base
+    assert 'id="cookieAccept"' in base
 
 
 def test_catalog_and_search_use_separate_interior_color_and_material_filters():

@@ -40,6 +40,7 @@ BRAND_FILTER_PRIORITY: List[str] = [
 
 
 TOP_BRANDS_CONTENT_KEY = "top_brands_json"
+TOP_MODELS_CONTENT_KEY = "top_models_json"
 
 
 _PRIORITY_ALIASES: Dict[str, str] = {
@@ -153,6 +154,76 @@ def load_priority_override(db: Any) -> Optional[List[str]]:
         logger.exception("brand_groups: failed to read %s", TOP_BRANDS_CONTENT_KEY)
         return None
     return _coerce_priority_list(text)
+
+
+def _coerce_models_override(value: Any) -> Dict[str, List[str]]:
+    """Return a ``{brand: [model_label, ...]}`` dict from operator-supplied JSON.
+
+    Keys (brand names) and values (model labels) are stripped of whitespace,
+    blank entries are dropped, and brand keys are case-folded for lookup
+    convenience. The dict is empty when ``value`` is malformed.
+    """
+
+    if value is None:
+        return {}
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except (TypeError, ValueError):
+            logger.warning("top_models_json is not valid JSON: %r", text[:96])
+            return {}
+        return _coerce_models_override(parsed)
+    if not isinstance(value, dict):
+        return {}
+    cleaned: Dict[str, List[str]] = {}
+    for brand_raw, models_raw in value.items():
+        brand_name = str(brand_raw or "").strip()
+        if not brand_name:
+            continue
+        if not isinstance(models_raw, (list, tuple)):
+            continue
+        seen: set[str] = set()
+        names: List[str] = []
+        for item in models_raw:
+            text = str(item or "").strip()
+            if not text:
+                continue
+            key = text.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            names.append(text)
+        if names:
+            cleaned[brand_name.casefold()] = names
+    return cleaned
+
+
+def load_models_priority(db: Any) -> Dict[str, List[str]]:
+    """Read the operator-edited per-brand model priority list."""
+
+    try:
+        from ..services.content_service import ContentService
+    except Exception:
+        logger.exception("brand_groups: cannot import ContentService for model override")
+        return {}
+    try:
+        text = ContentService(db).get(TOP_MODELS_CONTENT_KEY)
+    except Exception:
+        logger.exception("brand_groups: failed to read %s", TOP_MODELS_CONTENT_KEY)
+        return {}
+    return _coerce_models_override(text)
+
+
+def models_priority_for_brand(db: Any, brand: Optional[str]) -> List[str]:
+    """Return the operator-defined priority labels for ``brand`` (case-insensitive)."""
+
+    if not brand:
+        return []
+    overrides = load_models_priority(db)
+    return list(overrides.get(brand.strip().casefold(), []))
 
 
 def group_brands(

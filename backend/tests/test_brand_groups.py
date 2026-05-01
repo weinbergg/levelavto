@@ -102,3 +102,17 @@ def test_coerce_priority_list_drops_duplicates_and_blanks():
     assert _coerce_priority_list(["BMW", "", "bmw", "  ", "Audi"]) == ["BMW", "Audi"]
     assert _coerce_priority_list(None) is None
     assert _coerce_priority_list("   ") is None
+
+
+def test_coerce_models_override_handles_dict_and_json_string():
+    from backend.app.utils.brand_groups import _coerce_models_override
+
+    direct = _coerce_models_override({"BMW": ["X5", "X6", "X5"], "  ": ["X1"]})
+    assert direct == {"bmw": ["X5", "X6"]}
+
+    text = _coerce_models_override('{"Mercedes-Benz": ["G-Class", "S-Class"], "Audi": []}')
+    assert text == {"mercedes-benz": ["G-Class", "S-Class"]}
+
+    assert _coerce_models_override(None) == {}
+    assert _coerce_models_override("not-json") == {}
+    assert _coerce_models_override({"BMW": "X5"}) == {}  # value must be a list

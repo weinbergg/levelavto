@@ -1,0 +1,248 @@
+{% extends "admin/_layout.html" %}
+
+{% block page_actions %}
+{% if selected_brand %}
+  <form method="post" action="/admin/top-models" data-confirm="Сбросить приоритет моделей для «{{ selected_brand }}»?" style="margin: 0">
+    <input type="hidden" name="brand" value="{{ selected_brand }}">
+    <input type="hidden" name="reset" value="1">
+    <button type="submit" class="la-btn la-btn--ghost la-btn--sm">Сбросить для «{{ selected_brand }}»</button>
+  </form>
+{% endif %}
+{% endblock %}
+
+{% block page_content %}
+<div class="la-card">
+  <div class="la-card__body">
+    <p class="la-text-muted" style="margin-bottom: 14px">
+      Выберите марку и перетащите модели/серии в левую колонку, чтобы они отображались
+      первыми в фильтре «Модель» каталога. Это работает по тем же правилам, что и
+      «Топ-марки» — на главной, в каталоге и в расширенном поиске.
+    </p>
+
+    <form method="get" action="/admin/top-models" class="la-hstack" style="margin-bottom: 14px">
+      <label class="la-field" style="max-width: 320px; margin: 0">
+        <span class="la-field__label">Марка</span>
+        <select name="brand" class="la-input" onchange="this.form.submit()">
+          <option value="">— выберите —</option>
+          {% for b in all_brands %}
+          <option value="{{ b }}" {% if selected_brand and b.lower() == selected_brand.lower() %}selected{% endif %}>{{ b }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <noscript><button type="submit" class="la-btn la-btn--ghost">Открыть</button></noscript>
+    </form>
+
+    {% if not selected_brand %}
+      <div class="la-text-dim" style="padding: 22px; text-align: center">
+        Выберите марку, чтобы увидеть список её моделей.
+      </div>
+    {% else %}
+      {% if not selected_groups %}
+        <div class="la-text-dim" style="padding: 22px; text-align: center">
+          Для «{{ selected_brand }}» в нашей базе пока нет моделей.
+        </div>
+      {% else %}
+        <div class="la-form-grid la-form-grid--2" style="align-items: stretch">
+          <div class="la-card la-card--inset" style="margin: 0">
+            <div class="la-card__header">
+              <div class="la-card__header-text">
+                <div class="la-card__title">★ Приоритетные модели</div>
+                <div class="la-card__sub" id="top-counter">{{ selected_priority|length }} в списке</div>
+              </div>
+            </div>
+            <div class="la-card__body" style="min-height: 360px">
+              <input type="text" class="la-input" id="filter-top" placeholder="Фильтр по названию…">
+              <ul class="la-brand-list" id="list-top" data-target="top">
+                {% for label in selected_priority %}
+                <li class="la-brand-chip" data-model="{{ label }}">
+                  <span class="la-brand-chip__handle">⋮⋮</span>
+                  <span class="la-brand-chip__name">{{ label }}</span>
+                  <button type="button" class="la-brand-chip__remove" data-action="move-other" title="Убрать из топа">×</button>
+                </li>
+                {% endfor %}
+              </ul>
+              {% if not selected_priority %}
+              <div class="la-text-dim" id="top-empty" style="text-align: center; padding: 22px">Пусто. Перетащите модели сюда.</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="la-card la-card--inset" style="margin: 0">
+            <div class="la-card__header">
+              <div class="la-card__header-text">
+                <div class="la-card__title">Все модели «{{ selected_brand }}»</div>
+                <div class="la-card__sub" id="other-counter">{{ selected_groups|length }} в базе</div>
+              </div>
+            </div>
+            <div class="la-card__body" style="min-height: 360px">
+              <input type="text" class="la-input" id="filter-other" placeholder="Фильтр по названию…">
+              <ul class="la-brand-list la-brand-list--alt" id="list-other" data-target="other">
+                {% set priority_set = selected_priority|map('lower')|list %}
+                {% for group in selected_groups %}
+                  {% if group.label.lower() not in priority_set %}
+                  <li class="la-brand-chip la-brand-chip--alt" data-model="{{ group.label }}">
+                    <span class="la-brand-chip__handle">⋮⋮</span>
+                    <span class="la-brand-chip__name">{{ group.label }}</span>
+                    <button type="button" class="la-brand-chip__add" data-action="move-top" title="Добавить в топ">+</button>
+                  </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <form method="post" action="/admin/top-models" id="top-models-form" style="margin-top: 22px">
+          <input type="hidden" name="brand" value="{{ selected_brand }}">
+          <input type="hidden" name="models" id="top-models-input" value="{{ selected_priority | join(',') }}">
+          <div class="la-hstack">
+            <button type="submit" class="la-btn la-btn--primary">Сохранить</button>
+            <a class="la-btn la-btn--ghost" href="/admin/top-models?brand={{ selected_brand }}">Отменить изменения</a>
+            <span class="la-text-dim" id="dirty-flag" hidden>есть несохранённые изменения</span>
+          </div>
+        </form>
+      {% endif %}
+    {% endif %}
+
+    {% if overrides_summary %}
+    <div class="la-divider"></div>
+    <div class="la-text-dim" style="font-size: 12.5px">
+      Сейчас приоритет настроен для:
+      {% for entry in overrides_summary %}
+        <a href="/admin/top-models?brand={{ entry.brand }}" style="color: inherit">{{ entry.brand }}</a> ({{ entry.count }}){% if not loop.last %}, {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function() {
+  const listTop = document.getElementById('list-top');
+  const listOther = document.getElementById('list-other');
+  const hidden = document.getElementById('top-models-input');
+  const dirty = document.getElementById('dirty-flag');
+  const topCounter = document.getElementById('top-counter');
+  const otherCounter = document.getElementById('other-counter');
+  const topEmpty = document.getElementById('top-empty');
+  if (!listTop || !listOther || !hidden) return;
+  let isDirty = false;
+
+  function syncForm() {
+    const items = Array.from(listTop.querySelectorAll('.la-brand-chip'))
+      .map(li => li.dataset.model)
+      .filter(Boolean);
+    hidden.value = items.join(',');
+    if (topCounter) topCounter.textContent = items.length + ' в списке';
+    if (otherCounter) {
+      const otherCount = listOther.querySelectorAll('.la-brand-chip').length;
+      otherCounter.textContent = otherCount + ' в базе';
+    }
+    if (topEmpty) topEmpty.hidden = items.length > 0;
+    if (!isDirty) {
+      isDirty = true;
+      if (dirty) dirty.hidden = false;
+    }
+  }
+
+  function refreshActionButtons(li, target) {
+    const removeBtn = li.querySelector('.la-brand-chip__remove');
+    const addBtn = li.querySelector('.la-brand-chip__add');
+    if (target === 'top') {
+      li.classList.remove('la-brand-chip--alt');
+      if (removeBtn) removeBtn.style.display = '';
+      if (addBtn) addBtn.style.display = 'none';
+    } else {
+      li.classList.add('la-brand-chip--alt');
+      if (removeBtn) removeBtn.style.display = 'none';
+      if (addBtn) addBtn.style.display = '';
+    }
+  }
+
+  function moveTo(li, list) {
+    list.appendChild(li);
+    refreshActionButtons(li, list.dataset.target);
+    syncForm();
+  }
+
+  document.body.addEventListener('click', function(e) {
+    const t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+    const li = t.closest('.la-brand-chip');
+    if (!li) return;
+    if (t.dataset.action === 'move-top') moveTo(li, listTop);
+    else if (t.dataset.action === 'move-other') moveTo(li, listOther);
+  });
+
+  let dragged = null;
+
+  function attachDrag(li) {
+    li.draggable = true;
+    li.addEventListener('dragstart', function(e) {
+      dragged = li;
+      li.classList.add('is-dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', li.dataset.model || ''); } catch (_) {}
+      }
+    });
+    li.addEventListener('dragend', function() {
+      li.classList.remove('is-dragging');
+      dragged = null;
+    });
+  }
+
+  document.querySelectorAll('.la-brand-chip').forEach(attachDrag);
+
+  [listTop, listOther].forEach(function(list) {
+    list.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      list.classList.add('is-dragover');
+      const after = getDragAfterElement(list, e.clientY);
+      if (!dragged) return;
+      if (!after) {
+        list.appendChild(dragged);
+      } else {
+        list.insertBefore(dragged, after);
+      }
+    });
+    list.addEventListener('dragleave', function() {
+      list.classList.remove('is-dragover');
+    });
+    list.addEventListener('drop', function(e) {
+      e.preventDefault();
+      list.classList.remove('is-dragover');
+      if (dragged) refreshActionButtons(dragged, list.dataset.target);
+      syncForm();
+    });
+  });
+
+  function getDragAfterElement(list, y) {
+    const items = Array.from(list.querySelectorAll('.la-brand-chip:not(.is-dragging)'));
+    return items.reduce(function(closest, child) {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      }
+      return closest;
+    }, { offset: -Infinity, element: null }).element;
+  }
+
+  function attachFilter(inputId, listEl) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.addEventListener('input', function() {
+      const q = input.value.trim().toLowerCase();
+      listEl.querySelectorAll('.la-brand-chip').forEach(function(li) {
+        const name = (li.dataset.model || '').toLowerCase();
+        li.classList.toggle('is-hidden', q && name.indexOf(q) === -1);
+      });
+    });
+  }
+
+  attachFilter('filter-top', listTop);
+  attachFilter('filter-other', listOther);
+})();
+</script>
+{% endblock %}

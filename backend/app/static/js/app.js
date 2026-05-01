@@ -2878,7 +2878,7 @@
           itemBtn.type = 'button'
           itemBtn.className = 'model-accordion__item'
           itemBtn.dataset.modelValue = value
-          itemBtn.textContent = `${group?.label || row?.label || value}${count ? ` (${count})` : ''}`
+          itemBtn.textContent = `${group?.label || row?.label || value}`
           itemBtn.addEventListener('mousedown', (event) => {
             event.preventDefault()
           })
@@ -2894,7 +2894,7 @@
         const details = document.createElement('details')
         details.className = 'model-accordion__group'
         const summary = document.createElement('summary')
-        summary.textContent = `${group?.label || 'Прочее'}${count ? ` (${count})` : ''}`
+        summary.textContent = `${group?.label || 'Прочее'}`
         details.appendChild(summary)
 
         const modelsWrap = document.createElement('div')
@@ -2958,13 +2958,38 @@
         event.stopPropagation()
         applySelection()
       })
-      root.addEventListener('toggle', () => {
-        if (!root.open) {
-          resetDraftSelection()
+      const adjustDropdownToViewport = () => {
+        if (!root.open) return
+        const body = root.querySelector('.model-accordion__body')
+        if (!body) return
+        const summary = root.querySelector('summary')
+        const summaryRect = (summary || root).getBoundingClientRect()
+        const vh = window.innerHeight || document.documentElement.clientHeight || 0
+        const safeBottomPadding = 24
+        const spaceBelow = Math.max(160, vh - summaryRect.bottom - safeBottomPadding)
+        const spaceAbove = Math.max(160, summaryRect.top - safeBottomPadding)
+        const preferredCap = Math.min(560, Math.max(spaceBelow, spaceAbove))
+        if (spaceBelow >= 240 || spaceBelow >= spaceAbove) {
+          body.style.removeProperty('top')
+          body.style.removeProperty('bottom')
+          body.style.maxHeight = `${Math.min(preferredCap, spaceBelow)}px`
         } else {
-          resetDraftSelection()
+          body.style.top = 'auto'
+          body.style.bottom = 'calc(100% + 8px)'
+          body.style.maxHeight = `${Math.min(preferredCap, spaceAbove)}px`
+        }
+      }
+      root.addEventListener('toggle', () => {
+        resetDraftSelection()
+        if (root.open) {
+          requestAnimationFrame(adjustDropdownToViewport)
         }
       })
+      const handleResizeForRoot = () => {
+        if (root.open) adjustDropdownToViewport()
+      }
+      window.addEventListener('resize', handleResizeForRoot, { passive: true })
+      window.addEventListener('scroll', handleResizeForRoot, { passive: true, capture: true })
 
       setAccordionState(container, select.value || '', Array.from(selectedModels))
       if (select.__modelAccordionChangeHandler) {

@@ -12,6 +12,8 @@ from .favorite import Favorite
 from .car_spec_reference import CarSpecReference
 from .phone_verification import PhoneVerificationChallenge
 from .email_verification import EmailVerificationChallenge
+from .notification import Notification
+from .page_visit import PageVisit
 
 __all__ = [
     "Source",
@@ -26,6 +28,9 @@ __all__ = [
     "ProgressKV",
     "Favorite",
     "CarSpecReference",
+    "CalculatorConfig",
     "PhoneVerificationChallenge",
     "EmailVerificationChallenge",
+    "Notification",
+    "PageVisit",
 ]
