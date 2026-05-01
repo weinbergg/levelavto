@@ -145,24 +145,50 @@ def main() -> None:
         help="Print a per-value breakdown before doing anything",
     )
     parser.add_argument("--limit", type=int, default=0, help="Stop after N rows (0 = all)")
+    parser.add_argument(
+        "--chunk",
+        type=int,
+        default=2000,
+        help="Stream candidates in chunks of this size (default 2000)",
+    )
+    parser.add_argument(
+        "--commit-every",
+        type=int,
+        default=2000,
+        help="Commit and clear the SQLAlchemy identity map every N processed rows",
+    )
+    parser.add_argument(
+        "--include-numeric",
+        action="store_true",
+        help="Also consider numeric-only engine_type (e.g. '2.0') as polluted. Off by default — too noisy.",
+    )
     args = parser.parse_args()
 
     mode = "APPLY (writes will be committed)" if args.apply else "DRY-RUN (no writes)"
     print(f">>> Cleanup engine_type — {mode}", flush=True)
 
     with SessionLocal() as db:
-        # Cheap pre-filter: every disclaimer fragment ends up containing
-        # "based on", "co2", "co₂", "emission", "consumption", or "combined".
-        # We collect candidates with an OR of LIKE patterns so the DB does
-        # not have to scan the full table — engine_type is a small column
-        # but the table can be large.
+        # Cheap, narrow pre-filter — only disclaimer fragments, so the
+        # candidate set is small (a few hundred / thousand) instead of
+        # the whole 700k+ table. The previous version added a numeric-only
+        # regex which matched every car with an integer engine_type and
+        # blew the candidate count up to 728k, choking memory before any
+        # progress was made.
         like_clauses = [func.lower(Car.engine_type).like(f"%{frag}%") for frag in _DISCLAIMER_FRAGMENTS]
-        # Also catch pure-numeric noise.
-        like_clauses.append(Car.engine_type.op("~")(r"^[ \t]*[0-9]+([.,][0-9]+)?[ \t]*$"))
-        candidates_stmt = select(Car).where(or_(*like_clauses))
+        if args.include_numeric:
+            like_clauses.append(
+                Car.engine_type.op("~")(r"^[ \t]*[0-9]+([.,][0-9]+)?[ \t]*$")
+            )
+        where_clause = or_(*like_clauses)
+        candidates_stmt = (
+            select(Car)
+            .where(where_clause)
+            .order_by(Car.id)
+            .execution_options(yield_per=args.chunk)
+        )
 
         total_count = db.execute(
-            select(func.count()).select_from(Car).where(or_(*like_clauses))
+            select(func.count()).select_from(Car).where(where_clause)
         ).scalar_one()
         print(f">>> Кандидатов в БД: {total_count}", flush=True)
 
@@ -170,10 +196,14 @@ def main() -> None:
         total_polluted = 0
         total_recovered = 0
         total_blanked = 0
+        pending_writes = 0
         per_value: Counter[str] = Counter()
         recovered_into: Counter[str] = Counter()
 
-        for car in db.execute(candidates_stmt).scalars():
+        # Stream rows so we don't load the entire candidate set into memory.
+        # ``yield_per`` requires execution within ``stream_results=True``
+        # context, which the execution option above already enables.
+        for car in db.execute(candidates_stmt).yield_per(args.chunk).scalars():
             total_seen += 1
             if not _looks_polluted(car.engine_type):
                 continue
@@ -187,14 +217,24 @@ def main() -> None:
                 total_blanked += 1
             if args.apply:
                 car.engine_type = new_value
+                pending_writes += 1
+                if pending_writes >= args.commit_every:
+                    db.commit()
+                    db.expire_all()
+                    pending_writes = 0
             if total_seen % 500 == 0:
                 print(
-                    f"   ... осмотрено {total_seen}, обновлено {total_polluted} "
+                    f"   ... осмотрено {total_seen}, найдено загрязнённых {total_polluted} "
                     f"(восстановлено {total_recovered}, в NULL {total_blanked})",
                     flush=True,
                 )
             if args.limit and total_seen >= args.limit:
                 break
+
+        if args.apply and pending_writes:
+            db.commit()
+            db.expire_all()
+            pending_writes = 0
 
         print(f"\nКандидатов осмотрено: {total_seen}")
         print(f"Признаны загрязнёнными: {total_polluted}")
@@ -210,7 +250,6 @@ def main() -> None:
             print(f"  {n:>6}  {value}")
 
         if args.apply:
-            db.commit()
             print(
                 f"\n✅ Применено: {total_polluted} строк обновлено "
                 f"({total_recovered} восстановлено, {total_blanked} -> NULL).",
