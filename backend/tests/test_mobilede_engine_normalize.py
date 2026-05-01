@@ -16,17 +16,17 @@ def _parser():
 
 def test_normalize_engine_prefers_hybrid():
     p = _parser()
-    assert p._normalize_engine("Electric", "plug-in hybrid (petrol/electric)") == "Hybrid"
+    assert p._normalize_engine("Electric", "plug-in hybrid (petrol/electric)") == "hybrid"
 
 
 def test_normalize_engine_electric():
     p = _parser()
-    assert p._normalize_engine(None, "Electric") == "Electric"
+    assert p._normalize_engine(None, "Electric") == "electric"
 
 
 def test_normalize_engine_diesel():
     p = _parser()
-    assert p._normalize_engine("Diesel", None) == "Diesel"
+    assert p._normalize_engine("Diesel", None) == "diesel"
 
 
 def test_parse_first_registration_month_year():
@@ -64,16 +64,16 @@ def test_normalize_engine_drops_co2_disclaimer_text():
 def test_normalize_engine_falls_back_from_disclaimer_full_to_raw_keyword():
     """If `full` is disclaimer text but `raw` has a real keyword, still match."""
     p = _parser()
-    assert p._normalize_engine("Hybrid", "Based on CO₂ emissions (combined)") == "Hybrid"
-    assert p._normalize_engine("Diesel", "Based on CO₂ emissions (combined)") == "Diesel"
+    assert p._normalize_engine("Hybrid", "Based on CO₂ emissions (combined)") == "hybrid"
+    assert p._normalize_engine("Diesel", "Based on CO₂ emissions (combined)") == "diesel"
 
 
 def test_normalize_engine_phev_and_electric_synonyms():
     p = _parser()
-    assert p._normalize_engine(None, "PHEV") == "Hybrid"
-    assert p._normalize_engine(None, "Elektro") == "Electric"
-    assert p._normalize_engine(None, "Autogas LPG") == "LPG"
-    assert p._normalize_engine(None, "Erdgas (CNG)") == "CNG"
+    assert p._normalize_engine(None, "PHEV") == "hybrid"
+    assert p._normalize_engine(None, "Elektro") == "electric"
+    assert p._normalize_engine(None, "Autogas LPG") == "lpg"
+    assert p._normalize_engine(None, "Erdgas (CNG)") == "cng"
 
 
 def test_normalize_engine_recovers_hybrid_from_variant_when_full_is_disclaimer():
@@ -86,7 +86,7 @@ def test_normalize_engine_recovers_hybrid_from_variant_when_full_is_disclaimer()
             "Based on CO₂ emissions (combined)",
             hint_texts=("Cayenne E-Hybrid Platinum Edition", None),
         )
-        == "Hybrid"
+        == "hybrid"
     )
     # URL slug fallback
     assert (
@@ -96,7 +96,7 @@ def test_normalize_engine_recovers_hybrid_from_variant_when_full_is_disclaimer()
             hint_texts=(None, None, None,
                         "https://suchen.mobile.de/auto-inserat/porsche-cayenne-e-hybrid-platinum/420659370.html"),
         )
-        == "Hybrid"
+        == "hybrid"
     )
     # Variant containing "diesel" wins over disclaimer.
     assert (
@@ -105,18 +105,18 @@ def test_normalize_engine_recovers_hybrid_from_variant_when_full_is_disclaimer()
             "Based on CO₂ emissions (combined)",
             hint_texts=("X5 xDrive 30d Diesel", None),
         )
-        == "Diesel"
+        == "diesel"
     )
 
 
 def test_normalize_engine_orders_hybrid_before_electric_for_e_hybrid():
     """`Cayenne E-Hybrid` must NOT be misclassified as Electric."""
     p = _parser()
-    assert p._normalize_engine(None, "E-Hybrid") == "Hybrid"
-    assert p._normalize_engine(None, "Cayenne E-Hyb Coupé") == "Hybrid"
-    # But pure EV still maps to Electric.
-    assert p._normalize_engine(None, "Taycan EV") == "Electric"
-    assert p._normalize_engine(None, "EQE 350+") == "Electric"
+    assert p._normalize_engine(None, "E-Hybrid") == "hybrid"
+    assert p._normalize_engine(None, "Cayenne E-Hyb Coupé") == "hybrid"
+    # But pure EV still maps to electric.
+    assert p._normalize_engine(None, "Taycan EV") == "electric"
+    assert p._normalize_engine(None, "EQE 350+") == "electric"
 
 
 def test_normalize_engine_returns_none_when_no_hint_anywhere():

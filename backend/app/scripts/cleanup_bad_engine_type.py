@@ -62,15 +62,23 @@ def _looks_polluted(value: Optional[str]) -> bool:
 
 
 def _classify_text(text: Optional[str]) -> Optional[str]:
-    """Same canonical-label mapping the patched parser uses."""
+    """Same canonical-label mapping the patched parser uses.
+
+    Returns a lowercase canonical value (``diesel`` / ``hybrid`` /
+    ``petrol`` / ``electric`` / ``lpg`` / ``cng``) so the column stays
+    consistent with the indexed ``lower(trim(engine_type))`` filter and
+    with values written by ``utils.spec_inference.normalize_engine_type``.
+    Mixed-case / cyrillic forms ("Diesel", "Дизель", "Бензин") are
+    confusing for SQL and visually noisy in admin tooling.
+    """
 
     val = (text or "").strip().lower()
     if not val:
         return None
     if any(noise in val for noise in _DISCLAIMER_FRAGMENTS):
         return None
-    if "diesel" in val or re.search(r"\btdi\b", val):
-        return "Diesel"
+    if "diesel" in val or "дизель" in val or re.search(r"\btdi\b", val):
+        return "diesel"
     if (
         "e-hybrid" in val
         or "e-hyb" in val
@@ -78,25 +86,31 @@ def _classify_text(text: Optional[str]) -> Optional[str]:
         or "phev" in val
         or "plug-in" in val
         or "plug in" in val
+        or "plugin" in val
         or "hybrid" in val
+        or "гибрид" in val
+        or "электро" in val and ("бензин" in val or "diesel" in val or "дизель" in val)
     ):
-        return "Hybrid"
+        return "hybrid"
     if (
         "electric" in val
         or "elektro" in val
+        or "электро" in val
         or re.search(r"\bev\b", val)
         or re.search(r"\beq[a-z]\b", val)
     ):
-        return "Electric"
-    if "petrol" in val or "benzin" in val or "gasoline" in val:
-        return "Petrol"
-    if "lpg" in val or re.search(r"\bgpl\b", val) or "autogas" in val:
-        return "LPG"
-    if "cng" in val or "natural gas" in val or "erdgas" in val:
-        return "CNG"
+        return "electric"
+    if "petrol" in val or "benzin" in val or "gasoline" in val or "бензин" in val:
+        return "petrol"
+    if "lpg" in val or re.search(r"\bgpl\b", val) or "autogas" in val or "пропан" in val:
+        return "lpg"
+    if "cng" in val or "natural gas" in val or "erdgas" in val or "метан" in val:
+        return "cng"
+    if "hydrogen" in val or "водород" in val or "fuel cell" in val:
+        return "hydrogen"
     canonical = normalize_engine_type(val)
     if canonical:
-        return canonical.capitalize()
+        return canonical
     return None
 
 

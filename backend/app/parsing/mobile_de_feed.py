@@ -108,10 +108,15 @@ class MobileDeFeedParser:
     def _classify_fuel_text(cls, text: Optional[str]) -> Optional[str]:
         """Map a free-text snippet to one of the canonical fuel labels.
 
-        Returns ``None`` if no canonical label can be inferred. The order
-        matters: ``e-hybrid`` and ``plug-in`` MUST be checked before
-        ``electric`` because Porsche's hybrid variants contain both words
-        (``Cayenne E-Hybrid`` is a hybrid, not an EV).
+        Returns ``None`` if no canonical label can be inferred. Output
+        is lowercase canonical English (``diesel`` / ``hybrid`` /
+        ``petrol`` / ``electric`` / ``lpg`` / ``cng``) so the public
+        catalog filter (which lowercases ``cars.engine_type`` before
+        matching) and ad-hoc admin SQL (case-sensitive in PostgreSQL)
+        agree on the column's canonical form. The order matters:
+        ``e-hybrid`` and ``plug-in`` MUST be checked before ``electric``
+        because Porsche's hybrid variants contain both words (``Cayenne
+        E-Hybrid`` is a hybrid, not an EV).
         """
 
         val = (text or "").strip().lower()
@@ -119,8 +124,8 @@ class MobileDeFeedParser:
             return None
         if any(noise in val for noise in cls._DISCLAIMER_NOISE):
             return None
-        if "diesel" in val or re.search(r"\btdi\b", val):
-            return "Diesel"
+        if "diesel" in val or "дизель" in val or re.search(r"\btdi\b", val):
+            return "diesel"
         if (
             "e-hybrid" in val
             or "e-hyb" in val
@@ -128,25 +133,30 @@ class MobileDeFeedParser:
             or "phev" in val
             or "plug-in" in val
             or "plug in" in val
+            or "plugin" in val
             or "hybrid" in val
+            or "гибрид" in val
         ):
-            return "Hybrid"
+            return "hybrid"
         if (
             "electric" in val
             or "elektro" in val
+            or "электро" in val
             or re.search(r"\bev\b", val)
             or re.search(r"\beq[a-z]\b", val)  # Mercedes EQE / EQS / EQA / EQB
         ):
-            return "Electric"
-        if "petrol" in val or "benzin" in val or "gasoline" in val:
-            return "Petrol"
-        if "lpg" in val or re.search(r"\bgpl\b", val) or "autogas" in val:
-            return "LPG"
-        if "cng" in val or "natural gas" in val or "erdgas" in val:
-            return "CNG"
+            return "electric"
+        if "petrol" in val or "benzin" in val or "gasoline" in val or "бензин" in val:
+            return "petrol"
+        if "lpg" in val or re.search(r"\bgpl\b", val) or "autogas" in val or "пропан" in val:
+            return "lpg"
+        if "cng" in val or "natural gas" in val or "erdgas" in val or "метан" in val:
+            return "cng"
+        if "hydrogen" in val or "fuel cell" in val or "водород" in val:
+            return "hydrogen"
         canonical = _normalize_engine_type_canonical(val)
         if canonical:
-            return canonical.capitalize()
+            return canonical
         return None
 
     def _normalize_engine(
@@ -366,7 +376,7 @@ class MobileDeFeedParser:
             power_hp = self._resolve_power_hp(row)
             power_kw = self._resolve_power_kw(row)
             engine_cc = self._resolve_engine_cc(row)
-            if engine_type == "Electric":
+            if engine_type == "electric":
                 engine_cc = None
             yield CarParsed(
                 source_key=self.config.key,
