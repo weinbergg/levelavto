@@ -408,7 +408,16 @@ def _extract_short_class_value(payload: Dict[str, Any], *field_keys: str) -> Opt
     return None
 
 
-def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any], limit: int = 12) -> List[Car]:
+def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any], limit: int = 20) -> List[Car]:
+    # Admin-pinned cars take priority. Operator picks them via
+    # /admin (tab «Рекомендуемые»), and they end up in featured_cars
+    # with placement="recommended". Whatever the operator pinned
+    # shows on the home page in pinned-position order; if the list
+    # is empty we fall back to the auto-selection below.
+    pinned = service.featured_for("recommended", limit=limit, fallback_limit=None)
+    if pinned:
+        return pinned[:limit]
+
     cache_key = (
         cfg.get("reg_year_min", 2021),
         cfg.get("reg_year_max", 2023),
@@ -1099,7 +1108,10 @@ def _search_ssr_filter_context(
 
 
 def _build_home_filter_context(service: CarsService) -> Dict[str, Any]:
-    cache_key = "home_filter_ctx:eu_default"
+    # Embed dataset_version in the cache key so admin actions that bump
+    # the version (e.g. saving the top-brands list) automatically
+    # invalidate the per-worker in-process snapshot on the next request.
+    cache_key = f"home_filter_ctx:eu_default:v{_home_dataset_version()}"
     cached = _HOME_FILTER_CTX_CACHE.get(cache_key)
     if cached:
         return cached
@@ -1416,7 +1428,7 @@ def _home_context(
     reco_cfg = load_config()
     fx_rates = service.get_fx_rates() or {}
     t0 = time.perf_counter()
-    recommended = _get_home_recommended(service, db, reco_cfg, limit=12)
+    recommended = _get_home_recommended(service, db, reco_cfg, limit=20)
     _stage("recommended_ms", t0)
     if os.getenv("HOME_REFRESH_VISIBLE_PRICES", "0") == "1":
         service.refresh_visible_price_cache(recommended)

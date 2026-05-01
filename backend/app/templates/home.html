@@ -269,9 +269,9 @@
         <p class="section-sub">{{ home.recommended.subtitle }}</p>
       </div>
     </div>
-    <div class="cards cards-highlights">
+    <div class="cards cards-highlights cards-carousel" data-carousel="recommended">
       {% for car in recommended_cars %}
-      <a class="card car-card" href="/car/{{ car.id }}">
+      <a class="card car-card car-card--carousel" href="/car/{{ car.id }}">
         <div class="thumb-wrap">
           <span class="badge-tag badge-tag--alt">{{ home.recommended.badge_label }}</span>
           <img

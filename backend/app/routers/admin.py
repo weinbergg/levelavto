@@ -193,13 +193,62 @@ def _bump_filter_caches() -> None:
 
     Called after editing the operator-controlled top-brands list so the
     very next request rebuilds ``filter_ctx_base`` with the new ordering.
+    Also nukes the in-process caches inside the pages router — without
+    this, every gunicorn worker keeps serving stale data from its own
+    TTLCache for up to 15 minutes (which is exactly what the operator
+    saw when changes "didn't apply" even in incognito).
     """
 
     try:
         redis_delete_by_pattern("filter_ctx_*")
+        redis_delete_by_pattern("home_*")
         bump_dataset_version()
     except Exception:
         logger.exception("admin: failed to bump filter caches after top-brands edit")
+    _drop_pages_in_process_caches()
+
+
+def _bump_home_caches() -> None:
+    """Drop home-page caches after operator changes featured/recommended."""
+
+    try:
+        redis_delete_by_pattern("home_*")
+    except Exception:
+        logger.exception("admin: failed to drop home_* redis keys")
+    _drop_pages_in_process_caches()
+
+
+def _drop_pages_in_process_caches() -> None:
+    """Best-effort wipe of the per-worker TTLCaches inside pages.py.
+
+    Each gunicorn worker keeps its own LRU/TTL caches for the home page
+    and for the public filter context. Bumping ``dataset_version`` is
+    not enough because some of those keys do not embed the version yet,
+    so we explicitly call ``.clear()`` on every cache the pages module
+    exposes. This only affects the worker handling this request, but
+    Redis-side invalidation above ensures every other worker rebuilds
+    on its next request anyway.
+    """
+
+    try:
+        from . import pages as _pages_router  # local import to avoid cycles
+    except Exception:
+        logger.exception("admin: cannot import pages router to drop in-process caches")
+        return
+    for cache_name in (
+        "_FILTER_CTX_CACHE",
+        "_TOTAL_CARS_CACHE",
+        "_HOME_FILTER_CTX_CACHE",
+        "_HOME_MEDIA_CACHE",
+        "_HOME_RECOMMENDED_CACHE",
+        "_HOME_MORE_OFFERS_CACHE",
+    ):
+        cache = getattr(_pages_router, cache_name, None)
+        if cache is not None:
+            try:
+                cache.clear()
+            except Exception:
+                logger.warning("admin: failed to clear %s", cache_name, exc_info=True)
 
 
 @router.get("/admin/top-brands", response_class=None)
@@ -1265,10 +1314,7 @@ def update_recommended(
     )
     # Drop the cached SSR home payload so the new config takes effect on
     # the next refresh — otherwise the recommended block can stay stale.
-    try:
-        redis_delete_by_pattern("home_*")
-    except Exception:
-        logger.exception("admin: failed to bump home cache after recommended save")
+    _bump_home_caches()
     return _admin_redirect("Параметры рекомендуемых сохранены")
 
 
@@ -1282,6 +1328,7 @@ def update_featured(
 ):
     ids = [int(x) for x in car_ids.replace(",", " ").split() if x.strip().isdigit()]
     AdminService(db).set_featured(placement, ids)
+    _bump_home_caches()
     msg = f"Закреплено машин: {len(ids)}" if ids else "Список очищен — используется автоподбор"
     return _admin_redirect(msg)
 
@@ -1315,6 +1362,7 @@ async def upload_featured_template(
     raw = (await file.read()).decode("utf-8", errors="ignore")
     ids = [int(x) for x in raw.replace(",", " ").split() if x.strip().isdigit()]
     AdminService(db).set_featured("recommended", ids)
+    _bump_home_caches()
     return _admin_redirect(f"Загружено {len(ids)} ID")
 
 

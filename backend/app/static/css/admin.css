@@ -596,7 +596,10 @@
 
 /* ───────────────────────────  Buttons  ─────────────────────────── */
 
-.la-btn {
+.la-btn,
+.la-admin a.la-btn,
+.la-admin a.la-btn:hover,
+.la-admin a.la-btn:visited {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -612,6 +615,7 @@
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .la-btn:hover { text-decoration: none; }
@@ -621,7 +625,10 @@
   cursor: not-allowed;
 }
 
-.la-btn--primary {
+.la-btn--primary,
+.la-admin a.la-btn--primary,
+.la-admin a.la-btn--primary:hover,
+.la-admin a.la-btn--primary:visited {
   background: var(--la-accent);
   border-color: var(--la-accent);
   color: #fff;
@@ -634,7 +641,10 @@
   box-shadow: 0 4px 14px var(--la-accent-soft);
 }
 
-.la-btn--secondary {
+.la-btn--secondary,
+.la-admin a.la-btn--secondary,
+.la-admin a.la-btn--secondary:hover,
+.la-admin a.la-btn--secondary:visited {
   background: transparent;
   border-color: var(--la-border-strong);
   color: var(--la-text);
@@ -643,12 +653,16 @@
 .la-btn--secondary:hover:not(:disabled) {
   border-color: var(--la-text);
   background: var(--la-surface-interactive);
+  color: var(--la-text);
 }
 
-.la-btn--ghost {
+.la-btn--ghost,
+.la-admin a.la-btn--ghost,
+.la-admin a.la-btn--ghost:hover,
+.la-admin a.la-btn--ghost:visited {
   background: transparent;
   border-color: transparent;
-  color: var(--la-text-muted);
+  color: var(--la-text);
 }
 
 .la-btn--ghost:hover:not(:disabled) {
@@ -656,7 +670,10 @@
   background: var(--la-surface-interactive);
 }
 
-.la-btn--danger {
+.la-btn--danger,
+.la-admin a.la-btn--danger,
+.la-admin a.la-btn--danger:hover,
+.la-admin a.la-btn--danger:visited {
   background: var(--la-danger);
   border-color: var(--la-danger);
   color: #fff;
@@ -665,6 +682,7 @@
 .la-btn--danger:hover:not(:disabled) {
   background: #e8543f;
   border-color: #e8543f;
+  color: #fff;
 }
 
 .la-btn--sm {
