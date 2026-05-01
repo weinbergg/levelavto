@@ -36,6 +36,7 @@ from sqlalchemy import and_, func, or_, select
 
 from ..db import SessionLocal
 from ..models import Car
+from ..utils.redis_cache import bump_dataset_version
 from .cleanup_bad_engine_type import _derive_from_car
 
 
@@ -147,6 +148,21 @@ def main() -> None:
             f"\nПрименено: {total_recovered} строк обновлено.",
             flush=True,
         )
+        if total_recovered > 0:
+            try:
+                new_ver = bump_dataset_version()
+                print(
+                    f"Версия датасета поднята до {new_ver} — все версионированные "
+                    "кэши (Redis + in-process) автоматически инвалидируются.",
+                    flush=True,
+                )
+            except Exception as exc:
+                print(
+                    "ВНИМАНИЕ: не удалось поднять dataset_version в Redis "
+                    f"({exc!r}). Сделайте `redis-cli FLUSHDB` или рестарт web "
+                    "вручную, чтобы пользователи увидели изменения.",
+                    flush=True,
+                )
     else:
         print(
             "\nЭто был dry-run. Запустите с --apply, чтобы сохранить изменения.",
