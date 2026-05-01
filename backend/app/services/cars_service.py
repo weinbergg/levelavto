@@ -620,10 +620,21 @@ class CarsService:
             if _MODEL_NUMERIC_ORDINAL_RE.fullmatch(search_word):
                 break
             if _MODEL_GEN_TOKEN_RE.fullmatch(search_word):
-                break
+                # First word that looks like a generation code (e.g. "GV80",
+                # "F30") is almost always the actual model name itself —
+                # only treat such tokens as generation suffixes once we've
+                # already kept a real word.
+                if keep:
+                    break
             if search_word in _MODEL_FALLBACK_STOPWORDS:
                 break
             if re.fullmatch(r"\d+(?:\.\d+)?", search_word):
+                break
+            # Once we've kept a real model word, a follow-up bare 2-3 letter
+            # token (IG, GT, RS, SE, EV, …) is almost always a trim /
+            # generation / edition suffix; stop here so the canonical label
+            # stays short.
+            if keep and re.fullmatch(r"[a-z]{2,3}", search_word):
                 break
             keep.append(word)
             if len(keep) >= 2 and re.search(r"\d", keep[0]):

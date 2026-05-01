@@ -155,7 +155,7 @@ def main() -> None:
         "--commit-every",
         type=int,
         default=2000,
-        help="Commit and clear the SQLAlchemy identity map every N processed rows",
+        help="(deprecated, kept for CLI compatibility) commit cadence is now == chunk size",
     )
     parser.add_argument(
         "--include-numeric",
@@ -167,99 +167,110 @@ def main() -> None:
     mode = "APPLY (writes will be committed)" if args.apply else "DRY-RUN (no writes)"
     print(f">>> Cleanup engine_type — {mode}", flush=True)
 
-    with SessionLocal() as db:
-        # Cheap, narrow pre-filter — only disclaimer fragments, so the
-        # candidate set is small (a few hundred / thousand) instead of
-        # the whole 700k+ table. The previous version added a numeric-only
-        # regex which matched every car with an integer engine_type and
-        # blew the candidate count up to 728k, choking memory before any
-        # progress was made.
+    # Cheap, narrow pre-filter — only disclaimer fragments, so the
+    # candidate set is small (a few hundred / thousand) instead of
+    # the whole 700k+ table. The previous version added a numeric-only
+    # regex which matched every car with an integer engine_type and
+    # blew the candidate count up to 728k, choking memory before any
+    # progress was made.
+    def _build_where():
         like_clauses = [func.lower(Car.engine_type).like(f"%{frag}%") for frag in _DISCLAIMER_FRAGMENTS]
         if args.include_numeric:
             like_clauses.append(
                 Car.engine_type.op("~")(r"^[ \t]*[0-9]+([.,][0-9]+)?[ \t]*$")
             )
-        where_clause = or_(*like_clauses)
-        candidates_stmt = (
-            select(Car)
-            .where(where_clause)
-            .order_by(Car.id)
-            .execution_options(yield_per=args.chunk)
-        )
+        return or_(*like_clauses)
 
+    # Pull just the primary keys upfront (~8 bytes each → ~6 MB even for 700k
+    # rows). Iterating by ID and re-querying small batches avoids the
+    # ``psycopg2.ProgrammingError: named cursor isn't valid anymore`` we hit
+    # before — server-side cursors get invalidated as soon as we commit
+    # mid-iteration, so we cannot mix ``yield_per`` with periodic commits in
+    # the same session.
+    with SessionLocal() as db:
+        where_clause = _build_where()
         total_count = db.execute(
             select(func.count()).select_from(Car).where(where_clause)
         ).scalar_one()
         print(f">>> Кандидатов в БД: {total_count}", flush=True)
 
-        total_seen = 0
-        total_polluted = 0
-        total_recovered = 0
-        total_blanked = 0
-        pending_writes = 0
-        per_value: Counter[str] = Counter()
-        recovered_into: Counter[str] = Counter()
+        candidate_ids = list(
+            db.execute(
+                select(Car.id).where(where_clause).order_by(Car.id)
+            ).scalars()
+        )
 
-        # Stream rows so we don't load the entire candidate set into memory.
-        # ``yield_per`` requires execution within ``stream_results=True``
-        # context, which the execution option above already enables.
-        for car in db.execute(candidates_stmt).yield_per(args.chunk).scalars():
-            total_seen += 1
-            if not _looks_polluted(car.engine_type):
-                continue
-            total_polluted += 1
-            per_value[(car.engine_type or "").strip().lower()] += 1
-            new_value = _derive_from_car(car)
-            if new_value:
-                total_recovered += 1
-                recovered_into[new_value] += 1
-            else:
-                total_blanked += 1
+    total_seen = 0
+    total_polluted = 0
+    total_recovered = 0
+    total_blanked = 0
+    per_value: Counter[str] = Counter()
+    recovered_into: Counter[str] = Counter()
+
+    if args.limit:
+        candidate_ids = candidate_ids[: args.limit]
+
+    chunk_size = max(1, int(args.chunk))
+    next_progress_at = chunk_size  # print after every chunk
+    for offset in range(0, len(candidate_ids), chunk_size):
+        batch_ids = candidate_ids[offset : offset + chunk_size]
+        if not batch_ids:
+            break
+        with SessionLocal() as db:
+            cars = list(
+                db.execute(
+                    select(Car).where(Car.id.in_(batch_ids))
+                ).scalars()
+            )
+            for car in cars:
+                total_seen += 1
+                if not _looks_polluted(car.engine_type):
+                    continue
+                total_polluted += 1
+                per_value[(car.engine_type or "").strip().lower()] += 1
+                new_value = _derive_from_car(car)
+                if new_value:
+                    total_recovered += 1
+                    recovered_into[new_value] += 1
+                else:
+                    total_blanked += 1
+                if args.apply:
+                    car.engine_type = new_value
             if args.apply:
-                car.engine_type = new_value
-                pending_writes += 1
-                if pending_writes >= args.commit_every:
-                    db.commit()
-                    db.expire_all()
-                    pending_writes = 0
-            if total_seen % 500 == 0:
-                print(
-                    f"   ... осмотрено {total_seen}, найдено загрязнённых {total_polluted} "
-                    f"(восстановлено {total_recovered}, в NULL {total_blanked})",
-                    flush=True,
-                )
-            if args.limit and total_seen >= args.limit:
-                break
-
-        if args.apply and pending_writes:
-            db.commit()
-            db.expire_all()
-            pending_writes = 0
-
-        print(f"\nКандидатов осмотрено: {total_seen}")
-        print(f"Признаны загрязнёнными: {total_polluted}")
-        print(f"Восстановлено из payload/variant: {total_recovered}")
-        print(f"Сброшено в NULL: {total_blanked}")
-        print()
-        print("Топ загрязнённых значений:")
-        for value, n in per_value.most_common(20):
-            print(f"  {n:>6}  '{value}'")
-        print()
-        print("Распределение восстановленных:")
-        for value, n in recovered_into.most_common():
-            print(f"  {n:>6}  {value}")
-
-        if args.apply:
+                db.commit()
+        if total_seen >= next_progress_at:
             print(
-                f"\n✅ Применено: {total_polluted} строк обновлено "
-                f"({total_recovered} восстановлено, {total_blanked} -> NULL).",
+                f"   ... осмотрено {total_seen}/{len(candidate_ids)}, "
+                f"загрязнённых {total_polluted} "
+                f"(восстановлено {total_recovered}, в NULL {total_blanked})",
                 flush=True,
             )
-        else:
-            print(
-                "\n⚠ Это был dry-run. Запустите с --apply, чтобы сохранить изменения.",
-                flush=True,
-            )
+            next_progress_at += chunk_size
+
+    print(f"\nКандидатов осмотрено: {total_seen}")
+    print(f"Признаны загрязнёнными: {total_polluted}")
+    print(f"Восстановлено из payload/variant: {total_recovered}")
+    print(f"Сброшено в NULL: {total_blanked}")
+    print()
+    print("Топ загрязнённых значений:")
+    for value, n in per_value.most_common(20):
+        print(f"  {n:>6}  '{value}'")
+    print()
+    print("Распределение восстановленных:")
+    for value, n in recovered_into.most_common():
+        print(f"  {n:>6}  {value}")
+
+    if args.apply:
+        print(
+            f"\nПрименено: {total_polluted} строк обновлено "
+            f"({total_recovered} восстановлено, {total_blanked} -> NULL).",
+            flush=True,
+        )
+    else:
+        print(
+            "\nЭто был dry-run. Запустите с --apply, чтобы сохранить изменения.",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":

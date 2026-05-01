@@ -67,23 +67,26 @@ def test_model_grouping_bmw_normalizes_series_family_labels():
 
 
 def test_build_model_groups_priority_promotes_specific_labels_to_top():
+    # Audi keeps each model as its own group (no family collapse), so
+    # promoting individual labels via ``priority`` is straightforward.
     service = CarsService(db=None)  # type: ignore[arg-type]
     base_models = [
-        {"value": "X1", "label": "X1", "count": 1},
-        {"value": "X3", "label": "X3", "count": 1},
-        {"value": "X5", "label": "X5", "count": 1},
-        {"value": "5", "label": "5 серия", "count": 1},
-        {"value": "3", "label": "3 серия", "count": 1},
+        {"value": "A3", "label": "A3", "count": 1},
+        {"value": "A4", "label": "A4", "count": 1},
+        {"value": "A6", "label": "A6", "count": 1},
+        {"value": "Q3", "label": "Q3", "count": 1},
+        {"value": "Q5", "label": "Q5", "count": 1},
     ]
     out = service.build_model_groups(
-        brand="BMW",
+        brand="Audi",
         models=base_models,
-        priority=["X5", "5 серия"],
+        priority=["Q5", "A6"],
     )
     labels = [group["label"] for group in out]
-    assert labels[0] == "X5"
-    assert labels[1] == "5 серия"
-    assert labels[-1] != "X5"  # not duplicated; just promoted
+    assert labels[0] == "Q5"
+    assert labels[1] == "A6"
+    # remaining groups still present (priority promotes, doesn't drop)
+    assert set(labels) == {"A3", "A4", "A6", "Q3", "Q5"}
 
 
 def test_resolve_model_aliases_expands_family_label_to_group_members(monkeypatch):
