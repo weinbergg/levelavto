@@ -216,7 +216,9 @@
   color: var(--la-text-dim);
 }
 
-.la-admin-nav__item {
+.la-admin-nav__item,
+.la-admin a.la-admin-nav__item,
+.la-admin a.la-admin-nav__item:visited {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -227,21 +229,25 @@
   font-weight: 500;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
+  text-decoration: none;
 }
 
-.la-admin-nav__item:hover {
+.la-admin-nav__item:hover,
+.la-admin a.la-admin-nav__item:hover {
   background: var(--la-surface-interactive);
   color: #fff;
   text-decoration: none;
 }
 
-.la-admin-nav__item.is-active {
+.la-admin-nav__item.is-active,
+.la-admin a.la-admin-nav__item.is-active {
   background: var(--la-accent);
   color: #fff;
   box-shadow: var(--la-shadow-sm);
 }
 
-.la-admin-nav__item.is-active:hover {
+.la-admin-nav__item.is-active:hover,
+.la-admin a.la-admin-nav__item.is-active:hover {
   background: var(--la-accent);
   color: #fff;
 }
@@ -285,10 +291,12 @@
   font-size: 13px;
 }
 
-.la-admin-sidebar__toggle {
+.la-admin-sidebar__toggle,
+.la-admin a.la-admin-sidebar__toggle,
+.la-admin a.la-admin-sidebar__toggle:visited {
   background: transparent;
   border: 1px solid var(--la-border-strong);
-  color: var(--la-text-muted);
+  color: var(--la-text);
   border-radius: 8px;
   width: 32px;
   height: 32px;
@@ -296,11 +304,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  text-decoration: none;
 }
 
-.la-admin-sidebar__toggle:hover {
+.la-admin-sidebar__toggle:hover,
+.la-admin a.la-admin-sidebar__toggle:hover {
   background: var(--la-surface-interactive);
   color: #fff;
+  text-decoration: none;
 }
 
 /* ───────────────────────────  Topbar  ─────────────────────────── */

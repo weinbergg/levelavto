@@ -1784,6 +1784,25 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
     t0 = time.perf_counter()
     base_ctx_cached = _load_cached_filter_ctx_base({"region": canon_region, "country": canon_country})
     timing["base_filter_cache_ms"] = (time.perf_counter() - t0) * 1000
+    # Synchronous fallback when the base filter cache is missing (cold Redis,
+    # fresh deploy with new schema markers, eviction, etc.). Without it the
+    # sidebar filters render empty in the SSR HTML and only get hydrated when
+    # the JS layer fetches /api/filter_ctx_base — a noticeable 6 s "blink"
+    # for the operator.
+    if not base_ctx_cached:
+        try:
+            from backend.app.routers.catalog import filter_ctx_base as _filter_ctx_base_endpoint
+            t_fallback = time.perf_counter()
+            base_ctx_cached = _filter_ctx_base_endpoint(
+                request=request,
+                region=canon_region,
+                country=canon_country,
+                db=db,
+            )
+            timing["base_filter_fallback_ms"] = (time.perf_counter() - t_fallback) * 1000
+        except Exception:
+            logger.exception("catalog_filter_base_fallback_failed")
+            base_ctx_cached = None
     cached_brands = [
         str(item.get("value") or "").strip()
         for item in (base_ctx_cached or {}).get("brands") or []
