@@ -154,14 +154,8 @@ class MobileDeParser(BaseParser):
             fuel_raw = det["fuel"]  # type: ignore
             fuel = None
             if isinstance(fuel_raw, str):
-                if "бензин" in fuel_raw.lower():
-                    fuel = "Petrol"
-                elif "дизел" in fuel_raw.lower():
-                    fuel = "Diesel"
-                elif "гибрид" in fuel_raw.lower():
-                    fuel = "Hybrid"
-                else:
-                    fuel = fuel_raw
+                from ..scripts.cleanup_bad_engine_type import _classify_text
+                fuel = _classify_text(fuel_raw)
             image_url = img_el.get("src") if img_el else r.get("image")
             # Collect all image URLs in card: primary + thumbnails + other imgs present
             all_images: List[str] = []

@@ -26,21 +26,53 @@ def _normalize_body(body: Optional[str]) -> Optional[str]:
 
 
 def _normalize_fuel(fuel: Optional[str]) -> Optional[str]:
+    """Map an Encar fuel-type code to the canonical lowercase value used
+    by ``cars.engine_type`` everywhere else (mobile.de parser, public
+    catalog filter, admin tooling). Cross-fuel codes ("gasoline_lpg",
+    "gasoline_cng") historically wrote ``"Petrol/LPG"`` etc. — strings
+    the catalog filter does not know — so we collapse them to ``petrol``,
+    which is how Encar surfaces them on the Korean side anyway.
+    """
+
     if not fuel:
         return None
-    t = str(fuel).lower()
+    t = str(fuel).strip().lower()
+    if not t:
+        return None
     mapping = {
-        "gasoline": "Petrol",
-        "diesel": "Diesel",
-        "hybrid": "Hybrid",
-        "electric": "Electric",
-        "lpg": "LPG",
-        "cng": "CNG",
-        "gasoline_lpg": "Petrol/LPG",
-        "gasoline_cng": "Petrol/CNG",
-        "hydrogen": "Hydrogen",
+        "gasoline": "petrol",
+        "petrol": "petrol",
+        "benzin": "petrol",
+        "diesel": "diesel",
+        "hybrid": "hybrid",
+        "phev": "hybrid",
+        "plug-in hybrid": "hybrid",
+        "electric": "electric",
+        "ev": "electric",
+        "lpg": "lpg",
+        "cng": "cng",
+        "gasoline_lpg": "petrol",
+        "gasoline_cng": "petrol",
+        "hydrogen": "hydrogen",
+        "fuel cell": "hydrogen",
     }
-    return mapping.get(t, t.title())
+    if t in mapping:
+        return mapping[t]
+    if "diesel" in t:
+        return "diesel"
+    if "hybrid" in t or "phev" in t:
+        return "hybrid"
+    if "electric" in t or "ev" == t:
+        return "electric"
+    if "gasoline" in t or "petrol" in t or "benzin" in t:
+        return "petrol"
+    if "lpg" in t:
+        return "lpg"
+    if "cng" in t:
+        return "cng"
+    if "hydrogen" in t:
+        return "hydrogen"
+    return None
 
 
 def _normalize_transmission(val: Optional[str]) -> Optional[str]:

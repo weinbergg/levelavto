@@ -794,7 +794,16 @@ class EmAvtoKlgParser(BaseParser):
                     except ValueError:
                         pass
             else:
-                fuel = part.strip().capitalize()
+                # Run every non-mileage / non-year token through the canonical
+                # classifier so ``"103 квт"`` or ``"110"`` (random listing-card
+                # leftovers) never end up in cars.engine_type — the column has
+                # to stay in the {petrol, diesel, hybrid, electric, lpg, cng,
+                # hydrogen} canonical set or it's invisible to the public
+                # fuel filter.
+                from ..scripts.cleanup_bad_engine_type import _classify_text  # local import to avoid cycles
+                canonical = _classify_text(part)
+                if canonical:
+                    fuel = canonical
         return mileage, year, fuel
 
     def _extract_registration(
