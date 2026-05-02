@@ -53,12 +53,17 @@ from ..db import SessionLocal
 from ..utils.redis_cache import bump_dataset_version
 
 
-# Age buckets reported in --report mode. Buckets are based on
-# first_seen_at — see _age_expr() for the rationale.
+# Age buckets reported in --report mode. Granularity is intentionally
+# fine in the 30-180 day range because that is where most ballast
+# accumulates on a young deployment (DB ~6 months old): a used-car
+# listing on mobile.de typically lives 2-8 weeks, so cars first seen
+# 60+ days ago that are now inactive are dead weight regardless of
+# overall DB age.
 _BUCKETS: List[Tuple[str, int, int | None]] = [
     ("активные (никогда не удаляются)",            -1, 0),
     ("неактивные, first_seen_at < 30 дн",           0, 30),
-    ("неактивные, first_seen_at 30-90 дн",         30, 90),
+    ("неактивные, first_seen_at 30-60 дн",         30, 60),
+    ("неактивные, first_seen_at 60-90 дн",         60, 90),
     ("неактивные, first_seen_at 90-180 дн",        90, 180),
     ("неактивные, first_seen_at 180-365 дн",      180, 365),
     ("неактивные, first_seen_at 365-730 дн",      365, 730),

@@ -214,22 +214,29 @@ def _check_table_ballast(db) -> tuple[List[str], List[str]]:
 
     age_expr = "extract(epoch from now() - coalesce(first_seen_at, created_at)) / 86400.0"
     has_ts = "(first_seen_at IS NOT NULL OR created_at IS NOT NULL)"
+    # (label, lower_bound_days_for_threshold_choice, where_predicate)
+    # lower_bound_days = the smallest --days value that would catch
+    # this bucket. -1 means "never deletable" (recent), 0 means legacy.
     buckets = (
-        ("неактивные, first_seen_at < 30 дн",
+        ("неактивные, first_seen_at < 30 дн",        -1,
          f"AND {has_ts} AND {age_expr} < 30"),
-        ("неактивные, first_seen_at 30-180 дн",
-         f"AND {has_ts} AND {age_expr} >= 30 AND {age_expr} < 180"),
-        ("неактивные, first_seen_at 180-365 дн",
+        ("неактивные, first_seen_at 30-60 дн",       60,
+         f"AND {has_ts} AND {age_expr} >= 30 AND {age_expr} < 60"),
+        ("неактивные, first_seen_at 60-90 дн",       90,
+         f"AND {has_ts} AND {age_expr} >= 60 AND {age_expr} < 90"),
+        ("неактивные, first_seen_at 90-180 дн",     180,
+         f"AND {has_ts} AND {age_expr} >= 90 AND {age_expr} < 180"),
+        ("неактивные, first_seen_at 180-365 дн",    365,
          f"AND {has_ts} AND {age_expr} >= 180 AND {age_expr} < 365"),
-        ("неактивные, first_seen_at ≥ 365 дн",
+        ("неактивные, first_seen_at ≥ 365 дн",      365,
          f"AND {has_ts} AND {age_expr} >= 365"),
-        ("неактивные, без timestamp'ов (легаси)",
+        ("неактивные, без timestamp'ов (легаси)",     0,
          "AND first_seen_at IS NULL AND created_at IS NULL"),
     )
     print()
     print("  Возраст неактивных по first_seen_at (надёжный — не меняется после insert):")
-    deletable_180 = 0
-    for label, predicate in buckets:
+    counts: dict[int, int] = {}  # age_threshold -> cumulative deletable
+    for label, threshold, predicate in buckets:
         n = int(
             db.execute(
                 text(
@@ -238,16 +245,23 @@ def _check_table_ballast(db) -> tuple[List[str], List[str]]:
             ).scalar_one()
         )
         print(f"    {label:<42} {n:>10}")
-        if "180-365" in label or "≥ 365" in label or "легаси" in label:
-            deletable_180 += n
+        if threshold > 0:
+            counts[threshold] = counts.get(threshold, 0) + n
 
     if total and inactive / total > 0.5:
+        # Pick the most aggressive threshold (smallest --days) that
+        # still catches something — that's the highest-impact run.
+        best_days, best_n = 180, 0
+        for thr, n in sorted(counts.items()):
+            if n >= 100_000:  # don't recommend a threshold for trivial gains
+                best_days, best_n = thr, sum(c for d, c in counts.items() if d >= thr)
+                break
         suggestion = (
-            "scripts.cleanup_old_inactive_cars --apply --days 180 "
+            f"scripts.cleanup_old_inactive_cars --apply --days {best_days} "
             "(--include-legacy-null on by default)"
         )
-        if deletable_180:
-            suggestion += f" — освободит ~{deletable_180:,} строк"
+        if best_n:
+            suggestion += f" — освободит ~{best_n:,} строк"
         warnings.append(
             f"cars: {inactive / total:.0%} строк уже неактивны — {suggestion}"
         )
