@@ -53,17 +53,18 @@ from ..db import SessionLocal
 from ..utils.redis_cache import bump_dataset_version
 
 
-# Age buckets reported in --report mode. Each tuple is (label,
-# lower_inclusive_days, upper_exclusive_days). NULL means "no upper
-# bound".
+# Age buckets reported in --report mode. Buckets are based on
+# last_seen_at exclusively — see _age_expr() for why we deliberately
+# do NOT fall back to updated_at any more.
 _BUCKETS: List[Tuple[str, int, int | None]] = [
-    ("активные (никогда не удаляются)", -1, 0),
-    ("неактивные < 30 дн",                  0, 30),
-    ("неактивные 30-90 дн",                 30, 90),
-    ("неактивные 90-180 дн",                90, 180),
-    ("неактивные 180-365 дн",               180, 365),
-    ("неактивные 365-730 дн",               365, 730),
-    ("неактивные ≥ 730 дн",                 730, None),
+    ("активные (никогда не удаляются)",      -1, 0),
+    ("неактивные, last_seen_at < 30 дн",       0, 30),
+    ("неактивные, last_seen_at 30-90 дн",     30, 90),
+    ("неактивные, last_seen_at 90-180 дн",    90, 180),
+    ("неактивные, last_seen_at 180-365 дн",   180, 365),
+    ("неактивные, last_seen_at 365-730 дн",   365, 730),
+    ("неактивные, last_seen_at ≥ 730 дн",     730, None),
+    ("неактивные, last_seen_at IS NULL (легаси)", -2, -2),
 ]
 
 BATCH_SIZE = 5_000
@@ -72,57 +73,84 @@ BATCH_SIZE = 5_000
 def _age_expr() -> str:
     """SQL fragment yielding "days since this car was last seen alive".
 
-    Falls back to ``updated_at`` when ``last_seen_at`` is NULL so
-    legacy rows (pre-2024) are still classified.
+    Uses ``last_seen_at`` only. The earlier
+    ``coalesce(last_seen_at, updated_at)`` was a mistake: ``updated_at``
+    has ``onupdate=now()``, so every routine data migration
+    (engine_type normalisation, drive_type normalisation,
+    price_rub_cached refresh, …) bumps it on millions of rows. After
+    those migrations, the entire inactive set looked "freshly updated"
+    and the cleanup script could not find a single old row.
+
+    Returns NULL for cars whose ``last_seen_at`` is NULL — these are
+    legacy rows from before the column was introduced, treated
+    separately as the "ancient legacy" bucket.
     """
 
-    return "extract(epoch from now() - coalesce(last_seen_at, updated_at)) / 86400.0"
+    return "extract(epoch from now() - last_seen_at) / 86400.0"
 
 
 def _report(db) -> None:
     age = _age_expr()
     print()
-    print("Распределение машин по возрасту неактивности:")
-    print(f"  {'bucket':<40} {'count':>12}")
+    print("Распределение машин по возрасту неактивности (по last_seen_at):")
+    print(f"  {'bucket':<48} {'count':>12}")
     for label, lo, hi in _BUCKETS:
         if label.startswith("активные"):
-            n = db.execute(
-                text("SELECT count(*) FROM cars WHERE is_available IS true")
-            ).scalar_one()
+            sql = "SELECT count(*) FROM cars WHERE is_available IS true"
+            params: dict[str, float] = {}
+        elif "IS NULL" in label:
+            sql = (
+                "SELECT count(*) FROM cars "
+                "WHERE is_available IS NOT true AND last_seen_at IS NULL"
+            )
+            params = {}
         else:
-            clauses = ["is_available IS NOT true", f"{age} >= :lo"]
-            params: dict[str, float] = {"lo": float(lo)}
+            clauses = ["is_available IS NOT true", "last_seen_at IS NOT NULL", f"{age} >= :lo"]
+            params = {"lo": float(lo)}
             if hi is not None:
                 clauses.append(f"{age} < :hi")
                 params["hi"] = float(hi)
             sql = "SELECT count(*) FROM cars WHERE " + " AND ".join(clauses)
-            n = db.execute(text(sql), params).scalar_one()
-        print(f"  {label:<40} {int(n):>12}")
+        n = db.execute(text(sql), params).scalar_one()
+        print(f"  {label:<48} {int(n):>12}")
     total = db.execute(text("SELECT count(*) FROM cars")).scalar_one()
-    print(f"  {'─' * 40}")
-    print(f"  {'всего строк':<40} {int(total):>12}")
+    print(f"  {'─' * 48}")
+    print(f"  {'всего строк':<48} {int(total):>12}")
 
 
 def _max_id(db) -> int:
     return int(db.execute(text("SELECT coalesce(max(id), 0) FROM cars")).scalar_one())
 
 
-def _delete_chunked(db, days: int) -> int:
+def _delete_chunked(db, days: int, include_legacy_null: bool) -> int:
     """Delete every inactive car older than ``days``, in id-range chunks.
 
-    Equality on ``is_available`` + range on ``id`` are both indexed,
-    so each chunk is fast even though the predicate also references
-    ``last_seen_at`` (sequential per-row check on the 5k slice).
+    The predicate covers two cases:
+      * ``last_seen_at IS NOT NULL AND age >= :days`` — a normal
+        inactive listing whose parser saw it last more than N days ago.
+      * (when ``include_legacy_null`` is set) ``last_seen_at IS NULL``
+        — pre-2024 legacy rows with no last_seen_at populated; treated
+        as ancient.
+
+    Equality on ``is_available`` + id-range narrow each chunk; the
+    last_seen_at check is then a fast per-row comparison on the
+    5 000-row slice.
     """
 
-    age = _age_expr()
     max_id = _max_id(db)
     if not max_id:
         return 0
+    age_clause = (
+        "(last_seen_at IS NOT NULL AND extract(epoch from now() - last_seen_at) / 86400.0 >= :days"
+    )
+    if include_legacy_null:
+        age_clause += " OR last_seen_at IS NULL"
+    age_clause += ")"
     cur_id = 0
     total = 0
+    legacy_note = " (включая последние NULL last_seen_at)" if include_legacy_null else ""
     print(
-        f">>> Удаляем cars where is_available=false AND age >= {days} дн, "
+        f">>> Удаляем cars where is_available=false AND age >= {days} дн{legacy_note}, "
         f"батчами по {BATCH_SIZE} строк (max_id={max_id})",
         flush=True,
     )
@@ -133,7 +161,7 @@ def _delete_chunked(db, days: int) -> int:
                 DELETE FROM cars
                 WHERE id >= :lo AND id < :hi
                   AND is_available IS NOT true
-                  AND {age} >= :days
+                  AND {age_clause}
                 """
             ),
             {"lo": cur_id, "hi": cur_id + BATCH_SIZE, "days": float(days)},
@@ -163,6 +191,21 @@ def main() -> None:
         default=180,
         help="Delete inactive cars whose last_seen_at is older than this (default: 180)",
     )
+    parser.add_argument(
+        "--include-legacy-null",
+        action="store_true",
+        default=True,
+        help=(
+            "Also delete inactive cars whose last_seen_at IS NULL (pre-2024 "
+            "legacy rows that never had the column populated; default: on)"
+        ),
+    )
+    parser.add_argument(
+        "--no-include-legacy-null",
+        dest="include_legacy_null",
+        action="store_false",
+        help="Disable the legacy-NULL inclusion explicitly.",
+    )
     args = parser.parse_args()
 
     if args.days < 30:
@@ -172,28 +215,35 @@ def main() -> None:
         )
 
     mode = "APPLY (deletes will be committed)" if args.apply else "DRY-RUN (no deletes)"
-    print(f">>> Cleanup old inactive cars — {mode} (threshold: {args.days} дн)", flush=True)
+    legacy_note = " + legacy NULL" if args.include_legacy_null else ""
+    print(
+        f">>> Cleanup old inactive cars — {mode} "
+        f"(threshold: {args.days} дн{legacy_note})",
+        flush=True,
+    )
 
     with SessionLocal() as db:
         if args.report or not args.apply:
             _report(db)
 
-        # Always print the count that WOULD be deleted at this threshold.
         age = _age_expr()
+        legacy_clause = " OR last_seen_at IS NULL" if args.include_legacy_null else ""
         n_target = int(
             db.execute(
                 text(
                     f"""
                     SELECT count(*) FROM cars
                     WHERE is_available IS NOT true
-                      AND {age} >= :days
+                      AND ((last_seen_at IS NOT NULL AND {age} >= :days){legacy_clause})
                     """
                 ),
                 {"days": float(args.days)},
             ).scalar_one()
         )
         print()
-        print(f"Под удаление при threshold={args.days} дн: {n_target} строк")
+        print(
+            f"Под удаление при threshold={args.days} дн{legacy_note}: {n_target} строк"
+        )
 
         if not args.apply:
             print(
@@ -202,7 +252,7 @@ def main() -> None:
             )
             return
 
-        deleted = _delete_chunked(db, args.days)
+        deleted = _delete_chunked(db, args.days, args.include_legacy_null)
         print(f"\nГотово. Удалено строк: {deleted}", flush=True)
 
     try:

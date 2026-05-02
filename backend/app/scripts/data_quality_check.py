@@ -39,7 +39,7 @@ import json
 import sys
 from typing import Any, Dict, List
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, text
 
 from ..db import SessionLocal
 from ..models import Car, Source
@@ -182,6 +182,12 @@ def _check_table_ballast(db) -> tuple[List[str], List[str]]:
     Every batch operation (migrations, normalisers, backfills) scans
     ALL of cars, not just the active subset. If 70 % of the table is
     long-dead deactivated listings, every operation pays a 3× cost.
+
+    Distribution is read from ``last_seen_at`` only (NOT a coalesce
+    with ``updated_at``): every routine data-migration bumps
+    ``updated_at`` on millions of rows, so it cannot be trusted as an
+    "age since last seen alive" signal. ``last_seen_at IS NULL`` is
+    reported separately as the legacy bucket.
     """
 
     warnings: List[str] = []
@@ -195,10 +201,40 @@ def _check_table_ballast(db) -> tuple[List[str], List[str]]:
     print(f"  всего:       {total:>10}")
     print(f"  активных:    {active:>10}  ({active / max(total, 1):.1%})")
     print(f"  неактивных:  {inactive:>10}  ({inactive / max(total, 1):.1%})")
+
+    age_expr = "extract(epoch from now() - last_seen_at) / 86400.0"
+    buckets = (
+        ("неактивные < 30 дн",                "AND last_seen_at IS NOT NULL AND " + age_expr + " < 30"),
+        ("неактивные 30-180 дн",              "AND last_seen_at IS NOT NULL AND " + age_expr + " >= 30 AND " + age_expr + " < 180"),
+        ("неактивные 180-365 дн",             "AND last_seen_at IS NOT NULL AND " + age_expr + " >= 180 AND " + age_expr + " < 365"),
+        ("неактивные ≥ 365 дн",               "AND last_seen_at IS NOT NULL AND " + age_expr + " >= 365"),
+        ("неактивные с last_seen_at IS NULL", "AND last_seen_at IS NULL"),
+    )
+    print()
+    print("  Возраст неактивных по last_seen_at:")
+    deletable = 0
+    for label, predicate in buckets:
+        n = int(
+            db.execute(
+                text(
+                    f"SELECT count(*) FROM cars WHERE is_available IS NOT true {predicate}"
+                )
+            ).scalar_one()
+        )
+        print(f"    {label:<42} {n:>10}")
+        if "≥ 365" in label or "IS NULL" in label or "180-365" in label:
+            deletable += n
+
     if total and inactive / total > 0.5:
+        suggestion = (
+            "scripts.cleanup_old_inactive_cars --apply --days 180 "
+            "(опция --include-legacy-null включена по умолчанию — "
+            "она удалит и легаси-строки с NULL last_seen_at)"
+        )
+        if deletable:
+            suggestion += f" — освободит ~{deletable:,} строк"
         warnings.append(
-            f"cars: {inactive / total:.0%} строк уже неактивны — рассмотрите "
-            "scripts.cleanup_old_inactive_cars --apply --days 180"
+            f"cars: {inactive / total:.0%} строк уже неактивны — {suggestion}"
         )
     return warnings, errors
 
