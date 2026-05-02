@@ -11,6 +11,7 @@ from ..models import Car, Source, CarImage, ProgressKV
 from ..services.cars_service import CarsService
 from ..utils.pricing import to_rub
 from ..utils.color_groups import normalize_color_group
+from ..utils.engine_type import canonicalize_engine_type
 from ..utils.registration_defaults import apply_missing_registration_fallback
 
 
@@ -88,6 +89,11 @@ class ParsingDataService:
             payload.setdefault("thumbnail_url", None)
             payload.setdefault("is_available", True)
             payload["color_group"] = normalize_color_group(payload.get("color"))
+            # Defensive last-mile canonicalisation. Even if a parser is
+            # buggy or someone adds a new source that forgets to
+            # canonicalise its raw fuel field, the column stays in the
+            # canonical lowercase set the catalog filter understands.
+            payload["engine_type"] = canonicalize_engine_type(payload.get("engine_type"))
             # Normalize KR listing fields, but never invent a market type we did not parse.
             if payload.get("country") == "KR":
                 payload["kr_market_type"] = payload.get("kr_market_type") or None

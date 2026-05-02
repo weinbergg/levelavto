@@ -339,6 +339,16 @@ def main() -> None:
         deleted += redis_delete_by_pattern("filter_ctx_*")
         new_ver = bump_dataset_version()
         print(f"[mobilede_daily] redis invalidated keys={deleted} dataset_version={new_ver}")
+        if os.getenv("RUN_DQC_AFTER_DAILY", "1") != "0":
+            try:
+                # Import lazily so a syntax error in the QA script can never
+                # block the actual daily import. The script returns 0/1/2;
+                # we surface that in the daily print but never raise.
+                from backend.app.scripts.data_quality_check import main as dqc_main
+                dqc_rc = dqc_main()
+                print(f"[mobilede_daily] data_quality_check rc={dqc_rc}", flush=True)
+            except Exception as exc:
+                print(f"[mobilede_daily] data_quality_check error: {exc}", flush=True)
         if not KEEP_CSV:
             try:
                 target.unlink()

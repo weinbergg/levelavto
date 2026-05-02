@@ -154,8 +154,8 @@ class MobileDeParser(BaseParser):
             fuel_raw = det["fuel"]  # type: ignore
             fuel = None
             if isinstance(fuel_raw, str):
-                from ..scripts.cleanup_bad_engine_type import _classify_text
-                fuel = _classify_text(fuel_raw)
+                from ..utils.engine_type import canonicalize_engine_type
+                fuel = canonicalize_engine_type(fuel_raw)
             image_url = img_el.get("src") if img_el else r.get("image")
             # Collect all image URLs in card: primary + thumbnails + other imgs present
             all_images: List[str] = []

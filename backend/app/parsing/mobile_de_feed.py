@@ -108,56 +108,14 @@ class MobileDeFeedParser:
     def _classify_fuel_text(cls, text: Optional[str]) -> Optional[str]:
         """Map a free-text snippet to one of the canonical fuel labels.
 
-        Returns ``None`` if no canonical label can be inferred. Output
-        is lowercase canonical English (``diesel`` / ``hybrid`` /
-        ``petrol`` / ``electric`` / ``lpg`` / ``cng``) so the public
-        catalog filter (which lowercases ``cars.engine_type`` before
-        matching) and ad-hoc admin SQL (case-sensitive in PostgreSQL)
-        agree on the column's canonical form. The order matters:
-        ``e-hybrid`` and ``plug-in`` MUST be checked before ``electric``
-        because Porsche's hybrid variants contain both words (``Cayenne
-        E-Hybrid`` is a hybrid, not an EV).
+        Delegates to :func:`backend.app.utils.engine_type.canonicalize_engine_type`
+        — the project-wide single source of truth — so parser, backfill
+        scripts, upsert defensive guard and the DB CHECK constraint can
+        never disagree on what counts as canonical.
         """
 
-        val = (text or "").strip().lower()
-        if not val:
-            return None
-        if any(noise in val for noise in cls._DISCLAIMER_NOISE):
-            return None
-        if "diesel" in val or "дизель" in val or re.search(r"\btdi\b", val):
-            return "diesel"
-        if (
-            "e-hybrid" in val
-            or "e-hyb" in val
-            or "e-hibri" in val
-            or "phev" in val
-            or "plug-in" in val
-            or "plug in" in val
-            or "plugin" in val
-            or "hybrid" in val
-            or "гибрид" in val
-        ):
-            return "hybrid"
-        if (
-            "electric" in val
-            or "elektro" in val
-            or "электро" in val
-            or re.search(r"\bev\b", val)
-            or re.search(r"\beq[a-z]\b", val)  # Mercedes EQE / EQS / EQA / EQB
-        ):
-            return "electric"
-        if "petrol" in val or "benzin" in val or "gasoline" in val or "бензин" in val:
-            return "petrol"
-        if "lpg" in val or re.search(r"\bgpl\b", val) or "autogas" in val or "пропан" in val:
-            return "lpg"
-        if "cng" in val or "natural gas" in val or "erdgas" in val or "метан" in val:
-            return "cng"
-        if "hydrogen" in val or "fuel cell" in val or "водород" in val:
-            return "hydrogen"
-        canonical = _normalize_engine_type_canonical(val)
-        if canonical:
-            return canonical
-        return None
+        from ..utils.engine_type import canonicalize_engine_type
+        return canonicalize_engine_type(text)
 
     def _normalize_engine(
         self,
