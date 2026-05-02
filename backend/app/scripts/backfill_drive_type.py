@@ -66,21 +66,47 @@ def _count_null(conn) -> int:
     )
 
 
-def _apply_rule(conn, target: str, regex: str) -> int:
-    """Update every NULL row whose variant or model matches ``regex``."""
+def _apply_rule(db, target: str, regex: str, batch_size: int = 50_000) -> int:
+    """Update every NULL row whose variant or model matches ``regex``.
 
-    res = conn.execute(
-        text(
-            """
-            UPDATE cars
-            SET drive_type = :tgt
-            WHERE (drive_type IS NULL OR drive_type = '')
-              AND lower(coalesce(variant, '') || ' ' || coalesce(model, '')) ~ :rx
-            """
-        ),
-        {"tgt": target, "rx": regex},
+    Loops in id-range batches with explicit COMMITs between them so a
+    monolithic 800k-row transaction does not bloat WAL on prod. Each
+    batch is small enough to finish in a few seconds; a mid-run kill
+    loses at most one batch instead of the entire job.
+    """
+
+    conn = db.connection()
+    max_id = int(
+        conn.execute(text("SELECT coalesce(max(id), 0) FROM cars")).scalar_one()
     )
-    return int(res.rowcount or 0)
+    if not max_id:
+        return 0
+    cur_id = 0
+    total = 0
+    print(f"   {target}: max_id={max_id}, batch={batch_size}", flush=True)
+    while cur_id <= max_id:
+        res = conn.execute(
+            text(
+                """
+                UPDATE cars
+                SET drive_type = :tgt
+                WHERE id >= :lo AND id < :hi
+                  AND (drive_type IS NULL OR drive_type = '')
+                  AND lower(coalesce(variant, '') || ' ' || coalesce(model, '')) ~ :rx
+                """
+            ),
+            {"tgt": target, "lo": cur_id, "hi": cur_id + batch_size, "rx": regex},
+        )
+        n = int(res.rowcount or 0)
+        db.commit()
+        total += n
+        if n:
+            print(
+                f"   {target}: id [{cur_id}, {cur_id + batch_size}) — updated {n}, total {total}",
+                flush=True,
+            )
+        cur_id += batch_size
+    return total
 
 
 def _report_distribution(conn) -> Tuple[int, int]:
@@ -156,11 +182,10 @@ def main() -> None:
             return
 
         recovered = {
-            "awd": _apply_rule(conn, "awd", _AWD_REGEX),
-            "rwd": _apply_rule(conn, "rwd", _RWD_REGEX),
-            "fwd": _apply_rule(conn, "fwd", _FWD_REGEX),
+            "awd": _apply_rule(db, "awd", _AWD_REGEX),
+            "rwd": _apply_rule(db, "rwd", _RWD_REGEX),
+            "fwd": _apply_rule(db, "fwd", _FWD_REGEX),
         }
-        db.commit()
 
         after_null = _count_null(conn)
         print()

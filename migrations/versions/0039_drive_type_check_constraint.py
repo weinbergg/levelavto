@@ -67,28 +67,65 @@ _FWD_LIKE = (
 
 
 def upgrade() -> None:
-    # Single-pass CASE rewrite — one sequential scan instead of four
-    # separate UPDATEs. Each row touched at most once; rows already in
-    # the canonical set are skipped by the WHERE clause so the operation
-    # is idempotent and re-runnable after a partial / killed previous
-    # attempt. The whole thing typically finishes in well under a minute
-    # on a 1.8 M-row table even without a supporting index.
+    # Chunked CASE rewrite. A single monolithic UPDATE over ~1 M rows
+    # means one giant transaction that bloats WAL, holds many row
+    # locks at once, and is unkillable without rolling back hours of
+    # work. We instead loop in 50 000-row id ranges with an explicit
+    # COMMIT after each batch — per-batch wall time is a few seconds,
+    # progress is visible in pg_stat_user_tables.n_tup_upd, and a
+    # mid-run kill loses at most one batch (autocommit guarantees
+    # everything before is durable).
+    #
+    # Outer driver runs the loop in PL/pgSQL because Alembic wraps
+    # ``op.execute`` in its own transactional DDL block; ``COMMIT``
+    # inside a procedure is the standard PG ≥ 11 escape hatch for
+    # writing batched data migrations that need to commit between
+    # batches.
+    op.execute("COMMIT")  # leave Alembic's wrapping txn so PROCEDURE can COMMIT
     op.execute(
         f"""
-        UPDATE cars AS c
-        SET drive_type = CASE
-            WHEN {_AWD_LIKE} THEN 'awd'
-            WHEN {_RWD_LIKE} THEN 'rwd'
-            WHEN {_FWD_LIKE} THEN 'fwd'
-            ELSE NULL
+        DO $$
+        DECLARE
+            cur_id BIGINT := 0;
+            max_id BIGINT;
+            batch_size CONSTANT INTEGER := 50000;
+            updated_in_batch INTEGER;
+            total_updated BIGINT := 0;
+        BEGIN
+            SELECT max(id) INTO max_id FROM cars;
+            IF max_id IS NULL THEN
+                RETURN;
+            END IF;
+            RAISE NOTICE 'drive_type normalisation: max_id=%', max_id;
+            WHILE cur_id <= max_id LOOP
+                UPDATE cars AS c
+                SET drive_type = CASE
+                    WHEN {_AWD_LIKE} THEN 'awd'
+                    WHEN {_RWD_LIKE} THEN 'rwd'
+                    WHEN {_FWD_LIKE} THEN 'fwd'
+                    ELSE NULL
+                END
+                FROM (
+                    SELECT id, lower(trim(drive_type)) AS val
+                    FROM cars
+                    WHERE id >= cur_id AND id < cur_id + batch_size
+                      AND drive_type IS NOT NULL
+                      AND drive_type NOT IN ({_DRIVE_LIST_SQL})
+                ) AS s
+                WHERE c.id = s.id;
+                GET DIAGNOSTICS updated_in_batch = ROW_COUNT;
+                total_updated := total_updated + updated_in_batch;
+                COMMIT;
+                IF updated_in_batch > 0 THEN
+                    RAISE NOTICE
+                        'drive_type batch [%, %): updated=%, running_total=%',
+                        cur_id, cur_id + batch_size, updated_in_batch, total_updated;
+                END IF;
+                cur_id := cur_id + batch_size;
+            END LOOP;
+            RAISE NOTICE 'drive_type normalisation finished, total_updated=%', total_updated;
         END
-        FROM (
-            SELECT id, lower(trim(drive_type)) AS val
-            FROM cars
-            WHERE drive_type IS NOT NULL
-              AND drive_type NOT IN ({_DRIVE_LIST_SQL})
-        ) AS s
-        WHERE c.id = s.id
+        $$;
         """
     )
 
