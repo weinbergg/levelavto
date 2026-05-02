@@ -83,8 +83,16 @@ def canonicalize_engine_type(value: Optional[str]) -> Optional[str]:
     if re.fullmatch(r"[0-9]+(?:[.,][0-9]+)?", val):
         return None
 
+    # Diesel wins over every "+ electric" combination so that
+    # "Diesel/Electric (Hybrid)" — mobile.de's label for mild-hybrid
+    # diesels — is still classified as diesel, matching how mobile.de
+    # itself counts those listings under the "Diesel" filter.
     if "diesel" in val or "дизель" in val or re.search(r"\btdi\b", val):
         return "diesel"
+
+    # Real PHEV / hybrid keywords (Porsche "E-Hybrid", BMW "PHEV",
+    # generic "Vollhybrid"). Comes before the Cyrillic compound
+    # detection so the explicit hybrid signal always wins.
     if (
         "e-hybrid" in val
         or "e-hyb" in val
@@ -98,30 +106,63 @@ def canonicalize_engine_type(value: Optional[str]) -> Optional[str]:
         or "vollhybrid" in val
     ):
         return "hybrid"
-    if (
-        "electric" in val
-        or "elektro" in val
-        or "электро" in val
-        or re.search(r"\bev\b", val)
-        or re.search(r"\beq[a-z]\b", val)  # Mercedes EQE / EQS / EQA / EQB
-    ):
-        return "electric"
-    if (
+
+    has_petrol_token = (
         "petrol" in val
         or "benzin" in val
         or "benzina" in val
         or "gasoline" in val
         or "бензин" in val
-    ):
-        return "petrol"
-    if "lpg" in val or re.search(r"\bgpl\b", val) or "autogas" in val or "пропан" in val:
+    )
+    has_electric_token = (
+        "electric" in val
+        or "elektro" in val
+        or "электро" in val
+        or re.search(r"\bev\b", val)
+        or re.search(r"\beq[a-z]\b", val)  # Mercedes EQE / EQS / EQA / EQB
+    )
+    has_lpg_token = (
+        "lpg" in val
+        or re.search(r"\bgpl\b", val)
+        or "autogas" in val
+        or "пропан" in val
+    )
+    has_cng_token = (
+        "cng" in val
+        or "natural gas" in val
+        or "erdgas" in val
+        or "метан" in val
+        or "природный газ" in val
+    )
+
+    # Compound fuels — order reflects mobile.de's own category routing:
+    #   * petrol + electric → hybrid (e.g. "Бензин + электро")
+    #   * petrol + LPG     → lpg     (bivalent → searched for as LPG)
+    #   * petrol + CNG     → cng     (bivalent → searched for as CNG)
+    if has_petrol_token and has_electric_token:
+        return "hybrid"
+    if has_petrol_token and has_lpg_token:
         return "lpg"
-    if "cng" in val or "natural gas" in val or "erdgas" in val or "метан" in val:
+    if has_petrol_token and has_cng_token:
+        return "cng"
+
+    if has_electric_token:
+        return "electric"
+    if has_petrol_token:
+        return "petrol"
+    if has_lpg_token:
+        return "lpg"
+    if has_cng_token:
         return "cng"
     if "hydrogen" in val or "fuel cell" in val or "водород" in val:
         return "hydrogen"
     if "ethanol" in val or re.search(r"\be85\b", val) or "ffv" in val or "flexfuel" in val:
         return "ethanol"
+    # mobile.de "Andere" / "Other" / Russian "Остальные" — explicit
+    # non-fuel-specific bucket. Keep it as a real value rather than
+    # NULL so the operator can see how many such rows exist.
+    if val == "other" or "остальн" in val or "andere" in val:
+        return "other"
     return None
 
 

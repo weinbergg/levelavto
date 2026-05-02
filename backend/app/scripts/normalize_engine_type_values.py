@@ -29,20 +29,8 @@ from sqlalchemy import func, select, update
 
 from ..db import SessionLocal
 from ..models import Car
+from ..utils.engine_type import CANONICAL_ENGINE_TYPES, canonicalize_engine_type
 from ..utils.redis_cache import bump_dataset_version
-from .cleanup_bad_engine_type import _classify_text
-
-
-_CANONICAL_FORMS = {
-    "diesel",
-    "petrol",
-    "hybrid",
-    "electric",
-    "lpg",
-    "cng",
-    "hydrogen",
-    "ethanol",
-}
 
 
 def _build_mapping(distinct_values: List[str]) -> Dict[str, str]:
@@ -59,14 +47,14 @@ def _build_mapping(distinct_values: List[str]) -> Dict[str, str]:
         # Already canonical? Only fast-skip when the *exact stored bytes*
         # match — leading/trailing spaces or capital letters still need
         # to be rewritten so the column is uniform.
-        canonical = _classify_text(stripped)
+        canonical = canonicalize_engine_type(stripped)
         if not canonical:
             continue
-        if canonical not in _CANONICAL_FORMS:
-            # Defensive: classifier can return values outside the strict
-            # canonical set if normalize_engine_type evolves. Skip — better
-            # to keep the original than to lossily rewrite to a string the
-            # filter doesn't know.
+        if canonical not in CANONICAL_ENGINE_TYPES:
+            # Defensive: classifier returned something outside the
+            # project-wide canonical set. Skip — better to keep the
+            # original than to lossily rewrite to a value the filter
+            # and the DB CHECK constraint do not know.
             continue
         if original == canonical:
             continue
