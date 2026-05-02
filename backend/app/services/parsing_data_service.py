@@ -11,6 +11,7 @@ from ..models import Car, Source, CarImage, ProgressKV
 from ..services.cars_service import CarsService
 from ..utils.pricing import to_rub
 from ..utils.color_groups import normalize_color_group
+from ..utils.drive_type import canonicalize_drive_type, infer_drive_type_from_variant
 from ..utils.engine_type import canonicalize_engine_type
 from ..utils.registration_defaults import apply_missing_registration_fallback
 
@@ -94,6 +95,14 @@ class ParsingDataService:
             # canonicalise its raw fuel field, the column stays in the
             # canonical lowercase set the catalog filter understands.
             payload["engine_type"] = canonicalize_engine_type(payload.get("engine_type"))
+            # Same treatment for drive_type — and as a free bonus we
+            # backfill from the variant string ("xDrive40d", "quattro",
+            # "4MATIC") when the parser returned nothing, which used
+            # to leave 45 % of mobile.de listings as NULL.
+            drive = canonicalize_drive_type(payload.get("drive_type"))
+            if not drive:
+                drive = infer_drive_type_from_variant(payload.get("variant"))
+            payload["drive_type"] = drive
             # Normalize KR listing fields, but never invent a market type we did not parse.
             if payload.get("country") == "KR":
                 payload["kr_market_type"] = payload.get("kr_market_type") or None

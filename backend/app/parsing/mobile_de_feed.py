@@ -240,14 +240,8 @@ class MobileDeFeedParser:
         return None
 
     def _detect_drive(self, options: List[str]) -> Optional[str]:
-        opts = " ".join(options).lower()
-        if "four-wheel drive" in opts or "all wheel" in opts or "four-wheel" in opts:
-            return "AWD"
-        if "front wheel drive" in opts:
-            return "FWD"
-        if "rear wheel drive" in opts:
-            return "RWD"
-        return None
+        from ..utils.drive_type import canonicalize_drive_type
+        return canonicalize_drive_type(" ".join(options))
 
     def _parse_first_registration(self, raw: Optional[str]) -> tuple[Optional[int], Optional[int]]:
         if not raw:

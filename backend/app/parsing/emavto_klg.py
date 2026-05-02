@@ -921,16 +921,8 @@ class EmAvtoKlgParser(BaseParser):
         return raw.strip().capitalize()
 
     def _normalize_drive(self, raw: Optional[str]) -> Optional[str]:
-        if not raw:
-            return None
-        t = raw.lower()
-        if "полн" in t or "4x4" in t or "awd" in t:
-            return "AWD"
-        if "задн" in t or "rwd" in t:
-            return "RWD"
-        if "перед" in t or "fwd" in t:
-            return "FWD"
-        return raw.strip().upper()
+        from ..utils.drive_type import canonicalize_drive_type
+        return canonicalize_drive_type(raw)
 
     def _normalize_body(self, raw: Optional[str]) -> Optional[str]:
         if not raw:

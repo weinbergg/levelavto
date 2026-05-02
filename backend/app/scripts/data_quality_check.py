@@ -43,6 +43,7 @@ from sqlalchemy import and_, func, select
 
 from ..db import SessionLocal
 from ..models import Car, Source
+from ..utils.drive_type import CANONICAL_DRIVE_TYPES
 from ..utils.engine_type import CANONICAL_ENGINE_TYPES
 
 
@@ -75,37 +76,71 @@ def _section(title: str) -> None:
     print("─" * 72)
 
 
-def _check_engine_type_canonical(db) -> tuple[List[str], List[str]]:
-    """Return (warnings, errors)."""
+def _report_distinct_canonicality(
+    db,
+    section_title: str,
+    column,
+    canonical: frozenset[str],
+    *,
+    fix_hint: str,
+) -> tuple[List[str], List[str]]:
+    """Generic helper that prints a DISTINCT report and flags non-canonical
+    values for any column with a fixed canonical set
+    (engine_type, drive_type, ...).
+    """
 
     rows = db.execute(
-        select(Car.engine_type, func.count())
-        .where(Car.engine_type.is_not(None))
-        .group_by(Car.engine_type)
+        select(column, func.count())
+        .where(column.is_not(None))
+        .group_by(column)
         .order_by(func.count().desc())
     ).all()
     warnings: List[str] = []
     errors: List[str] = []
-    _section("1. cars.engine_type — каноничность DISTINCT значений")
+    _section(section_title)
     if not rows:
-        warnings.append("engine_type: колонка целиком NULL")
+        warnings.append(f"{column.key}: колонка целиком NULL")
         return warnings, errors
     print(f"{'count':>10}  value")
     bad = []
     for value, count in rows:
         marker = " "
-        if value not in CANONICAL_ENGINE_TYPES:
+        if value not in canonical:
             marker = "✗"
             bad.append((value, int(count)))
         print(f"{int(count):>10}  {marker} '{value}'")
     if bad:
         bad_total = sum(c for _, c in bad)
         errors.append(
-            f"engine_type: {len(bad)} non-canonical values, {bad_total} rows "
-            "— add them to utils.engine_type.CANONICAL_ENGINE_TYPES or run "
-            "normalize_engine_type_values --apply"
+            f"{column.key}: {len(bad)} non-canonical values, {bad_total} rows — {fix_hint}"
         )
     return warnings, errors
+
+
+def _check_engine_type_canonical(db) -> tuple[List[str], List[str]]:
+    return _report_distinct_canonicality(
+        db,
+        "1. cars.engine_type — каноничность DISTINCT значений",
+        Car.engine_type,
+        CANONICAL_ENGINE_TYPES,
+        fix_hint=(
+            "add them to utils.engine_type.CANONICAL_ENGINE_TYPES or run "
+            "normalize_engine_type_values --apply"
+        ),
+    )
+
+
+def _check_drive_type_canonical(db) -> tuple[List[str], List[str]]:
+    return _report_distinct_canonicality(
+        db,
+        "1b. cars.drive_type — каноничность DISTINCT значений",
+        Car.drive_type,
+        CANONICAL_DRIVE_TYPES,
+        fix_hint=(
+            "add them to utils.drive_type.CANONICAL_DRIVE_TYPES or re-run "
+            "the alembic migration"
+        ),
+    )
 
 
 def _check_null_ratios(db) -> tuple[List[str], List[str]]:
@@ -209,6 +244,7 @@ def main() -> int:
     with SessionLocal() as db:
         for fn in (
             _check_engine_type_canonical,
+            _check_drive_type_canonical,
             _check_null_ratios,
             _check_per_source_totals,
             _check_coverage_probes,
