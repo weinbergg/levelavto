@@ -287,16 +287,21 @@ class ParsingDataService:
         car.spec_inferred_at = None
 
     def deactivate_missing(self, source: Source, seen_external_ids: List[str]) -> int:
-        # Mark cars from this source not seen in this run as unavailable
+        # Mark cars from this source not seen in this run as unavailable.
+        # IMPORTANT: do NOT touch last_seen_at here — that column means
+        # "the last moment a parser actually saw this listing alive in
+        # the feed", which is precisely the timestamp we need preserved
+        # for the cleanup script. The previous behaviour bumped it to
+        # ``now`` on every deactivation cycle, which permanently lost
+        # the real "last alive" moment and made all 3.7M inactive rows
+        # look freshly seen <90 days ago.
         external_set = set(seen_external_ids)
         cars = self.db.execute(select(Car).where(
             Car.source_id == source.id)).scalars().all()
         changed = 0
-        now = datetime.utcnow()
         for car in cars:
             if car.external_id not in external_set and car.is_available:
                 car.is_available = False
-                car.last_seen_at = now
                 changed += 1
         if changed:
             self.db.commit()
@@ -306,8 +311,14 @@ class ParsingDataService:
         """
         Deactivate cars not seen during the current run based on last_seen_at.
         This avoids keeping a full external_id list in memory for large feeds.
+
+        We deliberately do NOT update ``last_seen_at`` here: the column
+        is the "last moment we actually saw this car in the feed", and
+        deactivation is the moment when we stopped seeing it. Bumping
+        it to ``now`` (the previous behaviour) destroyed the only
+        reliable age signal we had — see cleanup_old_inactive_cars
+        for the consumer side.
         """
-        now = datetime.utcnow()
         stmt = (
             update(Car)
             .where(
@@ -315,7 +326,7 @@ class ParsingDataService:
                 Car.is_available.is_(True),
                 or_(Car.last_seen_at.is_(None), Car.last_seen_at < run_started_at),
             )
-            .values(is_available=False, last_seen_at=now)
+            .values(is_available=False)
         )
         result = self.db.execute(stmt)
         self.db.commit()

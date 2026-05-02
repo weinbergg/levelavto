@@ -59,11 +59,19 @@ _COVERAGE_PROBES: List[Dict[str, Any]] = [
 ]
 
 # Columns whose NULL ratio matters because the public filter uses them.
+# drive_type threshold is intentionally generous (55 %): the mobile.de
+# CSV feed only ships drive info for vehicles where the OEM tags it
+# explicitly (xDrive / 4MATIC / quattro / 4MOTION / RWD / FWD badges
+# in the Options field). Mainstream cars (VW Golf, BMW 1-series, MB
+# C-class etc.) ship without any drive marker in the feed at all, so
+# ~40 % NULL is the steady-state floor we cannot meaningfully reduce
+# without external lookup tables. Treat the threshold as "definitely
+# something broke if we cross this" rather than a quality target.
 _NULL_RATIO_COLUMNS = (
     ("engine_type", 0.20),       # warn if >20 % cars have no fuel
     ("body_type", 0.15),
     ("transmission", 0.30),
-    ("drive_type", 0.40),
+    ("drive_type", 0.55),
     ("mileage", 0.05),
     ("registration_year", 0.10),
 )
@@ -183,11 +191,13 @@ def _check_table_ballast(db) -> tuple[List[str], List[str]]:
     ALL of cars, not just the active subset. If 70 % of the table is
     long-dead deactivated listings, every operation pays a 3× cost.
 
-    Distribution is read from ``last_seen_at`` only (NOT a coalesce
-    with ``updated_at``): every routine data-migration bumps
-    ``updated_at`` on millions of rows, so it cannot be trusted as an
-    "age since last seen alive" signal. ``last_seen_at IS NULL`` is
-    reported separately as the legacy bucket.
+    Distribution is read from ``coalesce(first_seen_at, created_at)``
+    — both columns are set on insert and never updated afterwards.
+    We deliberately do NOT use ``last_seen_at`` here: until the
+    deactivation-bug fix landed, the deactivation pass bumped
+    ``last_seen_at = now()``, so historical inactive rows have
+    contaminated values that would give us ~0 in the "old" buckets.
+    Using ``first_seen_at`` as the age signal sidesteps that mess.
     """
 
     warnings: List[str] = []
@@ -202,17 +212,23 @@ def _check_table_ballast(db) -> tuple[List[str], List[str]]:
     print(f"  активных:    {active:>10}  ({active / max(total, 1):.1%})")
     print(f"  неактивных:  {inactive:>10}  ({inactive / max(total, 1):.1%})")
 
-    age_expr = "extract(epoch from now() - last_seen_at) / 86400.0"
+    age_expr = "extract(epoch from now() - coalesce(first_seen_at, created_at)) / 86400.0"
+    has_ts = "(first_seen_at IS NOT NULL OR created_at IS NOT NULL)"
     buckets = (
-        ("неактивные < 30 дн",                "AND last_seen_at IS NOT NULL AND " + age_expr + " < 30"),
-        ("неактивные 30-180 дн",              "AND last_seen_at IS NOT NULL AND " + age_expr + " >= 30 AND " + age_expr + " < 180"),
-        ("неактивные 180-365 дн",             "AND last_seen_at IS NOT NULL AND " + age_expr + " >= 180 AND " + age_expr + " < 365"),
-        ("неактивные ≥ 365 дн",               "AND last_seen_at IS NOT NULL AND " + age_expr + " >= 365"),
-        ("неактивные с last_seen_at IS NULL", "AND last_seen_at IS NULL"),
+        ("неактивные, first_seen_at < 30 дн",
+         f"AND {has_ts} AND {age_expr} < 30"),
+        ("неактивные, first_seen_at 30-180 дн",
+         f"AND {has_ts} AND {age_expr} >= 30 AND {age_expr} < 180"),
+        ("неактивные, first_seen_at 180-365 дн",
+         f"AND {has_ts} AND {age_expr} >= 180 AND {age_expr} < 365"),
+        ("неактивные, first_seen_at ≥ 365 дн",
+         f"AND {has_ts} AND {age_expr} >= 365"),
+        ("неактивные, без timestamp'ов (легаси)",
+         "AND first_seen_at IS NULL AND created_at IS NULL"),
     )
     print()
-    print("  Возраст неактивных по last_seen_at:")
-    deletable = 0
+    print("  Возраст неактивных по first_seen_at (надёжный — не меняется после insert):")
+    deletable_180 = 0
     for label, predicate in buckets:
         n = int(
             db.execute(
@@ -222,17 +238,16 @@ def _check_table_ballast(db) -> tuple[List[str], List[str]]:
             ).scalar_one()
         )
         print(f"    {label:<42} {n:>10}")
-        if "≥ 365" in label or "IS NULL" in label or "180-365" in label:
-            deletable += n
+        if "180-365" in label or "≥ 365" in label or "легаси" in label:
+            deletable_180 += n
 
     if total and inactive / total > 0.5:
         suggestion = (
             "scripts.cleanup_old_inactive_cars --apply --days 180 "
-            "(опция --include-legacy-null включена по умолчанию — "
-            "она удалит и легаси-строки с NULL last_seen_at)"
+            "(--include-legacy-null on by default)"
         )
-        if deletable:
-            suggestion += f" — освободит ~{deletable:,} строк"
+        if deletable_180:
+            suggestion += f" — освободит ~{deletable_180:,} строк"
         warnings.append(
             f"cars: {inactive / total:.0%} строк уже неактивны — {suggestion}"
         )
