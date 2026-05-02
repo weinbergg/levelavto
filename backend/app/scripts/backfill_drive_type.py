@@ -55,9 +55,14 @@ _FWD_REGEX = (
 )
 
 
-def _count_null(conn) -> int:
+def _count_null(db) -> int:
+    """Always grab a fresh connection — between batched commits the
+    previous one may have been auto-released, and reusing the cached
+    handle yields ResourceClosedError on the next ``conn.execute``.
+    """
+
     return int(
-        conn.execute(
+        db.execute(
             text(
                 "SELECT count(*) FROM cars "
                 "WHERE drive_type IS NULL OR drive_type = ''"
@@ -66,26 +71,30 @@ def _count_null(conn) -> int:
     )
 
 
+def _max_id(db) -> int:
+    return int(db.execute(text("SELECT coalesce(max(id), 0) FROM cars")).scalar_one())
+
+
 def _apply_rule(db, target: str, regex: str, batch_size: int = 50_000) -> int:
     """Update every NULL row whose variant or model matches ``regex``.
 
     Loops in id-range batches with explicit COMMITs between them so a
     monolithic 800k-row transaction does not bloat WAL on prod. Each
     batch is small enough to finish in a few seconds; a mid-run kill
-    loses at most one batch instead of the entire job.
+    loses at most one batch instead of the entire job. We use the
+    Session's own ``execute`` / ``commit`` rather than a cached
+    connection handle, otherwise SQLAlchemy 2.x closes the connection
+    between commits and the next call yields ResourceClosedError.
     """
 
-    conn = db.connection()
-    max_id = int(
-        conn.execute(text("SELECT coalesce(max(id), 0) FROM cars")).scalar_one()
-    )
+    max_id = _max_id(db)
     if not max_id:
         return 0
     cur_id = 0
     total = 0
     print(f"   {target}: max_id={max_id}, batch={batch_size}", flush=True)
     while cur_id <= max_id:
-        res = conn.execute(
+        res = db.execute(
             text(
                 """
                 UPDATE cars
@@ -109,8 +118,8 @@ def _apply_rule(db, target: str, regex: str, batch_size: int = 50_000) -> int:
     return total
 
 
-def _report_distribution(conn) -> Tuple[int, int]:
-    rows = conn.execute(
+def _report_distribution(db) -> Tuple[int, int]:
+    rows = db.execute(
         text(
             "SELECT drive_type, count(*) "
             "FROM cars GROUP BY drive_type ORDER BY count(*) DESC"
@@ -139,25 +148,20 @@ def main() -> None:
     print(f">>> Backfill drive_type — {mode}", flush=True)
 
     with SessionLocal() as db:
-        conn = db.connection()
-
-        before_null = _count_null(conn)
+        before_null = _count_null(db)
         print(f">>> Кандидатов в БД (drive_type IS NULL/''): {before_null}", flush=True)
         if not before_null:
             print("Нечего восстанавливать.", flush=True)
             return
 
         if args.report or not args.apply:
-            _report_distribution(conn)
+            _report_distribution(db)
 
         if not args.apply:
-            # Dry-run estimate — count rows that WOULD match each rule
-            # without actually updating anything. Run inside the same
-            # connection so the rollback is cheap.
             est = {}
             for label, regex in (("awd", _AWD_REGEX), ("rwd", _RWD_REGEX), ("fwd", _FWD_REGEX)):
                 est[label] = int(
-                    conn.execute(
+                    db.execute(
                         text(
                             """
                             SELECT count(*) FROM cars
@@ -187,7 +191,7 @@ def main() -> None:
             "fwd": _apply_rule(db, "fwd", _FWD_REGEX),
         }
 
-        after_null = _count_null(conn)
+        after_null = _count_null(db)
         print()
         print("Восстановлено:")
         for value, n in recovered.items():

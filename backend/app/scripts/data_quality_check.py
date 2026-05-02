@@ -176,6 +176,33 @@ def _check_null_ratios(db) -> tuple[List[str], List[str]]:
     return warnings, errors
 
 
+def _check_table_ballast(db) -> tuple[List[str], List[str]]:
+    """Surface the inactive-car overhead.
+
+    Every batch operation (migrations, normalisers, backfills) scans
+    ALL of cars, not just the active subset. If 70 % of the table is
+    long-dead deactivated listings, every operation pays a 3× cost.
+    """
+
+    warnings: List[str] = []
+    errors: List[str] = []
+    _section("2b. Соотношение active / inactive в cars")
+    total = db.execute(select(func.count()).select_from(Car)).scalar_one()
+    active = db.execute(
+        select(func.count()).select_from(Car).where(Car.is_available.is_(True))
+    ).scalar_one()
+    inactive = total - active
+    print(f"  всего:       {total:>10}")
+    print(f"  активных:    {active:>10}  ({active / max(total, 1):.1%})")
+    print(f"  неактивных:  {inactive:>10}  ({inactive / max(total, 1):.1%})")
+    if total and inactive / total > 0.5:
+        warnings.append(
+            f"cars: {inactive / total:.0%} строк уже неактивны — рассмотрите "
+            "scripts.cleanup_old_inactive_cars --apply --days 180"
+        )
+    return warnings, errors
+
+
 def _check_per_source_totals(db) -> tuple[List[str], List[str]]:
     warnings: List[str] = []
     errors: List[str] = []
@@ -246,6 +273,7 @@ def main() -> int:
             _check_engine_type_canonical,
             _check_drive_type_canonical,
             _check_null_ratios,
+            _check_table_ballast,
             _check_per_source_totals,
             _check_coverage_probes,
         ):
