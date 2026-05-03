@@ -165,14 +165,37 @@ class MobileDeFeedParser:
             return None
 
     def _resolve_price_eur(self, row: MobileDeCsvRow) -> Optional[float]:
-        if row.price_eur_nt is not None:
-            try:
-                return float(row.price_eur_nt)
-            except Exception:
-                pass
+        """Pick the price the end-customer actually pays.
+
+        mobile.de exposes two prices in the CSV:
+
+          * ``price_eur``    — gross price (with German 19% VAT). This
+            is what every regular buyer sees on the listing page and
+            what they pay to the dealer.
+          * ``price_eur_nt`` — net price for VAT-deductible export
+            buyers (commercial dealers re-exporting outside the EU).
+            About 40 % of mobile.de listings ship this field set.
+
+        The previous priority (price_eur_nt first) silently wrote the
+        net price into Car.price for every dealer-listed car — which
+        meant our public catalogue showed prices ~16 % below the real
+        sticker price (=1 / 1.19 net-to-gross ratio). Verified via
+        scripts.audit_csv_vs_db: 40 % of sampled rows had
+        DB price = CSV price_eur * 0.840 exactly.
+
+        Fix: gross first, net only as a fallback when gross is
+        missing. The net value is still preserved in source_payload
+        for any downstream tooling that needs it.
+        """
+
         if row.price_eur is not None:
             try:
                 return float(row.price_eur)
+            except Exception:
+                pass
+        if row.price_eur_nt is not None:
+            try:
+                return float(row.price_eur_nt)
             except Exception:
                 pass
         return None
