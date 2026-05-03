@@ -65,7 +65,13 @@ def _source_id(db, key: str = "mobile_de") -> int:
 
 
 def _count_affected(db, src_id: int) -> int:
-    """Rows where the gross/net difference is real and > 0.5 %."""
+    """Rows where the gross/net difference is real and > 0.5 %.
+
+    NOTE: ``source_payload`` is declared as plain ``JSON`` in the
+    model (not ``JSONB``), so the ``?`` key-existence operator does
+    NOT exist for it. We use ``->>'key' IS NOT NULL`` instead, which
+    works for both JSON and JSONB and returns NULL for missing keys.
+    """
 
     return int(
         db.execute(
@@ -73,10 +79,10 @@ def _count_affected(db, src_id: int) -> int:
                 """
                 SELECT count(*) FROM cars
                 WHERE source_id = :src
-                  AND source_payload ? 'price_eur'
-                  AND source_payload ? 'price_eur_nt'
-                  AND (source_payload->>'price_eur')::numeric IS NOT NULL
-                  AND (source_payload->>'price_eur_nt')::numeric IS NOT NULL
+                  AND (source_payload->>'price_eur') IS NOT NULL
+                  AND (source_payload->>'price_eur_nt') IS NOT NULL
+                  AND (source_payload->>'price_eur')   ~ '^[0-9.]+$'
+                  AND (source_payload->>'price_eur_nt') ~ '^[0-9.]+$'
                   AND (source_payload->>'price_eur')::numeric > 0
                   AND (source_payload->>'price_eur_nt')::numeric > 0
                   AND (source_payload->>'price_eur')::numeric
@@ -135,8 +141,10 @@ def _apply(db, src_id: int, eur_rate: Optional[float]) -> tuple[int, int]:
                         )
                     WHERE id >= :lo AND id < :hi
                       AND source_id = :src
-                      AND source_payload ? 'price_eur'
-                      AND source_payload ? 'price_eur_nt'
+                      AND (source_payload->>'price_eur') IS NOT NULL
+                      AND (source_payload->>'price_eur_nt') IS NOT NULL
+                      AND (source_payload->>'price_eur')   ~ '^[0-9.]+$'
+                      AND (source_payload->>'price_eur_nt') ~ '^[0-9.]+$'
                       AND (source_payload->>'price_eur')::numeric > 0
                       AND (source_payload->>'price_eur_nt')::numeric > 0
                       AND price IS NOT NULL
@@ -155,8 +163,10 @@ def _apply(db, src_id: int, eur_rate: Optional[float]) -> tuple[int, int]:
                     SET price = (source_payload->>'price_eur')::numeric
                     WHERE id >= :lo AND id < :hi
                       AND source_id = :src
-                      AND source_payload ? 'price_eur'
-                      AND source_payload ? 'price_eur_nt'
+                      AND (source_payload->>'price_eur') IS NOT NULL
+                      AND (source_payload->>'price_eur_nt') IS NOT NULL
+                      AND (source_payload->>'price_eur')   ~ '^[0-9.]+$'
+                      AND (source_payload->>'price_eur_nt') ~ '^[0-9.]+$'
                       AND (source_payload->>'price_eur')::numeric > 0
                       AND (source_payload->>'price_eur_nt')::numeric > 0
                       AND price IS NOT NULL
@@ -212,8 +222,10 @@ def main() -> None:
                         (source_payload->>'price_eur_nt')::numeric AS net
                     FROM cars
                     WHERE source_id = :src
-                      AND source_payload ? 'price_eur'
-                      AND source_payload ? 'price_eur_nt'
+                      AND (source_payload->>'price_eur') IS NOT NULL
+                      AND (source_payload->>'price_eur_nt') IS NOT NULL
+                      AND (source_payload->>'price_eur')   ~ '^[0-9.]+$'
+                      AND (source_payload->>'price_eur_nt') ~ '^[0-9.]+$'
                       AND (source_payload->>'price_eur')::numeric
                           <> (source_payload->>'price_eur_nt')::numeric
                       AND price IS NOT NULL
