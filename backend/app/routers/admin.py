@@ -27,6 +27,8 @@ from ..utils.customs_template import (
     bump_customs_version,
     build_util_template,
     apply_util_template,
+    build_util_xlsx,
+    apply_util_xlsx,
 )
 from ..utils.brand_groups import (
     BRAND_FILTER_PRIORITY,
@@ -487,6 +489,16 @@ def admin_calculator_excel_page(
             "token": pending.get("token"),
         }
 
+    # Cheap count — used to translate "Recalc all" into a wall-clock hint.
+    # is_available=true is the same predicate the recalc script honours.
+    try:
+        recalc_total = int(
+            db.query(func.count(Car.id)).filter(Car.is_available.is_(True)).scalar() or 0
+        )
+    except Exception:
+        logger.exception("calculator page: failed to count active cars")
+        recalc_total = 0
+
     templates = request.app.state.templates
     return templates.TemplateResponse(
         "admin/calculator_excel.html",
@@ -505,7 +517,9 @@ def admin_calculator_excel_page(
             "latest": latest,
             "versions": versions,
             "pending": pending_summary,
-            "estimate": None,
+            "recalc_total": recalc_total,
+            "recalc_eta": _format_eta(recalc_total),
+            "recalc_rate": int(_RECALC_ROWS_PER_SECOND),
         },
     )
 
@@ -515,12 +529,34 @@ def admin_calculator_export_xlsx(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    from ..utils.calculator_xlsx_export import render_calculator_payload
+    """Download the live calculator config as a human-readable xlsx.
+
+    Wrapped in try/except so any failure inside openpyxl (corrupt payload,
+    surprise None field, missing dependency in the running image) lands in
+    the admin flash bar instead of a stock 500 page. We log the full
+    traceback so it shows up in container logs for debugging.
+    """
+
+    try:
+        from ..utils.calculator_xlsx_export import render_calculator_payload
+    except Exception as exc:
+        logger.exception("calculator export: render module import failed")
+        return _admin_redirect(
+            error=f"Не удалось загрузить модуль экспорта: {exc}. Обратитесь к разработчику.",
+            path="/admin/calculator/excel",
+        )
 
     latest = CalculatorConfigService(db).latest()
     if not latest:
         return _admin_redirect(error="Конфиг не загружен", path="/admin/calculator/excel")
-    data = render_calculator_payload(latest.payload or {})
+    try:
+        data = render_calculator_payload(latest.payload or {})
+    except Exception as exc:
+        logger.exception("calculator export: render failed for v%s", latest.version)
+        return _admin_redirect(
+            error=f"Не удалось собрать xlsx из v{latest.version}: {exc}",
+            path="/admin/calculator/excel",
+        )
     filename = f"calculator-config-v{latest.version}.xlsx"
     return Response(
         content=data,
@@ -671,9 +707,20 @@ def admin_calculator_template(user: User = Depends(require_admin)):
     set to 0 / empty so the customer can fill it in from scratch
     without seeing existing rates. Built off the in-code DEFAULT_CONFIG
     skeleton — never the production payload.
+
+    Same defensive try/except wrapping as
+    :func:`admin_calculator_export_xlsx` — the operator sees a flash
+    instead of a stock 500 page on failure.
     """
 
-    from ..utils.calculator_xlsx_export import render_calculator_payload
+    try:
+        from ..utils.calculator_xlsx_export import render_calculator_payload
+    except Exception as exc:
+        logger.exception("calculator template: render module import failed")
+        return _admin_redirect(
+            error=f"Не удалось загрузить модуль экспорта: {exc}",
+            path="/admin/calculator/excel",
+        )
 
     expenses_blank = {
         "bank": 0,
@@ -741,7 +788,14 @@ def admin_calculator_template(user: User = Depends(require_admin)):
             },
         },
     }
-    data = render_calculator_payload(skeleton)
+    try:
+        data = render_calculator_payload(skeleton)
+    except Exception as exc:
+        logger.exception("calculator template: render of blank skeleton failed")
+        return _admin_redirect(
+            error=f"Не удалось собрать пустой шаблон: {exc}",
+            path="/admin/calculator/excel",
+        )
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -805,9 +859,10 @@ def admin_calculator_recalc(
     )
 
 
-# Empirical baseline measured on the prod server during full-table runs.
-# We use this to translate a row count into an expected wall-clock time
-# in the admin UI. Update if the real prod rate drifts noticeably.
+# Empirical baseline measured on the prod server during full-table runs
+# (~280 rows/s with default --batch=2000). Used to translate the active
+# car count into a "you'll wait roughly X minutes" hint shown next to
+# the Recalc button. Update if the real prod rate drifts noticeably.
 _RECALC_ROWS_PER_SECOND = 280.0
 
 
@@ -819,179 +874,9 @@ def _format_eta(rows: int) -> str:
         return f"~{seconds} с"
     minutes = seconds / 60.0
     if minutes < 90:
-        return f"~{minutes:.1f} мин"
+        return f"~{minutes:.0f} мин"
     hours = minutes / 60.0
     return f"~{hours:.1f} ч"
-
-
-@router.get("/admin/calculator/recalc/estimate", response_class=None)
-def admin_calculator_recalc_estimate(
-    request: Request,
-    user: User | None = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    region: str = "all",
-    country: str = "",
-    brands: str = "",
-    engine_type: str = "",
-    age_min: int | None = None,
-    age_max: int | None = None,
-    only_missing: int = 0,
-):
-    """Read-only "what would a recalc look like" report.
-
-    Counts how many rows match a given selection (same filter rules as
-    ``recalc_calc_cache``) and translates that into an expected runtime
-    using ``_RECALC_ROWS_PER_SECOND``. Touches NOTHING in the DB or in
-    Redis. Designed so the operator can play with the filters and see
-    where the bottleneck is BEFORE clicking the irreversible "Recalc"
-    button.
-    """
-
-    if user is None:
-        return RedirectResponse(
-            url="/login?next=" + quote("/admin/calculator/excel"), status_code=302
-        )
-    if not user.is_admin:
-        return RedirectResponse(url="/", status_code=302)
-
-    from datetime import datetime as _dt
-    from sqlalchemy import func as _func, or_ as _or, and_ as _and
-
-    base = db.query(_func.count(Car.id)).filter(Car.is_available.is_(True))
-    region_norm = (region or "all").lower()
-    if region_norm == "eu":
-        base = base.filter(~Car.country.like("KR%"))
-    elif region_norm == "kr":
-        base = base.filter(Car.country.like("KR%"))
-    if country:
-        base = base.filter(Car.country == country.upper())
-    brand_list = [b.strip() for b in (brands or "").split(",") if b.strip()]
-    if brand_list:
-        base = base.filter(_func.lower(_func.trim(Car.brand)).in_(
-            [b.lower() for b in brand_list]
-        ))
-    if engine_type:
-        base = base.filter(Car.engine_type == engine_type.strip().lower())
-    if only_missing:
-        base = base.filter(Car.total_price_rub_cached.is_(None))
-    if age_min is not None or age_max is not None:
-        current_year = _dt.utcnow().year
-        reg_year = _func.coalesce(Car.registration_year, Car.year)
-        if age_min is not None:
-            base = base.filter(reg_year <= current_year - age_min)
-        if age_max is not None:
-            base = base.filter(reg_year >= current_year - age_max)
-
-    rows = int(base.scalar() or 0)
-
-    # Quick breakdown — country and engine type — so the operator can see
-    # where the bulk lives. Cheap aggregations on the same predicate base.
-    by_country: list[dict] = []
-    by_engine: list[dict] = []
-    if rows:
-        # Re-build the predicate list separately so we can reuse it for
-        # group-by queries without re-typing every filter.
-        conditions = [Car.is_available.is_(True)]
-        if region_norm == "eu":
-            conditions.append(~Car.country.like("KR%"))
-        elif region_norm == "kr":
-            conditions.append(Car.country.like("KR%"))
-        if country:
-            conditions.append(Car.country == country.upper())
-        if brand_list:
-            conditions.append(_func.lower(_func.trim(Car.brand)).in_(
-                [b.lower() for b in brand_list]
-            ))
-        if engine_type:
-            conditions.append(Car.engine_type == engine_type.strip().lower())
-        if only_missing:
-            conditions.append(Car.total_price_rub_cached.is_(None))
-        if age_min is not None or age_max is not None:
-            current_year = _dt.utcnow().year
-            reg_year = _func.coalesce(Car.registration_year, Car.year)
-            if age_min is not None:
-                conditions.append(reg_year <= current_year - age_min)
-            if age_max is not None:
-                conditions.append(reg_year >= current_year - age_max)
-
-        country_rows = db.execute(
-            select(Car.country, _func.count(Car.id))
-            .where(_and(*conditions))
-            .group_by(Car.country)
-            .order_by(_func.count(Car.id).desc())
-            .limit(10)
-        ).all()
-        by_country = [
-            {"country": (r[0] or "—"), "count": int(r[1])}
-            for r in country_rows
-        ]
-
-        engine_rows = db.execute(
-            select(Car.engine_type, _func.count(Car.id))
-            .where(_and(*conditions))
-            .group_by(Car.engine_type)
-            .order_by(_func.count(Car.id).desc())
-            .limit(10)
-        ).all()
-        by_engine = [
-            {"engine_type": (r[0] or "—"), "count": int(r[1])}
-            for r in engine_rows
-        ]
-
-    estimate = {
-        "rows": rows,
-        "eta_human": _format_eta(rows),
-        "rate": int(_RECALC_ROWS_PER_SECOND),
-        "by_country": by_country,
-        "by_engine": by_engine,
-        "filters": {
-            "region": region_norm,
-            "country": country,
-            "brands": brands,
-            "engine_type": engine_type,
-            "age_min": age_min,
-            "age_max": age_max,
-            "only_missing": bool(only_missing),
-        },
-    }
-
-    # Render the same calculator page so the result lands directly under
-    # the form. Re-using the existing handler would re-parse pending
-    # session state — easier to just inline what it does.
-    svc = CalculatorConfigService(db)
-    latest = svc.latest()
-    versions = svc.all_versions(limit=10)
-    pending = request.session.get("calc_preview")
-    pending_summary = None
-    if pending:
-        pending_summary = {
-            "filename": pending.get("filename", "файл.xlsx"),
-            "total_changes": len(pending.get("changes") or {}),
-            "changes": (pending.get("changes") or {}),
-            "token": pending.get("token"),
-        }
-
-    templates = request.app.state.templates
-    return templates.TemplateResponse(
-        "admin/calculator_excel.html",
-        {
-            "request": request,
-            "user": user,
-            "page_title": "Калькулятор · Excel",
-            "page_subtitle": (
-                "Скачайте текущий конфиг, отредактируйте в Excel, "
-                "загрузите для предпросмотра — изменения применятся только после подтверждения."
-            ),
-            "breadcrumbs": [
-                ("Админка", "/admin"),
-                ("Калькулятор · Excel", None),
-            ],
-            "latest": latest,
-            "versions": versions,
-            "pending": pending_summary,
-            "estimate": estimate,
-        },
-    )
 
 
 @router.get("/admin/users", response_class=None)
@@ -1606,12 +1491,42 @@ def download_customs_template(
     request: Request,
     user: User = Depends(require_admin),
 ):
+    """Download the utilisation-fee template as xlsx by default.
+
+    The bookkeeper opens it directly in Excel — the workbook has one
+    sheet per age bucket (`До 3 лет`, `3–5 лет`, `Электро/Гибрид`)
+    with merged section headers and a single editable column («Сумма (₽)»).
+    """
+
+    data = load_customs_dict()
+    try:
+        content = build_util_xlsx(data)
+    except Exception as exc:
+        logger.exception("util template: xlsx render failed")
+        return _admin_redirect(
+            error=f"Не удалось собрать xlsx утильсбора: {exc}",
+        )
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="util_template.xlsx"'},
+    )
+
+
+@router.get("/admin/customs/template.txt")
+def download_customs_template_txt(
+    request: Request,
+    user: User = Depends(require_admin),
+):
+    """Legacy plain-text fallback. Same content as the xlsx but for
+    operators who prefer editing in a plain editor."""
+
     data = load_customs_dict()
     content = build_util_template(data)
     return Response(
         content,
         media_type="text/plain",
-        headers={"Content-Disposition": "attachment; filename=util_template.txt"},
+        headers={"Content-Disposition": 'attachment; filename="util_template.txt"'},
     )
 
 
@@ -1621,17 +1536,33 @@ async def upload_customs_template(
     user: User = Depends(require_admin),
     file: UploadFile = File(...),
 ):
-    if not file.filename.lower().endswith((".txt", ".csv")):
-        return _admin_redirect(error="Неподдерживаемый формат — нужен .txt или .csv")
-    raw = (await file.read()).decode("utf-8", errors="ignore")
+    """Accept either xlsx (preferred, matches the new download) or txt/csv.
+
+    The xlsx parser is :func:`apply_util_xlsx` — it tolerates section
+    headers and skips non-numeric rows. txt/csv goes through the legacy
+    parser :func:`apply_util_template` for backward compatibility with
+    older bookkeeper habits.
+    """
+
+    name = file.filename.lower()
+    if not name.endswith((".xlsx", ".xlsm", ".xls", ".txt", ".csv")):
+        return _admin_redirect(
+            error="Неподдерживаемый формат — нужен .xlsx (рекомендуется), .txt или .csv"
+        )
+    raw = await file.read()
     data = load_customs_dict()
-    stats = apply_util_template(data, raw)
+    if name.endswith((".xlsx", ".xlsm", ".xls")):
+        stats = apply_util_xlsx(data, raw)
+    else:
+        stats = apply_util_template(data, raw.decode("utf-8", errors="ignore"))
     bump_customs_version(data)
     save_customs_dict(data)
     reset_customs_config_cache()
     msg = f"Обновлено строк: {stats.updated}"
     if stats.errors:
         msg += f", ошибок: {stats.errors}"
+    if stats.skipped:
+        msg += f", пропущено: {stats.skipped}"
     return _admin_redirect(msg)
 
 

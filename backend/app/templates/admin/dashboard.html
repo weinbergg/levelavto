@@ -430,13 +430,18 @@
             </div>
           </div>
           <div class="la-card__body">
-            <div class="la-hstack" style="margin-bottom: 14px">
-              <a class="la-btn la-btn--secondary" href="/admin/customs/template">Скачать текущий шаблон</a>
+            <div class="la-hstack" style="margin-bottom: 14px; gap: 10px; flex-wrap: wrap">
+              <a class="la-btn la-btn--primary" href="/admin/customs/template">⬇ Скачать Excel-шаблон</a>
+              <a class="la-btn la-btn--ghost la-btn--sm" href="/admin/customs/template.txt">текстовый формат</a>
+            </div>
+            <div class="la-text-dim" style="font-size: 12.5px; margin-bottom: 14px">
+              Excel-шаблон удобно редактировать бухгалтеру: на каждый возраст —
+              отдельный лист, меняйте только колонку «Сумма (₽)».
             </div>
             <form method="post" action="/admin/customs/upload" enctype="multipart/form-data" class="la-form">
               <div class="la-field">
-                <label class="la-field__label">Файл шаблона (.txt / .csv)</label>
-                <input class="la-input" type="file" name="file" accept=".txt,.csv">
+                <label class="la-field__label">Файл шаблона (.xlsx предпочтительно, либо .txt / .csv)</label>
+                <input class="la-input" type="file" name="file" accept=".xlsx,.xlsm,.xls,.txt,.csv">
               </div>
               <button type="submit" class="la-btn la-btn--primary">Применить изменения</button>
             </form>
