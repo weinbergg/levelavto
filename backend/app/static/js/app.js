@@ -3061,28 +3061,28 @@
   // horizontally. If everything fits, switch to a centered static layout
   // so sparse rows don't stick to the left edge on wide screens.
   function initRecommendedCarousel() {
-    const root = document.querySelector('[data-carousel-root="recommended"]')
-    if (!root) return
-    const track = root.querySelector('[data-carousel-track]')
-    if (!track) return
-    const cards = track.querySelectorAll('.car-card')
-    if (cards.length === 0) return
-
     const EDGE_TOLERANCE = 2
 
-    function maxScroll() {
-      return Math.max(track.scrollWidth - track.clientWidth, 0)
-    }
-    function syncRecommendedRailMode() {
-      const isStatic = maxScroll() <= EDGE_TOLERANCE
-      track.classList.toggle('cards-carousel--static', isStatic)
-      if (isStatic) {
-        track.scrollLeft = 0
-      }
-    }
+    document.querySelectorAll('[data-carousel-root="recommended"]').forEach((root) => {
+      const track = root.querySelector('[data-carousel-track]')
+      if (!track) return
+      const cards = track.querySelectorAll('.car-card')
+      if (cards.length === 0) return
 
-    syncRecommendedRailMode()
-    window.addEventListener('resize', syncRecommendedRailMode, { passive: true })
+      function maxScroll() {
+        return Math.max(track.scrollWidth - track.clientWidth, 0)
+      }
+      function syncRecommendedRailMode() {
+        const isStatic = maxScroll() <= EDGE_TOLERANCE
+        track.classList.toggle('cards-carousel--static', isStatic)
+        if (isStatic) {
+          track.scrollLeft = 0
+        }
+      }
+
+      syncRecommendedRailMode()
+      window.addEventListener('resize', syncRecommendedRailMode, { passive: true })
+    })
   }
 
   function initHome() {

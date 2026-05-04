@@ -115,6 +115,17 @@
   .filter-grid--overlay.filter-grid--compact {
     grid-template-columns: 1fr;
   }
+  .home-recommendation-block {
+    padding: 16px;
+    border-radius: 18px;
+  }
+  .home-recommendation-block__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .home-recommendation-block__link {
+    width: 100%;
+  }
 }
 .hero-with-video .hero-grid {
   position: relative;
@@ -713,6 +724,54 @@
 }
 .leader-card__content h3 {
   margin: 0 0 6px;
+}
+.home-recommendation-stack {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+.home-recommendation-block {
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(225, 75, 58, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(20, 24, 32, 0.96), rgba(14, 17, 24, 0.94));
+  box-shadow: 0 20px 44px rgba(8, 11, 18, 0.22);
+}
+.home-recommendation-block__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.home-recommendation-block__title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+.home-recommendation-block__link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+.home-recommendation-block__link:hover {
+  background: rgba(225, 75, 58, 0.12);
+  border-color: rgba(225, 75, 58, 0.32);
+}
+.home-recommendation-block__rail {
+  margin-top: 4px;
 }
 .social-grid {
   display: grid;

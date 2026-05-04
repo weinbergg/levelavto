@@ -354,6 +354,17 @@ class CarsService:
         return cast(Car.source_payload, JSONB)
 
     @classmethod
+    def _payload_text_value_expr(cls, key: str) -> Any:
+        return func.jsonb_extract_path_text(cls._payload_json_expr(), key)
+
+    @classmethod
+    def _payload_text_match_clause(cls, key: str, value: Any) -> Any:
+        text_value = str(value or "").strip()
+        if not text_value:
+            return None
+        return cls._payload_text_value_expr(key) == text_value
+
+    @classmethod
     def _payload_exact_match_clause(cls, key: str, value: Any) -> Any:
         payload_json = cls._payload_json_expr()
         text_value = str(value or "").strip()
@@ -1997,11 +2008,11 @@ class CarsService:
         payload_text = func.lower(cast(Car.source_payload, String))
 
         if num_seats and "num_seats" not in exclude:
-            clause = self._payload_exact_match_clause("num_seats", num_seats)
+            clause = self._payload_text_match_clause("num_seats", num_seats)
             if clause is not None:
                 conditions.append(clause)
         if doors_count and "doors_count" not in exclude:
-            clause = self._payload_exact_match_clause("doors_count", doors_count)
+            clause = self._payload_text_match_clause("doors_count", doors_count)
             if clause is not None:
                 conditions.append(clause)
         if emission_class and "emission_class" not in exclude:
@@ -2103,7 +2114,7 @@ class CarsService:
             if clause is not None:
                 conditions.append(clause)
         if owners_count and "owners_count" not in exclude:
-            clause = self._payload_exact_match_clause("owners_count", owners_count)
+            clause = self._payload_text_match_clause("owners_count", owners_count)
             if clause is not None:
                 conditions.append(clause)
 
@@ -2670,44 +2681,7 @@ class CarsService:
         if count_only:
             return [], int(total or 0)
 
-        order_clause = []
-        if sort == "price_asc":
-            price_expr = self._public_display_price_rub_expr()
-            price_group_expr = self._public_display_price_group_expr()
-            order_clause = [
-                price_group_expr.asc(),
-                price_expr.asc().nullslast(),
-                Car.id.asc(),
-            ]
-        elif sort == "price_desc":
-            price_expr = self._public_display_price_rub_expr()
-            price_group_expr = self._public_display_price_group_expr()
-            order_clause = [
-                price_group_expr.asc(),
-                price_expr.desc().nullslast(),
-                Car.id.asc(),
-            ]
-        elif sort == "year_desc":
-            order_clause = [Car.year.desc().nullslast(), Car.id.desc()]
-        elif sort == "year_asc":
-            order_clause = [Car.year.asc().nullslast(), Car.id.desc()]
-        elif sort == "mileage_asc":
-            order_clause = [Car.mileage.asc().nullslast(), Car.id.desc()]
-        elif sort == "mileage_desc":
-            order_clause = [Car.mileage.desc().nullslast(), Car.id.desc()]
-        elif sort == "reg_desc":
-            order_clause = [Car.reg_sort_key.desc().nullslast(), Car.id.desc()]
-        elif sort == "reg_asc":
-            order_clause = [Car.reg_sort_key.asc().nullslast(), Car.id.desc()]
-        elif sort == "listing_desc":
-            order_clause = [Car.listing_sort_ts.desc().nullslast(), Car.id.desc()]
-        elif sort == "listing_asc":
-            order_clause = [Car.listing_sort_ts.asc().nullslast(), Car.id.desc()]
-        else:
-            # default: цена сначала дешевые
-            price_expr = self._public_display_price_rub_expr()
-            price_group_expr = self._public_display_price_group_expr()
-            order_clause = [price_group_expr.asc(), price_expr.asc().nullslast(), Car.id.desc()]
+        order_clause = self._list_order_clause(sort)
 
         thumb_rank = case(
             (
@@ -4799,6 +4773,160 @@ class CarsService:
             hide_no_local_photo=hide_no_local_photo,
         )
         return int(total)
+
+    def _list_order_clause(self, sort: Optional[str]) -> List[Any]:
+        if sort == "price_asc":
+            price_expr = self._public_display_price_rub_expr()
+            price_group_expr = self._public_display_price_group_expr()
+            return [
+                price_group_expr.asc(),
+                price_expr.asc().nullslast(),
+                Car.id.asc(),
+            ]
+        if sort == "price_desc":
+            price_expr = self._public_display_price_rub_expr()
+            price_group_expr = self._public_display_price_group_expr()
+            return [
+                price_group_expr.asc(),
+                price_expr.desc().nullslast(),
+                Car.id.asc(),
+            ]
+        if sort == "year_desc":
+            return [Car.year.desc().nullslast(), Car.id.desc()]
+        if sort == "year_asc":
+            return [Car.year.asc().nullslast(), Car.id.desc()]
+        if sort == "mileage_asc":
+            return [Car.mileage.asc().nullslast(), Car.id.desc()]
+        if sort == "mileage_desc":
+            return [Car.mileage.desc().nullslast(), Car.id.desc()]
+        if sort == "reg_desc":
+            return [Car.reg_sort_key.desc().nullslast(), Car.id.desc()]
+        if sort == "reg_asc":
+            return [Car.reg_sort_key.asc().nullslast(), Car.id.desc()]
+        if sort == "listing_desc":
+            return [Car.listing_sort_ts.desc().nullslast(), Car.id.desc()]
+        if sort == "listing_asc":
+            return [Car.listing_sort_ts.asc().nullslast(), Car.id.desc()]
+        price_expr = self._public_display_price_rub_expr()
+        price_group_expr = self._public_display_price_group_expr()
+        return [price_group_expr.asc(), price_expr.asc().nullslast(), Car.id.desc()]
+
+    def preview_cars(
+        self,
+        *,
+        region: Optional[str] = None,
+        country: Optional[str] = None,
+        kr_type: Optional[str] = None,
+        brand: Optional[str] = None,
+        lines: Optional[List[str]] = None,
+        source_key: Optional[str | List[str]] = None,
+        q: Optional[str] = None,
+        model: Optional[str] = None,
+        generation: Optional[str] = None,
+        color: Optional[str] = None,
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        year_min: Optional[int] = None,
+        year_max: Optional[int] = None,
+        mileage_min: Optional[int] = None,
+        mileage_max: Optional[int] = None,
+        reg_year_min: Optional[int] = None,
+        reg_month_min: Optional[int] = None,
+        reg_year_max: Optional[int] = None,
+        reg_month_max: Optional[int] = None,
+        body_type: Optional[str] = None,
+        engine_type: Optional[str] = None,
+        transmission: Optional[str] = None,
+        drive_type: Optional[str] = None,
+        num_seats: Optional[str] = None,
+        doors_count: Optional[str] = None,
+        emission_class: Optional[str] = None,
+        efficiency_class: Optional[str] = None,
+        climatisation: Optional[str] = None,
+        airbags: Optional[str] = None,
+        interior_design: Optional[str] = None,
+        interior_color: Optional[str] = None,
+        interior_material: Optional[str] = None,
+        vat_reclaimable: Optional[str] = None,
+        air_suspension: Optional[bool] = None,
+        price_rating_label: Optional[str] = None,
+        owners_count: Optional[str] = None,
+        power_hp_min: Optional[float] = None,
+        power_hp_max: Optional[float] = None,
+        engine_cc_min: Optional[int] = None,
+        engine_cc_max: Optional[int] = None,
+        condition: Optional[str] = None,
+        sort: Optional[str] = None,
+        limit: int = 8,
+        hide_no_local_photo: bool = False,
+    ) -> List[Car]:
+        normalized_color = normalize_csv_values(color) or color
+        normalized_interior_design = normalize_csv_values(interior_design) or interior_design
+        normalized_interior_color = normalize_csv_values(interior_color) or interior_color
+        normalized_interior_material = normalize_csv_values(interior_material) or interior_material
+        conditions, _ = self._build_list_conditions(
+            region=region,
+            country=country,
+            kr_type=kr_type,
+            brand=brand,
+            lines=lines,
+            source_key=source_key,
+            q=q,
+            model=model,
+            generation=generation,
+            color=normalized_color,
+            price_min=price_min,
+            price_max=price_max,
+            year_min=year_min,
+            year_max=year_max,
+            mileage_min=mileage_min,
+            mileage_max=mileage_max,
+            reg_year_min=reg_year_min,
+            reg_month_min=reg_month_min,
+            reg_year_max=reg_year_max,
+            reg_month_max=reg_month_max,
+            body_type=body_type,
+            engine_type=engine_type,
+            transmission=transmission,
+            drive_type=drive_type,
+            num_seats=num_seats,
+            doors_count=doors_count,
+            emission_class=emission_class,
+            efficiency_class=efficiency_class,
+            climatisation=climatisation,
+            airbags=airbags,
+            interior_design=normalized_interior_design,
+            interior_color=normalized_interior_color,
+            interior_material=normalized_interior_material,
+            vat_reclaimable=vat_reclaimable,
+            air_suspension=air_suspension,
+            price_rating_label=price_rating_label,
+            owners_count=owners_count,
+            power_hp_min=power_hp_min,
+            power_hp_max=power_hp_max,
+            engine_cc_min=engine_cc_min,
+            engine_cc_max=engine_cc_max,
+            condition=condition,
+            hide_no_local_photo=hide_no_local_photo,
+        )
+        where_expr = and_(*conditions)
+        thumb_rank = case(
+            (
+                or_(
+                    and_(Car.thumbnail_local_path.is_not(None), Car.thumbnail_local_path != ""),
+                    and_(Car.thumbnail_url.is_not(None), Car.thumbnail_url != ""),
+                ),
+                1,
+            ),
+            else_=0,
+        ).desc()
+        stmt = (
+            select(Car)
+            .where(where_expr)
+            .order_by(thumb_rank, *self._list_order_clause(sort))
+            .limit(max(1, int(limit or 8)))
+        )
+        return list(self.db.execute(stmt).scalars().all())
 
     def price_info(self, car: Car) -> Dict[str, Any]:
         payload = car.source_payload or {}

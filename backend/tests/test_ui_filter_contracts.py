@@ -98,6 +98,7 @@ def test_home_recommended_block_uses_static_centered_rail_without_arrow_buttons(
     assert 'data-carousel-prev' not in template
     assert 'data-carousel-next' not in template
     assert "cards-carousel--static" in script
+    assert "document.querySelectorAll('[data-carousel-root=\"recommended\"]')" in script
     assert ".cards-carousel.cards-carousel--static" in css
 
 
@@ -173,7 +174,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=115' in template
+    assert '/static/js/app.js?v=116' in template
 
 
 def test_catalog_ssr_cache_hit_refreshes_prices_and_recomputes_display_price():
@@ -183,7 +184,7 @@ def test_catalog_ssr_cache_hit_refreshes_prices_and_recomputes_display_price():
     assert 'resolve_public_display_price_rub(' in pages_router
     assert 'catalog_ssr_cache_refresh_failed' in pages_router
     base_template = _read("app/templates/base.html")
-    assert '/static/css/styles.css?v=68' in base_template
+    assert '/static/css/styles.css?v=69' in base_template
 
 
 def test_deploy_cron_has_midday_public_prewarm():
@@ -202,24 +203,34 @@ def test_deploy_cron_has_midday_public_prewarm():
     assert 'PREWARM_INCLUDE_ENGINE_LISTS="${PREWARM_INCLUDE_ENGINE_LISTS:-0}"' in script
 
 
-def test_payload_exact_filters_use_jsonb_contains_and_daily_prewarm_stays_light():
+def test_payload_exact_filters_use_text_expr_for_hot_fields_and_daily_prewarm_stays_light():
     repo_root = Path(__file__).resolve().parents[2]
     service = _read("app/services/cars_service.py")
     pipeline = (repo_root / "scripts" / "mobilede_daily_pipeline.sh").read_text(encoding="utf-8")
     migration = (repo_root / "migrations" / "versions" / "0040_payload_exact_filter_gin.py").read_text(
         encoding="utf-8"
     )
+    migration_btree = (repo_root / "migrations" / "versions" / "0041_payload_exact_text_btree.py").read_text(
+        encoding="utf-8"
+    )
     assert "def _payload_exact_match_clause" in service
+    assert "def _payload_text_match_clause" in service
+    assert 'return cls._payload_text_value_expr(key) == text_value' in service
     assert 'payload_json.contains({key: text_value})' in service
     assert 'payload_json.contains({key: int_value})' in service
-    assert 'clause = self._payload_exact_match_clause("num_seats", num_seats)' in service
-    assert 'clause = self._payload_exact_match_clause("doors_count", doors_count)' in service
-    assert 'clause = self._payload_exact_match_clause("owners_count", owners_count)' in service
+    assert 'clause = self._payload_text_match_clause("num_seats", num_seats)' in service
+    assert 'clause = self._payload_text_match_clause("doors_count", doors_count)' in service
+    assert 'clause = self._payload_text_match_clause("owners_count", owners_count)' in service
+    assert "def preview_cars(" in service
     assert 'PREWARM_INCLUDE_BRAND_LISTS="${PREWARM_INCLUDE_BRAND_LISTS:-0}"' in pipeline
     assert 'PREWARM_INCLUDE_BRAND_COUNTS="${PREWARM_INCLUDE_BRAND_COUNTS:-0}"' in pipeline
     assert 'PREWARM_INCLUDE_ENGINE_LISTS="${PREWARM_INCLUDE_ENGINE_LISTS:-0}"' in pipeline
     assert "idx_cars_payload_jsonb_exact_avail" in migration
     assert "USING GIN ((CAST(source_payload AS jsonb)) jsonb_path_ops)" in migration
+    assert "idx_cars_src_country_num_seats_avail" in migration_btree
+    assert "idx_cars_src_country_doors_count_avail" in migration_btree
+    assert "idx_cars_src_country_owners_count_avail" in migration_btree
+    assert "jsonb_extract_path_text(CAST(source_payload AS jsonb), 'num_seats')" in migration_btree
     assert 'include_broad_base = os.getenv("PREWARM_INCLUDE_BROAD_BASE", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
     assert 'include_broad_counts = os.getenv("PREWARM_INCLUDE_BROAD_COUNTS", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
     assert 'include_broad_lists = os.getenv("PREWARM_INCLUDE_BROAD_LISTS", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
@@ -314,8 +325,8 @@ def test_admin_layout_uses_new_design_system():
     assert 'class="la-admin"' in layout
     assert 'class="la-admin-shell"' in layout
     assert 'data-sidebar-toggle' in layout
-    assert "/static/css/admin.css?v=4" in layout
-    assert "/static/js/admin.js?v=4" in layout
+    assert "/static/css/admin.css?v=6" in layout
+    assert "/static/js/admin.js?v=7" in layout
     assert 'grid-template-areas:\n    "topbar  sidebar"' in css
     assert "1fr var(--la-sidebar-w)" in css
     assert "--la-bg: #0b0e13" in css
@@ -324,8 +335,9 @@ def test_admin_layout_uses_new_design_system():
     assert 'href="/admin"' in sidebar
     assert 'href="/admin/users"' in sidebar
     assert 'href="/admin/top-brands"' in sidebar
+    assert 'href="/admin/top-models"' in sidebar
     assert 'href="/admin#tab=recommended"' in sidebar
-    assert 'href="/admin#tab=calculator"' in sidebar
+    assert 'href="/admin/calculator/excel"' in sidebar
     assert 'href="/admin#tab=customs"' in sidebar
     assert 'href="/admin#tab=contacts"' in sidebar
     assert 'href="/admin#tab=home"' in sidebar
@@ -350,6 +362,8 @@ def test_admin_layout_uses_new_design_system():
     assert 'data-tab-panel="recommended"' in dashboard
     assert 'data-tab-panel="customs"' in dashboard
     assert 'data-tab-panel="calculator"' in dashboard
+    assert 'data-recommendation-blocks-editor' in dashboard
+    assert 'data-recommendation-blocks-add' in dashboard
 
 
 def test_admin_router_uses_flash_redirects_for_user_feedback():
@@ -357,8 +371,29 @@ def test_admin_router_uses_flash_redirects_for_user_feedback():
     assert "def _admin_redirect(" in router
     assert "_admin_redirect(\"Контакты сохранены\")" in router
     assert "_admin_redirect(\"Параметры рекомендуемых сохранены\")" in router
+    assert "Сохранено подборок:" in router
     assert "_admin_redirect(\"Тексты главной страницы сохранены\")" in router
     assert "overview_stats" in router
+
+
+def test_home_recommendation_blocks_are_loaded_from_site_content_and_rendered_independently():
+    pages = _read("app/routers/pages.py")
+    admin = _read("app/routers/admin.py")
+    template = _read("app/templates/home.html")
+    dashboard = _read("app/templates/admin/dashboard.html")
+    util = _read("app/utils/home_recommendation_blocks.py")
+    assert "HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY" in pages
+    assert "load_home_recommendation_blocks" in pages
+    assert "recommendation_blocks = _get_home_recommendation_blocks" in pages
+    assert '"recommendation_blocks": recommendation_blocks' in pages
+    assert '@router.post("/admin/recommendation-blocks")' in admin
+    assert "serialize_home_recommendation_blocks(blocks)" in admin
+    assert "build_home_recommendation_blocks(" in admin
+    assert "{% if recommendation_blocks %}" in template
+    assert "home-recommendation-block__title" in template
+    assert "data-recommendation-block-row" in dashboard
+    assert "normalize_block_query" in util
+    assert "HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY" in util
 
 
 def test_admin_router_has_get_handlers_for_every_sidebar_link():

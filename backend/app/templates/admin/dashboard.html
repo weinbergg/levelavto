@@ -283,6 +283,98 @@
 
     {# ────────────────────────  Recommended  ──────────────────────── #}
     <section class="la-tab-panel" data-tab-panel="recommended" hidden style="padding: 18px 22px 22px">
+      <div class="la-card la-card--inset" style="margin-bottom: 18px">
+        <div class="la-card__header">
+          <div class="la-card__header-text">
+            <div class="la-card__title">Независимые подборки на главной</div>
+            <div class="la-card__sub">
+              Каждая строка ниже — отдельный блок рекомендаций со своим фильтром и своим мини-каталогом на главной.
+              Вставляйте готовую ссылку из каталога или расширенного поиска. Если список пуст, главная использует старый единый блок ниже.
+            </div>
+          </div>
+        </div>
+        <div class="la-card__body">
+          <form method="post" action="/admin/recommendation-blocks" class="la-form" data-recommendation-blocks-editor>
+            <div class="la-vstack" data-recommendation-blocks-list style="display: grid; gap: 14px">
+              {% set block_rows = recommendation_blocks if recommendation_blocks else [{'title': '', 'query': '', 'limit': 8, 'enabled': True}] %}
+              {% for block in block_rows %}
+              <div class="la-card" data-recommendation-block-row>
+                <div class="la-card__body">
+                  <div class="la-form-grid">
+                    <div class="la-field">
+                      <label class="la-field__label">Название блока</label>
+                      <input class="la-input" type="text" name="block_title" value="{{ block.title }}" placeholder="Например: BMW X5 из Германии">
+                    </div>
+                    <div class="la-field">
+                      <label class="la-field__label">Сколько карточек показывать</label>
+                      <input class="la-input" type="number" min="4" max="12" step="1" name="block_limit" value="{{ block.limit or 8 }}">
+                    </div>
+                    <div class="la-field">
+                      <label class="la-field__label">Статус</label>
+                      <select class="la-input" name="block_enabled">
+                        <option value="1" {% if block.enabled is not sameas false %}selected{% endif %}>Активна</option>
+                        <option value="0" {% if block.enabled is sameas false %}selected{% endif %}>Выключена</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="la-field" style="margin-top: 14px">
+                    <label class="la-field__label">Ссылка каталога или query</label>
+                    <textarea class="la-textarea" name="block_query" rows="3" placeholder="/catalog?region=EU&country=DE&brand=BMW&model=X5&sort=price_asc">{{ block.query }}</textarea>
+                    <span class="la-field__hint">
+                      Поддерживаются параметры из <code>/catalog</code> и <code>/search</code>. Порядок блоков на главной = порядок строк здесь.
+                    </span>
+                  </div>
+                  <div class="la-hstack" style="margin-top: 12px">
+                    <button type="button" class="la-btn la-btn--ghost" data-recommendation-block-up>Выше</button>
+                    <button type="button" class="la-btn la-btn--ghost" data-recommendation-block-down>Ниже</button>
+                    <button type="button" class="la-btn la-btn--ghost" data-recommendation-block-remove>Удалить</button>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            <template id="recommendation-block-template">
+              <div class="la-card" data-recommendation-block-row>
+                <div class="la-card__body">
+                  <div class="la-form-grid">
+                    <div class="la-field">
+                      <label class="la-field__label">Название блока</label>
+                      <input class="la-input" type="text" name="block_title" value="" placeholder="Например: Audi A6 свежие">
+                    </div>
+                    <div class="la-field">
+                      <label class="la-field__label">Сколько карточек показывать</label>
+                      <input class="la-input" type="number" min="4" max="12" step="1" name="block_limit" value="8">
+                    </div>
+                    <div class="la-field">
+                      <label class="la-field__label">Статус</label>
+                      <select class="la-input" name="block_enabled">
+                        <option value="1" selected>Активна</option>
+                        <option value="0">Выключена</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="la-field" style="margin-top: 14px">
+                    <label class="la-field__label">Ссылка каталога или query</label>
+                    <textarea class="la-textarea" name="block_query" rows="3" placeholder="/catalog?region=EU&country=DE&brand=Audi&model=A6&sort=price_asc"></textarea>
+                  </div>
+                  <div class="la-hstack" style="margin-top: 12px">
+                    <button type="button" class="la-btn la-btn--ghost" data-recommendation-block-up>Выше</button>
+                    <button type="button" class="la-btn la-btn--ghost" data-recommendation-block-down>Ниже</button>
+                    <button type="button" class="la-btn la-btn--ghost" data-recommendation-block-remove>Удалить</button>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <div class="la-hstack" style="margin-top: 16px">
+              <button type="button" class="la-btn la-btn--secondary" data-recommendation-blocks-add>Добавить подборку</button>
+              <button type="submit" class="la-btn la-btn--primary">Сохранить подборки</button>
+              <span class="la-text-dim" style="font-size: 12.5px">
+                Можно хранить до 20 блоков. Они перекрывают старый единый блок, только если здесь есть хотя бы одна сохранённая подборка.
+              </span>
+            </div>
+          </form>
+        </div>
+      </div>
       <div class="la-card-grid la-card-grid--2">
         <div class="la-card la-card--inset">
           <div class="la-card__header">

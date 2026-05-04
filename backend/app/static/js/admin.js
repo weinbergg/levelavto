@@ -387,6 +387,57 @@
     })
   }
 
+  function initRecommendationBlocksEditor() {
+    const root = document.querySelector('[data-recommendation-blocks-editor]')
+    if (!root || root.dataset.ready === '1') return
+    root.dataset.ready = '1'
+
+    const list = root.querySelector('[data-recommendation-blocks-list]')
+    const addBtn = root.querySelector('[data-recommendation-blocks-add]')
+    const tpl = document.querySelector('#recommendation-block-template')
+    if (!list || !addBtn || !tpl) return
+
+    function bindRow(row) {
+      if (!row || row.dataset.bound === '1') return
+      row.dataset.bound = '1'
+      const removeBtn = row.querySelector('[data-recommendation-block-remove]')
+      const upBtn = row.querySelector('[data-recommendation-block-up]')
+      const downBtn = row.querySelector('[data-recommendation-block-down]')
+      if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+          row.remove()
+        })
+      }
+      if (upBtn) {
+        upBtn.addEventListener('click', () => {
+          const prev = row.previousElementSibling
+          if (prev) {
+            list.insertBefore(row, prev)
+          }
+        })
+      }
+      if (downBtn) {
+        downBtn.addEventListener('click', () => {
+          const next = row.nextElementSibling
+          if (next) {
+            list.insertBefore(next, row)
+          }
+        })
+      }
+    }
+
+    list.querySelectorAll('[data-recommendation-block-row]').forEach(bindRow)
+    addBtn.addEventListener('click', () => {
+      const fragment = tpl.content.cloneNode(true)
+      const row = fragment.querySelector('[data-recommendation-block-row]')
+      if (!row) return
+      bindRow(row)
+      list.appendChild(row)
+      const titleInput = row.querySelector('input[name="block_title"]')
+      if (titleInput) titleInput.focus()
+    })
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     initSidebar()
     initFlashFromQuery()
@@ -394,6 +445,7 @@
     initActiveNav()
     activateTabFromHash()
     initCarsPickers()
+    initRecommendationBlocksEditor()
   })
 
   window.addEventListener('hashchange', () => {

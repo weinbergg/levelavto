@@ -2,6 +2,7 @@ import json
 import time
 import logging
 import re
+import hashlib
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
@@ -65,6 +66,10 @@ from ..utils.country_map import country_label_ru, resolve_display_country, norma
 from ..utils.color_groups import split_color_facets
 from ..utils.thumbs import local_media_exists, normalize_classistatic_url, resolve_thumbnail_url
 from ..utils.home_content import build_home_content
+from ..utils.home_recommendation_blocks import (
+    HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY,
+    load_home_recommendation_blocks,
+)
 from ..utils.brand_groups import group_brands, load_priority_override
 from ..utils.telegram import send_telegram_message
 
@@ -77,6 +82,7 @@ _HOME_FILTER_CTX_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
 _HOME_MEDIA_CACHE: TTLCache = TTLCache(maxsize=2, ttl=3600)
 _HOME_RECOMMENDED_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
 _HOME_MORE_OFFERS_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
+_HOME_RECOMMENDATION_BLOCK_CACHE: TTLCache = TTLCache(maxsize=64, ttl=900)
 
 
 def _detail_inline_calc_enabled() -> bool:
@@ -137,6 +143,120 @@ def _home_recommended_redis_key(cfg: Dict[str, Any], limit: int) -> str:
 
 def _home_more_offers_redis_key(limit: int) -> str:
     return f"home_more_offers:2021:160:1900:40000:suv:{limit}:v{_home_dataset_version()}"
+
+
+def _home_recommendation_block_redis_key(query: str, limit: int) -> str:
+    digest = hashlib.sha1(f"{query}|{limit}|{_home_dataset_version()}".encode("utf-8")).hexdigest()[:16]
+    return f"home_recommendation_block:{digest}"
+
+
+def _coerce_query_int(value: Any) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_query_float(value: Any) -> Optional[float]:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_query_bool(value: Any) -> Optional[bool]:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
+def _recommendation_block_kwargs(query: str) -> Dict[str, Any]:
+    parsed = parse_qs(query, keep_blank_values=False)
+
+    def _last(name: str) -> Optional[str]:
+        values = parsed.get(name) or []
+        if not values:
+            return None
+        value = str(values[-1]).strip()
+        return value or None
+
+    raw_params: Dict[str, Any] = {}
+    for key in (
+        "region",
+        "country",
+        "kr_type",
+        "brand",
+        "model",
+        "generation",
+        "q",
+        "color",
+        "engine_type",
+        "transmission",
+        "body_type",
+        "drive_type",
+        "condition",
+        "num_seats",
+        "doors_count",
+        "emission_class",
+        "efficiency_class",
+        "climatisation",
+        "airbags",
+        "interior_design",
+        "interior_color",
+        "interior_material",
+        "vat_reclaimable",
+        "price_rating_label",
+        "owners_count",
+    ):
+        raw_params[key] = _last(key)
+    if parsed.get("line"):
+        raw_params["lines"] = [str(item).strip() for item in parsed.get("line") or [] if str(item).strip()]
+    source_values = [str(item).strip() for item in parsed.get("source") or [] if str(item).strip()]
+    if source_values:
+        raw_params["source_key"] = source_values if len(source_values) > 1 else source_values[0]
+    raw_params.update(
+        {
+            "price_min": _coerce_query_float(_last("price_min")),
+            "price_max": _coerce_query_float(_last("price_max")),
+            "power_hp_min": _coerce_query_float(_last("power_hp_min")),
+            "power_hp_max": _coerce_query_float(_last("power_hp_max")),
+            "engine_cc_min": _coerce_query_int(_last("engine_cc_min")),
+            "engine_cc_max": _coerce_query_int(_last("engine_cc_max")),
+            "year_min": _coerce_query_int(_last("year_min")),
+            "year_max": _coerce_query_int(_last("year_max")),
+            "mileage_min": _coerce_query_int(_last("mileage_min")),
+            "mileage_max": _coerce_query_int(_last("mileage_max")),
+            "reg_year_min": _coerce_query_int(_last("reg_year_min")),
+            "reg_month_min": _coerce_query_int(_last("reg_month_min")),
+            "reg_year_max": _coerce_query_int(_last("reg_year_max")),
+            "reg_month_max": _coerce_query_int(_last("reg_month_max")),
+            "air_suspension": _coerce_query_bool(_last("air_suspension")),
+            "hide_no_local_photo": _coerce_query_bool(_last("hide_no_local_photo")) is True,
+            "sort": _last("sort") or "price_asc",
+        }
+    )
+    scoped = _apply_public_catalog_default_scope(
+        {
+            key: value
+            for key, value in raw_params.items()
+            if key in {"region", "country", "kr_type"} and value not in (None, "")
+        }
+    )
+    raw_params["region"] = scoped.get("region")
+    raw_params["country"] = scoped.get("country")
+    raw_params["kr_type"] = scoped.get("kr_type")
+    return raw_params
 
 
 def _load_cars_by_ids(db: Session, ids: List[int]) -> List[Car]:
@@ -469,6 +589,49 @@ def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any]
         _HOME_RECOMMENDED_CACHE[cache_key] = ids
         redis_set_json(redis_key, ids, ttl_sec=1800)
     return items
+
+
+def _get_home_recommendation_blocks(
+    service: CarsService,
+    db: Session,
+    blocks_cfg: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for block in blocks_cfg:
+        if not block.get("enabled", True):
+            continue
+        query = str(block.get("query") or "").strip()
+        if not query:
+            continue
+        limit = max(1, int(block.get("limit") or 8))
+        cache_key = (query, limit, _home_dataset_version())
+        cached_ids = _HOME_RECOMMENDATION_BLOCK_CACHE.get(cache_key)
+        items: List[Car] = []
+        if cached_ids:
+            items = _load_cars_by_ids(db, [int(car_id) for car_id in cached_ids if car_id])
+        if not items:
+            redis_key = _home_recommendation_block_redis_key(query, limit)
+            cached_ids = redis_get_json(redis_key)
+            if isinstance(cached_ids, list) and cached_ids:
+                items = _load_cars_by_ids(db, [int(car_id) for car_id in cached_ids if car_id])
+                if items:
+                    _HOME_RECOMMENDATION_BLOCK_CACHE[cache_key] = cached_ids
+        if not items:
+            kwargs = _recommendation_block_kwargs(query)
+            items = service.preview_cars(limit=limit, **kwargs)
+            ids = [int(car.id) for car in items if getattr(car, "id", None)]
+            if ids:
+                _HOME_RECOMMENDATION_BLOCK_CACHE[cache_key] = ids
+                redis_set_json(_home_recommendation_block_redis_key(query, limit), ids, ttl_sec=1800)
+        out.append(
+            {
+                "title": str(block.get("title") or "").strip() or f"Подборка {len(out) + 1}",
+                "query": query,
+                "catalog_href": f"/catalog?{query}",
+                "items": items,
+            }
+        )
+    return out
 
 
 def _get_home_more_offers(service: CarsService, db: Session, limit: int = 12) -> List[Car]:
@@ -1447,23 +1610,10 @@ def _home_context(
     reco_cfg = load_config()
     fx_rates = service.get_fx_rates() or {}
     t0 = time.perf_counter()
-    recommended = _get_home_recommended(service, db, reco_cfg, limit=20)
-    _stage("recommended_ms", t0)
-    if os.getenv("HOME_REFRESH_VISIBLE_PRICES", "0") == "1":
-        service.refresh_visible_price_cache(recommended)
-    for car in recommended:
-        _decorate_showcase_car(car, fx_rates=fx_rates)
-    t0 = time.perf_counter()
-    more_offers = _get_home_more_offers(service, db, limit=12)
-    _stage("more_offers_ms", t0)
-    if os.getenv("HOME_REFRESH_VISIBLE_PRICES", "0") == "1":
-        service.refresh_visible_price_cache(more_offers)
-    for car in more_offers:
-        _decorate_showcase_car(car, fx_rates=fx_rates)
-    t0 = time.perf_counter()
     content = ContentService(db).content_map(
         [
             "home_content",
+            HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY,
             "hero_title",
             "hero_subtitle",
             "hero_note",
@@ -1480,7 +1630,29 @@ def _home_context(
             "contact_map_link",
         ])
     home_content = build_home_content(content)
+    recommendation_blocks_cfg = load_home_recommendation_blocks(content.get(HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY))
     _stage("content_ms", t0)
+    t0 = time.perf_counter()
+    recommendation_blocks = _get_home_recommendation_blocks(service, db, recommendation_blocks_cfg)
+    recommended = [] if recommendation_blocks else _get_home_recommended(service, db, reco_cfg, limit=20)
+    _stage("recommended_ms", t0)
+    if os.getenv("HOME_REFRESH_VISIBLE_PRICES", "0") == "1" and recommendation_blocks:
+        for block in recommendation_blocks:
+            service.refresh_visible_price_cache(block.get("items") or [])
+    if os.getenv("HOME_REFRESH_VISIBLE_PRICES", "0") == "1":
+        service.refresh_visible_price_cache(recommended)
+    for block in recommendation_blocks:
+        for car in block.get("items") or []:
+            _decorate_showcase_car(car, fx_rates=fx_rates)
+    for car in recommended:
+        _decorate_showcase_car(car, fx_rates=fx_rates)
+    t0 = time.perf_counter()
+    more_offers = _get_home_more_offers(service, db, limit=12)
+    _stage("more_offers_ms", t0)
+    if os.getenv("HOME_REFRESH_VISIBLE_PRICES", "0") == "1":
+        service.refresh_visible_price_cache(more_offers)
+    for car in more_offers:
+        _decorate_showcase_car(car, fx_rates=fx_rates)
     t0 = time.perf_counter()
     fx_rates = service.get_fx_rates(allow_fetch=False) or {}
     _stage("fx_rates_ms", t0)
@@ -1592,6 +1764,7 @@ def _home_context(
         "brand_logos": brand_logos,
         "partner_logos": partner_logos,
         "body_type_stats": body_type_stats,
+        "recommendation_blocks": recommendation_blocks,
         "recommended_cars": recommended,
         "more_offer_cars": more_offers,
         "content": content,

@@ -21,6 +21,12 @@ from ..services.content_service import ContentService
 from ..services.customs_config import reset_customs_config_cache
 from ..utils.recommended_config import load_config, save_config, DEFAULT_CONFIG
 from ..utils.home_content import build_home_content, default_home_content, serialize_home_content
+from ..utils.home_recommendation_blocks import (
+    HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY,
+    build_home_recommendation_blocks,
+    load_home_recommendation_blocks,
+    serialize_home_recommendation_blocks,
+)
 from ..utils.customs_template import (
     load_customs_dict,
     save_customs_dict,
@@ -99,9 +105,10 @@ def admin_dashboard(
     cars_svc = CarsService(db)
     featured_recommended = admin_svc.list_featured("recommended")
     content = admin_svc.list_site_content(
-        list(CONTACT_KEYS.keys()) + ["home_content", *LEGACY_HOME_KEYS]
+        list(CONTACT_KEYS.keys()) + ["home_content", HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY, *LEGACY_HOME_KEYS]
     )
     home_content = build_home_content(content)
+    recommendation_blocks = load_home_recommendation_blocks(content.get(HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY))
     recommended_cfg = load_config()
     calc_cfg = CalculatorConfigService(db).latest()
     total_cars = cars_svc.total_cars()
@@ -120,6 +127,7 @@ def admin_dashboard(
             "user": user,
             "content": content,
             "home": home_content,
+            "recommendation_blocks": recommendation_blocks,
             "recommended_cfg": recommended_cfg,
             "featured_recommended": featured_recommended,
             "calc_cfg": calc_cfg,
@@ -264,6 +272,7 @@ def _drop_pages_in_process_caches() -> None:
         "_HOME_FILTER_CTX_CACHE",
         "_HOME_MEDIA_CACHE",
         "_HOME_RECOMMENDED_CACHE",
+        "_HOME_RECOMMENDATION_BLOCK_CACHE",
         "_HOME_MORE_OFFERS_CACHE",
     ):
         cache = getattr(_pages_router, cache_name, None)
@@ -1442,6 +1451,30 @@ def update_featured(
     _bump_home_caches()
     msg = f"Закреплено машин: {len(ids)}" if ids else "Список очищен — используется автоподбор"
     return _admin_redirect(msg)
+
+
+@router.post("/admin/recommendation-blocks")
+async def update_recommendation_blocks(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    form = await request.form()
+    blocks = build_home_recommendation_blocks(
+        list(form.getlist("block_title")),
+        list(form.getlist("block_query")),
+        list(form.getlist("block_limit")),
+        list(form.getlist("block_enabled")),
+    )
+    AdminService(db).set_site_content(
+        {
+            HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY: serialize_home_recommendation_blocks(blocks),
+        }
+    )
+    _bump_home_caches()
+    if not blocks:
+        return _admin_redirect("Подборки очищены — главная вернулась к старому блоку рекомендаций")
+    return _admin_redirect(f"Сохранено подборок: {len(blocks)}")
 
 
 @router.post("/admin/featured/clear")
