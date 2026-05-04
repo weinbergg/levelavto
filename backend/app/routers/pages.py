@@ -1788,6 +1788,8 @@ def index(request: Request, db=Depends(get_db), user=Depends(get_current_user)):
         logger.info("HOME_TIMING %s", request.state.html_parts)
     t_render = time.perf_counter()
     resp = templates.TemplateResponse("home.html", ctx)
+    # Главная рендерится из БД; без этого общие прокси/CDN могут отдавать старый HTML после деплоя.
+    resp.headers["Cache-Control"] = "private, no-cache"
     request.state.perf["render_ms"] = (time.perf_counter() - t_render) * 1000
     return resp
 

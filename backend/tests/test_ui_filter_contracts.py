@@ -736,7 +736,7 @@ def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
 
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
-    assert '/static/css/home.css?v=28' in template
+    assert '/static/css/home.css?v=30' in template
     assert "{% for img in collage_images %}" in template
     assert "collage_images[:120]" not in template
 
