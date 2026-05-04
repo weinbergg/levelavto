@@ -139,20 +139,149 @@
 <div class="la-card" style="margin-top: 22px">
   <div class="la-card__header">
     <div class="la-card__header-text">
-      <div class="la-card__title">Применить новую конфигурацию к каталогу</div>
+      <div class="la-card__title">Оценить объём пересчёта (без запуска)</div>
       <div class="la-card__sub">
-        После загрузки нового xlsx цены пересчитываются не сразу — нажмите кнопку ниже, чтобы запустить пересчёт по всем странам.
-        Пересчёт идёт в фоне, может занять несколько минут.
+        Выберите фильтры — посчитаем количество машин и примерное время пересчёта.
+        <strong>Никаких изменений не вносится</strong>, можно безопасно крутить параметры.
       </div>
     </div>
   </div>
   <div class="la-card__body">
-    <form method="post" action="/admin/calculator/recalc" style="display: inline" data-confirm="Запустить полный пересчёт каталога? Это может занять до 10 минут на больших базах.">
-      <button type="submit" class="la-btn la-btn--primary">⟳ Пересчитать каталог</button>
+    <form method="get" action="/admin/calculator/recalc/estimate" class="la-form">
+      <div class="la-form-grid la-form-grid--3">
+        <div class="la-field">
+          <label class="la-field__label">Регион</label>
+          <select class="la-input" name="region">
+            {% set sel_region = (estimate.filters.region if estimate else 'all') %}
+            <option value="all" {% if sel_region == 'all' %}selected{% endif %}>Все</option>
+            <option value="eu"  {% if sel_region == 'eu'  %}selected{% endif %}>Европа</option>
+            <option value="kr"  {% if sel_region == 'kr'  %}selected{% endif %}>Корея</option>
+          </select>
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Страна (ISO, например DE, IT, KR)</label>
+          <input class="la-input" type="text" name="country" maxlength="4"
+                 value="{{ estimate.filters.country if estimate else '' }}"
+                 placeholder="например, DE">
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Тип двигателя</label>
+          <select class="la-input" name="engine_type">
+            {% set sel_eng = (estimate.filters.engine_type if estimate else '') %}
+            <option value=""         {% if not sel_eng %}selected{% endif %}>Любой</option>
+            <option value="petrol"   {% if sel_eng == 'petrol'   %}selected{% endif %}>Бензин</option>
+            <option value="diesel"   {% if sel_eng == 'diesel'   %}selected{% endif %}>Дизель</option>
+            <option value="hybrid"   {% if sel_eng == 'hybrid'   %}selected{% endif %}>Гибрид</option>
+            <option value="electric" {% if sel_eng == 'electric' %}selected{% endif %}>Электро</option>
+          </select>
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Возраст: от лет</label>
+          <input class="la-input" type="number" name="age_min" min="0" max="50"
+                 value="{{ estimate.filters.age_min if estimate and estimate.filters.age_min is not none else '' }}"
+                 placeholder="например, 3">
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Возраст: до лет</label>
+          <input class="la-input" type="number" name="age_max" min="0" max="50"
+                 value="{{ estimate.filters.age_max if estimate and estimate.filters.age_max is not none else '' }}"
+                 placeholder="например, 5">
+        </div>
+        <div class="la-field">
+          <label class="la-field__label">Бренды (через запятую)</label>
+          <input class="la-input" type="text" name="brands"
+                 value="{{ estimate.filters.brands if estimate else '' }}"
+                 placeholder="например, BMW, Mercedes-Benz">
+        </div>
+      </div>
+      <div class="la-hstack" style="margin-top: 10px; gap: 14px; align-items: center">
+        <label class="la-text-dim" style="display: flex; align-items: center; gap: 6px; font-size: 13px">
+          <input type="checkbox" name="only_missing" value="1"
+                 {% if estimate and estimate.filters.only_missing %}checked{% endif %}>
+          только машины с пустым total_price_rub_cached
+        </label>
+        <button type="submit" class="la-btn la-btn--primary">Оценить</button>
+      </div>
+    </form>
+
+    {% if estimate %}
+    <div class="la-divider"></div>
+    <div class="la-form-grid la-form-grid--3" style="align-items: stretch">
+      <div class="la-card la-card--inset" style="margin: 0">
+        <div class="la-card__body">
+          <div class="la-text-muted" style="font-size: 12.5px">Машин под пересчёт</div>
+          <div style="font-size: 28px; font-weight: 600; margin-top: 4px">{{ "{:,}".format(estimate.rows).replace(",", " ") }}</div>
+        </div>
+      </div>
+      <div class="la-card la-card--inset" style="margin: 0">
+        <div class="la-card__body">
+          <div class="la-text-muted" style="font-size: 12.5px">Примерное время</div>
+          <div style="font-size: 28px; font-weight: 600; margin-top: 4px">{{ estimate.eta_human }}</div>
+          <div class="la-text-dim" style="font-size: 12px">базовая скорость ≈ {{ estimate.rate }} строк/с</div>
+        </div>
+      </div>
+      <div class="la-card la-card--inset" style="margin: 0">
+        <div class="la-card__body">
+          <div class="la-text-muted" style="font-size: 12.5px; margin-bottom: 6px">Топ-10 стран в выборке</div>
+          {% if estimate.by_country %}
+          <table class="la-table la-table--compact">
+            <tbody>
+              {% for row in estimate.by_country %}
+              <tr><td class="la-mono">{{ row.country }}</td><td class="la-text-dim">{{ "{:,}".format(row.count).replace(",", " ") }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="la-text-dim">Нет машин в выборке</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% if estimate.by_engine %}
+    <div style="margin-top: 14px">
+      <div class="la-text-muted" style="font-size: 12.5px; margin-bottom: 6px">Распределение по двигателю в выборке</div>
+      <div class="la-hstack" style="flex-wrap: wrap; gap: 8px">
+        {% for row in estimate.by_engine %}
+        <span class="la-chip">{{ row.engine_type }}: <strong>{{ "{:,}".format(row.count).replace(",", " ") }}</strong></span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="la-text-dim" style="margin-top: 14px; font-size: 12.5px">
+      Это только оценка. Чтобы реально пересчитать выбранную выборку — используйте команду в консоли (см. ниже).
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="la-card" style="margin-top: 22px">
+  <div class="la-card__header">
+    <div class="la-card__header-text">
+      <div class="la-card__title">Применить новую конфигурацию к каталогу</div>
+      <div class="la-card__sub">
+        Полный пересчёт по всему каталогу займёт значительное время.
+        Перед запуском <strong>рекомендуем оценить объём</strong> через форму выше.
+      </div>
+    </div>
+  </div>
+  <div class="la-card__body">
+    <form method="post" action="/admin/calculator/recalc" style="display: inline"
+          data-confirm="Запустить полный пересчёт каталога? Откатить процесс на полпути нельзя — лучше сначала оценить.">
+      <button type="submit" class="la-btn la-btn--primary">⟳ Пересчитать каталог (полный)</button>
     </form>
     <span class="la-text-dim" style="margin-left: 12px; font-size: 12.5px">
-      Запускает <code>recalc_calc_cache</code> по всем регионам. Прогресс — в логах контейнера web.
+      Запускает <code>recalc_calc_cache</code> по всем регионам в фоне. Прогресс — в логах контейнера web.
     </span>
+    <details style="margin-top: 14px">
+      <summary class="la-text-dim" style="cursor: pointer; font-size: 12.5px">Ручной запуск выборочного пересчёта (через консоль)</summary>
+      <pre class="la-mono" style="margin-top: 8px; padding: 10px; background: var(--la-surface-soft); border-radius: 8px; font-size: 12px; overflow-x: auto"
+>{# Подставьте свои фильтры — те же поля, что в оценке выше #}
+docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
+  --region EU --age-min 3 --age-max 5 --dry-run     # сначала оценка
+
+docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
+  --region EU --age-min 3 --age-max 5               # реальный пересчёт</pre>
+    </details>
   </div>
 </div>
 {% endblock %}

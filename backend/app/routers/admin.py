@@ -505,6 +505,7 @@ def admin_calculator_excel_page(
             "latest": latest,
             "versions": versions,
             "pending": pending_summary,
+            "estimate": None,
         },
     )
 
@@ -801,6 +802,195 @@ def admin_calculator_recalc(
     return _admin_redirect(
         "Пересчёт запущен в фоне. Это займёт несколько минут — следите за «Машин в базе» на сводке.",
         path="/admin/calculator/excel",
+    )
+
+
+# Empirical baseline measured on the prod server during full-table runs.
+# We use this to translate a row count into an expected wall-clock time
+# in the admin UI. Update if the real prod rate drifts noticeably.
+_RECALC_ROWS_PER_SECOND = 280.0
+
+
+def _format_eta(rows: int) -> str:
+    if rows <= 0:
+        return "0 мин"
+    seconds = int(rows / _RECALC_ROWS_PER_SECOND)
+    if seconds < 60:
+        return f"~{seconds} с"
+    minutes = seconds / 60.0
+    if minutes < 90:
+        return f"~{minutes:.1f} мин"
+    hours = minutes / 60.0
+    return f"~{hours:.1f} ч"
+
+
+@router.get("/admin/calculator/recalc/estimate", response_class=None)
+def admin_calculator_recalc_estimate(
+    request: Request,
+    user: User | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    region: str = "all",
+    country: str = "",
+    brands: str = "",
+    engine_type: str = "",
+    age_min: int | None = None,
+    age_max: int | None = None,
+    only_missing: int = 0,
+):
+    """Read-only "what would a recalc look like" report.
+
+    Counts how many rows match a given selection (same filter rules as
+    ``recalc_calc_cache``) and translates that into an expected runtime
+    using ``_RECALC_ROWS_PER_SECOND``. Touches NOTHING in the DB or in
+    Redis. Designed so the operator can play with the filters and see
+    where the bottleneck is BEFORE clicking the irreversible "Recalc"
+    button.
+    """
+
+    if user is None:
+        return RedirectResponse(
+            url="/login?next=" + quote("/admin/calculator/excel"), status_code=302
+        )
+    if not user.is_admin:
+        return RedirectResponse(url="/", status_code=302)
+
+    from datetime import datetime as _dt
+    from sqlalchemy import func as _func, or_ as _or, and_ as _and
+
+    base = db.query(_func.count(Car.id)).filter(Car.is_available.is_(True))
+    region_norm = (region or "all").lower()
+    if region_norm == "eu":
+        base = base.filter(~Car.country.like("KR%"))
+    elif region_norm == "kr":
+        base = base.filter(Car.country.like("KR%"))
+    if country:
+        base = base.filter(Car.country == country.upper())
+    brand_list = [b.strip() for b in (brands or "").split(",") if b.strip()]
+    if brand_list:
+        base = base.filter(_func.lower(_func.trim(Car.brand)).in_(
+            [b.lower() for b in brand_list]
+        ))
+    if engine_type:
+        base = base.filter(Car.engine_type == engine_type.strip().lower())
+    if only_missing:
+        base = base.filter(Car.total_price_rub_cached.is_(None))
+    if age_min is not None or age_max is not None:
+        current_year = _dt.utcnow().year
+        reg_year = _func.coalesce(Car.registration_year, Car.year)
+        if age_min is not None:
+            base = base.filter(reg_year <= current_year - age_min)
+        if age_max is not None:
+            base = base.filter(reg_year >= current_year - age_max)
+
+    rows = int(base.scalar() or 0)
+
+    # Quick breakdown — country and engine type — so the operator can see
+    # where the bulk lives. Cheap aggregations on the same predicate base.
+    by_country: list[dict] = []
+    by_engine: list[dict] = []
+    if rows:
+        # Re-build the predicate list separately so we can reuse it for
+        # group-by queries without re-typing every filter.
+        conditions = [Car.is_available.is_(True)]
+        if region_norm == "eu":
+            conditions.append(~Car.country.like("KR%"))
+        elif region_norm == "kr":
+            conditions.append(Car.country.like("KR%"))
+        if country:
+            conditions.append(Car.country == country.upper())
+        if brand_list:
+            conditions.append(_func.lower(_func.trim(Car.brand)).in_(
+                [b.lower() for b in brand_list]
+            ))
+        if engine_type:
+            conditions.append(Car.engine_type == engine_type.strip().lower())
+        if only_missing:
+            conditions.append(Car.total_price_rub_cached.is_(None))
+        if age_min is not None or age_max is not None:
+            current_year = _dt.utcnow().year
+            reg_year = _func.coalesce(Car.registration_year, Car.year)
+            if age_min is not None:
+                conditions.append(reg_year <= current_year - age_min)
+            if age_max is not None:
+                conditions.append(reg_year >= current_year - age_max)
+
+        country_rows = db.execute(
+            select(Car.country, _func.count(Car.id))
+            .where(_and(*conditions))
+            .group_by(Car.country)
+            .order_by(_func.count(Car.id).desc())
+            .limit(10)
+        ).all()
+        by_country = [
+            {"country": (r[0] or "—"), "count": int(r[1])}
+            for r in country_rows
+        ]
+
+        engine_rows = db.execute(
+            select(Car.engine_type, _func.count(Car.id))
+            .where(_and(*conditions))
+            .group_by(Car.engine_type)
+            .order_by(_func.count(Car.id).desc())
+            .limit(10)
+        ).all()
+        by_engine = [
+            {"engine_type": (r[0] or "—"), "count": int(r[1])}
+            for r in engine_rows
+        ]
+
+    estimate = {
+        "rows": rows,
+        "eta_human": _format_eta(rows),
+        "rate": int(_RECALC_ROWS_PER_SECOND),
+        "by_country": by_country,
+        "by_engine": by_engine,
+        "filters": {
+            "region": region_norm,
+            "country": country,
+            "brands": brands,
+            "engine_type": engine_type,
+            "age_min": age_min,
+            "age_max": age_max,
+            "only_missing": bool(only_missing),
+        },
+    }
+
+    # Render the same calculator page so the result lands directly under
+    # the form. Re-using the existing handler would re-parse pending
+    # session state — easier to just inline what it does.
+    svc = CalculatorConfigService(db)
+    latest = svc.latest()
+    versions = svc.all_versions(limit=10)
+    pending = request.session.get("calc_preview")
+    pending_summary = None
+    if pending:
+        pending_summary = {
+            "filename": pending.get("filename", "файл.xlsx"),
+            "total_changes": len(pending.get("changes") or {}),
+            "changes": (pending.get("changes") or {}),
+            "token": pending.get("token"),
+        }
+
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "admin/calculator_excel.html",
+        {
+            "request": request,
+            "user": user,
+            "page_title": "Калькулятор · Excel",
+            "page_subtitle": (
+                "Скачайте текущий конфиг, отредактируйте в Excel, "
+                "загрузите для предпросмотра — изменения применятся только после подтверждения."
+            ),
+            "breadcrumbs": [
+                ("Админка", "/admin"),
+                ("Калькулятор · Excel", None),
+            ],
+            "latest": latest,
+            "versions": versions,
+            "pending": pending_summary,
+            "estimate": estimate,
+        },
     )
 
 
