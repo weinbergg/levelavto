@@ -27,7 +27,7 @@
     <span class="la-stat__label">Избранных машин</span>
     <span class="la-stat__value">{{ '{:,}'.format(overview_stats.favorites_total).replace(',', ' ') }}</span>
     <span class="la-stat__delta {% if overview_stats.favorites_week > 0 %}la-stat__delta--up{% else %}la-stat__delta--flat{% endif %}">+{{ overview_stats.favorites_week }} за неделю</span>
-  </div>
+      </div>
 </section>
 
 <div class="la-card">
@@ -117,7 +117,7 @@
               <div class="la-field"><label class="la-field__label">Ссылка каталога</label><input class="la-input" type="text" name="search_catalog_label" value="{{ home.search.catalog_label }}"></div>
             </div>
           </div>
-        </div>
+    </div>
 
         <div class="la-card la-card--inset">
           <div class="la-card__header"><div class="la-card__header-text"><div class="la-card__title">Hero</div></div></div>
@@ -272,7 +272,7 @@
               <div class="la-field"><label class="la-field__label">Кнопка email</label><input class="la-input" type="text" name="contacts_email_button" value="{{ home.contacts.email_button }}"></div>
             </div>
           </div>
-        </div>
+    </div>
 
         <div class="la-hstack">
           <button type="submit" class="la-btn la-btn--primary">Сохранить тексты главной</button>
@@ -309,7 +309,7 @@
               </span>
             </form>
           </div>
-        </div>
+    </div>
 
         <div class="la-card la-card--inset">
           <div class="la-card__header">
@@ -319,13 +319,13 @@
             </div>
           </div>
           <div class="la-card__body">
-            {% if featured_recommended %}
+      {% if featured_recommended %}
             <div class="la-hstack" style="margin-bottom: 14px">
-              {% for item in featured_recommended %}
+          {% for item in featured_recommended %}
               <span class="la-chip">#{{ item.car.id }} · {{ item.car.brand or '' }} {{ item.car.model or '' }}</span>
-              {% endfor %}
-            </div>
-            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
             <form method="post" action="/admin/featured" class="la-form" id="featured-form">
               <input type="hidden" name="placement" value="recommended">
               <div class="la-field">
@@ -368,7 +368,7 @@
                   После очистки на главной снова будет работать подбор по параметрам слева.
                 </span>
               </div>
-            </form>
+      </form>
           </div>
         </div>
       </div>
@@ -383,32 +383,32 @@
               <div class="la-card__title">Точечное редактирование строки</div>
               <div class="la-card__sub">Меняйте одну ячейку утиль-таблицы, остальное останется прежним.</div>
             </div>
-          </div>
+    </div>
           <div class="la-card__body">
             <form method="post" action="/admin/customs/edit" class="la-form">
               <div class="la-form-grid la-form-grid--3">
                 <div class="la-field">
                   <label class="la-field__label">Возраст</label>
                   <select class="la-select" name="age_bucket">
-                    <option value="under_3">Младше 3 лет</option>
-                    <option value="3_5">3–5 лет</option>
-                    <option value="electric">Электро</option>
-                  </select>
+            <option value="under_3">Младше 3 лет</option>
+            <option value="3_5">3–5 лет</option>
+            <option value="electric">Электро</option>
+          </select>
                 </div>
                 <div class="la-field">
                   <label class="la-field__label">Бакет объёма</label>
                   <select class="la-select" name="cc_table">
-                    {% for table_name in customs_cc_tables %}
-                    <option value="{{ table_name }}">{{ table_name }}</option>
-                    {% endfor %}
-                  </select>
+            {% for table_name in customs_cc_tables %}
+              <option value="{{ table_name }}">{{ table_name }}</option>
+            {% endfor %}
+          </select>
                 </div>
                 <div class="la-field">
                   <label class="la-field__label">Тип мощности</label>
                   <select class="la-select" name="power_type">
-                    <option value="kw">кВт</option>
-                    <option value="hp">л.с.</option>
-                  </select>
+            <option value="kw">кВт</option>
+            <option value="hp">л.с.</option>
+          </select>
                 </div>
                 <div class="la-field"><label class="la-field__label">От</label><input class="la-input" type="number" name="range_from" step="0.01" required></div>
                 <div class="la-field"><label class="la-field__label">До</label><input class="la-input" type="number" name="range_to" step="0.01" required></div>
@@ -441,7 +441,7 @@
                 <input class="la-input" type="file" name="file" accept=".xlsx,.xlsm,.xls,.txt,.csv">
               </div>
               <button type="submit" class="la-btn la-btn--primary">Применить изменения</button>
-            </form>
+      </form>
           </div>
         </div>
       </div>
@@ -454,11 +454,11 @@
           <div class="la-card__header-text">
             <div class="la-card__title">Текущая конфигурация</div>
             <div class="la-card__sub">
-              {% if calc_cfg %}
+      {% if calc_cfg %}
               Версия {{ calc_cfg.version }} · источник: {{ calc_cfg.source }}{% if calc_cfg.comment %} · {{ calc_cfg.comment }}{% endif %}
-              {% else %}
+      {% else %}
               Конфигурация ещё не загружена.
-              {% endif %}
+      {% endif %}
             </div>
           </div>
         </div>
@@ -470,8 +470,8 @@
               <span class="la-field__hint">Полная замена конфигурации калькулятора. Кэш цен пересчитывается отдельно после загрузки.</span>
             </div>
             <button type="submit" class="la-btn la-btn--primary">Загрузить файл</button>
-          </form>
-        </div>
+      </form>
+    </div>
       </div>
       <div class="la-empty">
         <div class="la-empty__title">Поэлементное редактирование скоро появится</div>
