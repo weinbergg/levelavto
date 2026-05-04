@@ -3057,6 +3057,96 @@
     return false
   }
 
+  // Recommended-block carousel: prev/next buttons + circular auto-rotate.
+  // Track is .cards-carousel — a horizontal scroll-snap rail with up to
+  // 20 cards. We scroll one viewport-width at a time so the user moves
+  // by exactly the visible card row (4 on desktop, 3/2/1 by breakpoint).
+  // When the rail hits the right edge, the next click jumps to 0 — and
+  // vice versa — so the experience is seamless ("кольцевая прокрутка").
+  // Auto-rotate runs while the user isn't hovering and the tab is
+  // visible; manual click resets the timer so the user always gets the
+  // full pause on whatever page they just navigated to.
+  function initRecommendedCarousel() {
+    const root = document.querySelector('[data-carousel-root="recommended"]')
+    if (!root) return
+    const track = root.querySelector('[data-carousel-track]')
+    const prevBtn = root.querySelector('[data-carousel-prev]')
+    const nextBtn = root.querySelector('[data-carousel-next]')
+    if (!track || !prevBtn || !nextBtn) return
+    const cards = track.querySelectorAll('.car-card')
+    if (cards.length === 0) {
+      prevBtn.style.display = 'none'
+      nextBtn.style.display = 'none'
+      return
+    }
+
+    const AUTO_ROTATE_MS = 6000
+    // 1px tolerance for browser rounding when comparing to scrollWidth.
+    const EDGE_TOLERANCE = 2
+
+    function pageWidth() {
+      return Math.max(track.clientWidth, 1)
+    }
+    function maxScroll() {
+      return Math.max(track.scrollWidth - track.clientWidth, 0)
+    }
+    function atEnd() {
+      return track.scrollLeft >= maxScroll() - EDGE_TOLERANCE
+    }
+    function atStart() {
+      return track.scrollLeft <= EDGE_TOLERANCE
+    }
+
+    function goNext() {
+      if (atEnd()) {
+        track.scrollTo({ left: 0, behavior: 'smooth' })
+      } else {
+        track.scrollBy({ left: pageWidth(), behavior: 'smooth' })
+      }
+    }
+    function goPrev() {
+      if (atStart()) {
+        track.scrollTo({ left: maxScroll(), behavior: 'smooth' })
+      } else {
+        track.scrollBy({ left: -pageWidth(), behavior: 'smooth' })
+      }
+    }
+
+    let timer = null
+    function start() {
+      stop()
+      // Only auto-rotate if there's something to scroll past — a
+      // single-page rail (≤4 cards on desktop) doesn't need it.
+      if (maxScroll() <= EDGE_TOLERANCE) return
+      timer = setInterval(goNext, AUTO_ROTATE_MS)
+    }
+    function stop() {
+      if (timer) {
+        clearInterval(timer)
+        timer = null
+      }
+    }
+
+    prevBtn.addEventListener('click', () => {
+      goPrev()
+      start()
+    })
+    nextBtn.addEventListener('click', () => {
+      goNext()
+      start()
+    })
+    root.addEventListener('mouseenter', stop)
+    root.addEventListener('mouseleave', start)
+    track.addEventListener('touchstart', stop, { passive: true })
+    track.addEventListener('touchend', start, { passive: true })
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stop()
+      else start()
+    })
+
+    start()
+  }
+
   function initHome() {
     const form = qs('#home-search')
     if (!form) return
@@ -4564,6 +4654,7 @@
     safeInit('favorites', loadFavoritesState)
     safeInit('catalog', initCatalog)
     safeInit('home', initHome)
+    safeInit('recommended-carousel', initRecommendedCarousel)
     safeInit('expand-toggles', initExpandToggles)
     safeInit('advanced-search', initAdvancedSearch)
     safeInit('detail-gallery', initDetailGallery)

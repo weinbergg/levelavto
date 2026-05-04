@@ -334,16 +334,26 @@
                 data-options-eu='{{ interior_color_options_eu | tojson }}'
                 data-options-kr='{{ interior_color_options_kr | tojson }}'
               >
-                {% for opt in interior_color_options_eu %}
-                <button
-                  type="button"
-                  class="choice-chip choice-chip--swatch"
-                  data-value="{{ opt.value }}"
-                  data-label="{{ opt.label }}"
-                  aria-label="{{ opt.label }}"
-                  {% if opt.hex %}style="--chip-color: {{ opt.hex }}"{% endif %}
-                >{{ opt.label }}</button>
-                {% endfor %}
+                {% if interior_color_options_eu and interior_color_options_eu|length > 0 %}
+                  {% for opt in interior_color_options_eu %}
+                  <button
+                    type="button"
+                    class="choice-chip choice-chip--swatch"
+                    data-value="{{ opt.value }}"
+                    data-label="{{ opt.label }}"
+                    aria-label="{{ opt.label }}"
+                    {% if opt.hex %}style="--chip-color: {{ opt.hex }}"{% endif %}
+                  >{{ opt.label }}</button>
+                  {% endfor %}
+                {% elif payload_deferred %}
+                  {# Skeleton: 6 placeholder chips while /api/filter_payload
+                     loads. JS replaces them on response. Without this the
+                     section looks empty for ~1-2s and operators think the
+                     filter is broken. #}
+                  {% for _ in range(6) %}
+                  <span class="choice-chip choice-chip--skeleton" aria-hidden="true">&nbsp;</span>
+                  {% endfor %}
+                {% endif %}
               </div>
               <input type="hidden" name="interior_color" value="{{ params.get('interior_color','') }}">
             </div>
@@ -358,15 +368,21 @@
                 data-options-eu='{{ interior_material_options_eu | tojson }}'
                 data-options-kr='{{ interior_material_options_kr | tojson }}'
               >
-                {% for opt in interior_material_options_eu %}
-                <button
-                  type="button"
-                  class="choice-chip choice-chip--checkbox"
-                  data-value="{{ opt.value }}"
-                  data-label="{{ opt.label }}"
-                  aria-label="{{ opt.label }}"
-                >{{ opt.label }}</button>
-                {% endfor %}
+                {% if interior_material_options_eu and interior_material_options_eu|length > 0 %}
+                  {% for opt in interior_material_options_eu %}
+                  <button
+                    type="button"
+                    class="choice-chip choice-chip--checkbox"
+                    data-value="{{ opt.value }}"
+                    data-label="{{ opt.label }}"
+                    aria-label="{{ opt.label }}"
+                  >{{ opt.label }}</button>
+                  {% endfor %}
+                {% elif payload_deferred %}
+                  {% for _ in range(4) %}
+                  <span class="choice-chip choice-chip--skeleton" aria-hidden="true">&nbsp;</span>
+                  {% endfor %}
+                {% endif %}
               </div>
               <input type="hidden" name="interior_material" value="{{ params.get('interior_material','') }}">
             </div>

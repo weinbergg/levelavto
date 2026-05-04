@@ -329,9 +329,15 @@
             <form method="post" action="/admin/featured" class="la-form" id="featured-form">
               <input type="hidden" name="placement" value="recommended">
               <div class="la-field">
-                <label class="la-field__label">Поиск машины по бренду / модели / id</label>
-                <div class="la-cars-picker" data-cars-picker>
-                  <input class="la-input la-cars-picker__search" type="text" placeholder="например, Mercedes E300 или 12345" autocomplete="off">
+                <label class="la-field__label">Найти машину для добавления</label>
+                <div class="la-cars-picker" data-cars-picker data-cars-picker-limit="20">
+                  <div class="la-cars-picker__inputs">
+                    <input class="la-input la-cars-picker__search" type="text" placeholder="например, Mercedes E300 — выберите из подсказок" autocomplete="off">
+                    <div class="la-cars-picker__quickid">
+                      <input class="la-input la-cars-picker__id" type="number" min="1" step="1" placeholder="или введите id (12345)" autocomplete="off" data-cars-picker-id-input>
+                      <button type="button" class="la-btn la-btn--primary la-cars-picker__add" data-cars-picker-id-add aria-label="Добавить машину по id">+</button>
+                    </div>
+                  </div>
                   <div class="la-cars-picker__suggestions" hidden></div>
                   <div class="la-cars-picker__chips" data-cars-picker-chips>
                     {% for item in featured_recommended %}
@@ -345,14 +351,13 @@
                   <input type="hidden" name="car_ids" value="{% for item in featured_recommended %}{{ item.car.id }}{% if not loop.last %},{% endif %}{% endfor %}" data-cars-picker-input>
                 </div>
                 <span class="la-field__hint">
-                  В списке сейчас <strong data-cars-picker-counter>{{ featured_recommended|length }}</strong> машин.
-                  Введите бренд, модель или id и выберите из подсказок — машина добавится чипом ниже.
-                  Жмите × на чипе, чтобы убрать. Изменения вступают в силу только после кнопки «Сохранить список».
+                  В списке сейчас <strong data-cars-picker-counter>{{ featured_recommended|length }}</strong>
+                  из <strong>20</strong> возможных машин.
+                  Удалить — крестиком на чипе. Изменения сохраняются только после нажатия «Сохранить список».
                 </span>
               </div>
               <div class="la-hstack">
                 <button type="submit" class="la-btn la-btn--primary">Сохранить список</button>
-                <a class="la-btn la-btn--secondary" href="/admin/featured/template">Скачать текстовый шаблон</a>
               </div>
             </form>
             <form method="post" action="/admin/featured/clear" class="la-form" data-confirm="Очистить весь список рекомендуемых? На главной снова будет работать автоподбор по параметрам выше.">
@@ -363,14 +368,6 @@
                   После очистки на главной снова будет работать подбор по параметрам слева.
                 </span>
               </div>
-            </form>
-            <div class="la-divider"></div>
-            <form method="post" action="/admin/featured/upload" enctype="multipart/form-data" class="la-form">
-              <div class="la-field">
-                <label class="la-field__label">Загрузить шаблон (.txt / .csv)</label>
-                <input class="la-input" type="file" name="file" accept=".txt,.csv">
-              </div>
-              <button type="submit" class="la-btn la-btn--secondary">Применить файл</button>
             </form>
           </div>
         </div>

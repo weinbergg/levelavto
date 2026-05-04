@@ -896,6 +896,50 @@
   gap: 6px;
 }
 
+/* Two-column "search + by-id" toolbar that sits above the chips. The
+   search box stretches; the by-id pair (number input + ‹+›) is a fixed
+   compact widget on the right. Stacks on small screens. */
+.la-cars-picker__inputs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.la-cars-picker__quickid {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.la-cars-picker__id {
+  width: 200px;
+}
+.la-cars-picker__add {
+  width: 38px;
+  height: 38px;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 600;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 38px;
+}
+.la-cars-picker__add:disabled,
+.la-cars-picker__id:disabled,
+.la-cars-picker__search:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (max-width: 720px) {
+  .la-cars-picker__inputs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .la-cars-picker__id {
+    width: 100%;
+  }
+}
+
 /* ───────────────────────────  Empty state  ─────────────────────────── */
 
 .la-empty {

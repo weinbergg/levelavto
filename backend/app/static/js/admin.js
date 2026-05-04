@@ -161,6 +161,17 @@
       const hidden = root.querySelector('[data-cars-picker-input]')
       if (!input || !sugg || !chipsBox || !hidden) return
 
+      // Optional id-add subform — second input + ‹+› button. Supported by
+      // newer templates that want explicit "I know the id, just take it"
+      // affordance on top of the typeahead.
+      const idInput = root.querySelector('[data-cars-picker-id-input]')
+      const idAddBtn = root.querySelector('[data-cars-picker-id-add]')
+
+      // Optional cap on how many cars can sit in the list at once.
+      // Driven by data-cars-picker-limit on the picker root. Falls back
+      // to a permissive default so legacy templates aren't constrained.
+      const limit = parseInt(root.dataset.carsPickerLimit || '0', 10) || 0
+
       // Counter element lives in the field hint outside the picker root,
       // so look it up at the document level. Optional — older templates
       // can omit the marker and the picker will still work.
@@ -176,10 +187,26 @@
       function syncHidden() {
         hidden.value = Array.from(selected.keys()).join(',')
         if (counterEl) counterEl.textContent = String(selected.size)
+        // Lock the inputs once the operator has hit the configured cap —
+        // keeps the UX honest instead of failing on the server with a
+        // truncation message.
+        const atCap = limit > 0 && selected.size >= limit
+        if (input) input.disabled = atCap
+        if (idInput) idInput.disabled = atCap
+        if (idAddBtn) idAddBtn.disabled = atCap
+        if (atCap && counterEl && counterEl.parentElement) {
+          counterEl.parentElement.dataset.atCap = '1'
+        } else if (counterEl && counterEl.parentElement) {
+          delete counterEl.parentElement.dataset.atCap
+        }
       }
 
       function addChip(id, info) {
         if (selected.has(String(id))) return
+        if (limit > 0 && selected.size >= limit) {
+          window.alert('Максимум ' + limit + ' машин в списке. Удалите ненужные перед добавлением новых.')
+          return
+        }
         selected.set(String(id), info || { title: '' })
         const chip = document.createElement('span')
         chip.className = 'la-chip la-chip--with-action'
@@ -197,6 +224,59 @@
         chip.appendChild(rm)
         chipsBox.appendChild(chip)
         syncHidden()
+      }
+
+      // Add-by-id mini-form. We intentionally hit the same /search API
+      // that powers the typeahead — passing the id as the query — so a
+      // bogus id surfaces as "не нашли машину" instead of getting silently
+      // pinned. Mirrors what the operator would get clicking the suggestion.
+      function addById() {
+        if (!idInput) return
+        const raw = (idInput.value || '').trim()
+        if (!raw) return
+        if (!/^\d+$/.test(raw)) {
+          window.alert('Введите число — id машины из каталога.')
+          return
+        }
+        if (selected.has(raw)) {
+          idInput.value = ''
+          window.alert('Машина #' + raw + ' уже в списке.')
+          return
+        }
+        if (limit > 0 && selected.size >= limit) {
+          window.alert('Максимум ' + limit + ' машин в списке.')
+          return
+        }
+        // Lookup via the same admin search API used by the typeahead.
+        fetch('/admin/api/cars/search?q=' + encodeURIComponent(raw) + '&limit=5')
+          .then((r) => (r.ok ? r.json() : { results: [] }))
+          .then((data) => {
+            const exact = (data.results || []).find((it) => String(it.id) === raw)
+            if (!exact) {
+              window.alert('Машина #' + raw + ' не найдена в каталоге. Проверьте id.')
+              return
+            }
+            addChip(exact.id, { title: exact.title || '', subtitle: exact.subtitle || '' })
+            idInput.value = ''
+            idInput.focus()
+          })
+          .catch(() => {
+            window.alert('Не удалось проверить id. Попробуйте позже.')
+          })
+      }
+      if (idAddBtn) {
+        idAddBtn.addEventListener('click', (event) => {
+          event.preventDefault()
+          addById()
+        })
+      }
+      if (idInput) {
+        idInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            addById()
+          }
+        })
       }
 
       // Wire up any × on prefilled chips (server-rendered).
