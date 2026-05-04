@@ -274,7 +274,7 @@ def _drop_pages_in_process_caches() -> None:
                 logger.warning("admin: failed to clear %s", cache_name, exc_info=True)
 
 
-@router.get("/admin/top-brands", response_class=None)
+@router.get("/admin/top-brands")
 def admin_top_brands_page(
     request: Request,
     user: User | None = Depends(get_current_user),
@@ -352,7 +352,7 @@ def admin_top_brands_save(
     )
 
 
-@router.get("/admin/top-models", response_class=None)
+@router.get("/admin/top-models")
 def admin_top_models_page(
     request: Request,
     user: User | None = Depends(get_current_user),
@@ -464,7 +464,7 @@ def admin_top_models_save(
     )
 
 
-@router.get("/admin/calculator/excel", response_class=None)
+@router.get("/admin/calculator/excel")
 def admin_calculator_excel_page(
     request: Request,
     user: User | None = Depends(get_current_user),
@@ -879,7 +879,7 @@ def _format_eta(rows: int) -> str:
     return f"~{hours:.1f} ч"
 
 
-@router.get("/admin/users", response_class=None)
+@router.get("/admin/users")
 def admin_users_page(
     request: Request,
     user: User | None = Depends(get_current_user),
@@ -968,7 +968,7 @@ def admin_users_page(
     )
 
 
-@router.get("/admin/users/{user_id}", response_class=None)
+@router.get("/admin/users/{user_id}")
 def admin_user_detail(
     request: Request,
     user_id: int,
@@ -1016,7 +1016,7 @@ def admin_user_detail(
     )
 
 
-@router.get("/admin/notifications", response_class=None)
+@router.get("/admin/notifications")
 def admin_notifications_page(
     request: Request,
     user: User | None = Depends(get_current_user),
@@ -1220,7 +1220,7 @@ def admin_users_export_xlsx(
     )
 
 
-@router.get("/admin/api/cars/search", response_class=None)
+@router.get("/admin/api/cars/search")
 def admin_cars_search(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -1281,7 +1281,7 @@ def admin_cars_search(
     return {"results": out}
 
 
-@router.get("/admin/analytics", response_class=None)
+@router.get("/admin/analytics")
 def admin_analytics_page(
     request: Request,
     user: User | None = Depends(get_current_user),

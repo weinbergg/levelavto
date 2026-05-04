@@ -426,8 +426,8 @@ def test_admin_users_page_lists_users_with_filters():
     router = _read("app/routers/admin.py")
     listing = _read("app/templates/admin/users.html")
     detail = _read("app/templates/admin/user_detail.html")
-    assert '@router.get("/admin/users", response_class=None)' in router
-    assert '@router.get("/admin/users/{user_id}", response_class=None)' in router
+    assert '@router.get("/admin/users")' in router
+    assert '@router.get("/admin/users/{user_id}")' in router
     # Search and filter parameters are wired to actual SQL.
     assert "User.email.ilike" in router
     assert "fav_count_subq" in router
