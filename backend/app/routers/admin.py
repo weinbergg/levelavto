@@ -209,12 +209,33 @@ def _bump_filter_caches() -> None:
 
 
 def _bump_home_caches() -> None:
-    """Drop home-page caches after operator changes featured/recommended."""
+    """Drop home-page caches after operator changes featured/recommended.
+
+    Three-step invalidation — each step covers a different cache layer:
+
+    1. ``redis_delete_by_pattern("home_*")`` — wipes the Redis-side keys
+       used by the home page (``home_recommended:...``, ``home_more_offers:...``
+       etc.). Visible to every gunicorn worker immediately.
+    2. ``bump_dataset_version()`` — increments the global dataset version.
+       All in-process TTLCaches whose ``cache_key`` embeds the version
+       (``_HOME_RECOMMENDED_CACHE``, ``_HOME_MORE_OFFERS_CACHE``,
+       ``_HOME_MEDIA_CACHE``, ``_HOME_FILTER_CTX_CACHE`` and the public
+       ``cars_list_*`` family) automatically MISS on the next request,
+       in EVERY worker — not just the one that processed this admin POST.
+    3. ``_drop_pages_in_process_caches()`` — best-effort wipe of the
+       caches in the worker that handled this request, so the very next
+       page render after the admin redirect already shows the new state
+       without a 1-2s rebuild penalty in the worst case.
+    """
 
     try:
         redis_delete_by_pattern("home_*")
     except Exception:
         logger.exception("admin: failed to drop home_* redis keys")
+    try:
+        bump_dataset_version()
+    except Exception:
+        logger.exception("admin: failed to bump dataset_version")
     _drop_pages_in_process_caches()
 
 

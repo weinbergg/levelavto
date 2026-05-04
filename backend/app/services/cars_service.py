@@ -4593,15 +4593,30 @@ class CarsService:
         # для обратной совместимости используем рекомендованные
         return self.featured_for("recommended", limit=limit, fallback_limit=limit)
 
-    def featured_for(self, placement: str, limit: int = 8, fallback_limit: int | None = None) -> List[Car]:
+    def featured_for(
+        self,
+        placement: str,
+        limit: int = 8,
+        fallback_limit: int | None = None,
+        require_available: bool = False,
+    ) -> List[Car]:
+        # By default we honour an operator's pin even if the underlying car
+        # has flipped to is_available=false (e.g. it briefly fell out of the
+        # CSV feed, or a deactivation pass ran between the admin click and
+        # the next page load). The operator explicitly chose this car — UX
+        # surprise of "I pinned it and nothing happened" is much worse than
+        # showing a card that may be temporarily unavailable. Callers that
+        # really want the strict filter can pass require_available=True.
+        conditions = [
+            FeaturedCar.placement == placement,
+            FeaturedCar.is_active.is_(True),
+        ]
+        if require_available:
+            conditions.append(self._available_expr())
         stmt = (
             select(Car)
             .join(FeaturedCar, FeaturedCar.car_id == Car.id)
-            .where(
-                FeaturedCar.placement == placement,
-                FeaturedCar.is_active.is_(True),
-                self._available_expr(),
-            )
+            .where(*conditions)
             .order_by(FeaturedCar.position.asc(), Car.created_at.desc(), Car.id.desc())
             .limit(limit)
         )
