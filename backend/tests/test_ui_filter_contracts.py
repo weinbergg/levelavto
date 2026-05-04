@@ -471,6 +471,7 @@ def test_admin_stubs_no_longer_redirect_to_dashboard():
 def test_filter_payload_can_defer_to_base_ctx_on_public_scope():
     catalog_router = _read("app/routers/catalog.py")
     assert "def _build_deferred_filter_payload_from_base_ctx(" in catalog_router
+    assert 'force_full_payload = _to_bool(qp.get("full_payload")) is True' in catalog_router
     assert "if params == base_scope_params and base_ctx is not None and not force_full_payload:" in catalog_router
     assert "source=base_ctx_deferred" in catalog_router
     assert '"payload_deferred": True' in catalog_router

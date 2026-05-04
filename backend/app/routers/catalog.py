@@ -1886,6 +1886,7 @@ def filter_payload(
         )
 
     qp = request.query_params
+    force_full_payload = _to_bool(qp.get("full_payload")) is True
     region = qp.get("region")
     country = qp.get("country")
     eu_country = qp.get("eu_country")
