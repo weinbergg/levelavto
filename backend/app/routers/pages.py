@@ -193,6 +193,58 @@ def _load_cars_by_ids(db: Session, ids: List[int]) -> List[Car]:
     )
 
 
+def _coerce_cached_recommendation_block_ids(raw: Any) -> List[int]:
+    if not isinstance(raw, list):
+        return []
+    out: List[int] = []
+    for x in raw:
+        try:
+            cid = int(x)
+        except (TypeError, ValueError):
+            continue
+        if cid > 0:
+            out.append(cid)
+    return out
+
+
+def _merge_home_recommendation_block_items(
+    service: CarsService,
+    db: Session,
+    block: Dict[str, Any],
+    limit: int,
+) -> List[Car]:
+    manual_items = _load_cars_by_ids(db, [int(car_id) for car_id in (block.get("car_ids") or []) if car_id])
+    auto_items: List[Car] = []
+    if _home_recommendation_block_has_auto_filters(block) and len(manual_items) < limit:
+        # Pull extra rows: pinned IDs are prepended and duplicates are skipped, so a naive
+        # LIMIT clause often yields fewer than ``limit`` unique cars after de-duplication.
+        buffer = max(48, limit * 3)
+        auto_items = service.preview_cars(
+            region="EU",
+            lines=block.get("lines") or None,
+            price_min=block.get("price_min"),
+            price_max=block.get("price_max"),
+            mileage_max=block.get("mileage_max"),
+            reg_year_min=block.get("reg_year_min"),
+            reg_year_max=block.get("reg_year_max"),
+            power_hp_max=block.get("power_hp_max"),
+            engine_cc_max=block.get("engine_cc_max"),
+            sort="price_asc",
+            limit=limit + len(manual_items) + buffer,
+        )
+    merged: List[Car] = []
+    seen_ids: set[int] = set()
+    for car in [*manual_items, *auto_items]:
+        car_id = int(getattr(car, "id", 0) or 0)
+        if car_id <= 0 or car_id in seen_ids:
+            continue
+        seen_ids.add(car_id)
+        merged.append(car)
+        if len(merged) >= limit:
+            break
+    return merged
+
+
 def _decorate_showcase_car(car: Car, *, fx_rates: Optional[dict[str, float]] = None) -> Car:
     code, label = resolve_display_country(car)
     car.display_country_code = code
@@ -524,49 +576,36 @@ def _get_home_recommendation_blocks(
         limit = max(1, int(block.get("limit") or 8))
         signature = _home_recommendation_block_signature(block, limit)
         cache_key = (signature, _home_dataset_version())
-        cached_ids = _HOME_RECOMMENDATION_BLOCK_CACHE.get(cache_key)
-        items: List[Car] = []
-        if cached_ids:
-            items = _load_cars_by_ids(db, [int(car_id) for car_id in cached_ids if car_id])
-        if not items:
-            redis_key = _home_recommendation_block_redis_key(signature)
-            cached_ids = redis_get_json(redis_key)
-            if isinstance(cached_ids, list) and cached_ids:
-                items = _load_cars_by_ids(db, [int(car_id) for car_id in cached_ids if car_id])
-                if items:
-                    _HOME_RECOMMENDATION_BLOCK_CACHE[cache_key] = cached_ids
-        if not items:
-            manual_items = _load_cars_by_ids(db, [int(car_id) for car_id in (block.get("car_ids") or []) if car_id])
-            auto_items: List[Car] = []
-            if _home_recommendation_block_has_auto_filters(block) and len(manual_items) < limit:
-                auto_items = service.preview_cars(
-                    region="EU",
-                    lines=block.get("lines") or None,
-                    price_min=block.get("price_min"),
-                    price_max=block.get("price_max"),
-                    mileage_max=block.get("mileage_max"),
-                    reg_year_min=block.get("reg_year_min"),
-                    reg_year_max=block.get("reg_year_max"),
-                    power_hp_max=block.get("power_hp_max"),
-                    engine_cc_max=block.get("engine_cc_max"),
-                    sort="price_asc",
-                    limit=max(limit, limit + len(manual_items)),
-                )
-            merged: List[Car] = []
-            seen_ids: set[int] = set()
-            for car in [*manual_items, *auto_items]:
-                car_id = int(getattr(car, "id", 0) or 0)
-                if car_id <= 0 or car_id in seen_ids:
-                    continue
-                seen_ids.add(car_id)
-                merged.append(car)
-                if len(merged) >= limit:
-                    break
+
+        raw_cached: Any = _HOME_RECOMMENDATION_BLOCK_CACHE.get(cache_key)
+        if raw_cached is None:
+            raw_cached = redis_get_json(_home_recommendation_block_redis_key(signature))
+        ids_from_cache = _coerce_cached_recommendation_block_ids(raw_cached)
+
+        items = _load_cars_by_ids(db, ids_from_cache) if ids_from_cache else []
+
+        stale_missing_rows = bool(ids_from_cache) and len(items) < len(ids_from_cache)
+        cache_can_fill_more = (
+            bool(ids_from_cache)
+            and len(items) < limit
+            and _home_recommendation_block_has_auto_filters(block)
+        )
+
+        merged: Optional[List[Car]] = None
+        if stale_missing_rows or not ids_from_cache:
+            merged = _merge_home_recommendation_block_items(service, db, block, limit)
             items = merged
-            ids = [int(car.id) for car in items if getattr(car, "id", None)]
-            if ids:
-                _HOME_RECOMMENDATION_BLOCK_CACHE[cache_key] = ids
-                redis_set_json(_home_recommendation_block_redis_key(signature), ids, ttl_sec=1800)
+        elif cache_can_fill_more:
+            merged = _merge_home_recommendation_block_items(service, db, block, limit)
+            if len(merged) > len(items):
+                items = merged
+
+        if merged is not None:
+            new_ids = [int(car.id) for car in items if getattr(car, "id", None)]
+            if new_ids:
+                _HOME_RECOMMENDATION_BLOCK_CACHE[cache_key] = new_ids
+                redis_set_json(_home_recommendation_block_redis_key(signature), new_ids, ttl_sec=1800)
+
         catalog_query = build_block_catalog_query(block) if _home_recommendation_block_has_auto_filters(block) else ""
         out.append(
             {
