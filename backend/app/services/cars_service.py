@@ -2135,9 +2135,9 @@ class CarsService:
                 conditions.append(price_expr <= price_max)
 
         if year_min is not None and "year_min" not in exclude:
-            conditions.append(Car.year >= year_min)
+            conditions.append(or_(Car.year >= year_min, Car.year.is_(None)))
         if year_max is not None and "year_max" not in exclude:
-            conditions.append(Car.year <= year_max)
+            conditions.append(or_(Car.year <= year_max, Car.year.is_(None)))
         if mileage_min is not None and "mileage_min" not in exclude:
             conditions.append(Car.mileage >= mileage_min)
         if mileage_max is not None and "mileage_max" not in exclude:
@@ -2151,6 +2151,7 @@ class CarsService:
             if reg_month_min is not None and "reg_month_min" not in exclude:
                 conditions.append(
                     or_(
+                        reg_year_expr.is_(None),
                         reg_year_expr > reg_year_min,
                         and_(
                             reg_year_expr == reg_year_min,
@@ -2159,12 +2160,13 @@ class CarsService:
                     )
                 )
             else:
-                conditions.append(reg_year_expr >= reg_year_min)
+                conditions.append(or_(reg_year_expr >= reg_year_min, reg_year_expr.is_(None)))
 
         if reg_year_max is not None and "reg_year_max" not in exclude:
             if reg_month_max is not None and "reg_month_max" not in exclude:
                 conditions.append(
                     or_(
+                        reg_year_expr.is_(None),
                         reg_year_expr < reg_year_max,
                         and_(
                             reg_year_expr == reg_year_max,
@@ -2173,7 +2175,7 @@ class CarsService:
                     )
                 )
             else:
-                conditions.append(reg_year_expr <= reg_year_max)
+                conditions.append(or_(reg_year_expr <= reg_year_max, reg_year_expr.is_(None)))
 
         if body_type and "body_type" not in exclude:
             body_expr = func.lower(func.trim(Car.body_type))

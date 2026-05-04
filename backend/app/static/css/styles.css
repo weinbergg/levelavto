@@ -2895,11 +2895,9 @@ input[type="number"]::-webkit-outer-spin-button {
   align-items: stretch;
 }
 
-/* Single-row horizontal carousel for the “Recommended” block.
-   Up to 20 cards. Layout fixes 4 visible at once on desktop, 3 on
-   tablet, 2 on small tablet, 1 on phone. JS in app.js wires up the
-   ‹ / › buttons and a circular auto-rotation so the rail visibly
-   scrolls without user input. */
+/* Recommended block uses a single-row rail only when cards overflow.
+   If everything fits, JS toggles a centered static layout so a short
+   list doesn't hug the left edge on wide screens. */
 .cards-carousel-wrap {
   position: relative;
   margin-top: var(--space-md);
@@ -2918,6 +2916,12 @@ input[type="number"]::-webkit-outer-spin-button {
   scroll-padding-left: 4px;
   scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
+.cards-carousel.cards-carousel--static {
+  justify-content: center;
+  overflow-x: visible;
+  padding-bottom: 0;
+  scroll-snap-type: none;
+}
 .cards-carousel::-webkit-scrollbar {
   height: 8px;
 }
@@ -2934,6 +2938,10 @@ input[type="number"]::-webkit-outer-spin-button {
   flex: 0 0 calc((100% - var(--space-md) * 3) / 4);
   scroll-snap-align: start;
 }
+.cards-carousel.cards-carousel--static > .car-card {
+  flex: 0 1 320px;
+  max-width: 320px;
+}
 @media (max-width: 1099px) {
   .cards-carousel > .car-card {
     flex-basis: calc((100% - var(--space-md) * 2) / 3);
@@ -2947,6 +2955,9 @@ input[type="number"]::-webkit-outer-spin-button {
 @media (max-width: 599px) {
   .cards-carousel > .car-card {
     flex-basis: 100%;
+  }
+  .cards-carousel.cards-carousel--static > .car-card {
+    max-width: none;
   }
 }
 

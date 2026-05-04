@@ -262,6 +262,82 @@ def test_sort_price_asc_keeps_without_util_rows_after_moscow_prices(monkeypatch)
         assert ids == [2, 3, 1]
 
 
+def test_year_min_keeps_null_year_rows(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.add_all(
+            [
+                Car(id=1, source_id=1, external_id="1", country="DE", is_available=True, year=2020),
+                Car(id=2, source_id=1, external_id="2", country="DE", is_available=True, year=None),
+                Car(id=3, source_id=1, external_id="3", country="DE", is_available=True, year=2018),
+            ]
+        )
+        db.commit()
+        svc = CarsService(db)
+        monkeypatch.setattr(svc, "_should_catalog_inline_price_refresh", lambda **kwargs: False)
+        items, _ = svc.list_cars(
+            year_min=2020,
+            page=1,
+            page_size=10,
+            light=True,
+            use_fast_count=False,
+        )
+        ids = {item["id"] if isinstance(item, dict) else item.id for item in items}
+        assert ids == {1, 2}
+
+
+def test_reg_year_filters_keep_null_year_rows(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Source(id=1, key="mobile_de", name="Mobile.de", base_url="https://m.de", country="DE"))
+        db.add_all(
+            [
+                Car(
+                    id=1,
+                    source_id=1,
+                    external_id="1",
+                    country="DE",
+                    is_available=True,
+                    year=2020,
+                    registration_year=2020,
+                ),
+                Car(
+                    id=2,
+                    source_id=1,
+                    external_id="2",
+                    country="DE",
+                    is_available=True,
+                    year=None,
+                    registration_year=None,
+                ),
+                Car(
+                    id=3,
+                    source_id=1,
+                    external_id="3",
+                    country="DE",
+                    is_available=True,
+                    year=2018,
+                    registration_year=2018,
+                ),
+            ]
+        )
+        db.commit()
+        svc = CarsService(db)
+        monkeypatch.setattr(svc, "_should_catalog_inline_price_refresh", lambda **kwargs: False)
+        items, _ = svc.list_cars(
+            reg_year_min=2020,
+            page=1,
+            page_size=10,
+            light=True,
+            use_fast_count=False,
+        )
+        ids = {item["id"] if isinstance(item, dict) else item.id for item in items}
+        assert ids == {1, 2}
+
+
 def test_card_and_detail_use_same_field():
     base = Path(__file__).resolve().parents[1]
     catalog_tpl = (base / "app" / "templates" / "catalog.html").read_text(encoding="utf-8")

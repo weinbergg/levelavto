@@ -271,12 +271,6 @@
     </div>
     {% if recommended_cars %}
     <div class="cards-carousel-wrap" data-carousel-root="recommended">
-      <button
-        type="button"
-        class="cards-carousel__nav cards-carousel__nav--prev"
-        aria-label="Предыдущие предложения"
-        data-carousel-prev
-      >‹</button>
       <div class="cards cards-highlights cards-carousel" data-carousel="recommended" data-carousel-track>
         {% for car in recommended_cars %}
         <a class="card car-card car-card--carousel" href="/car/{{ car.id }}">
@@ -324,12 +318,6 @@
         </a>
         {% endfor %}
       </div>
-      <button
-        type="button"
-        class="cards-carousel__nav cards-carousel__nav--next"
-        aria-label="Следующие предложения"
-        data-carousel-next
-      >›</button>
     </div>
     {% else %}
     <p class="hero-note">{{ home.recommended.empty_note }}</p>

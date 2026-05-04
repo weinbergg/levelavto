@@ -91,6 +91,16 @@ def test_home_count_keeps_server_total_until_user_changes_filters():
     assert "if (!homeCountDirty && !hasInitialHomeQuery) return" in script
 
 
+def test_home_recommended_block_uses_static_centered_rail_without_arrow_buttons():
+    template = _read("app/templates/home.html")
+    script = _read("app/static/js/app.js")
+    css = _read("app/static/css/styles.css")
+    assert 'data-carousel-prev' not in template
+    assert 'data-carousel-next' not in template
+    assert "cards-carousel--static" in script
+    assert ".cards-carousel.cards-carousel--static" in css
+
+
 def test_catalog_ssr_keeps_germany_initial_items_and_does_not_defer_de():
     router = _read("app/routers/pages.py")
     assert 'return region_norm == "KR" or country_norm == "KR"' in router
@@ -1116,6 +1126,10 @@ def test_registration_year_filters_fallback_to_car_year_when_missing():
     assert "reg_year_expr = self._effective_registration_year_expr()" in service
     assert "reg_month_floor_expr = self._effective_registration_month_floor_expr()" in service
     assert "reg_month_ceil_expr = self._effective_registration_month_ceil_expr()" in service
+    assert "or_(Car.year >= year_min, Car.year.is_(None))" in service
+    assert "or_(Car.year <= year_max, Car.year.is_(None))" in service
+    assert "or_(reg_year_expr >= reg_year_min, reg_year_expr.is_(None))" in service
+    assert "or_(reg_year_expr <= reg_year_max, reg_year_expr.is_(None))" in service
     assert "CarsService._effective_registration_year_expr().cast(Integer)" in counts
 
 
