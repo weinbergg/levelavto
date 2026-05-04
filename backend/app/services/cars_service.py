@@ -4769,7 +4769,8 @@ class CarsService:
             page=1,
             page_size=1,
             light=True,
-            use_fast_count=False,
+            count_only=True,
+            use_fast_count=os.getenv("CATALOG_USE_FAST_COUNT", "1") != "0",
             hide_no_local_photo=hide_no_local_photo,
         )
         return int(total)

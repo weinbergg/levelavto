@@ -94,12 +94,15 @@ def test_home_count_keeps_server_total_until_user_changes_filters():
 def test_home_recommended_block_uses_static_centered_rail_without_arrow_buttons():
     template = _read("app/templates/home.html")
     script = _read("app/static/js/app.js")
-    css = _read("app/static/css/styles.css")
+    css = _read("app/static/css/home.css")
     assert 'data-carousel-prev' not in template
     assert 'data-carousel-next' not in template
-    assert "cards-carousel--static" in script
+    assert 'class="home-recommendation-stack"' in template
+    assert 'class="home-recommendation-grid"' in template
     assert "document.querySelectorAll('[data-carousel-root=\"recommended\"]')" in script
-    assert ".cards-carousel.cards-carousel--static" in css
+    assert ".home-recommendation-stack {" in css
+    assert "overflow-x: auto;" in css
+    assert ".home-recommendation-grid {" in css
 
 
 def test_catalog_ssr_keeps_germany_initial_items_and_does_not_defer_de():
@@ -234,6 +237,8 @@ def test_payload_exact_filters_use_text_expr_for_hot_fields_and_daily_prewarm_st
     assert 'include_broad_base = os.getenv("PREWARM_INCLUDE_BROAD_BASE", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
     assert 'include_broad_counts = os.getenv("PREWARM_INCLUDE_BROAD_COUNTS", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
     assert 'include_broad_lists = os.getenv("PREWARM_INCLUDE_BROAD_LISTS", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
+    assert "count_only=True" in service
+    assert 'use_fast_count=os.getenv("CATALOG_USE_FAST_COUNT", "1") != "0"' in service
 
 
 def test_admin_featured_lists_only_active_and_removes_cleared_rows():
@@ -391,8 +396,12 @@ def test_home_recommendation_blocks_are_loaded_from_site_content_and_rendered_in
     assert "build_home_recommendation_blocks(" in admin
     assert "{% if recommendation_blocks %}" in template
     assert "home-recommendation-block__title" in template
+    assert "home-recommendation-grid" in template
     assert "data-recommendation-block-row" in dashboard
-    assert "normalize_block_query" in util
+    assert 'name="block_lines"' in dashboard
+    assert 'name="block_car_ids"' in dashboard
+    assert 'name="block_query"' not in dashboard
+    assert "build_block_catalog_query" in util
     assert "HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY" in util
 
 
@@ -724,7 +733,7 @@ def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
 
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
-    assert '/static/css/home.css?v=26' in template
+    assert '/static/css/home.css?v=28' in template
     assert "{% for img in collage_images %}" in template
     assert "collage_images[:120]" not in template
 
@@ -900,15 +909,15 @@ def test_cars_count_route_tracks_registration_month_filters():
 
 def test_pages_home_uses_recommended_and_media_cache_helpers():
     router = _read("app/routers/pages.py")
-    assert "_get_home_recommended(service, db, reco_cfg, limit=12)" in router
+    assert "_get_home_recommended(service, db, reco_cfg, limit=20)" in router
     assert "_get_home_more_offers(service, db, limit=12)" in router
     assert "def _home_media_cache_version()" in router
     assert 'return f"home_media_ctx:{_home_media_cache_version()}"' in router
     assert 'static" / "home-collage"' in router
     assert "home_recommended:" in router
     assert "home_more_offers:" in router
-    assert 'cfg.get("reg_year_min", 2021)' in router
-    assert 'cfg.get("power_hp_max", 160)' in router
+    assert 'cfg.get("reg_year_min")' in router
+    assert 'cfg.get("power_hp_max")' in router
 
 
 def test_home_collage_and_home_content_copy_are_updated():
@@ -1166,7 +1175,7 @@ def test_advanced_search_preserves_server_rendered_filter_options_until_first_li
     assert "preserveExistingOnEmpty: preserveChoiceChips" in script
     assert "const enableDynamicPayload = form.dataset.dynamicPayload === '1'" in script
     assert "if (!enableDynamicPayload) return" in script
-    assert 'data-dynamic-payload="0"' in template
+    assert 'data-dynamic-payload="1"' in template
 
 
 def test_count_cars_keeps_interior_filters_in_count_path():
@@ -1309,21 +1318,23 @@ def test_admin_users_xlsx_export_route_exists():
     assert '/admin/users.xlsx?' in template
 
 
-def test_recommended_form_exposes_all_default_config_fields():
+def test_recommendation_blocks_form_exposes_per_block_selection_fields():
     template = _read("app/templates/admin/dashboard.html")
     admin = _read("app/routers/admin.py")
     for field in (
-        "max_age_years",
-        "price_min",
-        "price_max",
-        "mileage_max",
-        "reg_year_min",
-        "reg_year_max",
-        "power_hp_max",
-        "engine_cc_max",
+        "block_lines",
+        "block_price_min",
+        "block_price_max",
+        "block_mileage_max",
+        "block_reg_year_min",
+        "block_reg_year_max",
+        "block_power_hp_max",
+        "block_engine_cc_max",
+        "block_car_ids",
     ):
         assert f'name="{field}"' in template, f"missing field {field} in dashboard form"
-        assert f'{field}: int = Form' in admin, f"missing {field} in update_recommended"
+    assert '@router.post("/admin/recommendation-blocks")' in admin
+    assert "build_home_recommendation_blocks(" in admin
 
 
 def test_calculator_page_has_rollback_template_and_recalc_buttons():

@@ -1462,9 +1462,17 @@ async def update_recommendation_blocks(
     form = await request.form()
     blocks = build_home_recommendation_blocks(
         list(form.getlist("block_title")),
-        list(form.getlist("block_query")),
         list(form.getlist("block_limit")),
         list(form.getlist("block_enabled")),
+        list(form.getlist("block_lines")),
+        list(form.getlist("block_price_min")),
+        list(form.getlist("block_price_max")),
+        list(form.getlist("block_mileage_max")),
+        list(form.getlist("block_reg_year_min")),
+        list(form.getlist("block_reg_year_max")),
+        list(form.getlist("block_power_hp_max")),
+        list(form.getlist("block_engine_cc_max")),
+        list(form.getlist("block_car_ids")),
     )
     AdminService(db).set_site_content(
         {

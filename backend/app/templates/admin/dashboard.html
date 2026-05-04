@@ -288,15 +288,15 @@
           <div class="la-card__header-text">
             <div class="la-card__title">Независимые подборки на главной</div>
             <div class="la-card__sub">
-              Каждая строка ниже — отдельный блок рекомендаций со своим фильтром и своим мини-каталогом на главной.
-              Вставляйте готовую ссылку из каталога или расширенного поиска. Если список пуст, главная использует старый единый блок ниже.
+              Каждая строка ниже — отдельная подборка на главной со своим заголовком, списком моделей, рамками подбора и ручными машинами по id.
+              Если подборки пусты, главная временно возвращается к старому резервному блоку рекомендаций.
             </div>
           </div>
         </div>
         <div class="la-card__body">
           <form method="post" action="/admin/recommendation-blocks" class="la-form" data-recommendation-blocks-editor>
             <div class="la-vstack" data-recommendation-blocks-list style="display: grid; gap: 14px">
-              {% set block_rows = recommendation_blocks if recommendation_blocks else [{'title': '', 'query': '', 'limit': 8, 'enabled': True}] %}
+              {% set block_rows = recommendation_blocks if recommendation_blocks else [{'title': '', 'limit': 8, 'enabled': True, 'lines_text': '', 'price_min': '', 'price_max': '', 'mileage_max': '', 'reg_year_min': '', 'reg_year_max': '', 'power_hp_max': '', 'engine_cc_max': '', 'car_ids_text': ''}] %}
               {% for block in block_rows %}
               <div class="la-card" data-recommendation-block-row>
                 <div class="la-card__body">
@@ -317,12 +317,40 @@
                       </select>
                     </div>
                   </div>
-                  <div class="la-field" style="margin-top: 14px">
-                    <label class="la-field__label">Ссылка каталога или query</label>
-                    <textarea class="la-textarea" name="block_query" rows="3" placeholder="/catalog?region=EU&country=DE&brand=BMW&model=X5&sort=price_asc">{{ block.query }}</textarea>
-                    <span class="la-field__hint">
-                      Поддерживаются параметры из <code>/catalog</code> и <code>/search</code>. Порядок блоков на главной = порядок строк здесь.
-                    </span>
+                  <div class="la-form-grid la-form-grid--2" style="margin-top: 14px">
+                    <div class="la-field">
+                      <label class="la-field__label">Марки и модели</label>
+                      <textarea class="la-textarea" name="block_lines" rows="4" placeholder="Mercedes-Benz|E-Class|&#10;Audi|A6|">{{ block.lines_text }}</textarea>
+                      <span class="la-field__hint">
+                        Одна строка = <code>Марка|Модель|Вариант</code>. Вариант можно не указывать. Можно перечислить несколько строк.
+                      </span>
+                    </div>
+                    <div class="la-field">
+                      <label class="la-field__label">Машины вручную по id</label>
+                      <textarea class="la-textarea" name="block_car_ids" rows="4" placeholder="333438, 300957">{{ block.car_ids_text }}</textarea>
+                      <span class="la-field__hint">
+                        Эти машины попадут в начало подборки. Формат: id через запятую или с новой строки.
+                      </span>
+                    </div>
+                  </div>
+                  <div class="la-card la-card--inset" style="margin-top: 14px">
+                    <div class="la-card__header">
+                      <div class="la-card__header-text">
+                        <div class="la-card__title">Параметры подбора</div>
+                        <div class="la-card__sub">Используется тот же набор ограничений, что раньше был у общего автоподбора.</div>
+                      </div>
+                    </div>
+                    <div class="la-card__body">
+                      <div class="la-form-grid la-form-grid--3">
+                        <div class="la-field"><label class="la-field__label">Цена от, ₽</label><input class="la-input" type="number" name="block_price_min" value="{{ block.price_min or '' }}"></div>
+                        <div class="la-field"><label class="la-field__label">Цена до, ₽</label><input class="la-input" type="number" name="block_price_max" value="{{ block.price_max or '' }}"></div>
+                        <div class="la-field"><label class="la-field__label">Пробег до, км</label><input class="la-input" type="number" name="block_mileage_max" value="{{ block.mileage_max or '' }}"></div>
+                        <div class="la-field"><label class="la-field__label">Год регистрации от</label><input class="la-input" type="number" name="block_reg_year_min" value="{{ block.reg_year_min or '' }}"></div>
+                        <div class="la-field"><label class="la-field__label">Год регистрации до</label><input class="la-input" type="number" name="block_reg_year_max" value="{{ block.reg_year_max or '' }}"></div>
+                        <div class="la-field"><label class="la-field__label">Мощность до, л.с.</label><input class="la-input" type="number" name="block_power_hp_max" value="{{ block.power_hp_max or '' }}"></div>
+                        <div class="la-field"><label class="la-field__label">Объём двигателя до, см³</label><input class="la-input" type="number" name="block_engine_cc_max" value="{{ block.engine_cc_max or '' }}"></div>
+                      </div>
+                    </div>
                   </div>
                   <div class="la-hstack" style="margin-top: 12px">
                     <button type="button" class="la-btn la-btn--ghost" data-recommendation-block-up>Выше</button>
@@ -353,9 +381,34 @@
                       </select>
                     </div>
                   </div>
-                  <div class="la-field" style="margin-top: 14px">
-                    <label class="la-field__label">Ссылка каталога или query</label>
-                    <textarea class="la-textarea" name="block_query" rows="3" placeholder="/catalog?region=EU&country=DE&brand=Audi&model=A6&sort=price_asc"></textarea>
+                  <div class="la-form-grid la-form-grid--2" style="margin-top: 14px">
+                    <div class="la-field">
+                      <label class="la-field__label">Марки и модели</label>
+                      <textarea class="la-textarea" name="block_lines" rows="4" placeholder="Mercedes-Benz|E-Class|&#10;Audi|A6|"></textarea>
+                    </div>
+                    <div class="la-field">
+                      <label class="la-field__label">Машины вручную по id</label>
+                      <textarea class="la-textarea" name="block_car_ids" rows="4" placeholder="333438, 300957"></textarea>
+                    </div>
+                  </div>
+                  <div class="la-card la-card--inset" style="margin-top: 14px">
+                    <div class="la-card__header">
+                      <div class="la-card__header-text">
+                        <div class="la-card__title">Параметры подбора</div>
+                        <div class="la-card__sub">Цена, пробег, постановка на учёт, л.с. и объём двигателя.</div>
+                      </div>
+                    </div>
+                    <div class="la-card__body">
+                      <div class="la-form-grid la-form-grid--3">
+                        <div class="la-field"><label class="la-field__label">Цена от, ₽</label><input class="la-input" type="number" name="block_price_min" value=""></div>
+                        <div class="la-field"><label class="la-field__label">Цена до, ₽</label><input class="la-input" type="number" name="block_price_max" value=""></div>
+                        <div class="la-field"><label class="la-field__label">Пробег до, км</label><input class="la-input" type="number" name="block_mileage_max" value=""></div>
+                        <div class="la-field"><label class="la-field__label">Год регистрации от</label><input class="la-input" type="number" name="block_reg_year_min" value=""></div>
+                        <div class="la-field"><label class="la-field__label">Год регистрации до</label><input class="la-input" type="number" name="block_reg_year_max" value=""></div>
+                        <div class="la-field"><label class="la-field__label">Мощность до, л.с.</label><input class="la-input" type="number" name="block_power_hp_max" value=""></div>
+                        <div class="la-field"><label class="la-field__label">Объём двигателя до, см³</label><input class="la-input" type="number" name="block_engine_cc_max" value=""></div>
+                      </div>
+                    </div>
                   </div>
                   <div class="la-hstack" style="margin-top: 12px">
                     <button type="button" class="la-btn la-btn--ghost" data-recommendation-block-up>Выше</button>
@@ -369,99 +422,10 @@
               <button type="button" class="la-btn la-btn--secondary" data-recommendation-blocks-add>Добавить подборку</button>
               <button type="submit" class="la-btn la-btn--primary">Сохранить подборки</button>
               <span class="la-text-dim" style="font-size: 12.5px">
-                Можно хранить до 20 блоков. Они перекрывают старый единый блок, только если здесь есть хотя бы одна сохранённая подборка.
+                Можно хранить до 20 подборок. Порядок карточек на главной = порядок строк здесь.
               </span>
             </div>
           </form>
-        </div>
-      </div>
-      <div class="la-card-grid la-card-grid--2">
-        <div class="la-card la-card--inset">
-          <div class="la-card__header">
-            <div class="la-card__header-text">
-              <div class="la-card__title">Параметры подбора</div>
-              <div class="la-card__sub">По этим фильтрам отбираются машины для блока «Рекомендуемые» на главной.</div>
-            </div>
-          </div>
-          <div class="la-card__body">
-            <form method="post" action="/admin/recommended" class="la-form">
-              <div class="la-form-grid la-form-grid--3">
-                <div class="la-field"><label class="la-field__label">Макс. возраст, лет</label><input class="la-input" type="number" name="max_age_years" value="{{ recommended_cfg.max_age_years }}"></div>
-                <div class="la-field"><label class="la-field__label">Цена от, ₽</label><input class="la-input" type="number" name="price_min" value="{{ recommended_cfg.price_min }}"></div>
-                <div class="la-field"><label class="la-field__label">Цена до, ₽</label><input class="la-input" type="number" name="price_max" value="{{ recommended_cfg.price_max }}"></div>
-                <div class="la-field"><label class="la-field__label">Пробег до, км</label><input class="la-input" type="number" name="mileage_max" value="{{ recommended_cfg.mileage_max }}"></div>
-                <div class="la-field"><label class="la-field__label">Год регистрации от</label><input class="la-input" type="number" name="reg_year_min" value="{{ recommended_cfg.reg_year_min }}"></div>
-                <div class="la-field"><label class="la-field__label">Год регистрации до</label><input class="la-input" type="number" name="reg_year_max" value="{{ recommended_cfg.reg_year_max }}"></div>
-                <div class="la-field"><label class="la-field__label">Мощность до, л.с.</label><input class="la-input" type="number" name="power_hp_max" value="{{ recommended_cfg.power_hp_max }}"></div>
-                <div class="la-field"><label class="la-field__label">Объём двигателя до, см³</label><input class="la-input" type="number" name="engine_cc_max" value="{{ recommended_cfg.engine_cc_max }}"></div>
-              </div>
-              <button type="submit" class="la-btn la-btn--primary">Сохранить параметры</button>
-              <span class="la-text-dim" style="margin-left: 12px; font-size: 12.5px">
-                По этим фильтрам автоматически отбираются машины, если ниже список «Закреплённых» пуст.
-              </span>
-            </form>
-          </div>
-    </div>
-
-        <div class="la-card la-card--inset">
-          <div class="la-card__header">
-            <div class="la-card__header-text">
-              <div class="la-card__title">Закреплённые автомобили</div>
-              <div class="la-card__sub">{% if featured_recommended %}Сейчас показываются вручную выбранные машины.{% else %}Список пуст — используются последние авто с фото.{% endif %}</div>
-            </div>
-          </div>
-          <div class="la-card__body">
-      {% if featured_recommended %}
-            <div class="la-hstack" style="margin-bottom: 14px">
-          {% for item in featured_recommended %}
-              <span class="la-chip">#{{ item.car.id }} · {{ item.car.brand or '' }} {{ item.car.model or '' }}</span>
-          {% endfor %}
-        </div>
-      {% endif %}
-            <form method="post" action="/admin/featured" class="la-form" id="featured-form">
-              <input type="hidden" name="placement" value="recommended">
-              <div class="la-field">
-                <label class="la-field__label">Найти машину для добавления</label>
-                <div class="la-cars-picker" data-cars-picker data-cars-picker-limit="20">
-                  <div class="la-cars-picker__inputs">
-                    <input class="la-input la-cars-picker__search" type="text" placeholder="например, Mercedes E300 — выберите из подсказок" autocomplete="off">
-                    <div class="la-cars-picker__quickid">
-                      <input class="la-input la-cars-picker__id" type="number" min="1" step="1" placeholder="или введите id (12345)" autocomplete="off" data-cars-picker-id-input>
-                      <button type="button" class="la-btn la-btn--primary la-cars-picker__add" data-cars-picker-id-add aria-label="Добавить машину по id">+</button>
-                    </div>
-                  </div>
-                  <div class="la-cars-picker__suggestions" hidden></div>
-                  <div class="la-cars-picker__chips" data-cars-picker-chips>
-                    {% for item in featured_recommended %}
-                    {% set car = item.car %}
-                    <span class="la-chip la-chip--with-action" data-prefilled="{{ car.id }}">
-                      <span>#{{ car.id }} {{ car.brand or '' }} {{ car.model or '' }}</span>
-                      <button type="button" class="la-chip__remove" aria-label="Убрать">×</button>
-                    </span>
-                    {% endfor %}
-                  </div>
-                  <input type="hidden" name="car_ids" value="{% for item in featured_recommended %}{{ item.car.id }}{% if not loop.last %},{% endif %}{% endfor %}" data-cars-picker-input>
-                </div>
-                <span class="la-field__hint">
-                  В списке сейчас <strong data-cars-picker-counter>{{ featured_recommended|length }}</strong>
-                  из <strong>20</strong> возможных машин.
-                  Удалить — крестиком на чипе. Изменения сохраняются только после нажатия «Сохранить список».
-                </span>
-              </div>
-              <div class="la-hstack">
-                <button type="submit" class="la-btn la-btn--primary">Сохранить список</button>
-              </div>
-            </form>
-            <form method="post" action="/admin/featured/clear" class="la-form" data-confirm="Очистить весь список рекомендуемых? На главной снова будет работать автоподбор по параметрам выше.">
-              <input type="hidden" name="placement" value="recommended">
-              <div class="la-hstack" style="margin-top: 12px">
-                <button type="submit" class="la-btn la-btn--ghost">Очистить список и вернуться к автоподбору</button>
-                <span class="la-text-dim" style="font-size: 12.5px">
-                  После очистки на главной снова будет работать подбор по параметрам слева.
-                </span>
-              </div>
-      </form>
-          </div>
         </div>
       </div>
     </section>

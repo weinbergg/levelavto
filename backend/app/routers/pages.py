@@ -68,6 +68,7 @@ from ..utils.thumbs import local_media_exists, normalize_classistatic_url, resol
 from ..utils.home_content import build_home_content
 from ..utils.home_recommendation_blocks import (
     HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY,
+    build_block_catalog_query,
     load_home_recommendation_blocks,
 )
 from ..utils.brand_groups import group_brands, load_priority_override
@@ -145,118 +146,38 @@ def _home_more_offers_redis_key(limit: int) -> str:
     return f"home_more_offers:2021:160:1900:40000:suv:{limit}:v{_home_dataset_version()}"
 
 
-def _home_recommendation_block_redis_key(query: str, limit: int) -> str:
-    digest = hashlib.sha1(f"{query}|{limit}|{_home_dataset_version()}".encode("utf-8")).hexdigest()[:16]
+def _home_recommendation_block_redis_key(signature: str) -> str:
+    digest = hashlib.sha1(f"{signature}|{_home_dataset_version()}".encode("utf-8")).hexdigest()[:16]
     return f"home_recommendation_block:{digest}"
 
 
-def _coerce_query_int(value: Any) -> Optional[int]:
-    if value is None or value == "":
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+def _home_recommendation_block_signature(block: Dict[str, Any], limit: int) -> str:
+    payload = {
+        "lines": block.get("lines") or [],
+        "price_min": block.get("price_min"),
+        "price_max": block.get("price_max"),
+        "mileage_max": block.get("mileage_max"),
+        "reg_year_min": block.get("reg_year_min"),
+        "reg_year_max": block.get("reg_year_max"),
+        "power_hp_max": block.get("power_hp_max"),
+        "engine_cc_max": block.get("engine_cc_max"),
+        "car_ids": block.get("car_ids") or [],
+        "limit": limit,
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
 
-def _coerce_query_float(value: Any) -> Optional[float]:
-    if value is None or value == "":
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _coerce_query_bool(value: Any) -> Optional[bool]:
-    if value is None or value == "":
-        return None
-    if isinstance(value, bool):
-        return value
-    text = str(value).strip().lower()
-    if text in {"1", "true", "yes", "on"}:
-        return True
-    if text in {"0", "false", "no", "off"}:
-        return False
-    return None
-
-
-def _recommendation_block_kwargs(query: str) -> Dict[str, Any]:
-    parsed = parse_qs(query, keep_blank_values=False)
-
-    def _last(name: str) -> Optional[str]:
-        values = parsed.get(name) or []
-        if not values:
-            return None
-        value = str(values[-1]).strip()
-        return value or None
-
-    raw_params: Dict[str, Any] = {}
-    for key in (
-        "region",
-        "country",
-        "kr_type",
-        "brand",
-        "model",
-        "generation",
-        "q",
-        "color",
-        "engine_type",
-        "transmission",
-        "body_type",
-        "drive_type",
-        "condition",
-        "num_seats",
-        "doors_count",
-        "emission_class",
-        "efficiency_class",
-        "climatisation",
-        "airbags",
-        "interior_design",
-        "interior_color",
-        "interior_material",
-        "vat_reclaimable",
-        "price_rating_label",
-        "owners_count",
-    ):
-        raw_params[key] = _last(key)
-    if parsed.get("line"):
-        raw_params["lines"] = [str(item).strip() for item in parsed.get("line") or [] if str(item).strip()]
-    source_values = [str(item).strip() for item in parsed.get("source") or [] if str(item).strip()]
-    if source_values:
-        raw_params["source_key"] = source_values if len(source_values) > 1 else source_values[0]
-    raw_params.update(
-        {
-            "price_min": _coerce_query_float(_last("price_min")),
-            "price_max": _coerce_query_float(_last("price_max")),
-            "power_hp_min": _coerce_query_float(_last("power_hp_min")),
-            "power_hp_max": _coerce_query_float(_last("power_hp_max")),
-            "engine_cc_min": _coerce_query_int(_last("engine_cc_min")),
-            "engine_cc_max": _coerce_query_int(_last("engine_cc_max")),
-            "year_min": _coerce_query_int(_last("year_min")),
-            "year_max": _coerce_query_int(_last("year_max")),
-            "mileage_min": _coerce_query_int(_last("mileage_min")),
-            "mileage_max": _coerce_query_int(_last("mileage_max")),
-            "reg_year_min": _coerce_query_int(_last("reg_year_min")),
-            "reg_month_min": _coerce_query_int(_last("reg_month_min")),
-            "reg_year_max": _coerce_query_int(_last("reg_year_max")),
-            "reg_month_max": _coerce_query_int(_last("reg_month_max")),
-            "air_suspension": _coerce_query_bool(_last("air_suspension")),
-            "hide_no_local_photo": _coerce_query_bool(_last("hide_no_local_photo")) is True,
-            "sort": _last("sort") or "price_asc",
-        }
+def _home_recommendation_block_has_auto_filters(block: Dict[str, Any]) -> bool:
+    return bool(
+        (block.get("lines") or [])
+        or block.get("price_min") is not None
+        or block.get("price_max") is not None
+        or block.get("mileage_max") is not None
+        or block.get("reg_year_min") is not None
+        or block.get("reg_year_max") is not None
+        or block.get("power_hp_max") is not None
+        or block.get("engine_cc_max") is not None
     )
-    scoped = _apply_public_catalog_default_scope(
-        {
-            key: value
-            for key, value in raw_params.items()
-            if key in {"region", "country", "kr_type"} and value not in (None, "")
-        }
-    )
-    raw_params["region"] = scoped.get("region")
-    raw_params["country"] = scoped.get("country")
-    raw_params["kr_type"] = scoped.get("kr_type")
-    return raw_params
 
 
 def _load_cars_by_ids(db: Session, ids: List[int]) -> List[Car]:
@@ -600,34 +521,58 @@ def _get_home_recommendation_blocks(
     for block in blocks_cfg:
         if not block.get("enabled", True):
             continue
-        query = str(block.get("query") or "").strip()
-        if not query:
-            continue
         limit = max(1, int(block.get("limit") or 8))
-        cache_key = (query, limit, _home_dataset_version())
+        signature = _home_recommendation_block_signature(block, limit)
+        cache_key = (signature, _home_dataset_version())
         cached_ids = _HOME_RECOMMENDATION_BLOCK_CACHE.get(cache_key)
         items: List[Car] = []
         if cached_ids:
             items = _load_cars_by_ids(db, [int(car_id) for car_id in cached_ids if car_id])
         if not items:
-            redis_key = _home_recommendation_block_redis_key(query, limit)
+            redis_key = _home_recommendation_block_redis_key(signature)
             cached_ids = redis_get_json(redis_key)
             if isinstance(cached_ids, list) and cached_ids:
                 items = _load_cars_by_ids(db, [int(car_id) for car_id in cached_ids if car_id])
                 if items:
                     _HOME_RECOMMENDATION_BLOCK_CACHE[cache_key] = cached_ids
         if not items:
-            kwargs = _recommendation_block_kwargs(query)
-            items = service.preview_cars(limit=limit, **kwargs)
+            manual_items = _load_cars_by_ids(db, [int(car_id) for car_id in (block.get("car_ids") or []) if car_id])
+            auto_items: List[Car] = []
+            if _home_recommendation_block_has_auto_filters(block) and len(manual_items) < limit:
+                auto_items = service.preview_cars(
+                    region="EU",
+                    lines=block.get("lines") or None,
+                    price_min=block.get("price_min"),
+                    price_max=block.get("price_max"),
+                    mileage_max=block.get("mileage_max"),
+                    reg_year_min=block.get("reg_year_min"),
+                    reg_year_max=block.get("reg_year_max"),
+                    power_hp_max=block.get("power_hp_max"),
+                    engine_cc_max=block.get("engine_cc_max"),
+                    sort="price_asc",
+                    limit=max(limit, limit + len(manual_items)),
+                )
+            merged: List[Car] = []
+            seen_ids: set[int] = set()
+            for car in [*manual_items, *auto_items]:
+                car_id = int(getattr(car, "id", 0) or 0)
+                if car_id <= 0 or car_id in seen_ids:
+                    continue
+                seen_ids.add(car_id)
+                merged.append(car)
+                if len(merged) >= limit:
+                    break
+            items = merged
             ids = [int(car.id) for car in items if getattr(car, "id", None)]
             if ids:
                 _HOME_RECOMMENDATION_BLOCK_CACHE[cache_key] = ids
-                redis_set_json(_home_recommendation_block_redis_key(query, limit), ids, ttl_sec=1800)
+                redis_set_json(_home_recommendation_block_redis_key(signature), ids, ttl_sec=1800)
+        catalog_query = build_block_catalog_query(block) if _home_recommendation_block_has_auto_filters(block) else ""
         out.append(
             {
                 "title": str(block.get("title") or "").strip() or f"Подборка {len(out) + 1}",
-                "query": query,
-                "catalog_href": f"/catalog?{query}",
+                "catalog_href": f"/catalog?{catalog_query}" if catalog_query else None,
+                "lines": block.get("lines") or [],
                 "items": items,
             }
         )

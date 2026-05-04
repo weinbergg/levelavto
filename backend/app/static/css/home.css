@@ -726,11 +726,16 @@
   margin: 0 0 6px;
 }
 .home-recommendation-stack {
-  display: grid;
+  display: flex;
   gap: 18px;
   margin-top: 18px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
 }
 .home-recommendation-block {
+  flex: 0 0 min(420px, 86vw);
   padding: 20px;
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -738,6 +743,7 @@
     radial-gradient(circle at top right, rgba(225, 75, 58, 0.12), transparent 34%),
     linear-gradient(180deg, rgba(20, 24, 32, 0.96), rgba(14, 17, 24, 0.94));
   box-shadow: 0 20px 44px rgba(8, 11, 18, 0.22);
+  scroll-snap-align: start;
 }
 .home-recommendation-block__header {
   display: flex;
@@ -770,8 +776,46 @@
   background: rgba(225, 75, 58, 0.12);
   border-color: rgba(225, 75, 58, 0.32);
 }
-.home-recommendation-block__rail {
+.home-recommendation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
   margin-top: 4px;
+}
+.home-recommendation-card {
+  min-width: 0;
+  overflow: hidden;
+}
+.home-recommendation-card .thumb-wrap {
+  aspect-ratio: 4 / 2.7;
+}
+.home-recommendation-card .thumb {
+  height: 100%;
+  object-fit: cover;
+}
+.home-recommendation-card .car-card__body {
+  gap: 10px;
+  padding: 12px;
+}
+.home-recommendation-card .car-card__title {
+  font-size: 15px;
+}
+.home-recommendation-card .car-card__subtitle,
+.home-recommendation-card .car-card__meta,
+.home-recommendation-card .specs,
+.home-recommendation-card .price-note {
+  font-size: 12px;
+}
+.home-recommendation-card .specs {
+  gap: 4px;
+}
+@media (max-width: 720px) {
+  .home-recommendation-block {
+    flex-basis: min(340px, 88vw);
+  }
+  .home-recommendation-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .social-grid {
   display: grid;
