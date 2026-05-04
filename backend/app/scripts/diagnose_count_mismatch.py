@@ -45,6 +45,8 @@ from sqlalchemy.orm import Session
 
 from ..db import SessionLocal
 from ..models import Car, Source
+from ..services.cars_service import CarsService
+from ..utils.redis_cache import redis_delete_by_pattern
 
 
 def _print_section(title: str) -> None:
@@ -69,6 +71,15 @@ def main() -> None:
     ap.add_argument("--reg-year-min", type=int, default=None, help="inclusive, e.g. 2025")
     ap.add_argument("--reg-year-max", type=int, default=None, help="inclusive, e.g. 2025")
     ap.add_argument("--country", default="", help="ISO country code, e.g. DE")
+    ap.add_argument(
+        "--drop-cache",
+        action="store_true",
+        help=(
+            "drop counts/list/filter Redis caches for this brand+model. "
+            "Use this if the public catalog still shows a stale number "
+            "after a cleanup or backfill."
+        ),
+    )
     args = ap.parse_args()
 
     brand = args.brand.strip()
@@ -157,20 +168,20 @@ def main() -> None:
         for y, cnt in year_rows:
             _row(f"  {y or '—'}", int(cnt))
 
-        # ── 5) Duplicate ``inner_id`` — same listing counted twice? ──
-        _print_section("Поиск дубликатов inner_id")
+        # ── 5) Duplicate ``external_id`` — same listing counted twice? ──
+        _print_section("Поиск дубликатов external_id")
         dup_rows = db.execute(
-            select(Car.inner_id, func.count(Car.id).label("c"))
+            select(Car.external_id, func.count(Car.id).label("c"))
             .where(and_(*base_conds))
-            .group_by(Car.inner_id)
+            .group_by(Car.external_id)
             .having(func.count(Car.id) > 1)
             .order_by(func.count(Car.id).desc())
             .limit(10)
         ).all()
         if dup_rows:
-            _row("Найдено дубликатов inner_id", len(dup_rows))
-            for inner, cnt in dup_rows:
-                _row(f"  inner_id={inner}", int(cnt), dim=True)
+            _row("Найдено дубликатов external_id", len(dup_rows))
+            for ext, cnt in dup_rows:
+                _row(f"  external_id={ext}", int(cnt), dim=True)
         else:
             _row("Дубликатов нет", "OK", dim=True)
 
@@ -218,32 +229,97 @@ def main() -> None:
         for v, cnt in variant_rows:
             _row(f"  {v}", int(cnt))
 
-        # ── 8) Sample inner_ids the operator can verify on mobile.de. ──
-        _print_section("Случайные 10 inner_id для ручной проверки")
+        # ── 8) Sample external_ids the operator can verify on mobile.de. ──
+        # mobile.de URL pattern: /fahrzeuge/details.html?id=<external_id>
+        _print_section("Случайные 10 объявлений для ручной проверки")
         sample = db.execute(
-            select(Car.id, Car.inner_id, Car.country, Car.registration_year, Car.last_seen_at)
+            select(
+                Car.id,
+                Car.external_id,
+                Car.country,
+                Car.registration_year,
+                Car.year,
+                Car.last_seen_at,
+            )
             .where(and_(*base_conds))
             .order_by(func.random())
             .limit(10)
         ).all()
-        for car_id, inner, c, ry, ls in sample:
-            print(f"  id={car_id:<10} inner_id={inner!r:<14} {c} {ry} {ls}")
+        print("  id          external_id        country  reg_year  model_year  last_seen")
+        for car_id, ext, c, ry, my, ls in sample:
+            ext_s = (str(ext) if ext else "—")[:18]
+            ls_s = ls.strftime("%Y-%m-%d %H:%M") if ls else "NULL"
+            print(f"  {car_id:<11} {ext_s:<18} {c or '—':<8} {ry or '—':<9} {my or '—':<11} {ls_s}")
 
-        # ── 9) Comparison hint. ──
-        _print_section("Сравнение")
-        # Ru-EU mobile.de count = mobile.de + active EU + reg_year exact + DE-only.
-        if any(s == "mobile_de" for s, _ in src_rows):
-            mob = next((cnt for s, cnt in src_rows if s == "mobile_de"), 0)
+        # ── 9) THE KEY CHECK — what would the public catalog count? ──
+        # /api/cars/count uses CarsService.count_cars + an HTTP/in-process
+        # cache. If this number matches our 388, the gap is purely a
+        # stale Redis/TTLCache entry — running with --drop-cache fixes it.
+        # If it returns 2042 here too, the gap is a logic mismatch (most
+        # likely _effective_registration_year_expr including model-year
+        # cars where registration_year IS NULL).
+        _print_section("Сравнение с тем, как считает публичный каталог")
+        service = CarsService(db)
+        catalog_count = service.count_cars(
+            brand=brand,
+            model=model,
+            reg_year_min=reg_year_min,
+            reg_year_max=reg_year_max,
+            country=country or None,
+        )
+        _row("Catalog count (как фронт)", catalog_count)
+        _row("Diagnostic count (точно)", total)
+        if catalog_count == total:
             print(
-                f"  Чисто mobile.de активных в нашем срезе: {int(mob):,}".replace(",", " ")
+                "  → Цифры совпадают. Если на сайте показывается другое — "
+                "это закэшированное старое значение.\n"
+                "    Запусти повторно с --drop-cache, чтобы сбросить."
             )
-        if not country:
-            de_count = next((cnt for c, cnt in country_rows if c == "DE"), None)
-            if de_count is not None:
-                print(
-                    f"  Только Германия (DE): {int(de_count):,}".replace(",", " ")
-                    + " — обычно ближе к default-показателю mobile.de"
-                )
+        else:
+            diff = catalog_count - total
+            print(
+                f"  → Расхождение {diff:+d}. Это уже логика count_cars, "
+                "а не кэш. Скорее всего из-за того, что эффективный год "
+                "регистрации захватывает машины с registration_year=NULL "
+                "и включает их по Car.year (model year)."
+            )
+            null_reg = int(
+                db.execute(
+                    select(func.count(Car.id)).where(
+                        and_(
+                            Car.is_available.is_(True),
+                            func.lower(func.trim(Car.brand)) == brand.lower(),
+                            func.lower(func.trim(Car.model)) == model.lower(),
+                            Car.registration_year.is_(None),
+                        )
+                    )
+                ).scalar() or 0
+            )
+            _row("Машин с registration_year=NULL для этой модели", null_reg)
+
+        # ── 10) Optionally drop the stale cache. ──
+        if args.drop_cache:
+            _print_section("Сброс кэша")
+            patterns = [
+                "cars_count*",
+                "cars_list*",
+                "filter_payload*",
+                "filter_ctx*",
+                "home_*",
+            ]
+            total_dropped = 0
+            for pattern in patterns:
+                try:
+                    dropped = redis_delete_by_pattern(pattern) or 0
+                    total_dropped += int(dropped)
+                    _row(f"Удалено ключей по {pattern!r}", int(dropped), dim=True)
+                except Exception as exc:  # pragma: no cover
+                    print(f"  ⚠ Не удалось дропнуть {pattern}: {exc}")
+            _row("Всего сброшено ключей", total_dropped)
+            print(
+                "\n  Откройте каталог в инкогнито или с Ctrl+Shift+R — "
+                "счётчик должен показать актуальное число."
+            )
 
     finally:
         db.close()
