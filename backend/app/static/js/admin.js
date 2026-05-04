@@ -226,10 +226,9 @@
         syncHidden()
       }
 
-      // Add-by-id mini-form. We intentionally hit the same /search API
-      // that powers the typeahead — passing the id as the query — so a
-      // bogus id surfaces as "не нашли машину" instead of getting silently
-      // pinned. Mirrors what the operator would get clicking the suggestion.
+      // Add-by-id mini-form. We hit the same /search API that powers the
+      // typeahead, but the server now resolves both the internal Car.id
+      // and the mobile.de external_id, so an operator can paste either.
       function addById() {
         if (!idInput) return
         const raw = (idInput.value || '').trim()
@@ -238,30 +237,46 @@
           window.alert('Введите число — id машины из каталога.')
           return
         }
-        if (selected.has(raw)) {
-          idInput.value = ''
-          window.alert('Машина #' + raw + ' уже в списке.')
-          return
-        }
-        if (limit > 0 && selected.size >= limit) {
-          window.alert('Максимум ' + limit + ' машин в списке.')
-          return
-        }
-        // Lookup via the same admin search API used by the typeahead.
-        fetch('/admin/api/cars/search?q=' + encodeURIComponent(raw) + '&limit=5')
-          .then((r) => (r.ok ? r.json() : { results: [] }))
+        // Lookup via the admin search API — server resolves both Car.id
+        // and external_id, so we just take the first exact match.
+        fetch('/admin/api/cars/search?q=' + encodeURIComponent(raw) + '&limit=5', {
+          credentials: 'same-origin',
+        })
+          .then((r) => {
+            if (r.status === 401 || r.status === 403) {
+              throw new Error('Сессия истекла. Перезайдите в админку.')
+            }
+            if (!r.ok) throw new Error('HTTP ' + r.status)
+            return r.json()
+          })
           .then((data) => {
-            const exact = (data.results || []).find((it) => String(it.id) === raw)
-            if (!exact) {
+            const results = data.results || []
+            // Prefer match by internal id, then by external_id, otherwise
+            // (safety net) take the single result that came back.
+            let hit = results.find((it) => String(it.id) === raw)
+            if (!hit) hit = results.find((it) => String(it.external_id || '') === raw)
+            if (!hit && results.length === 1) hit = results[0]
+            if (!hit) {
               window.alert('Машина #' + raw + ' не найдена в каталоге. Проверьте id.')
               return
             }
-            addChip(exact.id, { title: exact.title || '', subtitle: exact.subtitle || '' })
+            const internalId = String(hit.id)
+            if (selected.has(internalId)) {
+              idInput.value = ''
+              window.alert('Машина #' + internalId + ' уже в списке.')
+              return
+            }
+            if (limit > 0 && selected.size >= limit) {
+              window.alert('Максимум ' + limit + ' машин в списке.')
+              return
+            }
+            addChip(hit.id, { title: hit.title || '', subtitle: hit.subtitle || '' })
             idInput.value = ''
             idInput.focus()
           })
-          .catch(() => {
-            window.alert('Не удалось проверить id. Попробуйте позже.')
+          .catch((err) => {
+            const msg = (err && err.message) ? err.message : 'Не удалось проверить id. Попробуйте позже.'
+            window.alert(msg)
           })
       }
       if (idAddBtn) {

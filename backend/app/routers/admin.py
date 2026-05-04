@@ -1236,15 +1236,22 @@ def admin_cars_search(
     from ..utils.thumbs import resolve_thumbnail_url
 
     q_clean = (q or "").strip()
-    stmt = select(Car).limit(max(1, min(int(limit or 20), 50)))
+    page_limit = max(1, min(int(limit or 20), 50))
+    stmt = select(Car).limit(page_limit)
     if q_clean.isdigit():
-        stmt = stmt.where(Car.id == int(q_clean))
+        # Operators routinely paste either our internal Car.id (catalogue URLs)
+        # or the external mobile.de offer id (visible on the source page) —
+        # match on both so the picker resolves either input transparently.
+        stmt = stmt.where(
+            (Car.id == int(q_clean)) | (Car.external_id == q_clean)
+        )
     elif q_clean:
         like = f"%{q_clean}%"
         stmt = stmt.where(
             Car.brand.ilike(like)
             | Car.model.ilike(like)
             | Car.variant.ilike(like)
+            | Car.external_id.ilike(like)
         ).order_by(Car.id.desc())
     else:
         stmt = stmt.order_by(Car.id.desc())
@@ -1258,10 +1265,16 @@ def admin_cars_search(
         )
         label_parts = [car.brand or "", car.model or ""]
         title = " ".join(p for p in label_parts if p).strip() or f"#{car.id}"
+        subtitle_parts: list[str] = []
+        if car.variant:
+            subtitle_parts.append(car.variant)
+        if car.external_id:
+            subtitle_parts.append(f"ext {car.external_id}")
         out.append({
             "id": car.id,
+            "external_id": car.external_id or "",
             "title": title,
-            "subtitle": car.variant or "",
+            "subtitle": " · ".join(subtitle_parts),
             "year": car.year,
             "thumbnail_url": thumb or "/static/img/no-photo.svg",
         })
