@@ -194,7 +194,17 @@ def normalize_color_group(raw: Optional[str], color_hex: Optional[str] = None) -
             return group
     if not raw:
         return "other"
-    norm = _normalize_text(raw)
+    raw_trim = str(raw).strip()
+    if not raw_trim:
+        return "other"
+    # Cyrillic / localized bucket labels must run before _normalize_text strips non-Latin.
+    ru = raw_trim.lower()
+    if ru in _LABEL_TO_KEY:
+        return _LABEL_TO_KEY[ru]
+    first_word = ru.split()[0]
+    if first_word != ru and first_word in _LABEL_TO_KEY:
+        return _LABEL_TO_KEY[first_word]
+    norm = _normalize_text(raw_trim)
     if not norm:
         return "other"
     if norm in _LABEL_TO_KEY:

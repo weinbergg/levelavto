@@ -4926,10 +4926,14 @@ class CarsService:
             ),
             else_=0,
         ).desc()
+        mileage_rank = case(
+            (and_(Car.mileage.is_not(None), Car.mileage > 0), 1),
+            else_=0,
+        ).desc()
         stmt = (
             select(Car)
             .where(where_expr)
-            .order_by(thumb_rank, *self._list_order_clause(sort))
+            .order_by(thumb_rank, mileage_rank, *self._list_order_clause(sort))
             .limit(max(1, int(limit or 8)))
         )
         return list(self.db.execute(stmt).scalars().all())

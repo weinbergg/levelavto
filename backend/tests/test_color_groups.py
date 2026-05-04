@@ -1,6 +1,12 @@
 from backend.app.utils.color_groups import normalize_color_group, color_groups
 
 
+def test_normalize_color_group_russian_labels():
+    assert normalize_color_group("синий") == "blue"
+    assert normalize_color_group("Синий металлик") == "blue"
+    assert normalize_color_group("черный") == "black"
+
+
 def test_normalize_color_group_keywords():
     assert normalize_color_group("dunkelblau") == "blue"
     assert normalize_color_group("azurblau metallic") == "blue"

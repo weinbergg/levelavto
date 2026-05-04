@@ -757,6 +757,39 @@
 .home-recommendation-block__catalog-link:hover {
   color: var(--accent-2, #e14b3a);
 }
+
+/* Главная «Рекомендуем»: базовый `.cards { display: grid }` задаётся раньше по каскаду
+   на том же элементе, что и `.cards-carousel`. Фиксируем одну горизонтальную ленту. */
+#recommended .cards-carousel-wrap .cards.cards-carousel {
+  display: flex !important;
+  flex-flow: row nowrap !important;
+  grid-template-columns: unset !important;
+  align-items: stretch;
+  width: 100%;
+  min-height: 0;
+}
+#recommended .cards-carousel-wrap .cards.cards-carousel > .car-card {
+  flex: 0 0 auto;
+  width: min(320px, calc((100% - var(--space-md, 16px) * 3) / 4));
+  max-width: 320px;
+  scroll-snap-align: start;
+}
+@media (max-width: 1099px) {
+  #recommended .cards-carousel-wrap .cards.cards-carousel > .car-card {
+    width: min(320px, calc((100% - var(--space-md, 16px) * 2) / 3));
+  }
+}
+@media (max-width: 899px) {
+  #recommended .cards-carousel-wrap .cards.cards-carousel > .car-card {
+    width: min(320px, calc((100% - var(--space-md, 16px)) / 2));
+  }
+}
+@media (max-width: 599px) {
+  #recommended .cards-carousel-wrap .cards.cards-carousel > .car-card {
+    width: min(320px, 88vw);
+  }
+}
+
 @media (max-width: 720px) {
   .home-recommendation-stack {
     gap: 22px;
