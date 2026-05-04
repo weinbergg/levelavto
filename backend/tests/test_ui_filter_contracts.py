@@ -173,7 +173,7 @@ def test_advanced_search_rebuilds_missing_rows_and_uses_selected_models_for_line
 
 def test_base_template_bumps_app_bundle_version():
     template = _read("app/templates/base.html")
-    assert '/static/js/app.js?v=114' in template
+    assert '/static/js/app.js?v=115' in template
 
 
 def test_catalog_ssr_cache_hit_refreshes_prices_and_recomputes_display_price():
@@ -194,6 +194,9 @@ def test_deploy_cron_has_midday_public_prewarm():
     assert "scripts/prewarm_public_site.sh" in cron
     assert 'python -m backend.app.scripts.prewarm_cache' in script
     assert 'PREWARM_INCLUDE_PAYLOAD="${PREWARM_INCLUDE_PAYLOAD:-1}"' in script
+    assert 'PREWARM_INCLUDE_BRAND_LISTS="${PREWARM_INCLUDE_BRAND_LISTS:-0}"' in script
+    assert 'PREWARM_INCLUDE_BRAND_COUNTS="${PREWARM_INCLUDE_BRAND_COUNTS:-0}"' in script
+    assert 'PREWARM_INCLUDE_ENGINE_LISTS="${PREWARM_INCLUDE_ENGINE_LISTS:-0}"' in script
 
 
 def test_main_enables_gzip_for_large_html_and_api_payloads():
