@@ -273,34 +273,60 @@ class MobileDeFeedParser:
         if not value:
             return None, None
         normalized = re.sub(r"\s+", "", value)
-        if not normalized or normalized in {"-", "--", "n/a", "na"}:
+        if not normalized or normalized.lower() in {"-", "--", "n/a", "na"}:
             return None, None
 
+        # Strict patterns first — they extract both year and month.
         patterns = [
             r"^(?P<month>\d{1,2})[./-](?P<year>\d{4})$",
             r"^(?P<day>\d{1,2})[./-](?P<month>\d{1,2})[./-](?P<year>\d{4})$",
             r"^(?P<year>\d{4})[./-](?P<month>\d{1,2})$",
+            r"^(?P<year>\d{4})[./-](?P<month>\d{1,2})[./-](?P<day>\d{1,2})$",
             r"^(?P<year>\d{4})$",
+            # Two-digit year forms — common in some legacy feeds (MM/YY).
+            r"^(?P<month>\d{1,2})[./-](?P<yy>\d{2})$",
         ]
         for pattern in patterns:
             match = re.match(pattern, normalized)
             if not match:
                 continue
-            year_raw = match.groupdict().get("year")
-            month_raw = match.groupdict().get("month")
+            groups = match.groupdict()
+            year_raw = groups.get("year")
+            month_raw = groups.get("month")
+            yy_raw = groups.get("yy")
             try:
                 year = int(year_raw) if year_raw else None
             except Exception:
                 year = None
+            if year is None and yy_raw is not None:
+                try:
+                    yy = int(yy_raw)
+                    # Cut-off: 50..99 -> 19YY, 00..49 -> 20YY (mobile.de feed
+                    # is unlikely to contain pre-1950 cars in two-digit form).
+                    year = 1900 + yy if yy >= 50 else 2000 + yy
+                except Exception:
+                    year = None
             try:
                 month = int(month_raw) if month_raw else None
             except Exception:
                 month = None
-            if year is None or year < 1950 or year > 2100:
-                return None, None
+            # Lower bound 1900 — includes oldtimers (1938, 1943 etc.).
+            if year is None or year < 1900 or year > 2100:
+                continue  # try next pattern instead of bailing out
             if month is not None and (month < 1 or month > 12):
-                return None, None
+                month = None  # keep the year, drop only the bogus month
             return year, month
+
+        # Tolerant fallback — find any 4-digit year-like substring in
+        # the raw value (covers free-form strings like "Erstzulassung 1995").
+        m = re.search(r"(19|20)\d{2}", value)
+        if m:
+            try:
+                year = int(m.group(0))
+                if 1900 <= year <= 2100:
+                    return year, None
+            except Exception:
+                pass
         return None, None
 
     def _resolve_model(self, row: MobileDeCsvRow) -> Optional[str]:
