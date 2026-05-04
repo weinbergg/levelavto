@@ -174,7 +174,10 @@ class AdminService:
         stmt = (
             select(FeaturedCar)
             .options(selectinload(FeaturedCar.car))
-            .where(FeaturedCar.placement == placement)
+            .where(
+                FeaturedCar.placement == placement,
+                FeaturedCar.is_active.is_(True),
+            )
             .order_by(FeaturedCar.position.asc(), FeaturedCar.id.asc())
         )
         return list(self.db.execute(stmt).scalars().all())
@@ -219,12 +222,13 @@ class AdminService:
                 )
             position += 1
 
-        # deactivate entries that are not requested
+        # Physically remove entries that are no longer requested.
+        # Soft-deleting them left stale rows visible in admin flows and
+        # complicated cache invalidation without providing useful history.
         for cid, fc in existing.items():
             if cid not in unique_ids:
-                fc.is_active = False
+                self.db.delete(fc)
 
         self.db.commit()
         return self.list_featured(placement)
-
 

@@ -219,6 +219,12 @@ def test_payload_exact_filters_use_jsonb_contains_and_daily_prewarm_stays_light(
     assert "USING GIN ((CAST(source_payload AS jsonb)) jsonb_path_ops)" in migration
 
 
+def test_admin_featured_lists_only_active_and_removes_cleared_rows():
+    service = _read("app/services/admin_service.py")
+    assert "FeaturedCar.is_active.is_(True)" in service
+    assert "self.db.delete(fc)" in service
+
+
 def test_main_enables_gzip_for_large_html_and_api_payloads():
     main = _read("app/main.py")
     assert "GZipMiddleware" in main
