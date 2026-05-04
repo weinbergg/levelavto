@@ -3698,6 +3698,7 @@
 
     const loadPayloadOptions = async () => {
       const params = buildParams(false)
+      params.set('full_payload', '1')
       const reqId = String((Number(form.dataset.payloadReqId || '0') || 0) + 1)
       form.dataset.payloadReqId = reqId
       try {

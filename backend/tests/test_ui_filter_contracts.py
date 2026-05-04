@@ -42,7 +42,7 @@ def test_search_template_keeps_core_selects_clickable():
     assert '<div class="field field--multi-select"><span class="field-label">Кузов</span>' in template
     assert '<div class="field field--multi-select"><span class="field-label">Топливо</span>' in template
     assert 'id="advanced-keywords"' in template
-    assert 'data-dynamic-payload="0"' in template
+    assert 'data-dynamic-payload="1"' in template
     assert template.index('name="q"') < template.index('id="advanced-tech"')
 
 
@@ -471,9 +471,14 @@ def test_admin_stubs_no_longer_redirect_to_dashboard():
 def test_filter_payload_can_defer_to_base_ctx_on_public_scope():
     catalog_router = _read("app/routers/catalog.py")
     assert "def _build_deferred_filter_payload_from_base_ctx(" in catalog_router
-    assert "if params == base_scope_params and base_ctx is not None:" in catalog_router
+    assert "if params == base_scope_params and base_ctx is not None and not force_full_payload:" in catalog_router
     assert "source=base_ctx_deferred" in catalog_router
     assert '"payload_deferred": True' in catalog_router
+
+
+def test_advanced_search_requests_full_payload_for_deferred_filter_sets():
+    script = _read("app/static/js/app.js")
+    assert "params.set('full_payload', '1')" in script or 'params.set("full_payload", "1")' in script
 
 
 def test_catalog_perf_path_canonicalizes_free_text_fuel_and_prewarms_engine_lists():

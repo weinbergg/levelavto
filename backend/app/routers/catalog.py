@@ -1295,6 +1295,7 @@ def cars_count(
 def advanced_count(request: Request, db: Session = Depends(get_db)):
     service = CarsService(db)
     qp = request.query_params
+    force_full_payload = _to_bool(qp.get("full_payload")) is True
     region = qp.get("region")
     country = qp.get("country")
     eu_country = qp.get("eu_country")
@@ -2058,7 +2059,7 @@ def filter_payload(
             ):
                 base_ctx = None
 
-        if params == base_scope_params and base_ctx is not None:
+        if params == base_scope_params and base_ctx is not None and not force_full_payload:
             data = _build_deferred_filter_payload_from_base_ctx(
                 base_ctx,
                 region=canon.get("region"),

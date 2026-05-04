@@ -7,7 +7,7 @@
       <h1>Расширенный поиск</h1>
       <p class="muted">Настройте параметры и перейдите в каталог с примененными фильтрами.</p>
     </div>
-    <form id="advanced-search-form" method="get" action="/catalog" data-dynamic-payload="0">
+    <form id="advanced-search-form" method="get" action="/catalog" data-dynamic-payload="1">
       {% set params = request.query_params %}
       {%- from "_brand_options.html" import brand_options -%}
       <div class="advanced-lines">
