@@ -94,15 +94,18 @@ def test_home_count_keeps_server_total_until_user_changes_filters():
 def test_home_recommended_block_uses_static_centered_rail_without_arrow_buttons():
     template = _read("app/templates/home.html")
     script = _read("app/static/js/app.js")
-    css = _read("app/static/css/home.css")
+    css_home = _read("app/static/css/home.css")
+    css_styles = _read("app/static/css/styles.css")
     assert 'data-carousel-prev' not in template
     assert 'data-carousel-next' not in template
     assert 'class="home-recommendation-stack"' in template
-    assert 'class="home-recommendation-grid"' in template
+    assert 'data-carousel-root="recommended"' in template
+    assert 'cards-carousel-wrap' in template
+    assert 'car-card--carousel' in template
     assert "document.querySelectorAll('[data-carousel-root=\"recommended\"]')" in script
-    assert ".home-recommendation-stack {" in css
-    assert "overflow-x: auto;" in css
-    assert ".home-recommendation-grid {" in css
+    assert ".home-recommendation-stack {" in css_home
+    assert ".cards-carousel {" in css_styles
+    assert "overflow-x: auto" in css_styles
 
 
 def test_catalog_ssr_keeps_germany_initial_items_and_does_not_defer_de():
@@ -396,7 +399,7 @@ def test_home_recommendation_blocks_are_loaded_from_site_content_and_rendered_in
     assert "build_home_recommendation_blocks(" in admin
     assert "{% if recommendation_blocks %}" in template
     assert "home-recommendation-block__title" in template
-    assert "home-recommendation-grid" in template
+    assert "cards-carousel-wrap" in template
     assert "data-recommendation-block-row" in dashboard
     assert 'name="block_lines"' in dashboard
     assert 'name="block_car_ids"' in dashboard
