@@ -621,7 +621,7 @@
   gap: 16px;
   align-items: stretch;
 }
-.cards-highlights {
+.cards-highlights:not(.cards-carousel) {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 14px;
 }

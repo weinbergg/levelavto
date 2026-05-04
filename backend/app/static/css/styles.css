@@ -2888,7 +2888,7 @@ input[type="number"]::-webkit-outer-spin-button {
   contain: none;
   overflow: visible;
 }
-.cards-highlights {
+.cards-highlights:not(.cards-carousel) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: var(--space-md);
@@ -3275,7 +3275,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 /* Featured / highlights in catalog */
-.cards-highlights {
+.cards-highlights:not(.cards-carousel) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 14px;
@@ -3292,6 +3292,14 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .cards-highlights .thumb-wrap {
   height: 180px;
+}
+.cards-highlights.cards-carousel {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  grid-template-columns: unset;
+  gap: var(--space-md);
+  align-items: stretch;
 }
 .car-card__title {
   font-weight: 700;

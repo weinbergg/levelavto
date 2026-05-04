@@ -161,6 +161,8 @@ def _home_recommendation_block_signature(block: Dict[str, Any], limit: int) -> s
         "reg_year_max": block.get("reg_year_max"),
         "power_hp_max": block.get("power_hp_max"),
         "engine_cc_max": block.get("engine_cc_max"),
+        "models": block.get("models") or [],
+        "colors": block.get("colors") or [],
         "car_ids": block.get("car_ids") or [],
         "limit": limit,
     }
@@ -170,6 +172,8 @@ def _home_recommendation_block_signature(block: Dict[str, Any], limit: int) -> s
 def _home_recommendation_block_has_auto_filters(block: Dict[str, Any]) -> bool:
     return bool(
         (block.get("lines") or [])
+        or (block.get("models") or [])
+        or (block.get("colors") or [])
         or block.get("price_min") is not None
         or block.get("price_max") is not None
         or block.get("mileage_max") is not None
@@ -219,9 +223,15 @@ def _merge_home_recommendation_block_items(
         # Pull extra rows: pinned IDs are prepended and duplicates are skipped, so a naive
         # LIMIT clause often yields fewer than ``limit`` unique cars after de-duplication.
         buffer = max(48, limit * 3)
+        models = block.get("models") or []
+        colors = block.get("colors") or []
+        model_param = ",".join(str(m) for m in models) if models else None
+        color_param = ",".join(str(c) for c in colors) if colors else None
         auto_items = service.preview_cars(
             region="EU",
             lines=block.get("lines") or None,
+            model=model_param,
+            color=color_param,
             price_min=block.get("price_min"),
             price_max=block.get("price_max"),
             mileage_max=block.get("mileage_max"),

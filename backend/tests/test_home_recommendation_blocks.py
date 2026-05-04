@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs
+
 from backend.app.utils.home_recommendation_blocks import (
     HOME_RECOMMENDATION_BLOCK_LIMIT_DEFAULT,
     build_block_catalog_query,
@@ -12,6 +14,8 @@ def test_build_home_recommendation_blocks_skips_blank_rows_caps_limit_and_parses
         ["99", "", "3"],
         ["1", "1", "0"],
         ["BMW|X5|\nBMW|X6|", "", "Audi|A6|"],
+        ["X5\nX6", "", ""],
+        ["", "", "черный"],
         ["1000000", "", ""],
         ["5000000", "", "7000000"],
         ["60000", "", "30000"],
@@ -25,11 +29,14 @@ def test_build_home_recommendation_blocks_skips_blank_rows_caps_limit_and_parses
     assert blocks[0]["title"] == "BMW / X5"
     assert blocks[0]["limit"] == 12
     assert blocks[0]["lines"] == ["BMW|X5|", "BMW|X6|"]
+    assert blocks[0]["models"] == ["X5", "X6"]
+    assert blocks[0]["colors"] == []
     assert blocks[0]["car_ids"] == [333438, 300957]
     assert blocks[0]["price_min"] == 1000000.0
     assert blocks[1]["title"] == "Audi свежие"
     assert blocks[1]["limit"] == 4
     assert blocks[1]["enabled"] is False
+    assert blocks[1]["colors"] == ["черный"]
     assert blocks[1]["car_ids"] == [12345]
 
 
@@ -59,7 +66,8 @@ def test_load_home_recommendation_blocks_supports_legacy_query_and_explicit_sche
     assert loaded[0]["lines"] == ["BMW|X5|"]
     assert loaded[0]["price_max"] == 5000000.0
     assert loaded[0]["reg_year_min"] == 2024
-    assert loaded[0]["car_ids"] == [333438]
+    assert loaded[0]["models"] == ["X5"]
+    assert loaded[0]["colors"] == []
     assert loaded[1]["lines"] == ["Audi|A6|", "Audi|A4|"]
     assert loaded[1]["mileage_max"] == 30000
     assert HOME_RECOMMENDATION_BLOCK_LIMIT_DEFAULT >= 4
@@ -89,3 +97,18 @@ def test_build_block_catalog_query_uses_explicit_block_fields():
     assert "power_hp_max=350" in query
     assert "engine_cc_max=3000" in query
     assert "sort=price_asc" in query
+
+
+def test_build_block_catalog_query_includes_models_and_colors():
+    query = build_block_catalog_query(
+        {
+            "lines": ["BMW|X5|"],
+            "models": ["GLE", "GLS"],
+            "colors": ["черный", "синий"],
+            "price_max": 4000000,
+        }
+    )
+    parsed = parse_qs(query)
+    assert parsed["model"] == ["GLE,GLS"]
+    assert "черный" in parsed["color"][0]
+    assert "синий" in parsed["color"][0]

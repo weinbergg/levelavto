@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
@@ -18,6 +19,7 @@ _LEGACY_QUERY_KEYS: List[str] = [
     "kr_type",
     "brand",
     "model",
+    "color",
     "price_min",
     "price_max",
     "mileage_max",
@@ -87,6 +89,29 @@ def _parse_lines(value: Any) -> List[str]:
             continue
         seen.add(normalized)
         out.append(normalized)
+    return out
+
+
+def _parse_filter_tokens(value: Any) -> List[str]:
+    """Free-form tokens from textarea (comma, semicolon or newline separated)."""
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        raw_items = [str(x).strip() for x in value if str(x or "").strip()]
+    else:
+        raw_items = []
+        for piece in re.split(r"[\n,;]+", str(value)):
+            t = piece.strip()
+            if t:
+                raw_items.append(t)
+    seen: set[str] = set()
+    out: List[str] = []
+    for t in raw_items:
+        key = t.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(t)
     return out
 
 
@@ -164,6 +189,8 @@ def _build_block_dict(
     limit: Any,
     enabled: Any,
     lines_value: Any,
+    models_value: Any,
+    colors_value: Any,
     price_min: Any,
     price_max: Any,
     mileage_max: Any,
@@ -174,17 +201,21 @@ def _build_block_dict(
     car_ids_value: Any,
 ) -> Optional[Dict[str, Any]]:
     lines = _parse_lines(lines_value)
+    models = _parse_filter_tokens(models_value)
+    colors = _parse_filter_tokens(colors_value)
     car_ids = _parse_car_ids(car_ids_value)
     block_title = _trim_text(title)
-    if not block_title and not lines and not car_ids:
+    if not block_title and not lines and not car_ids and not models and not colors:
         return None
-    if not lines and not car_ids:
+    if not lines and not car_ids and not models and not colors:
         return None
     cleaned = {
         "title": (block_title or "Подборка")[:120],
         "limit": _coerce_limit(limit),
         "enabled": _coerce_enabled(enabled),
         "lines": lines,
+        "models": models,
+        "colors": colors,
         "price_min": _coerce_float(price_min),
         "price_max": _coerce_float(price_max),
         "mileage_max": _coerce_int(mileage_max),
@@ -195,6 +226,8 @@ def _build_block_dict(
         "car_ids": car_ids,
     }
     cleaned["lines_text"] = "\n".join(cleaned["lines"])
+    cleaned["models_text"] = "\n".join(cleaned["models"])
+    cleaned["colors_text"] = "\n".join(cleaned["colors"])
     cleaned["car_ids_text"] = ", ".join(str(car_id) for car_id in cleaned["car_ids"])
     return cleaned
 
@@ -208,6 +241,8 @@ def _block_from_legacy_query(item: Dict[str, Any], index: int) -> Optional[Dict[
         limit=item.get("limit"),
         enabled=item.get("enabled", True),
         lines_value=_lines_from_legacy_query(item.get("query")),
+        models_value=bucket.get("model"),
+        colors_value=bucket.get("color"),
         price_min=(bucket.get("price_min") or [None])[-1],
         price_max=(bucket.get("price_max") or [None])[-1],
         mileage_max=(bucket.get("mileage_max") or [None])[-1],
@@ -246,6 +281,8 @@ def load_home_recommendation_blocks(raw: Any) -> List[Dict[str, Any]]:
                 limit=item.get("limit"),
                 enabled=item.get("enabled", True),
                 lines_value=item.get("lines"),
+                models_value=item.get("models"),
+                colors_value=item.get("colors"),
                 price_min=item.get("price_min"),
                 price_max=item.get("price_max"),
                 mileage_max=item.get("mileage_max"),
@@ -266,6 +303,8 @@ def build_home_recommendation_blocks(
     limits: List[Any],
     enabled_flags: List[Any],
     lines_values: List[Any],
+    models_values: List[Any],
+    colors_values: List[Any],
     price_mins: List[Any],
     price_maxs: List[Any],
     mileage_maxs: List[Any],
@@ -280,6 +319,8 @@ def build_home_recommendation_blocks(
         len(limits),
         len(enabled_flags),
         len(lines_values),
+        len(models_values),
+        len(colors_values),
         len(price_mins),
         len(price_maxs),
         len(mileage_maxs),
@@ -296,6 +337,8 @@ def build_home_recommendation_blocks(
             limit=limits[index] if index < len(limits) else HOME_RECOMMENDATION_BLOCK_LIMIT_DEFAULT,
             enabled=enabled_flags[index] if index < len(enabled_flags) else True,
             lines_value=lines_values[index] if index < len(lines_values) else "",
+            models_value=models_values[index] if index < len(models_values) else "",
+            colors_value=colors_values[index] if index < len(colors_values) else "",
             price_min=price_mins[index] if index < len(price_mins) else "",
             price_max=price_maxs[index] if index < len(price_maxs) else "",
             mileage_max=mileage_maxs[index] if index < len(mileage_maxs) else "",
@@ -322,6 +365,8 @@ def serialize_home_recommendation_blocks(blocks: List[Dict[str, Any]]) -> str:
                 "limit": block["limit"],
                 "enabled": block["enabled"],
                 "lines": block["lines"],
+                "models": block["models"],
+                "colors": block["colors"],
                 "price_min": block["price_min"],
                 "price_max": block["price_max"],
                 "mileage_max": block["mileage_max"],
@@ -352,5 +397,11 @@ def build_block_catalog_query(block: Dict[str, Any]) -> str:
         if value in (None, "", []):
             continue
         params.append((key, str(value)))
+    models = block.get("models") or []
+    if models:
+        params.append(("model", ",".join(str(m) for m in models)))
+    colors = block.get("colors") or []
+    if colors:
+        params.append(("color", ",".join(str(c) for c in colors)))
     params.append(("sort", "price_asc"))
     return urlencode(params, doseq=True)

@@ -1994,15 +1994,20 @@ class CarsService:
                 conditions.append(and_(*token_groups))
 
         if model and "model" not in exclude:
-            clause = self._model_filter_clause(
-                region=region,
-                country=country,
-                kr_type=kr_type,
-                brand=brand,
-                model=model,
-            )
-            if clause is not None:
-                conditions.append(clause)
+            model_tokens = split_csv_values(model)
+            clauses: List[Any] = []
+            for tok in model_tokens:
+                clause = self._model_filter_clause(
+                    region=region,
+                    country=country,
+                    kr_type=kr_type,
+                    brand=brand,
+                    model=tok,
+                )
+                if clause is not None:
+                    clauses.append(clause)
+            if clauses:
+                conditions.append(or_(*clauses) if len(clauses) > 1 else clauses[0])
 
         payload_json = self._payload_json_expr()
         payload_text = func.lower(cast(Car.source_payload, String))

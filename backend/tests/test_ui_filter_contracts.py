@@ -402,7 +402,8 @@ def test_home_recommendation_blocks_are_loaded_from_site_content_and_rendered_in
     assert "cards-carousel-wrap" in template
     assert "data-recommendation-block-row" in dashboard
     assert 'name="block_lines"' in dashboard
-    assert 'name="block_car_ids"' in dashboard
+    assert 'name="block_models"' in dashboard
+    assert 'name="block_colors"' in dashboard
     assert 'name="block_query"' not in dashboard
     assert "build_block_catalog_query" in util
     assert "HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY" in util
@@ -736,7 +737,7 @@ def test_home_css_keeps_model_actions_in_bottom_bar_on_mobile():
 
 def test_home_template_bumps_home_css_bundle_version():
     template = _read("app/templates/home.html")
-    assert '/static/css/home.css?v=30' in template
+    assert '/static/css/home.css?v=31' in template
     assert "{% for img in collage_images %}" in template
     assert "collage_images[:120]" not in template
 
@@ -1326,6 +1327,8 @@ def test_recommendation_blocks_form_exposes_per_block_selection_fields():
     admin = _read("app/routers/admin.py")
     for field in (
         "block_lines",
+        "block_models",
+        "block_colors",
         "block_price_min",
         "block_price_max",
         "block_mileage_max",

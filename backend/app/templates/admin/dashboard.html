@@ -296,7 +296,7 @@
         <div class="la-card__body">
           <form method="post" action="/admin/recommendation-blocks" class="la-form" data-recommendation-blocks-editor>
             <div class="la-vstack" data-recommendation-blocks-list style="display: grid; gap: 14px">
-              {% set block_rows = recommendation_blocks if recommendation_blocks else [{'title': '', 'limit': 8, 'enabled': True, 'lines_text': '', 'price_min': '', 'price_max': '', 'mileage_max': '', 'reg_year_min': '', 'reg_year_max': '', 'power_hp_max': '', 'engine_cc_max': '', 'car_ids_text': ''}] %}
+              {% set block_rows = recommendation_blocks if recommendation_blocks else [{'title': '', 'limit': 8, 'enabled': True, 'lines_text': '', 'models_text': '', 'colors_text': '', 'price_min': '', 'price_max': '', 'mileage_max': '', 'reg_year_min': '', 'reg_year_max': '', 'power_hp_max': '', 'engine_cc_max': '', 'car_ids_text': ''}] %}
               {% for block in block_rows %}
               <div class="la-card" data-recommendation-block-row>
                 <div class="la-card__body">
@@ -319,7 +319,7 @@
                   </div>
                   <div class="la-form-grid la-form-grid--2" style="margin-top: 14px">
                     <div class="la-field">
-                      <label class="la-field__label">Марки и модели</label>
+                      <label class="la-field__label">Марки и модели (строки)</label>
                       <textarea class="la-textarea" name="block_lines" rows="4" placeholder="Mercedes-Benz|E-Class|&#10;Audi|A6|">{{ block.lines_text }}</textarea>
                       <span class="la-field__hint">
                         Одна строка = <code>Марка|Модель|Вариант</code>. Вариант можно не указывать. Можно перечислить несколько строк.
@@ -330,6 +330,22 @@
                       <textarea class="la-textarea" name="block_car_ids" rows="4" placeholder="333438, 300957">{{ block.car_ids_text }}</textarea>
                       <span class="la-field__hint">
                         Эти машины попадут в начало подборки. Формат: id через запятую или с новой строки.
+                      </span>
+                    </div>
+                  </div>
+                  <div class="la-form-grid la-form-grid--2" style="margin-top: 14px">
+                    <div class="la-field">
+                      <label class="la-field__label">Дополнительно: модели</label>
+                      <textarea class="la-textarea" name="block_models" rows="3" placeholder="X5&#10;GLE Coupe">{{ block.models_text }}</textarea>
+                      <span class="la-field__hint">
+                        Сужает автоподбор: машина должна совпасть с маркой/строками выше и попасть под одно из названий моделей (через запятую или с новой строки). Несколько значений объединяются через «ИЛИ».
+                      </span>
+                    </div>
+                    <div class="la-field">
+                      <label class="la-field__label">Цвета кузова</label>
+                      <textarea class="la-textarea" name="block_colors" rows="3" placeholder="черный&#10;синий металлик">{{ block.colors_text }}</textarea>
+                      <span class="la-field__hint">
+                        Как в каталоге: группы цветов или подстрока (черный, белый, серый, синий…). Несколько значений — «ИЛИ».
                       </span>
                     </div>
                   </div>
@@ -383,12 +399,28 @@
                   </div>
                   <div class="la-form-grid la-form-grid--2" style="margin-top: 14px">
                     <div class="la-field">
-                      <label class="la-field__label">Марки и модели</label>
+                      <label class="la-field__label">Марки и модели (строки)</label>
                       <textarea class="la-textarea" name="block_lines" rows="4" placeholder="Mercedes-Benz|E-Class|&#10;Audi|A6|"></textarea>
                     </div>
                     <div class="la-field">
                       <label class="la-field__label">Машины вручную по id</label>
                       <textarea class="la-textarea" name="block_car_ids" rows="4" placeholder="333438, 300957"></textarea>
+                    </div>
+                  </div>
+                  <div class="la-form-grid la-form-grid--2" style="margin-top: 14px">
+                    <div class="la-field">
+                      <label class="la-field__label">Дополнительно: модели</label>
+                      <textarea class="la-textarea" name="block_models" rows="3" placeholder="X5&#10;GLE Coupe"></textarea>
+                      <span class="la-field__hint">
+                        Сужает автоподбор по названию модели (ИЛИ между строками). Работает вместе с блоком «строки» выше.
+                      </span>
+                    </div>
+                    <div class="la-field">
+                      <label class="la-field__label">Цвета кузова</label>
+                      <textarea class="la-textarea" name="block_colors" rows="3" placeholder="черный&#10;белый"></textarea>
+                      <span class="la-field__hint">
+                        Как параметр цвета в каталоге (ИЛИ между значениями).
+                      </span>
                     </div>
                   </div>
                   <div class="la-card la-card--inset" style="margin-top: 14px">

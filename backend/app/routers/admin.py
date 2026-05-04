@@ -1465,6 +1465,8 @@ async def update_recommendation_blocks(
         list(form.getlist("block_limit")),
         list(form.getlist("block_enabled")),
         list(form.getlist("block_lines")),
+        list(form.getlist("block_models")),
+        list(form.getlist("block_colors")),
         list(form.getlist("block_price_min")),
         list(form.getlist("block_price_max")),
         list(form.getlist("block_mileage_max")),
