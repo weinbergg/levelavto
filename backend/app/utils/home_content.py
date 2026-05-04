@@ -209,6 +209,83 @@ def default_home_content() -> Dict[str, Any]:
     return deepcopy(DEFAULT_HOME_CONTENT)
 
 
+def _pad_about_cards(about: Dict[str, Any]) -> None:
+    """Guarantee at least four “about” cards — ``home.html`` indexes ``cards[0..3]``."""
+
+    cards_src = DEFAULT_HOME_CONTENT["about"]["cards"]
+    raw_cards = about.get("cards")
+    if not isinstance(raw_cards, list):
+        about["cards"] = deepcopy(cards_src)
+        return
+    cards: list[Any] = []
+    for entry in raw_cards:
+        if isinstance(entry, dict):
+            cards.append(entry)
+        elif isinstance(entry, str):
+            cards.append({"title": entry, "items": []})
+        else:
+            cards.append({"title": str(entry), "items": []})
+    while len(cards) < len(cards_src):
+        cards.append(deepcopy(cards_src[len(cards)]))
+    for card in cards:
+        if isinstance(card, dict) and not isinstance(card.get("items"), list):
+            card["items"] = []
+    about["cards"] = cards
+
+
+def _pad_seo_paragraphs(seo: Dict[str, Any]) -> None:
+    """``home.html`` reads ``paragraphs[0..2]`` — pad from defaults if truncated."""
+
+    default_paras = DEFAULT_HOME_CONTENT["seo"]["paragraphs"]
+    paras = seo.get("paragraphs")
+    if not isinstance(paras, list):
+        seo["paragraphs"] = deepcopy(default_paras)
+        return
+    texts = [str(p).strip() if p is not None else "" for p in paras]
+    while len(texts) < len(default_paras):
+        texts.append(default_paras[len(texts)])
+    seo["paragraphs"] = texts
+
+
+def _ensure_nested_defaults(base: Dict[str, Any]) -> None:
+    """Repair partially-edited CMS JSON so public templates never IndexError."""
+
+    about = base.get("about")
+    if not isinstance(about, dict):
+        base["about"] = deepcopy(DEFAULT_HOME_CONTENT["about"])
+    else:
+        _pad_about_cards(about)
+        if not isinstance(about.get("leader"), dict) or not about["leader"]:
+            about["leader"] = deepcopy(DEFAULT_HOME_CONTENT["about"]["leader"])
+
+    seo = base.get("seo")
+    if not isinstance(seo, dict):
+        base["seo"] = deepcopy(DEFAULT_HOME_CONTENT["seo"])
+    else:
+        _pad_seo_paragraphs(seo)
+
+    hero = base.get("hero")
+    if isinstance(hero, dict):
+        benefits = hero.get("benefits")
+        if not isinstance(benefits, list) or len(benefits) < 1:
+            hero["benefits"] = deepcopy(DEFAULT_HOME_CONTENT["hero"]["benefits"])
+        actions = hero.get("actions")
+        if not isinstance(actions, dict):
+            hero["actions"] = deepcopy(DEFAULT_HOME_CONTENT["hero"]["actions"])
+        else:
+            for key, val in DEFAULT_HOME_CONTENT["hero"]["actions"].items():
+                actions.setdefault(key, val)
+
+    rec = base.get("recommended")
+    if not isinstance(rec, dict):
+        base["recommended"] = deepcopy(DEFAULT_HOME_CONTENT["recommended"])
+    else:
+        default_rec = DEFAULT_HOME_CONTENT["recommended"]
+        for key in ("title", "subtitle", "badge_label", "empty_note"):
+            if not str(rec.get(key) or "").strip():
+                rec[key] = default_rec[key]
+
+
 def build_home_content(content_map: Dict[str, str]) -> Dict[str, Any]:
     base = default_home_content()
     raw = content_map.get("home_content")
@@ -261,6 +338,7 @@ def build_home_content(content_map: Dict[str, str]) -> Dict[str, Any]:
     about_subtitle_norm = (base.get("about", {}).get("subtitle") or "").strip().lower()
     if about_subtitle_norm == "с 2019г. занимаюсь импортом автомобилей по всему миру.":
         base["about"]["subtitle"] = DEFAULT_HOME_CONTENT["about"]["subtitle"]
+    _ensure_nested_defaults(base)
     return base
 
 
