@@ -125,6 +125,9 @@ def main() -> None:
     include_brand_lists = os.getenv("PREWARM_INCLUDE_BRAND_LISTS", "1") != "0"
     include_brand_counts = os.getenv("PREWARM_INCLUDE_BRAND_COUNTS", "1") != "0"
     include_engine_lists = os.getenv("PREWARM_INCLUDE_ENGINE_LISTS", "1") != "0"
+    include_broad_base = os.getenv("PREWARM_INCLUDE_BROAD_BASE", "1") != "0"
+    include_broad_counts = os.getenv("PREWARM_INCLUDE_BROAD_COUNTS", "1") != "0"
+    include_broad_lists = os.getenv("PREWARM_INCLUDE_BROAD_LISTS", "1") != "0"
     include_country_sweep = os.getenv("PREWARM_COUNTRY_SWEEP", "0") == "1"
     list_sort = os.getenv("PREWARM_LIST_SORT", "price_asc")
     list_sorts_raw = os.getenv("PREWARM_LIST_SORTS", "").strip()
@@ -197,10 +200,14 @@ def main() -> None:
     with SessionLocal() as db:
         service = CarsService(db)
         base_tasks: List[Dict[str, Any]] = [
-            {"region": "EU"},
             {"region": "EU", "country": eu_country},
-            {"region": "KR"},
         ]
+        if include_broad_base:
+            base_tasks = [
+                {"region": "EU"},
+                {"region": "EU", "country": eu_country},
+                {"region": "KR"},
+            ]
         if os.getenv("INCLUDE_RU_PREWARM") == "1":
             base_tasks.append({"region": "RU"})
         for params in base_tasks:
@@ -211,10 +218,14 @@ def main() -> None:
             print(f"[prewarm] filter_ctx_base key={key} ms={ms:.2f}")
         if include_payload_ctx:
             payload_tasks: List[Dict[str, Any]] = [
-                {"region": "EU"},
                 {"region": "EU", "country": eu_country},
-                {"region": "KR"},
             ]
+            if include_broad_base:
+                payload_tasks = [
+                    {"region": "EU"},
+                    {"region": "EU", "country": eu_country},
+                    {"region": "KR"},
+                ]
             for params in payload_tasks:
                 if _should_stop(started, max_sec):
                     print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)
@@ -255,12 +266,15 @@ def main() -> None:
         total = service.total_cars()
         redis_set_json(build_total_cars_key(), total, ttl_sec=600)
         print(f"[prewarm] total_cars={total}")
-        count_keys = [
-            {"region": "EU"},
-            {"region": "KR"},
-        ]
+        count_keys: List[Dict[str, Any]] = []
         for c in priority_countries:
             count_keys.append({"region": "EU", "country": c})
+        if include_broad_counts:
+            count_keys = [
+                {"region": "EU"},
+                {"region": "KR"},
+                *count_keys,
+            ]
         if include_country_sweep:
             for c in country_sweep:
                 if c not in priority_countries:
@@ -305,10 +319,14 @@ def main() -> None:
         # Priority: warm broad generic pages first so the main catalog is hot
         # even if brand prewarming is cut short by PREWARM_MAX_SEC.
         list_tasks = [
-            {"region": "EU"},
-            {"region": "KR"},
             {"region": "EU", "country": eu_country},
         ]
+        if include_broad_lists:
+            list_tasks = [
+                {"region": "EU"},
+                {"region": "KR"},
+                {"region": "EU", "country": eu_country},
+            ]
         for params in list_tasks:
             if _should_stop(started, max_sec):
                 print("[prewarm] stop by PREWARM_MAX_SEC", flush=True)

@@ -194,6 +194,9 @@ def test_deploy_cron_has_midday_public_prewarm():
     assert "scripts/prewarm_public_site.sh" in cron
     assert 'python -m backend.app.scripts.prewarm_cache' in script
     assert 'PREWARM_INCLUDE_PAYLOAD="${PREWARM_INCLUDE_PAYLOAD:-1}"' in script
+    assert 'PREWARM_INCLUDE_BROAD_BASE="${PREWARM_INCLUDE_BROAD_BASE:-0}"' in script
+    assert 'PREWARM_INCLUDE_BROAD_COUNTS="${PREWARM_INCLUDE_BROAD_COUNTS:-0}"' in script
+    assert 'PREWARM_INCLUDE_BROAD_LISTS="${PREWARM_INCLUDE_BROAD_LISTS:-0}"' in script
     assert 'PREWARM_INCLUDE_BRAND_LISTS="${PREWARM_INCLUDE_BRAND_LISTS:-0}"' in script
     assert 'PREWARM_INCLUDE_BRAND_COUNTS="${PREWARM_INCLUDE_BRAND_COUNTS:-0}"' in script
     assert 'PREWARM_INCLUDE_ENGINE_LISTS="${PREWARM_INCLUDE_ENGINE_LISTS:-0}"' in script
@@ -217,6 +220,9 @@ def test_payload_exact_filters_use_jsonb_contains_and_daily_prewarm_stays_light(
     assert 'PREWARM_INCLUDE_ENGINE_LISTS="${PREWARM_INCLUDE_ENGINE_LISTS:-0}"' in pipeline
     assert "idx_cars_payload_jsonb_exact_avail" in migration
     assert "USING GIN ((CAST(source_payload AS jsonb)) jsonb_path_ops)" in migration
+    assert 'include_broad_base = os.getenv("PREWARM_INCLUDE_BROAD_BASE", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
+    assert 'include_broad_counts = os.getenv("PREWARM_INCLUDE_BROAD_COUNTS", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
+    assert 'include_broad_lists = os.getenv("PREWARM_INCLUDE_BROAD_LISTS", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
 
 
 def test_admin_featured_lists_only_active_and_removes_cleared_rows():

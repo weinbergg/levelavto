@@ -1,7 +1,7 @@
 """add gin index for exact payload filters
 
 Revision ID: 0040_payload_exact_filter_gin
-Revises: 0039_drive_type_check_constraint
+Revises: 0039_drive_type_check
 Create Date: 2026-05-04
 """
 
@@ -9,7 +9,7 @@ from alembic import op
 
 
 revision = "0040_payload_exact_filter_gin"
-down_revision = "0039_drive_type_check_constraint"
+down_revision = "0039_drive_type_check"
 branch_labels = None
 depends_on = None
 
