@@ -1356,6 +1356,26 @@ def update_featured(
     return _admin_redirect(msg)
 
 
+@router.post("/admin/featured/clear")
+def clear_featured(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    placement: str = Form("recommended"),
+):
+    """Explicit single-click reset of the pinned list for ``placement``.
+
+    Submitting an empty list via the regular form works, but operators
+    found it counter-intuitive ("I removed all chips, why is the form
+    still asking me to save?"). This endpoint is the one obvious button
+    that wipes everything and returns the home page to auto-selection.
+    """
+
+    AdminService(db).set_featured(placement, [])
+    _bump_home_caches()
+    return _admin_redirect("Список очищен — на главной снова работает автоподбор")
+
+
 @router.get("/admin/featured/template")
 def download_featured_template(
     request: Request,

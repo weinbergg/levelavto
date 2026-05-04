@@ -52,6 +52,23 @@ def main() -> None:
         default="",
         help="comma-separated brand list (case-insensitive), e.g. BMW,Mercedes-Benz",
     )
+    ap.add_argument(
+        "--age-min",
+        type=int,
+        default=None,
+        help="minimum car age in years (uses registration_year; e.g. --age-min 3)",
+    )
+    ap.add_argument(
+        "--age-max",
+        type=int,
+        default=None,
+        help="maximum car age in years (e.g. --age-max 5 to limit to cars 5y old or younger)",
+    )
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="count rows under selection and estimate runtime without touching anything",
+    )
     args = ap.parse_args()
 
     if args.shard_total < 1:
@@ -145,6 +162,16 @@ def main() -> None:
         if args.since_minutes:
             since_ts = datetime.utcnow() - timedelta(minutes=args.since_minutes)
             base = base.filter(Car.updated_at >= since_ts)
+        if args.age_min is not None or args.age_max is not None:
+            # Use registration_year primarily, fall back to model year — same
+            # rule the public catalog uses for age filtering. Avoids treating
+            # cars with NULL registration_year as 0-years old.
+            current_year = datetime.utcnow().year
+            reg_year = func.coalesce(Car.registration_year, Car.year)
+            if args.age_min is not None:
+                base = base.filter(reg_year <= current_year - args.age_min)
+            if args.age_max is not None:
+                base = base.filter(reg_year >= current_year - args.age_max)
 
         min_id = base.with_entities(Car.id).order_by(Car.id.asc()).limit(1).scalar()
         max_id = base.with_entities(Car.id).order_by(Car.id.desc()).limit(1).scalar()
@@ -153,6 +180,25 @@ def main() -> None:
             return
 
         total = base.count()
+        if args.dry_run:
+            # Empirical baseline from past full-table runs on the prod box:
+            # ~250-350 rows/s with default --batch=2000. We pick 280 as a
+            # mid-range estimate so operators see a realistic ceiling.
+            est_rate = 280.0
+            est_seconds = int(total / est_rate) if total else 0
+            est_minutes = est_seconds / 60.0
+            print(
+                "[recalc_calc_cache] DRY-RUN — no writes will be performed.\n"
+                f"  Cars matching selection : {total}\n"
+                f"  ID range                : {min_id} .. {max_id}\n"
+                f"  Estimated rate          : ~{est_rate:.0f} rows/s\n"
+                f"  Estimated runtime       : {est_minutes:.1f} min "
+                f"(~{est_seconds // 3600}h {est_seconds % 3600 // 60}m)\n"
+                "  Re-run without --dry-run to actually recalculate.",
+                flush=True,
+            )
+            return
+
         start = min_id
         started_at = time.time()
         window_no = 0

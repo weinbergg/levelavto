@@ -161,6 +161,11 @@
       const hidden = root.querySelector('[data-cars-picker-input]')
       if (!input || !sugg || !chipsBox || !hidden) return
 
+      // Counter element lives in the field hint outside the picker root,
+      // so look it up at the document level. Optional — older templates
+      // can omit the marker and the picker will still work.
+      const counterEl = document.querySelector('[data-cars-picker-counter]')
+
       // Seed selected map from any prefilled chips left by the server.
       const selected = new Map()
       chipsBox.querySelectorAll('.la-chip[data-prefilled]').forEach((chip) => {
@@ -170,6 +175,7 @@
 
       function syncHidden() {
         hidden.value = Array.from(selected.keys()).join(',')
+        if (counterEl) counterEl.textContent = String(selected.size)
       }
 
       function addChip(id, info) {

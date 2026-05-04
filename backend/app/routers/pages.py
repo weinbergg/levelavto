@@ -120,11 +120,18 @@ def _home_media_redis_key() -> str:
 
 
 def _home_recommended_redis_key(cfg: Dict[str, Any], limit: int) -> str:
+    # Encode every param the operator can tweak so a config edit invalidates
+    # the cached recommendation. ``-`` for ``None`` keeps the format readable.
+    def _p(key: str) -> str:
+        val = cfg.get(key)
+        return str(val) if val is not None else "-"
     return (
         "home_recommended:"
-        f"{cfg.get('reg_year_min', 2021)}:{cfg.get('reg_year_max', 2023)}:"
-        f"{cfg.get('power_hp_max', 160)}:{cfg.get('engine_cc_max', 1900)}:"
-        f"{limit}:v{_home_dataset_version()}"
+        f"reg={_p('reg_year_min')}-{_p('reg_year_max')}:"
+        f"pwr={_p('power_hp_max')}:cc={_p('engine_cc_max')}:"
+        f"km={_p('mileage_max')}:price={_p('price_min')}-{_p('price_max')}:"
+        f"age={_p('max_age_years')}:"
+        f"limit={limit}:v{_home_dataset_version()}"
     )
 
 
@@ -418,11 +425,19 @@ def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any]
     if pinned:
         return pinned[:limit]
 
+    # All recommendation parameters that the operator can tune in
+    # /admin → "Рекомендуемые" → "Параметры подборки". They MUST all be
+    # forwarded to recommended_auto() AND embedded in the cache key,
+    # otherwise the cached snapshot stays stale across param changes.
     cache_key = (
-        cfg.get("reg_year_min", 2021),
-        cfg.get("reg_year_max", 2023),
-        cfg.get("power_hp_max", 160),
-        cfg.get("engine_cc_max", 1900),
+        cfg.get("reg_year_min"),
+        cfg.get("reg_year_max"),
+        cfg.get("power_hp_max"),
+        cfg.get("engine_cc_max"),
+        cfg.get("mileage_max"),
+        cfg.get("price_min"),
+        cfg.get("price_max"),
+        cfg.get("max_age_years"),
         limit,
         _home_dataset_version(),
     )
@@ -439,10 +454,14 @@ def _get_home_recommended(service: CarsService, db: Session, cfg: Dict[str, Any]
             _HOME_RECOMMENDED_CACHE[cache_key] = cached_ids
             return cached_items
     items = service.recommended_auto(
-        reg_year_min=cfg.get("reg_year_min", 2021),
-        reg_year_max=cfg.get("reg_year_max", 2023),
-        power_hp_max=cfg.get("power_hp_max", 160),
-        engine_cc_max=cfg.get("engine_cc_max", 1900),
+        max_age_years=cfg.get("max_age_years"),
+        price_min=cfg.get("price_min"),
+        price_max=cfg.get("price_max"),
+        mileage_max=cfg.get("mileage_max"),
+        reg_year_min=cfg.get("reg_year_min"),
+        reg_year_max=cfg.get("reg_year_max"),
+        power_hp_max=cfg.get("power_hp_max"),
+        engine_cc_max=cfg.get("engine_cc_max"),
         limit=limit,
     )
     ids = [int(car.id) for car in items if getattr(car, "id", None)]

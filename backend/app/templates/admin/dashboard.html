@@ -344,11 +344,24 @@
                   </div>
                   <input type="hidden" name="car_ids" value="{% for item in featured_recommended %}{{ item.car.id }}{% if not loop.last %},{% endif %}{% endfor %}" data-cars-picker-input>
                 </div>
-                <span class="la-field__hint">Машины подгружаются в порядке добавления. Очистите все чипы и сохраните, чтобы вернуться к автоподбору по фильтрам выше.</span>
+                <span class="la-field__hint">
+                  В списке сейчас <strong data-cars-picker-counter>{{ featured_recommended|length }}</strong> машин.
+                  Введите бренд, модель или id и выберите из подсказок — машина добавится чипом ниже.
+                  Жмите × на чипе, чтобы убрать. Изменения вступают в силу только после кнопки «Сохранить список».
+                </span>
               </div>
               <div class="la-hstack">
                 <button type="submit" class="la-btn la-btn--primary">Сохранить список</button>
                 <a class="la-btn la-btn--secondary" href="/admin/featured/template">Скачать текстовый шаблон</a>
+              </div>
+            </form>
+            <form method="post" action="/admin/featured/clear" class="la-form" data-confirm="Очистить весь список рекомендуемых? На главной снова будет работать автоподбор по параметрам выше.">
+              <input type="hidden" name="placement" value="recommended">
+              <div class="la-hstack" style="margin-top: 12px">
+                <button type="submit" class="la-btn la-btn--ghost">Очистить список и вернуться к автоподбору</button>
+                <span class="la-text-dim" style="font-size: 12.5px">
+                  После очистки на главной снова будет работать подбор по параметрам слева.
+                </span>
               </div>
             </form>
             <div class="la-divider"></div>
