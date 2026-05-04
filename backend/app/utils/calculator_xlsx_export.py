@@ -30,7 +30,7 @@ _SECTION_FONT = Font(color="FFFFFF", bold=True, size=12)
 _SCENARIO_LABELS = {
     "under_3": "До 3 лет",
     "3_5": "3-5 лет",
-    "electric": "Электро / Гибрид",
+    "electric": "Электро · Гибрид",
 }
 
 

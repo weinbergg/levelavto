@@ -70,22 +70,11 @@
     <div class="la-card__body">
       <form method="post" action="/admin/calculator/preview" enctype="multipart/form-data" class="la-form">
         <div class="la-field">
-          <label class="la-field__label">Файл (.xlsx / .xlsm / .xls)</label>
+          <label class="la-field__label">Файл Excel (.xlsx)</label>
           <input class="la-input" type="file" name="file" accept=".xlsx,.xlsm,.xls" required>
-          <span class="la-field__hint">Форматирование шаблона как у файла «Калькулятор Авто под заказ.xlsx».</span>
+          <span class="la-field__hint">Используйте файл, скачанный кнопкой выше — структура такая же.</span>
         </div>
-        <button type="submit" class="la-btn la-btn--primary">Анализ файла</button>
-      </form>
-      <div class="la-divider"></div>
-      <form method="post" action="/admin/calculator/upload" enctype="multipart/form-data" class="la-form">
-        <details>
-          <summary class="la-text-dim" style="cursor: pointer">Загрузить и применить сразу (без предпросмотра)</summary>
-          <div class="la-field" style="margin-top: 10px">
-            <label class="la-field__label">Файл (.xlsx / .xlsm / .xls)</label>
-            <input class="la-input" type="file" name="file" accept=".xlsx,.xlsm,.xls">
-          </div>
-          <button type="submit" class="la-btn la-btn--secondary la-btn--sm" data-confirm="Применить файл сразу, без предпросмотра?">Загрузить и применить</button>
-        </details>
+        <button type="submit" class="la-btn la-btn--primary">Проверить изменения</button>
       </form>
     </div>
   </div>
@@ -122,15 +111,20 @@
       </table>
     </div>
 
-    <div class="la-hstack" style="margin-top: 18px">
+    <div class="la-hstack" style="margin-top: 18px; gap: 10px; flex-wrap: wrap">
       <form method="post" action="/admin/calculator/preview/apply" style="display: inline">
         <input type="hidden" name="token" value="{{ pending.token }}">
-        <button type="submit" class="la-btn la-btn--primary" data-confirm="Применить эти изменения? Будет создана новая версия конфига.">Применить ({{ pending.total_changes }} изменений)</button>
+        <button type="submit" class="la-btn la-btn--primary"
+                data-confirm="Применить эти изменения? Будет сохранена новая версия — старую можно вернуть кнопкой «Откатить» в истории версий.">
+          Применить ({{ pending.total_changes }} изменений)
+        </button>
       </form>
       <form method="post" action="/admin/calculator/preview/discard" style="display: inline">
-        <button type="submit" class="la-btn la-btn--secondary">Отменить предпросмотр</button>
+        <button type="submit" class="la-btn la-btn--secondary">Отменить</button>
       </form>
-      <span class="la-text-dim">Конфиг текущей сессии хранится 1 час. После применения создастся новая версия (откат — через скрипт).</span>
+      <span class="la-text-dim" style="font-size: 12.5px">
+        После применения сохраняется новая версия — старую можно вернуть в истории версий выше.
+      </span>
     </div>
   </div>
 </div>
@@ -180,23 +174,10 @@
         <button type="submit" class="la-btn la-btn--primary">⟳ Запустить пересчёт сейчас</button>
       </form>
       <span class="la-text-dim" style="font-size: 12.5px">
-        Запускается в фоне, можно закрыть страницу. Прогресс — в логах контейнера web.
+        Запускается в фоне — можно закрыть страницу и продолжать работу.
+        Новые цены появятся в каталоге постепенно по мере пересчёта.
       </span>
     </div>
-
-    <details style="margin-top: 16px">
-      <summary class="la-text-dim" style="cursor: pointer; font-size: 12.5px">Расширенный сценарий — выборочный пересчёт через консоль</summary>
-      <div class="la-text-dim" style="margin-top: 8px; font-size: 12.5px">
-        Если конфиг затрагивает только определённый возраст / регион — можно ограничить пересчёт.
-        Сначала <code>--dry-run</code> покажет количество и время без запуска.
-      </div>
-      <pre class="la-mono" style="margin-top: 8px; padding: 10px; background: var(--la-surface-soft); border-radius: 8px; font-size: 12px; overflow-x: auto"
->docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
-  --region EU --age-min 3 --age-max 5 --dry-run     # оценка без запуска
-
-docker compose exec -T web python -m backend.app.scripts.recalc_calc_cache \
-  --region EU --age-min 3 --age-max 5               # реальный пересчёт</pre>
-    </details>
   </div>
 </div>
 {% endblock %}
