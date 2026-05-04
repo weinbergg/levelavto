@@ -281,9 +281,9 @@
           <a class="home-recommendation-block__link" href="{{ block.catalog_href }}">Открыть подборку</a>
           {% endif %}
         </div>
-        {% if block.items %}
+        {% if block['items'] %}
         <div class="home-recommendation-grid">
-          {% for car in block.items %}
+          {% for car in block['items'] %}
           <a class="card car-card home-recommendation-card" href="/car/{{ car.id }}">
             <div class="thumb-wrap">
               <span class="badge-tag badge-tag--alt">{{ home.recommended.badge_label }}</span>
