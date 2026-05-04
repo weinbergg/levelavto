@@ -126,6 +126,9 @@ def main() -> None:
     parse_status = Counter()
     model_counter = Counter()
     bucket_model_counter = Counter()
+    bucket_country_counter = Counter()
+    brand_total_in_csv = 0
+    brand_models_in_csv: Counter[str] = Counter()
 
     with SessionLocal() as db:
         source_id = db.execute(select(Source.id).where(Source.key == "mobile_de")).scalar_one()
@@ -259,8 +262,11 @@ def main() -> None:
             reg_year_min=args.reg_year_min,
         ):
             continue
+        brand_total_in_csv += 1
+        brand_models_in_csv[str(payload.get("model") or "")] += 1
         payload_model_key = model_lookup_key(payload.get("model"))
         if payload_model_key in alias_keys:
+            bucket_country_counter[str(payload.get("country") or "?").upper()] += 1
             ext_id = str(payload.get("external_id") or "").strip()
             if ext_id:
                 if ext_id in bucket_csv_matches:
@@ -449,10 +455,15 @@ def main() -> None:
                 "count": int(matched_group.get("count") or 0) if matched_group else None,
                 "models": [str(item.get("value") or "") for item in (matched_group.get("models") or [])] if matched_group else [],
             },
+            "brand_in_csv": {
+                "total_rows_for_brand": brand_total_in_csv,
+                "model_breakdown": dict(brand_models_in_csv.most_common(40)),
+            },
             "csv": {
                 "matching_unique_external_ids": len(bucket_csv_ids),
                 "matching_duplicate_rows": duplicate_bucket_match_ids,
                 "matching_models": dict(bucket_model_counter.most_common(30)),
+                "country_breakdown": dict(bucket_country_counter.most_common(30)),
             },
             "db": {
                 "matching_total": len(bucket_db_ids),
