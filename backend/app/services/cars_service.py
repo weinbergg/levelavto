@@ -350,8 +350,29 @@ class CarsService:
         return Car.is_available.is_(True)
 
     @staticmethod
+    def _payload_json_expr():
+        return cast(Car.source_payload, JSONB)
+
+    @classmethod
+    def _payload_exact_match_clause(cls, key: str, value: Any) -> Any:
+        payload_json = cls._payload_json_expr()
+        text_value = str(value or "").strip()
+        if not text_value:
+            return None
+        if key in {"num_seats", "owners_count"}:
+            clauses = [payload_json.contains({key: text_value})]
+            try:
+                int_value = int(text_value)
+            except Exception:
+                int_value = None
+            if int_value is not None:
+                clauses.append(payload_json.contains({key: int_value}))
+            return or_(*clauses) if len(clauses) > 1 else clauses[0]
+        return payload_json.contains({key: text_value})
+
+    @staticmethod
     def _registration_defaulted_expr():
-        payload_json = cast(Car.source_payload, JSONB)
+        payload_json = CarsService._payload_json_expr()
         return (
             func.coalesce(
                 func.jsonb_extract_path_text(payload_json, "registration_defaulted"),
@@ -362,7 +383,7 @@ class CarsService:
 
     @classmethod
     def _registration_year_defaulted_expr(cls):
-        payload_json = cast(Car.source_payload, JSONB)
+        payload_json = cls._payload_json_expr()
         fallback_year, _ = get_missing_registration_default()
         # EU rows should trust the parsed first-registration year when it exists.
         # The defaulted flags were introduced to protect KR imports where fallback
@@ -397,7 +418,7 @@ class CarsService:
 
     @classmethod
     def _registration_month_defaulted_expr(cls):
-        payload_json = cast(Car.source_payload, JSONB)
+        payload_json = cls._payload_json_expr()
         _, fallback_month = get_missing_registration_default()
         month_defaulted_flag = and_(
             Car.country.like("KR%"),
@@ -1972,21 +1993,33 @@ class CarsService:
             if clause is not None:
                 conditions.append(clause)
 
-        payload_json = cast(Car.source_payload, JSONB)
+        payload_json = self._payload_json_expr()
         payload_text = func.lower(cast(Car.source_payload, String))
 
         if num_seats and "num_seats" not in exclude:
-            conditions.append(func.jsonb_extract_path_text(payload_json, "num_seats") == str(num_seats))
+            clause = self._payload_exact_match_clause("num_seats", num_seats)
+            if clause is not None:
+                conditions.append(clause)
         if doors_count and "doors_count" not in exclude:
-            conditions.append(func.jsonb_extract_path_text(payload_json, "doors_count") == str(doors_count))
+            clause = self._payload_exact_match_clause("doors_count", doors_count)
+            if clause is not None:
+                conditions.append(clause)
         if emission_class and "emission_class" not in exclude:
-            conditions.append(func.jsonb_extract_path_text(payload_json, "emission_class") == emission_class)
+            clause = self._payload_exact_match_clause("emission_class", emission_class)
+            if clause is not None:
+                conditions.append(clause)
         if efficiency_class and "efficiency_class" not in exclude:
-            conditions.append(func.jsonb_extract_path_text(payload_json, "efficiency_class") == efficiency_class)
+            clause = self._payload_exact_match_clause("efficiency_class", efficiency_class)
+            if clause is not None:
+                conditions.append(clause)
         if climatisation and "climatisation" not in exclude:
-            conditions.append(func.jsonb_extract_path_text(payload_json, "climatisation") == climatisation)
+            clause = self._payload_exact_match_clause("climatisation", climatisation)
+            if clause is not None:
+                conditions.append(clause)
         if airbags and "airbags" not in exclude:
-            conditions.append(func.jsonb_extract_path_text(payload_json, "airbags") == airbags)
+            clause = self._payload_exact_match_clause("airbags", airbags)
+            if clause is not None:
+                conditions.append(clause)
         interior_payload_expr = func.lower(
             func.coalesce(func.jsonb_extract_path_text(payload_json, "interior_design"), "")
         )
@@ -2066,9 +2099,13 @@ class CarsService:
                 )
             )
         if price_rating_label and "price_rating_label" not in exclude:
-            conditions.append(func.jsonb_extract_path_text(payload_json, "price_rating_label") == price_rating_label)
+            clause = self._payload_exact_match_clause("price_rating_label", price_rating_label)
+            if clause is not None:
+                conditions.append(clause)
         if owners_count and "owners_count" not in exclude:
-            conditions.append(func.jsonb_extract_path_text(payload_json, "owners_count") == str(owners_count))
+            clause = self._payload_exact_match_clause("owners_count", owners_count)
+            if clause is not None:
+                conditions.append(clause)
 
         if generation and "generation" not in exclude:
             conditions.append(func.lower(Car.generation).like(func.lower(f"%{generation.strip()}%")))

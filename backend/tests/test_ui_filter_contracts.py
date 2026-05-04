@@ -199,6 +199,26 @@ def test_deploy_cron_has_midday_public_prewarm():
     assert 'PREWARM_INCLUDE_ENGINE_LISTS="${PREWARM_INCLUDE_ENGINE_LISTS:-0}"' in script
 
 
+def test_payload_exact_filters_use_jsonb_contains_and_daily_prewarm_stays_light():
+    repo_root = Path(__file__).resolve().parents[2]
+    service = _read("app/services/cars_service.py")
+    pipeline = (repo_root / "scripts" / "mobilede_daily_pipeline.sh").read_text(encoding="utf-8")
+    migration = (repo_root / "migrations" / "versions" / "0040_payload_exact_filter_gin.py").read_text(
+        encoding="utf-8"
+    )
+    assert "def _payload_exact_match_clause" in service
+    assert 'payload_json.contains({key: text_value})' in service
+    assert 'payload_json.contains({key: int_value})' in service
+    assert 'clause = self._payload_exact_match_clause("num_seats", num_seats)' in service
+    assert 'clause = self._payload_exact_match_clause("doors_count", doors_count)' in service
+    assert 'clause = self._payload_exact_match_clause("owners_count", owners_count)' in service
+    assert 'PREWARM_INCLUDE_BRAND_LISTS="${PREWARM_INCLUDE_BRAND_LISTS:-0}"' in pipeline
+    assert 'PREWARM_INCLUDE_BRAND_COUNTS="${PREWARM_INCLUDE_BRAND_COUNTS:-0}"' in pipeline
+    assert 'PREWARM_INCLUDE_ENGINE_LISTS="${PREWARM_INCLUDE_ENGINE_LISTS:-0}"' in pipeline
+    assert "idx_cars_payload_jsonb_exact_avail" in migration
+    assert "USING GIN ((CAST(source_payload AS jsonb)) jsonb_path_ops)" in migration
+
+
 def test_main_enables_gzip_for_large_html_and_api_payloads():
     main = _read("app/main.py")
     assert "GZipMiddleware" in main
