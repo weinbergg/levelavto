@@ -200,6 +200,8 @@ def test_deploy_cron_has_midday_public_prewarm():
     assert "0 14 * * *" in cron
     assert "scripts/prewarm_public_site.sh" in cron
     assert 'python -m backend.app.scripts.prewarm_cache' in script
+    assert 'curl -fsS --max-time 20 "http://localhost:8000/" >/dev/null || true' in script
+    assert 'curl -fsS --max-time 20 "http://localhost:8000/catalog?region=EU&country=${PREWARM_EU_COUNTRY:-DE}&sort=price_asc" >/dev/null || true' in script
     assert 'PREWARM_INCLUDE_PAYLOAD="${PREWARM_INCLUDE_PAYLOAD:-1}"' in script
     assert 'PREWARM_INCLUDE_BROAD_BASE="${PREWARM_INCLUDE_BROAD_BASE:-0}"' in script
     assert 'PREWARM_INCLUDE_BROAD_COUNTS="${PREWARM_INCLUDE_BROAD_COUNTS:-0}"' in script
@@ -1371,7 +1373,9 @@ def test_analytics_page_uses_real_traffic_data():
     base = _read("app/templates/base.html")
     assert "traffic_overview" in service
     assert "func.count(func.distinct(PageVisit.visitor_id))" in service
+    assert "def _page_href(" in service
     assert "Топ-страницы" in template
+    assert '<a href="{{ row.href }}" target="_blank" rel="noopener"><code>{{ row.path }}</code></a>' in template
     assert "{% for row in traffic.timeline %}" in template
     assert "_VISITOR_COOKIE = \"la_vid\"" in middleware
     assert "_CONSENT_COOKIE = \"la_consent\"" in middleware

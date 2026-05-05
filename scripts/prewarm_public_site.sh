@@ -23,4 +23,9 @@ docker compose exec -T web env \
   PREWARM_EU_COUNTRY="${PREWARM_EU_COUNTRY:-DE}" \
   python -m backend.app.scripts.prewarm_cache || true
 
+# Warm the real SSR entrypoints too. The Python prewarm above hydrates
+# filters/list/count caches, but not the rendered home/catalog HTML.
+curl -fsS --max-time 20 "http://localhost:8000/" >/dev/null || true
+curl -fsS --max-time 20 "http://localhost:8000/catalog?region=EU&country=${PREWARM_EU_COUNTRY:-DE}&sort=price_asc" >/dev/null || true
+
 echo "[prewarm_public] done $(date -Iseconds)"

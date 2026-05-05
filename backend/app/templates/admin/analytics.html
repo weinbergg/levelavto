@@ -100,7 +100,7 @@
         <tbody>
           {% for row in traffic.top_pages %}
           <tr>
-            <td><code>{{ row.path }}</code></td>
+            <td><a href="{{ row.href }}" target="_blank" rel="noopener"><code>{{ row.path }}</code></a></td>
             <td class="col-num">{{ '{:,}'.format(row.visits).replace(',', ' ') }}</td>
             <td class="col-num">{{ '{:,}'.format(row.unique).replace(',', ' ') }}</td>
           </tr>

@@ -12,6 +12,15 @@ class AdminService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    @staticmethod
+    def _page_href(path: str | None) -> str:
+        raw = str(path or "/").strip() or "/"
+        if raw.startswith(("http://", "https://", "//")):
+            return raw
+        if not raw.startswith("/"):
+            return "/" + raw
+        return raw
+
     def overview_stats(self) -> Dict[str, int]:
         """Lightweight summary numbers shown on the admin dashboard.
 
@@ -132,6 +141,7 @@ class AdminService:
         top_pages = [
             {
                 "path": row.path or "/",
+                "href": self._page_href(row.path),
                 "visits": int(row.visits or 0),
                 "unique": int(row.uniq or 0),
             }
@@ -231,4 +241,3 @@ class AdminService:
 
         self.db.commit()
         return self.list_featured(placement)
-
