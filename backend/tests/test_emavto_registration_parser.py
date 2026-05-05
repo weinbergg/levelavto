@@ -153,3 +153,69 @@ def test_emavto_detail_extracts_engine_cc_from_data_displacement_and_label():
     assert detail["engine_cc"] == 5514
     assert detail["source_payload"]["engine_cc_raw"] == "5514"
     assert detail["source_payload"]["engine_cc_source"] == "emavto_data_displacement"
+
+
+def test_emavto_detail_marks_leasing_listings_for_skip():
+    parser = _parser()
+    html = """
+    <html><body>
+      <div class="car-labels">
+        <p class="label-leasing">
+          Автомобиль в лизинге
+        </p>
+      </div>
+      <main class="car-details" data-displacement="1998"></main>
+    </body></html>
+    """
+
+    class _Resp:
+        status_code = 200
+        text = html
+        headers = {}
+
+    parser._request_with_backoff = lambda url, params, bucket, is_detail, client=None, deadline=None: _Resp()  # type: ignore[assignment]
+
+    detail = parser._fetch_detail("https://example.com/car/leasing", bucket=type("B", (), {"acquire": lambda self: None})())
+
+    assert detail["skip_reason"] == "leasing"
+    assert detail["source_payload"]["emavto_is_leasing"] is True
+    assert detail["source_payload"]["emavto_skip_reason"] == "leasing"
+
+
+def test_emavto_backfill_skips_leasing_listings():
+    parser = _parser()
+    html = """
+    <html><body>
+      <div class="car-labels">
+        <p class="label-leasing">Автомобиль в лизинге</p>
+      </div>
+    </body></html>
+    """
+
+    class _Resp:
+        status_code = 200
+        text = html
+        headers = {}
+
+    parser._request_with_backoff = lambda url, params, bucket, is_detail, client=None, deadline=None: _Resp()  # type: ignore[assignment]
+
+    items = parser.fetch_missing_details(
+        [
+            {
+                "external_id": "leasing-1",
+                "source_url": "https://example.com/car/leasing-1",
+                "brand": "BMW",
+                "model": "X3",
+                "year": 2026,
+                "mileage": 624,
+                "price": 65000,
+                "engine_type": "petrol",
+                "thumbnail_url": "https://example.com/x3.jpg",
+                "kr_market_type": "import",
+            }
+        ],
+        max_runtime_sec=30,
+    )
+
+    assert items == []
+    assert parser.metrics["skipped_leasing"] == 1

@@ -49,6 +49,16 @@ def test_reclassify_emavto_market_type_script_has_safe_bulk_repair_flags():
     assert "[reclassify_emavto_market_type]" in content
 
 
+def test_cleanup_emavto_leasing_script_has_safe_repair_flags():
+    content = _read("app/scripts/cleanup_emavto_leasing.py")
+    assert "--car-id" in content
+    assert "--limit" in content
+    assert "--include-inactive" in content
+    assert "--delete" in content
+    assert "--apply" in content
+    assert "[cleanup_emavto_leasing]" in content
+
+
 def test_debug_kr_price_status_script_reports_missing_spec_causes():
     content = _read("app/scripts/debug_kr_price_status.py")
     assert "--sample-limit" in content

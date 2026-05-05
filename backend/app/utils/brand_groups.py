@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 BRAND_FILTER_PRIORITY: List[str] = [
     "Mercedes-Benz",
-    "BMW",
     "Audi",
     "Volkswagen",
     "Porsche",
@@ -46,6 +45,8 @@ TOP_MODELS_CONTENT_KEY = "top_models_json"
 _PRIORITY_ALIASES: Dict[str, str] = {
     "rollsroyce": "Rolls-Royce",
     "rolls royce": "Rolls-Royce",
+    "rolls roy's": "Rolls-Royce",
+    "rolls roys": "Rolls-Royce",
     "rolls-royce": "Rolls-Royce",
     "landrover": "Land Rover",
     "land-rover": "Land Rover",

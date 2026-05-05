@@ -904,6 +904,28 @@ def test_emavto_registration_recovery_and_stale_lock_contracts():
     assert "exit 1" in wrapper
 
 
+def test_emavto_leasing_skip_and_cleanup_contracts():
+    parser = _read("app/parsing/emavto_klg.py")
+    script = _read("app/scripts/cleanup_emavto_leasing.py")
+    brands = _read("app/utils/brand_groups.py")
+    assert "LEASING_MARKERS = (" in parser
+    assert 'if detail.get("skip_reason") == "leasing":' in parser
+    assert 'out["skip_reason"] = "leasing"' in parser
+    assert '"emavto_is_leasing": True' in parser
+    assert "def _detail_has_leasing_marker(" in parser
+    assert 'if soup.select_one(".label-leasing"):' in parser
+    assert 'BRAND_FILTER_PRIORITY: List[str] = [' in brands
+    assert '"Mercedes-Benz",' in brands
+    assert '"Audi",' in brands
+    assert '"BMW",' not in brands.split("BRAND_FILTER_PRIORITY: List[str] = [", 1)[1].split("]", 1)[0]
+    assert "rolls roy's" in brands
+    assert "--include-inactive" in script
+    assert "--delete" in script
+    assert "_merge_leasing_payload" in script
+    assert 'detail.get("skip_reason") == "leasing"' in script
+    assert 'car.is_available = False' in script
+
+
 def test_model_filters_use_canonical_labels_with_alias_restore():
     service = _read("app/services/cars_service.py")
     router = _read("app/routers/catalog.py")

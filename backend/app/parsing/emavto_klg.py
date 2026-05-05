@@ -26,6 +26,9 @@ class EmAvtoKlgParser(BaseParser):
     DETAILS_SEP_RE = re.compile(r"[·•|\u00b7]")
     DIGITS_RE = re.compile(r"\d+")
     REGISTRATION_LABELS = ["Дата постановки на учет", "Дата постановки на учёт"]
+    LEASING_MARKERS = (
+        "автомобиль в лизинге",
+    )
     MONTHS_RU = {
         "январь": 1,
         "февраль": 2,
@@ -82,6 +85,7 @@ class EmAvtoKlgParser(BaseParser):
             "list_latency": [],
             "detail_latency": [],
             "skipped_below_min_price": 0,
+            "skipped_leasing": 0,
         }
         self.last_tasks_total: int = 0
         self.last_details_done: int = 0
@@ -223,6 +227,7 @@ class EmAvtoKlgParser(BaseParser):
         else:
             self.last_list_tasks = []
             self.last_tasks_total = len(tasks)
+            processed_detail_tasks = 0
             logger.info(
                 "[emavto_klg] detail loop start tasks=%s max_items=%s", len(
                     tasks), max_items or "inf"
@@ -245,6 +250,14 @@ class EmAvtoKlgParser(BaseParser):
                 )
                 detail = self._fetch_detail(
                     task["source_url"], detail_bucket, client=client, deadline=deadline)
+                processed_detail_tasks += 1
+                if detail.get("skip_reason") == "leasing":
+                    self.metrics["skipped_leasing"] = int(self.metrics.get("skipped_leasing", 0) or 0) + 1
+                    logger.info(
+                        "[emavto_klg] detail skip ext_id=%s reason=leasing",
+                        task.get("external_id"),
+                    )
+                    continue
                 detail_payload = dict(detail.get("source_payload") or {})
                 detail_payload["kr_market_type"] = task.get("kr_market_type")
                 detail_payload["kr_market_type_source"] = "emavto_tab"
@@ -281,8 +294,8 @@ class EmAvtoKlgParser(BaseParser):
                 )
             client.close()
             self.last_details_done = len(results)
-            if len(results) < len(tasks):
-                self.missing_tasks = tasks[len(results):]
+            if processed_detail_tasks < len(tasks):
+                self.missing_tasks = tasks[processed_detail_tasks:]
             else:
                 self.missing_tasks = []
 
@@ -349,6 +362,13 @@ class EmAvtoKlgParser(BaseParser):
                 task.get("source_url"),
             )
             detail = self._fetch_detail(task["source_url"], detail_bucket, client=client, deadline=deadline)
+            if detail.get("skip_reason") == "leasing":
+                self.metrics["skipped_leasing"] = int(self.metrics.get("skipped_leasing", 0) or 0) + 1
+                logger.info(
+                    "[emavto_klg] backfill detail skip ext_id=%s reason=leasing",
+                    task.get("external_id"),
+                )
+                continue
             detail_payload = dict(detail.get("source_payload") or {})
             detail_payload["kr_market_type"] = task.get("kr_market_type")
             detail_payload["kr_market_type_source"] = "emavto_tab"
@@ -661,6 +681,15 @@ class EmAvtoKlgParser(BaseParser):
             return out
         soup = BeautifulSoup(resp.text, "html.parser")
         page_text = soup.get_text(" ", strip=True)
+        if self._detail_has_leasing_marker(soup, page_text):
+            out["skip_reason"] = "leasing"
+            out["source_payload"] = {
+                "emavto_is_leasing": True,
+                "emavto_skip_reason": "leasing",
+            }
+            if close_client:
+                client.close()
+            return out
         pairs: Dict[str, str] = {}
         for dt in soup.find_all("dt"):
             dd = dt.find_next_sibling("dd")
@@ -753,6 +782,15 @@ class EmAvtoKlgParser(BaseParser):
         if close_client:
             client.close()
         return out
+
+    @classmethod
+    def _detail_has_leasing_marker(cls, soup: BeautifulSoup, page_text: Optional[str]) -> bool:
+        if soup.select_one(".label-leasing"):
+            return True
+        text = str(page_text or "").casefold()
+        if not text:
+            return False
+        return any(marker in text for marker in cls.LEASING_MARKERS)
 
     # --- parsing helpers ---
     def _parse_price_usd(self, price_text: Optional[str]) -> Optional[int]:
