@@ -17,6 +17,7 @@ from ..db import get_db
 from ..services.cars_service import (
     CarsService,
     normalize_brand,
+    normalize_model_label,
     effective_engine_cc_value,
     effective_power_hp_value,
     effective_power_kw_value,
@@ -84,6 +85,7 @@ _HOME_MEDIA_CACHE: TTLCache = TTLCache(maxsize=2, ttl=3600)
 _HOME_RECOMMENDED_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
 _HOME_MORE_OFFERS_CACHE: TTLCache = TTLCache(maxsize=4, ttl=900)
 _HOME_RECOMMENDATION_BLOCK_CACHE: TTLCache = TTLCache(maxsize=64, ttl=900)
+_DETAIL_SIMILAR_OFFERS_CACHE: TTLCache = TTLCache(maxsize=128, ttl=1800)
 
 
 def _detail_inline_calc_enabled() -> bool:
@@ -149,6 +151,13 @@ def _home_more_offers_redis_key(limit: int) -> str:
 def _home_recommendation_block_redis_key(signature: str) -> str:
     digest = hashlib.sha1(f"{signature}|{_home_dataset_version()}".encode("utf-8")).hexdigest()[:16]
     return f"home_recommendation_block:{digest}"
+
+
+def _detail_similar_offers_redis_key(car_id: int, signature: str, limit: int) -> str:
+    digest = hashlib.sha1(
+        f"{car_id}|{signature}|{limit}|{_home_dataset_version()}".encode("utf-8")
+    ).hexdigest()[:16]
+    return f"detail_similar:{digest}"
 
 
 def _home_recommendation_block_signature(block: Dict[str, Any], limit: int) -> str:
@@ -658,6 +667,48 @@ def _get_home_more_offers(service: CarsService, db: Session, limit: int = 12) ->
     if ids:
         _HOME_MORE_OFFERS_CACHE[cache_key] = ids
         redis_set_json(redis_key, ids, ttl_sec=1800)
+    return items
+
+
+def _get_detail_similar_offers(
+    service: CarsService,
+    db: Session,
+    car: Car,
+    *,
+    limit: int = 6,
+) -> List[Car]:
+    model_label = normalize_model_label(getattr(car, "model", None))
+    if not model_label or model_label.casefold() in {"other", "others"}:
+        return []
+    limit = max(1, min(int(limit or 6), 10))
+    signature = json.dumps(
+        {
+            "brand": getattr(car, "brand", None) or "",
+            "model": model_label,
+            "generation": getattr(car, "generation", None) or "",
+            "country": getattr(car, "country", None) or "",
+            "year": getattr(car, "year", None),
+            "reg_year": getattr(car, "registration_year", None),
+            "mileage": getattr(car, "mileage", None),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    cache_key = (int(getattr(car, "id", 0) or 0), signature, limit, _home_dataset_version())
+    cached_ids: Any = _DETAIL_SIMILAR_OFFERS_CACHE.get(cache_key)
+    if cached_ids is None:
+        cached_ids = redis_get_json(_detail_similar_offers_redis_key(int(car.id), signature, limit))
+    ids = _coerce_cached_recommendation_block_ids(cached_ids)
+    if ids:
+        cached_items = _load_cars_by_ids(db, ids)
+        if cached_items:
+            _DETAIL_SIMILAR_OFFERS_CACHE[cache_key] = ids
+            return cached_items[:limit]
+    items = service.similar_cars(car, limit=limit)
+    ids = [int(item.id) for item in items if getattr(item, "id", None)]
+    if ids:
+        _DETAIL_SIMILAR_OFFERS_CACHE[cache_key] = ids
+        redis_set_json(_detail_similar_offers_redis_key(int(car.id), signature, limit), ids, ttl_sec=1800)
     return items
 
 
@@ -2131,7 +2182,7 @@ def catalog_page(request: Request, db=Depends(get_db), user=Depends(get_current_
                     timing["initial_decorate_ms"] = 0.0
                     timing["initial_images_ms"] = 0.0
                     timing["initial_cache_hit"] = 1.0
-                    if os.getenv("CATALOG_SSR_REFRESH_PRICES", "1") != "0":
+                    if os.getenv("CATALOG_SSR_REFRESH_PRICES", "0") != "0":
                         try:
                             t_sync = time.perf_counter()
                             service.sync_light_rows_from_db(
@@ -2679,7 +2730,7 @@ def car_detail_page(car_id: int, request: Request, db=Depends(get_db), user=Depe
         pricing = service.price_info(car)
         if _detail_similar_offers_enabled():
             try:
-                similar_offers = service.similar_cars(car, limit=10)
+                similar_offers = _get_detail_similar_offers(service, db, car, limit=6)
             except Exception:
                 logger.exception("detail_similar_offers_failed car=%s", getattr(car, "id", None))
                 similar_offers = []

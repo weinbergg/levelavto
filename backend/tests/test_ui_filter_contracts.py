@@ -78,6 +78,8 @@ def test_js_updates_generation_visibility_and_select_disabled_state():
     assert "if (!ssrHydrated) {" in script
     assert "void loadCars(initialPage)" in script
     assert script.count("cards.dataset.ssr = '0'") >= 2
+    assert "img.src = nextThumb || nextOrig" in script
+    assert "applyThumbFallback(img)" in script
     assert "contentWrap.className = 'model-accordion__content'" in script or 'contentWrap.className = "model-accordion__content"' in script
 
 
@@ -186,6 +188,7 @@ def test_base_template_bumps_app_bundle_version():
 def test_catalog_ssr_cache_hit_refreshes_prices_and_recomputes_display_price():
     pages_router = _read("app/routers/pages.py")
     assert 'CATALOG_SSR_REFRESH_PRICES' in pages_router
+    assert 'os.getenv("CATALOG_SSR_REFRESH_PRICES", "0") != "0"' in pages_router
     assert 'service.sync_light_rows_from_db(' in pages_router
     assert 'resolve_public_display_price_rub(' in pages_router
     assert 'catalog_ssr_cache_refresh_failed' in pages_router
@@ -244,6 +247,18 @@ def test_payload_exact_filters_use_text_expr_for_hot_fields_and_daily_prewarm_st
     assert 'include_broad_lists = os.getenv("PREWARM_INCLUDE_BROAD_LISTS", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
     assert "count_only=True" in service
     assert 'use_fast_count=os.getenv("CATALOG_USE_FAST_COUNT", "1") != "0"' in service
+
+
+def test_registration_month_filters_require_explicit_boundary_months():
+    service = _read("app/services/cars_service.py")
+    assert "def _registration_has_explicit_month_expr(cls)" in service
+    assert "reg_month_known_expr = self._registration_has_explicit_month_expr()" in service
+    assert "reg_month_known_expr," in service
+
+
+def test_detail_template_prefers_thumb_proxy_for_primary_image():
+    template = _read("app/templates/car_detail.html")
+    assert "{% set primary_src = primary_thumb_src or primary_fast_src or primary_raw %}" in template
 
 
 def test_admin_featured_lists_only_active_and_removes_cleared_rows():
@@ -1155,7 +1170,7 @@ def test_catalog_cards_stay_rub_only_and_detail_primary_prefers_thumb_with_orig_
     assert "{% elif car.price %}" not in catalog_template
     assert "primary_thumb_src = thumbs.thumb_src(primary_raw, 640, 5)" in detail_template
     assert "{% set primary_fast_src = (car.thumbnail_url or primary_thumb_src or '')|trim %}" in detail_template
-    assert "{% set primary_src = primary_fast_src or primary_raw %}" in detail_template
+    assert "{% set primary_src = primary_thumb_src or primary_fast_src or primary_raw %}" in detail_template
     assert 'fetchpriority="high"' in detail_template
     assert "data-thumb=\"{{ primary_fast_src or primary_thumb_src or '' }}\"" in detail_template
     assert "if (!img.dataset.thumbFallbackTried" in script
@@ -1165,7 +1180,7 @@ def test_catalog_cards_stay_rub_only_and_detail_primary_prefers_thumb_with_orig_
     assert "if similar_offers and os.getenv" in pages
     assert 'logger.exception("detail_similar_offers_failed car=%s"' in pages
     assert "applyThumbFallback(primary)" in script
-    assert "img.src = nextOrig || nextThumb" in script
+    assert "img.src = nextThumb || nextOrig" in script
     assert "applyThumbFallback(img)" in script
     assert "const renderedSrc = img.getAttribute('src') || ''" in script
     assert "ordered_images = sorted(" in pages

@@ -468,6 +468,13 @@ class CarsService:
         )
 
     @classmethod
+    def _registration_has_explicit_month_expr(cls):
+        return and_(
+            Car.registration_month.is_not(None),
+            not_(cls._registration_uses_fallback_month_expr()),
+        )
+
+    @classmethod
     def _effective_registration_year_expr(cls):
         return case(
             (cls._registration_uses_model_year_expr(), Car.year),
@@ -2199,6 +2206,7 @@ class CarsService:
         reg_year_expr = self._effective_registration_year_expr()
         reg_month_floor_expr = self._effective_registration_month_floor_expr()
         reg_month_ceil_expr = self._effective_registration_month_ceil_expr()
+        reg_month_known_expr = self._registration_has_explicit_month_expr()
 
         if reg_year_min is not None and "reg_year_min" not in exclude:
             if reg_month_min is not None and "reg_month_min" not in exclude:
@@ -2208,6 +2216,7 @@ class CarsService:
                         reg_year_expr > reg_year_min,
                         and_(
                             reg_year_expr == reg_year_min,
+                            reg_month_known_expr,
                             reg_month_floor_expr >= reg_month_min,
                         ),
                     )
@@ -2223,6 +2232,7 @@ class CarsService:
                         reg_year_expr < reg_year_max,
                         and_(
                             reg_year_expr == reg_year_max,
+                            reg_month_known_expr,
                             reg_month_ceil_expr <= reg_month_max,
                         ),
                     )
@@ -4396,6 +4406,8 @@ class CarsService:
         generation_key = str(car.generation or "").strip().lower()
         body_key = normalize_body_type(car.body_type) or str(car.body_type or "").strip().lower()
         engine_key = normalize_fuel(car.engine_type) or str(car.engine_type or "").strip().lower()
+        if not model_key or model_key in {"other", "others"}:
+            return []
         if not brand_keys and not model_key:
             return []
         limit_num = max(1, min(int(limit or 10), 24))

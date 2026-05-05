@@ -4470,8 +4470,8 @@
       delete img.dataset.thumbRetried
       delete img.dataset.thumbFallbackTried
       delete img.dataset.fallbackApplied
-      img.src = nextOrig || nextThumb
-      applyThumbFallback(img, { thumbProxy: false })
+      img.src = nextThumb || nextOrig
+      applyThumbFallback(img)
       syncActive()
     }
     const move = (step) => {

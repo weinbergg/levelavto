@@ -46,7 +46,7 @@
         {% set primary_raw = (primary or '')|trim %}
         {% set primary_thumb_src = thumbs.thumb_src(primary_raw, 640, 5) %}
         {% set primary_fast_src = (car.thumbnail_url or primary_thumb_src or '')|trim %}
-        {% set primary_src = primary_fast_src or primary_raw %}
+        {% set primary_src = primary_thumb_src or primary_fast_src or primary_raw %}
         <div class="detail-hero__main placeholder" data-images='{{ image_urls | tojson }}'>
           <button class="fav-btn fav-btn--detail" data-fav-button data-car-id="{{ car.id }}" aria-label="Добавить в избранное">★</button>
           {% if primary %}
