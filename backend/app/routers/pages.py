@@ -154,6 +154,7 @@ def _home_recommendation_block_redis_key(signature: str) -> str:
 def _home_recommendation_block_signature(block: Dict[str, Any], limit: int) -> str:
     payload = {
         "lines": block.get("lines") or [],
+        "keywords": block.get("keywords") or "",
         "price_min": block.get("price_min"),
         "price_max": block.get("price_max"),
         "mileage_max": block.get("mileage_max"),
@@ -174,6 +175,7 @@ def _home_recommendation_block_has_auto_filters(block: Dict[str, Any]) -> bool:
         (block.get("lines") or [])
         or (block.get("models") or [])
         or (block.get("colors") or [])
+        or str(block.get("keywords") or "").strip()
         or block.get("price_min") is not None
         or block.get("price_max") is not None
         or block.get("mileage_max") is not None
@@ -225,6 +227,7 @@ def _merge_home_recommendation_block_items(
         buffer = max(48, limit * 3)
         models = block.get("models") or []
         colors = block.get("colors") or []
+        keywords = str(block.get("keywords") or "").strip()
         model_param = ",".join(str(m) for m in models) if models else None
         color_param = ",".join(str(c) for c in colors) if colors else None
         auto_items = service.preview_cars(
@@ -232,6 +235,7 @@ def _merge_home_recommendation_block_items(
             lines=block.get("lines") or None,
             model=model_param,
             color=color_param,
+            q=keywords or None,
             price_min=block.get("price_min"),
             price_max=block.get("price_max"),
             mileage_max=block.get("mileage_max"),

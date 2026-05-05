@@ -397,11 +397,44 @@
     const tpl = document.querySelector('#recommendation-block-template')
     if (!list || !addBtn || !tpl) return
 
+    const COLOR_GROUP_LABELS = {
+      black: 'Черный',
+      white: 'Белый',
+      gray: 'Серый',
+      silver: 'Серебристый',
+      red: 'Красный',
+      blue: 'Синий',
+      green: 'Зеленый',
+      yellow: 'Желтый',
+      orange: 'Оранжевый',
+      brown: 'Коричневый',
+      beige: 'Бежевый',
+      purple: 'Фиолетовый',
+      pink: 'Розовый',
+      other: 'Другие',
+    }
+
     const splitCsvLike = (value) => {
       return String(value || '')
         .split(',')
         .map((item) => item.trim())
         .filter(Boolean)
+    }
+
+    const normalizeImportedColors = (values) => {
+      const seen = new Set()
+      const out = []
+      ;(values || []).forEach((value) => {
+        const raw = String(value || '').trim()
+        if (!raw) return
+        const key = raw.toLowerCase()
+        const label = COLOR_GROUP_LABELS[key] || raw
+        const dedupeKey = label.toLowerCase()
+        if (seen.has(dedupeKey)) return
+        seen.add(dedupeKey)
+        out.push(label)
+      })
+      return out
     }
 
     const toImportUrl = (raw) => {
@@ -423,8 +456,14 @@
       if (!url) return null
       const params = url.searchParams
       const lineValues = params.getAll('line').map((item) => String(item || '').trim()).filter(Boolean)
-      const modelValues = params.getAll('model').flatMap((item) => splitCsvLike(item))
-      const colorValues = params.getAll('color').flatMap((item) => splitCsvLike(item))
+      const explicitModelValues = params.getAll('model').flatMap((item) => splitCsvLike(item))
+      const lineModels = lineValues
+        .map((item) => String(item || '').split('|')[1] || '')
+        .map((item) => item.trim())
+        .filter(Boolean)
+      const modelValues = Array.from(new Set([...explicitModelValues, ...lineModels]))
+      const colorValues = normalizeImportedColors(params.getAll('color').flatMap((item) => splitCsvLike(item)))
+      const keywordValue = String(params.get('q') || '').trim()
       const brand = String(params.get('brand') || '').trim()
       const normalizedLines = lineValues.length
         ? lineValues
@@ -458,8 +497,9 @@
       }
       return {
         linesText: normalizedLines.join('\n'),
-        modelsText: lineValues.length ? '' : modelValues.join('\n'),
+        modelsText: modelValues.join('\n'),
         colorsText: colorValues.join('\n'),
+        keywords: keywordValue,
         title: derivedTitle,
         ...numbers,
       }
@@ -481,6 +521,7 @@
       setFieldValue('block_lines', parsed.linesText)
       setFieldValue('block_models', parsed.modelsText)
       setFieldValue('block_colors', parsed.colorsText)
+      setFieldValue('block_keywords', parsed.keywords)
       setFieldValue('block_price_min', parsed.price_min)
       setFieldValue('block_price_max', parsed.price_max)
       setFieldValue('block_mileage_max', parsed.mileage_max)

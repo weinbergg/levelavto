@@ -20,6 +20,7 @@ _LEGACY_QUERY_KEYS: List[str] = [
     "brand",
     "model",
     "color",
+    "q",
     "price_min",
     "price_max",
     "mileage_max",
@@ -191,6 +192,7 @@ def _build_block_dict(
     lines_value: Any,
     models_value: Any,
     colors_value: Any,
+    keywords_value: Any,
     price_min: Any,
     price_max: Any,
     mileage_max: Any,
@@ -203,11 +205,12 @@ def _build_block_dict(
     lines = _parse_lines(lines_value)
     models = _parse_filter_tokens(models_value)
     colors = _parse_filter_tokens(colors_value)
+    keywords = _trim_text(keywords_value)
     car_ids = _parse_car_ids(car_ids_value)
     block_title = _trim_text(title)
-    if not block_title and not lines and not car_ids and not models and not colors:
+    if not block_title and not lines and not car_ids and not models and not colors and not keywords:
         return None
-    if not lines and not car_ids and not models and not colors:
+    if not lines and not car_ids and not models and not colors and not keywords:
         return None
     cleaned = {
         "title": (block_title or "Подборка")[:120],
@@ -216,6 +219,7 @@ def _build_block_dict(
         "lines": lines,
         "models": models,
         "colors": colors,
+        "keywords": keywords[:200],
         "price_min": _coerce_float(price_min),
         "price_max": _coerce_float(price_max),
         "mileage_max": _coerce_int(mileage_max),
@@ -243,6 +247,7 @@ def _block_from_legacy_query(item: Dict[str, Any], index: int) -> Optional[Dict[
         lines_value=_lines_from_legacy_query(item.get("query")),
         models_value=bucket.get("model"),
         colors_value=bucket.get("color"),
+        keywords_value=(bucket.get("q") or [None])[-1],
         price_min=(bucket.get("price_min") or [None])[-1],
         price_max=(bucket.get("price_max") or [None])[-1],
         mileage_max=(bucket.get("mileage_max") or [None])[-1],
@@ -283,6 +288,7 @@ def load_home_recommendation_blocks(raw: Any) -> List[Dict[str, Any]]:
                 lines_value=item.get("lines"),
                 models_value=item.get("models"),
                 colors_value=item.get("colors"),
+                keywords_value=item.get("keywords"),
                 price_min=item.get("price_min"),
                 price_max=item.get("price_max"),
                 mileage_max=item.get("mileage_max"),
@@ -305,6 +311,7 @@ def build_home_recommendation_blocks(
     lines_values: List[Any],
     models_values: List[Any],
     colors_values: List[Any],
+    keywords_values: List[Any],
     price_mins: List[Any],
     price_maxs: List[Any],
     mileage_maxs: List[Any],
@@ -321,6 +328,7 @@ def build_home_recommendation_blocks(
         len(lines_values),
         len(models_values),
         len(colors_values),
+        len(keywords_values),
         len(price_mins),
         len(price_maxs),
         len(mileage_maxs),
@@ -339,6 +347,7 @@ def build_home_recommendation_blocks(
             lines_value=lines_values[index] if index < len(lines_values) else "",
             models_value=models_values[index] if index < len(models_values) else "",
             colors_value=colors_values[index] if index < len(colors_values) else "",
+            keywords_value=keywords_values[index] if index < len(keywords_values) else "",
             price_min=price_mins[index] if index < len(price_mins) else "",
             price_max=price_maxs[index] if index < len(price_maxs) else "",
             mileage_max=mileage_maxs[index] if index < len(mileage_maxs) else "",
@@ -367,6 +376,7 @@ def serialize_home_recommendation_blocks(blocks: List[Dict[str, Any]]) -> str:
                 "lines": block["lines"],
                 "models": block["models"],
                 "colors": block["colors"],
+                "keywords": block["keywords"],
                 "price_min": block["price_min"],
                 "price_max": block["price_max"],
                 "mileage_max": block["mileage_max"],
@@ -403,5 +413,8 @@ def build_block_catalog_query(block: Dict[str, Any]) -> str:
     colors = block.get("colors") or []
     if colors:
         params.append(("color", ",".join(str(c) for c in colors)))
+    keywords = str(block.get("keywords") or "").strip()
+    if keywords:
+        params.append(("q", keywords))
     params.append(("sort", "price_asc"))
     return urlencode(params, doseq=True)

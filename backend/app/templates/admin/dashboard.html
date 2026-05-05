@@ -296,7 +296,7 @@
         <div class="la-card__body">
           <form method="post" action="/admin/recommendation-blocks" class="la-form" data-recommendation-blocks-editor>
             <div class="la-vstack" data-recommendation-blocks-list style="display: grid; gap: 14px">
-              {% set block_rows = recommendation_blocks if recommendation_blocks else [{'title': '', 'limit': 8, 'enabled': True, 'lines_text': '', 'models_text': '', 'colors_text': '', 'price_min': '', 'price_max': '', 'mileage_max': '', 'reg_year_min': '', 'reg_year_max': '', 'power_hp_max': '', 'engine_cc_max': '', 'car_ids_text': ''}] %}
+              {% set block_rows = recommendation_blocks if recommendation_blocks else [{'title': '', 'limit': 8, 'enabled': True, 'lines_text': '', 'models_text': '', 'colors_text': '', 'keywords': '', 'price_min': '', 'price_max': '', 'mileage_max': '', 'reg_year_min': '', 'reg_year_max': '', 'power_hp_max': '', 'engine_cc_max': '', 'car_ids_text': ''}] %}
               {% for block in block_rows %}
               <div class="la-card" data-recommendation-block-row>
                 <div class="la-card__body">
@@ -365,6 +365,13 @@
                         Как в каталоге: группы цветов или подстрока (черный, белый, серый, синий…). Несколько значений — «ИЛИ».
                       </span>
                     </div>
+                  </div>
+                  <div class="la-field" style="margin-top: 14px">
+                    <label class="la-field__label">Ключевые слова</label>
+                    <input class="la-input" type="text" name="block_keywords" value="{{ block.keywords or '' }}" placeholder="AMG, panorama, ventilated seats">
+                    <span class="la-field__hint">
+                      Текстовый поисковик из каталога. Можно вставлять одно значение или целую фразу.
+                    </span>
                   </div>
                   <div class="la-card la-card--inset" style="margin-top: 14px">
                     <div class="la-card__header">
@@ -456,6 +463,13 @@
                         Как параметр цвета в каталоге (ИЛИ между значениями).
                       </span>
                     </div>
+                  </div>
+                  <div class="la-field" style="margin-top: 14px">
+                    <label class="la-field__label">Ключевые слова</label>
+                    <input class="la-input" type="text" name="block_keywords" value="" placeholder="AMG, panorama, ventilated seats">
+                    <span class="la-field__hint">
+                      Переносится из текстового поиска каталога.
+                    </span>
                   </div>
                   <div class="la-card la-card--inset" style="margin-top: 14px">
                     <div class="la-card__header">

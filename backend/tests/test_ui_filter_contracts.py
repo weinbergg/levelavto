@@ -334,7 +334,7 @@ def test_admin_layout_uses_new_design_system():
     assert 'class="la-admin-shell"' in layout
     assert 'data-sidebar-toggle' in layout
     assert "/static/css/admin.css?v=6" in layout
-    assert "/static/js/admin.js?v=8" in layout
+    assert "/static/js/admin.js?v=9" in layout
     assert 'grid-template-areas:\n    "topbar  sidebar"' in css
     assert "1fr var(--la-sidebar-w)" in css
     assert "--la-bg: #0b0e13" in css
@@ -405,11 +405,13 @@ def test_home_recommendation_blocks_are_loaded_from_site_content_and_rendered_in
     assert 'name="block_lines"' in dashboard
     assert 'name="block_models"' in dashboard
     assert 'name="block_colors"' in dashboard
+    assert 'name="block_keywords"' in dashboard
     assert 'data-recommendation-block-import' in dashboard
     assert 'data-recommendation-block-import-apply' in dashboard
     assert 'name="block_query"' not in dashboard
     assert "parseRecommendationBlockLink" in admin_js
     assert "applyImportedRecommendationLink" in admin_js
+    assert "normalizeImportedColors" in admin_js
     assert "build_block_catalog_query" in util
     assert "HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY" in util
 
@@ -1332,6 +1334,7 @@ def test_recommendation_blocks_form_exposes_per_block_selection_fields():
         "block_lines",
         "block_models",
         "block_colors",
+        "block_keywords",
         "block_price_min",
         "block_price_max",
         "block_mileage_max",
