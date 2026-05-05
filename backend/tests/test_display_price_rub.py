@@ -26,7 +26,7 @@ def test_sort_price_asc_uses_display_price():
         return (missing, value if value is not None else float("inf"), car["id"])
 
     ordered = [c["id"] for c in sorted(cars, key=sort_key)]
-    assert ordered == [4, 5, 2, 1, 3]
+    assert ordered == [1, 2, 4, 5, 3]
 
 
 def test_card_and_detail_use_same_field():

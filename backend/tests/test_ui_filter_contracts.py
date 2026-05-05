@@ -212,6 +212,8 @@ def test_deploy_cron_has_midday_public_prewarm():
     assert 'PREWARM_INCLUDE_BRAND_LISTS="${PREWARM_INCLUDE_BRAND_LISTS:-0}"' in script
     assert 'PREWARM_INCLUDE_BRAND_COUNTS="${PREWARM_INCLUDE_BRAND_COUNTS:-0}"' in script
     assert 'PREWARM_INCLUDE_ENGINE_LISTS="${PREWARM_INCLUDE_ENGINE_LISTS:-0}"' in script
+    assert 'if [ "${PREWARM_INCLUDE_KR_PUBLIC:-0}" = "1" ]; then' in script
+    assert 'curl -fsS --max-time 20 "http://localhost:8000/catalog?region=KR&sort=price_asc" >/dev/null || true' in script
 
 
 def test_payload_exact_filters_use_text_expr_for_hot_fields_and_daily_prewarm_stays_light():
@@ -242,9 +244,19 @@ def test_payload_exact_filters_use_text_expr_for_hot_fields_and_daily_prewarm_st
     assert "idx_cars_src_country_doors_count_avail" in migration_btree
     assert "idx_cars_src_country_owners_count_avail" in migration_btree
     assert "jsonb_extract_path_text(CAST(source_payload AS jsonb), 'num_seats')" in migration_btree
-    assert 'include_broad_base = os.getenv("PREWARM_INCLUDE_BROAD_BASE", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
-    assert 'include_broad_counts = os.getenv("PREWARM_INCLUDE_BROAD_COUNTS", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
-    assert 'include_broad_lists = os.getenv("PREWARM_INCLUDE_BROAD_LISTS", "1") != "0"' in _read("app/scripts/prewarm_cache.py")
+    prewarm_cache = _read("app/scripts/prewarm_cache.py")
+    assert 'include_broad_base = os.getenv("PREWARM_INCLUDE_BROAD_BASE", "0") != "0"' in prewarm_cache
+    assert 'include_broad_counts = os.getenv("PREWARM_INCLUDE_BROAD_COUNTS", "0") != "0"' in prewarm_cache
+    assert 'include_broad_lists = os.getenv("PREWARM_INCLUDE_BROAD_LISTS", "0") != "0"' in prewarm_cache
+    assert 'include_brand_lists = os.getenv("PREWARM_INCLUDE_BRAND_LISTS", "0") != "0"' in prewarm_cache
+    assert 'include_brand_counts = os.getenv("PREWARM_INCLUDE_BRAND_COUNTS", "0") != "0"' in prewarm_cache
+    assert 'include_engine_lists = os.getenv("PREWARM_INCLUDE_ENGINE_LISTS", "0") != "0"' in prewarm_cache
+    kr_pipeline = (repo_root / "scripts" / "kr_daily_pipeline.sh").read_text(encoding="utf-8")
+    assert 'bash scripts/prewarm_public_site.sh' in pipeline
+    assert 'PREWARM_INCLUDE_BROAD_BASE="${KR_PREWARM_INCLUDE_BROAD_BASE:-1}"' in kr_pipeline
+    assert 'PREWARM_INCLUDE_BRAND_LISTS="${KR_PREWARM_INCLUDE_BRAND_LISTS:-0}"' in kr_pipeline
+    assert 'PREWARM_INCLUDE_BRAND_COUNTS="${KR_PREWARM_INCLUDE_BRAND_COUNTS:-0}"' in kr_pipeline
+    assert 'PREWARM_INCLUDE_KR_PUBLIC=1' in kr_pipeline
     assert "count_only=True" in service
     assert 'use_fast_count=os.getenv("CATALOG_USE_FAST_COUNT", "1") != "0"' in service
 

@@ -122,12 +122,12 @@ def main() -> None:
     include_brand_ctx = os.getenv("PREWARM_INCLUDE_BRAND_CTX", "0") == "1"
     include_model_ctx = os.getenv("PREWARM_INCLUDE_MODEL_CTX", "0") == "1"
     include_payload_ctx = os.getenv("PREWARM_INCLUDE_PAYLOAD", "1") != "0"
-    include_brand_lists = os.getenv("PREWARM_INCLUDE_BRAND_LISTS", "1") != "0"
-    include_brand_counts = os.getenv("PREWARM_INCLUDE_BRAND_COUNTS", "1") != "0"
-    include_engine_lists = os.getenv("PREWARM_INCLUDE_ENGINE_LISTS", "1") != "0"
-    include_broad_base = os.getenv("PREWARM_INCLUDE_BROAD_BASE", "1") != "0"
-    include_broad_counts = os.getenv("PREWARM_INCLUDE_BROAD_COUNTS", "1") != "0"
-    include_broad_lists = os.getenv("PREWARM_INCLUDE_BROAD_LISTS", "1") != "0"
+    include_brand_lists = os.getenv("PREWARM_INCLUDE_BRAND_LISTS", "0") != "0"
+    include_brand_counts = os.getenv("PREWARM_INCLUDE_BRAND_COUNTS", "0") != "0"
+    include_engine_lists = os.getenv("PREWARM_INCLUDE_ENGINE_LISTS", "0") != "0"
+    include_broad_base = os.getenv("PREWARM_INCLUDE_BROAD_BASE", "0") != "0"
+    include_broad_counts = os.getenv("PREWARM_INCLUDE_BROAD_COUNTS", "0") != "0"
+    include_broad_lists = os.getenv("PREWARM_INCLUDE_BROAD_LISTS", "0") != "0"
     include_country_sweep = os.getenv("PREWARM_COUNTRY_SWEEP", "0") == "1"
     list_sort = os.getenv("PREWARM_LIST_SORT", "price_asc")
     list_sorts_raw = os.getenv("PREWARM_LIST_SORTS", "").strip()
