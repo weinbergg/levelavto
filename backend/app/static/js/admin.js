@@ -397,12 +397,108 @@
     const tpl = document.querySelector('#recommendation-block-template')
     if (!list || !addBtn || !tpl) return
 
+    const splitCsvLike = (value) => {
+      return String(value || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    }
+
+    const toImportUrl = (raw) => {
+      const text = String(raw || '').trim()
+      if (!text) return null
+      try {
+        if (/^https?:\/\//i.test(text)) return new URL(text)
+        if (text.startsWith('/')) return new URL(text, window.location.origin)
+        if (text.startsWith('?')) return new URL(`/catalog${text}`, window.location.origin)
+        if (text.includes('=')) return new URL(`/catalog?${text}`, window.location.origin)
+      } catch (_) {
+        return null
+      }
+      return null
+    }
+
+    const parseRecommendationBlockLink = (raw) => {
+      const url = toImportUrl(raw)
+      if (!url) return null
+      const params = url.searchParams
+      const lineValues = params.getAll('line').map((item) => String(item || '').trim()).filter(Boolean)
+      const modelValues = params.getAll('model').flatMap((item) => splitCsvLike(item))
+      const colorValues = params.getAll('color').flatMap((item) => splitCsvLike(item))
+      const brand = String(params.get('brand') || '').trim()
+      const normalizedLines = lineValues.length
+        ? lineValues
+        : (
+          brand
+            ? (modelValues.length ? modelValues.map((model) => `${brand}|${model}|`) : [`${brand}||`])
+            : []
+        )
+      const numbers = {}
+      ;[
+        'price_min',
+        'price_max',
+        'mileage_max',
+        'reg_year_min',
+        'reg_year_max',
+        'power_hp_max',
+        'engine_cc_max',
+      ].forEach((key) => {
+        const value = String(params.get(key) || '').trim()
+        numbers[key] = value
+      })
+      let derivedTitle = ''
+      if (normalizedLines.length === 1) {
+        const [brandPart, modelPart] = normalizedLines[0].split('|')
+        derivedTitle = [brandPart, modelPart].filter(Boolean).join(' ').trim()
+      } else if (normalizedLines.length > 1) {
+        const [brandPart] = normalizedLines[0].split('|')
+        derivedTitle = brandPart ? `${brandPart} и ещё ${normalizedLines.length - 1}` : 'Подборка из каталога'
+      } else if (brand) {
+        derivedTitle = brand
+      }
+      return {
+        linesText: normalizedLines.join('\n'),
+        modelsText: lineValues.length ? '' : modelValues.join('\n'),
+        colorsText: colorValues.join('\n'),
+        title: derivedTitle,
+        ...numbers,
+      }
+    }
+
+    function applyImportedRecommendationLink(row, raw) {
+      const parsed = parseRecommendationBlockLink(raw)
+      if (!parsed) {
+        if (window.adminToast) window.adminToast('Не удалось разобрать ссылку каталога', { kind: 'error' })
+        return
+      }
+      const setFieldValue = (name, value, { onlyIfEmpty = false } = {}) => {
+        const el = row.querySelector(`[name="${name}"]`)
+        if (!el) return
+        if (onlyIfEmpty && String(el.value || '').trim()) return
+        el.value = value == null ? '' : String(value)
+      }
+      setFieldValue('block_title', parsed.title, { onlyIfEmpty: true })
+      setFieldValue('block_lines', parsed.linesText)
+      setFieldValue('block_models', parsed.modelsText)
+      setFieldValue('block_colors', parsed.colorsText)
+      setFieldValue('block_price_min', parsed.price_min)
+      setFieldValue('block_price_max', parsed.price_max)
+      setFieldValue('block_mileage_max', parsed.mileage_max)
+      setFieldValue('block_reg_year_min', parsed.reg_year_min)
+      setFieldValue('block_reg_year_max', parsed.reg_year_max)
+      setFieldValue('block_power_hp_max', parsed.power_hp_max)
+      setFieldValue('block_engine_cc_max', parsed.engine_cc_max)
+      if (window.adminToast) window.adminToast('Подборка заполнена из ссылки', { kind: 'success' })
+    }
+
     function bindRow(row) {
       if (!row || row.dataset.bound === '1') return
       row.dataset.bound = '1'
       const removeBtn = row.querySelector('[data-recommendation-block-remove]')
       const upBtn = row.querySelector('[data-recommendation-block-up]')
       const downBtn = row.querySelector('[data-recommendation-block-down]')
+      const importInput = row.querySelector('[data-recommendation-block-import]')
+      const importApplyBtn = row.querySelector('[data-recommendation-block-import-apply]')
       if (removeBtn) {
         removeBtn.addEventListener('click', () => {
           row.remove()
@@ -422,6 +518,16 @@
           if (next) {
             list.insertBefore(next, row)
           }
+        })
+      }
+      if (importApplyBtn && importInput) {
+        importApplyBtn.addEventListener('click', () => {
+          applyImportedRecommendationLink(row, importInput.value)
+        })
+        importInput.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter') return
+          event.preventDefault()
+          applyImportedRecommendationLink(row, importInput.value)
         })
       }
     }

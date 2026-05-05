@@ -317,6 +317,23 @@
                       </select>
                     </div>
                   </div>
+                  <div class="la-field" style="margin-top: 14px">
+                    <label class="la-field__label">Заполнить по ссылке из каталога</label>
+                    <div class="la-hstack" style="align-items: stretch; gap: 10px; flex-wrap: wrap">
+                      <input
+                        class="la-input"
+                        type="text"
+                        value=""
+                        placeholder="https://levelavto.ru/catalog?... или /catalog?... или ?..."
+                        data-recommendation-block-import
+                        style="flex: 1 1 420px"
+                      >
+                      <button type="button" class="la-btn la-btn--secondary" data-recommendation-block-import-apply>Заполнить из ссылки</button>
+                    </div>
+                    <span class="la-field__hint">
+                      Страница не перезагружается. Берём из ссылки строки/модели, цвет, цену, пробег, постановку на учёт, л.с. и объём двигателя.
+                    </span>
+                  </div>
                   <div class="la-form-grid la-form-grid--2" style="margin-top: 14px">
                     <div class="la-field">
                       <label class="la-field__label">Марки и модели (строки)</label>
@@ -396,6 +413,23 @@
                         <option value="0">Выключена</option>
                       </select>
                     </div>
+                  </div>
+                  <div class="la-field" style="margin-top: 14px">
+                    <label class="la-field__label">Заполнить по ссылке из каталога</label>
+                    <div class="la-hstack" style="align-items: stretch; gap: 10px; flex-wrap: wrap">
+                      <input
+                        class="la-input"
+                        type="text"
+                        value=""
+                        placeholder="https://levelavto.ru/catalog?... или /catalog?... или ?..."
+                        data-recommendation-block-import
+                        style="flex: 1 1 420px"
+                      >
+                      <button type="button" class="la-btn la-btn--secondary" data-recommendation-block-import-apply>Заполнить из ссылки</button>
+                    </div>
+                    <span class="la-field__hint">
+                      Ссылка парсится прямо в браузере, без перезагрузки страницы.
+                    </span>
                   </div>
                   <div class="la-form-grid la-form-grid--2" style="margin-top: 14px">
                     <div class="la-field">

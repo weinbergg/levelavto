@@ -1641,13 +1641,6 @@ def _home_context(
     for car in recommended:
         _decorate_showcase_car(car, fx_rates=fx_rates)
     t0 = time.perf_counter()
-    more_offers = _get_home_more_offers(service, db, limit=12)
-    _stage("more_offers_ms", t0)
-    if os.getenv("HOME_REFRESH_VISIBLE_PRICES", "0") == "1":
-        service.refresh_visible_price_cache(more_offers)
-    for car in more_offers:
-        _decorate_showcase_car(car, fx_rates=fx_rates)
-    t0 = time.perf_counter()
     fx_rates = service.get_fx_rates(allow_fetch=False) or {}
     _stage("fx_rates_ms", t0)
     t0 = time.perf_counter()
@@ -1760,7 +1753,6 @@ def _home_context(
         "body_type_stats": body_type_stats,
         "recommendation_blocks": recommendation_blocks,
         "recommended_cars": recommended,
-        "more_offer_cars": more_offers,
         "content": content,
         "home": home_content,
         "fx_rates": fx_rates,

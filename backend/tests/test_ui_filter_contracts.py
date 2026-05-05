@@ -334,7 +334,7 @@ def test_admin_layout_uses_new_design_system():
     assert 'class="la-admin-shell"' in layout
     assert 'data-sidebar-toggle' in layout
     assert "/static/css/admin.css?v=6" in layout
-    assert "/static/js/admin.js?v=7" in layout
+    assert "/static/js/admin.js?v=8" in layout
     assert 'grid-template-areas:\n    "topbar  sidebar"' in css
     assert "1fr var(--la-sidebar-w)" in css
     assert "--la-bg: #0b0e13" in css
@@ -387,6 +387,7 @@ def test_admin_router_uses_flash_redirects_for_user_feedback():
 def test_home_recommendation_blocks_are_loaded_from_site_content_and_rendered_independently():
     pages = _read("app/routers/pages.py")
     admin = _read("app/routers/admin.py")
+    admin_js = _read("app/static/js/admin.js")
     template = _read("app/templates/home.html")
     dashboard = _read("app/templates/admin/dashboard.html")
     util = _read("app/utils/home_recommendation_blocks.py")
@@ -404,7 +405,11 @@ def test_home_recommendation_blocks_are_loaded_from_site_content_and_rendered_in
     assert 'name="block_lines"' in dashboard
     assert 'name="block_models"' in dashboard
     assert 'name="block_colors"' in dashboard
+    assert 'data-recommendation-block-import' in dashboard
+    assert 'data-recommendation-block-import-apply' in dashboard
     assert 'name="block_query"' not in dashboard
+    assert "parseRecommendationBlockLink" in admin_js
+    assert "applyImportedRecommendationLink" in admin_js
     assert "build_block_catalog_query" in util
     assert "HOME_RECOMMENDATION_BLOCKS_CONTENT_KEY" in util
 
@@ -914,12 +919,10 @@ def test_cars_count_route_tracks_registration_month_filters():
 def test_pages_home_uses_recommended_and_media_cache_helpers():
     router = _read("app/routers/pages.py")
     assert "_get_home_recommended(service, db, reco_cfg, limit=20)" in router
-    assert "_get_home_more_offers(service, db, limit=12)" in router
     assert "def _home_media_cache_version()" in router
     assert 'return f"home_media_ctx:{_home_media_cache_version()}"' in router
     assert 'static" / "home-collage"' in router
     assert "home_recommended:" in router
-    assert "home_more_offers:" in router
     assert 'cfg.get("reg_year_min")' in router
     assert 'cfg.get("power_hp_max")' in router
 
@@ -931,10 +934,9 @@ def test_home_collage_and_home_content_copy_are_updated():
     assert "data-loop-base-count" not in template
     assert "const syncCollageLoop = () => {" not in template
     assert "sizes=\"(max-width: 480px) 78px, (max-width: 640px) 88px, (max-width: 820px) 102px, 240px\"" in template
-    assert 'data-expand-toggle="home-more-offers-grid"' in template
-    assert 'data-expand-pages="2"' in template
-    assert 'id="home-more-offers-catalog"' in template
-    assert 'id="home-more-offers-grid"' in template
+    assert 'data-expand-toggle="home-more-offers-grid"' not in template
+    assert 'id="home-more-offers-catalog"' not in template
+    assert 'id="home-more-offers-grid"' not in template
     assert "Показываем только марки, которые есть в каталоге" in home_content
     assert "Доставка и подбор автомобилей из Европы и Азии" in home_content
     assert "Возим проверенные авто из Европы, Азии и РФ." not in home_content
@@ -1325,6 +1327,7 @@ def test_admin_users_xlsx_export_route_exists():
 def test_recommendation_blocks_form_exposes_per_block_selection_fields():
     template = _read("app/templates/admin/dashboard.html")
     admin = _read("app/routers/admin.py")
+    admin_js = _read("app/static/js/admin.js")
     for field in (
         "block_lines",
         "block_models",
@@ -1339,8 +1342,12 @@ def test_recommendation_blocks_form_exposes_per_block_selection_fields():
         "block_car_ids",
     ):
         assert f'name="{field}"' in template, f"missing field {field} in dashboard form"
+    assert 'data-recommendation-block-import' in template
+    assert 'data-recommendation-block-import-apply' in template
     assert '@router.post("/admin/recommendation-blocks")' in admin
     assert "build_home_recommendation_blocks(" in admin
+    assert "toImportUrl" in admin_js
+    assert "searchParams" in admin_js
 
 
 def test_calculator_page_has_rollback_template_and_recalc_buttons():
