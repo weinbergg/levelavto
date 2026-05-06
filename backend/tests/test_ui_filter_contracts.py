@@ -950,17 +950,21 @@ def test_model_filters_use_canonical_labels_with_alias_restore():
     service = _read("app/services/cars_service.py")
     router = _read("app/routers/catalog.py")
     script = _read("app/static/js/app.js")
+    styles = _read("app/static/css/styles.css")
     assert "def _canonical_model_label(" in service
     assert "_PORSCHE_MODEL_ALIASES" in service
     assert "def _brand_model_alias_label(" in service
     assert "def _resolve_model_aliases(" in service
     assert "def _model_filter_clause(" in service
+    assert 'if brand_norm == "LAND ROVER":' in service
     assert "if filters.get(\"model\"):" in service
     assert "clause = self._model_filter_clause(" in service
     assert "clause = service._model_filter_clause(" in router
     assert "select.__resolveModelValues = (values = []) => {" in script
     assert "const restoredModelsRaw = selectedLines.length ? selectedLines : getInitialLineModelsForBrand(normBrand)" in script
     assert "const resolvedSelectedValues = typeof modelSelect.__resolveModelValues === 'function'" in script
+    assert ".model-accordion__models > .model-accordion__model" in styles
+    assert "overflow-wrap: anywhere;" in styles
 
 
 def test_cars_count_route_tracks_registration_month_filters():

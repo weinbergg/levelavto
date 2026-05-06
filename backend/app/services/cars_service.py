@@ -4188,6 +4188,8 @@ class CarsService:
                 return "911-series"
         if brand_norm == "MERCEDES-BENZ" and raw.upper().startswith("AMG GT"):
             return "AMG GT"
+        if brand_norm == "LAND ROVER":
+            return normalize_model_label(raw)
         return token
     
     def _natural_text_key(self, value: Any) -> tuple:

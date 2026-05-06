@@ -92,3 +92,21 @@ def test_model_grouping_bentley_hp_variants_keep_base_family_label():
     groups = service.build_model_groups(brand="Bentley", models=models)
     bentayga_group = next(g for g in groups if g["label"] == "Bentayga")
     assert {m["value"] for m in bentayga_group["models"]} == {"Bentayga@@hp550", "Bentayga@@hp635"}
+
+
+def test_model_grouping_land_rover_keeps_range_rover_models_separate():
+    service = CarsService(db=None)  # type: ignore[arg-type]
+    models = [
+        {"value": "Range Rover", "label": "Range Rover", "count": 10},
+        {"value": "Range Rover Evoque", "label": "Range Rover Evoque", "count": 8},
+        {"value": "Range Rover Sport", "label": "Range Rover Sport", "count": 6},
+        {"value": "Range Rover Velar", "label": "Range Rover Velar", "count": 4},
+    ]
+    groups = service.build_model_groups(brand="Land Rover", models=models)
+    labels = {g["label"] for g in groups}
+    assert labels == {
+        "Range Rover",
+        "Range Rover Evoque",
+        "Range Rover Sport",
+        "Range Rover Velar",
+    }

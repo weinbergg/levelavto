@@ -2214,9 +2214,16 @@ body.filters-open {
 .model-accordion__models > .model-accordion__model {
   width: 100%;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.2;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .model-accordion__models > .model-accordion__model--all {
   grid-column: 1 / -1;
