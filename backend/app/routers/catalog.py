@@ -1683,7 +1683,26 @@ def filter_ctx_base(
     )
     body_types = _sort_by_label(build_body_type_options(service.facet_counts(field="body_type", filters=base_filters)))
     colors_basic, colors_other = _split_colors(service.facet_counts(field="color_group", filters=base_filters))
-    interior_payload = service.payload_values_bulk_filtered(["interior_design"], **base_filters)
+    try:
+        interior_limit = max(
+            8,
+            int(os.getenv("FILTER_CTX_BASE_INTERIOR_LIMIT", "64") or 64),
+        )
+    except Exception:
+        interior_limit = 64
+    try:
+        interior_max_scan = max(
+            200,
+            int(os.getenv("FILTER_CTX_BASE_INTERIOR_MAX_SCAN", "3500") or 3500),
+        )
+    except Exception:
+        interior_max_scan = 3500
+    interior_payload = service.payload_values_bulk_filtered(
+        ["interior_design"],
+        limit=interior_limit,
+        max_scan=interior_max_scan,
+        **base_filters,
+    )
     payload = {
         "_color_source": "color_group",
         "_engine_type_source": "normalized",

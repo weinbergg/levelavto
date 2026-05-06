@@ -131,7 +131,7 @@ def main() -> None:
             client.close()
 
         if args.apply and (deactivated or deleted):
-            bump_dataset_version(db)
+            bump_dataset_version()
         print(
             f"[cleanup_emavto_leasing] done batches={checked_batches} processed={processed} matched={matched} deactivated={deactivated} deleted={deleted}",
             flush=True,

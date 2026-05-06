@@ -57,6 +57,7 @@ BRAND_ALIASES = {
     "lynk co": "Lynk&Co",
     "lynk&co": "Lynk&Co",
     "landrover": "Land Rover",
+    "range rover": "Land Rover",
     "rolls royce": "Rolls-Royce",
     "rolls-royce": "Rolls-Royce",
 }
@@ -280,7 +281,7 @@ def brand_variants(value: Optional[str]) -> List[str]:
     if norm == "Lynk&Co":
         variants.add("Lynk Co")
     if norm == "Land Rover":
-        variants.add("LandRover")
+        variants.update({"LandRover", "Range Rover"})
     if norm == "Rolls-Royce":
         variants.add("Rolls Royce")
     return sorted(variants, key=lambda v: v.lower())
@@ -1189,15 +1190,17 @@ class CarsService:
         return bool(self._source_ids_for_hints(self.KOREA_SOURCE_HINTS))
 
     def has_korea_market_type_data(self) -> bool:
-        count = self.db.execute(
-            select(func.count(Car.id)).where(
+        stmt = (
+            select(Car.id)
+            .where(
                 self._available_expr(),
                 Car.country.like("KR%"),
                 Car.kr_market_type.is_not(None),
                 func.lower(Car.kr_market_type).in_(["domestic", "import"]),
             )
-        ).scalar()
-        return bool(int(count or 0))
+            .limit(1)
+        )
+        return self.db.execute(stmt).first() is not None
 
     def available_regions(self) -> List[str]:
         regions: List[str] = []

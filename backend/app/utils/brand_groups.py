@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 BRAND_FILTER_PRIORITY: List[str] = [
     "Mercedes-Benz",
     "Audi",
+    "BMW",
     "Volkswagen",
     "Porsche",
     "Land Rover",
