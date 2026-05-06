@@ -934,6 +934,8 @@ def test_emavto_leasing_skip_and_cleanup_contracts():
     assert '"BMW",' in brands.split("BRAND_FILTER_PRIORITY: List[str] = [", 1)[1].split("]", 1)[0]
     assert "rolls roy's" in brands
     assert "--include-inactive" in script
+    assert "--select-batch" in script
+    assert "--start-after-id" in script
     assert "--delete" in script
     assert "_merge_leasing_payload" in script
     assert 'detail.get("skip_reason") == "leasing"' in script

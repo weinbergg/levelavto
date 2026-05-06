@@ -53,6 +53,8 @@ def test_cleanup_emavto_leasing_script_has_safe_repair_flags():
     content = _read("app/scripts/cleanup_emavto_leasing.py")
     assert "--car-id" in content
     assert "--limit" in content
+    assert "--select-batch" in content
+    assert "--start-after-id" in content
     assert "--include-inactive" in content
     assert "--delete" in content
     assert "--apply" in content
