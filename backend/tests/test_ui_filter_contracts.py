@@ -200,11 +200,16 @@ def test_deploy_cron_has_midday_public_prewarm():
     repo_root = Path(__file__).resolve().parents[2]
     cron = (repo_root / "deploy" / "cron.mobilede").read_text(encoding="utf-8")
     script = (repo_root / "scripts" / "prewarm_public_site.sh").read_text(encoding="utf-8")
+    service = _read("app/services/cars_service.py")
+    pages_router = _read("app/routers/pages.py")
     assert "0 14 * * *" in cron
     assert "scripts/prewarm_public_site.sh" in cron
     assert 'python -m backend.app.scripts.prewarm_cache' in script
     assert 'curl -fsS --max-time 20 "http://localhost:8000/" >/dev/null || true' in script
     assert 'curl -fsS --max-time 20 "http://localhost:8000/catalog?region=EU&country=${PREWARM_EU_COUNTRY:-DE}&sort=price_asc" >/dev/null || true' in script
+    assert 'if [ "${PREWARM_INCLUDE_EU_ALL_PUBLIC:-1}" = "1" ]; then' in script
+    assert 'curl -fsS --max-time 20 "http://localhost:8000/api/cars?region=EU&sort=price_asc&page=1&page_size=12" >/dev/null || true' in script
+    assert 'curl -fsS --max-time 20 "http://localhost:8000/catalog?region=EU&sort=price_asc" >/dev/null || true' in script
     assert 'PREWARM_INCLUDE_PAYLOAD="${PREWARM_INCLUDE_PAYLOAD:-1}"' in script
     assert 'PREWARM_INCLUDE_BROAD_BASE="${PREWARM_INCLUDE_BROAD_BASE:-0}"' in script
     assert 'PREWARM_INCLUDE_BROAD_COUNTS="${PREWARM_INCLUDE_BROAD_COUNTS:-0}"' in script
@@ -214,6 +219,10 @@ def test_deploy_cron_has_midday_public_prewarm():
     assert 'PREWARM_INCLUDE_ENGINE_LISTS="${PREWARM_INCLUDE_ENGINE_LISTS:-0}"' in script
     assert 'if [ "${PREWARM_INCLUDE_KR_PUBLIC:-0}" = "1" ]; then' in script
     assert 'curl -fsS --max-time 20 "http://localhost:8000/catalog?region=KR&sort=price_asc" >/dev/null || true' in script
+    assert "def _cheap_light_price_order_clause" in service
+    assert "def _should_use_light_price_window_sort" in service
+    assert "sort_items_by_display_price(items, sort=sort)" in service
+    assert 'os.getenv("DETAIL_SIMILAR_OFFERS_ENABLED", "0") != "0"' in pages_router
 
 
 def test_payload_exact_filters_use_text_expr_for_hot_fields_and_daily_prewarm_stays_light():

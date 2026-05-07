@@ -93,7 +93,7 @@ def _detail_inline_calc_enabled() -> bool:
 
 
 def _detail_similar_offers_enabled() -> bool:
-    return os.getenv("DETAIL_SIMILAR_OFFERS_ENABLED", "1") != "0"
+    return os.getenv("DETAIL_SIMILAR_OFFERS_ENABLED", "0") != "0"
 
 
 def _home_dataset_version() -> str:

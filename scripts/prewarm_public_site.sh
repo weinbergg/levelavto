@@ -27,6 +27,10 @@ docker compose exec -T web env \
 # filters/list/count caches, but not the rendered home/catalog HTML.
 curl -fsS --max-time 20 "http://localhost:8000/" >/dev/null || true
 curl -fsS --max-time 20 "http://localhost:8000/catalog?region=EU&country=${PREWARM_EU_COUNTRY:-DE}&sort=price_asc" >/dev/null || true
+if [ "${PREWARM_INCLUDE_EU_ALL_PUBLIC:-1}" = "1" ]; then
+  curl -fsS --max-time 20 "http://localhost:8000/api/cars?region=EU&sort=price_asc&page=1&page_size=12" >/dev/null || true
+  curl -fsS --max-time 20 "http://localhost:8000/catalog?region=EU&sort=price_asc" >/dev/null || true
+fi
 if [ "${PREWARM_INCLUDE_KR_PUBLIC:-0}" = "1" ]; then
   curl -fsS --max-time 20 "http://localhost:8000/catalog?region=KR&sort=price_asc" >/dev/null || true
 fi

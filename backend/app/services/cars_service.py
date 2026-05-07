@@ -42,7 +42,14 @@ from ..utils.taxonomy import (
     parse_interior_trim_token,
 )
 from ..utils.breakdown_labels import label_for
-from ..utils.price_utils import ceil_to_step, get_round_step_rub, raw_price_to_rub
+from ..utils.price_utils import (
+    ceil_to_step,
+    get_round_step_rub,
+    price_without_util_note,
+    raw_price_to_rub,
+    resolve_public_display_price_rub,
+    sort_items_by_display_price,
+)
 from .calculator_config_service import CalculatorConfigService
 from .calculator import get_util_fee_rub as legacy_util_fee_rub
 from .calculator_runtime import EstimateRequest, calculate, is_bev
@@ -1749,6 +1756,50 @@ class CarsService:
     def _catalog_inline_price_refresh_enabled(self) -> bool:
         return os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0"
 
+    def _cheap_public_price_sort_expr(self):
+        return func.coalesce(
+            Car.total_price_rub_cached,
+            Car.price_rub_cached,
+        )
+
+    def _cheap_light_price_order_clause(self, sort: Optional[str]) -> List[Any]:
+        price_expr = self._cheap_public_price_sort_expr()
+        if sort == "price_desc":
+            return [price_expr.desc().nullslast(), Car.id.asc()]
+        return [price_expr.asc().nullslast(), Car.id.asc()]
+
+    def _should_use_light_price_window_sort(
+        self,
+        *,
+        sort: Optional[str],
+        light: bool,
+        page: int,
+        page_size: int,
+    ) -> bool:
+        if not light or sort not in {"price_asc", "price_desc"}:
+            return False
+        try:
+            max_page = max(1, int(os.getenv("CATALOG_LIGHT_PRICE_WINDOW_MAX_PAGE", "5") or 5))
+        except Exception:
+            max_page = 5
+        try:
+            max_page_size = max(1, int(os.getenv("CATALOG_LIGHT_PRICE_WINDOW_MAX_PAGE_SIZE", "40") or 40))
+        except Exception:
+            max_page_size = 40
+        return page <= max_page and page_size <= max_page_size
+
+    def _light_price_window_limit(self, *, page: int, page_size: int) -> int:
+        try:
+            floor = max(40, int(os.getenv("CATALOG_LIGHT_PRICE_WINDOW_MIN_ROWS", "240") or 240))
+        except Exception:
+            floor = 240
+        try:
+            cap = max(floor, int(os.getenv("CATALOG_LIGHT_PRICE_WINDOW_MAX_ROWS", "2000") or 2000))
+        except Exception:
+            cap = 2000
+        window = max(page * page_size * 12, floor)
+        return min(window, cap)
+
     def _should_catalog_inline_price_refresh(
         self,
         *,
@@ -2699,7 +2750,17 @@ class CarsService:
         if count_only:
             return [], int(total or 0)
 
-        order_clause = self._list_order_clause(sort)
+        use_light_price_window_sort = self._should_use_light_price_window_sort(
+            sort=sort,
+            light=light,
+            page=page,
+            page_size=page_size,
+        )
+        order_clause = (
+            self._cheap_light_price_order_clause(sort)
+            if use_light_price_window_sort
+            else self._list_order_clause(sort)
+        )
 
         thumb_rank = case(
             (
@@ -2751,9 +2812,11 @@ class CarsService:
                 )
                 .where(where_expr)
                 .order_by(*(([thumb_rank] if use_thumb_rank else [])), *order_clause)
-                .offset((page - 1) * page_size)
-                .limit(page_size)
             )
+            if use_light_price_window_sort:
+                stmt = stmt.limit(self._light_price_window_limit(page=page, page_size=page_size))
+            else:
+                stmt = stmt.offset((page - 1) * page_size).limit(page_size)
         else:
             stmt = (
                 select(Car)
@@ -2824,6 +2887,34 @@ class CarsService:
                     row["engine_cc"] = effective_engine_cc_value(row)
                     row["power_hp"] = effective_power_hp_value(row)
                     row["power_kw"] = effective_power_kw_value(row)
+                if use_light_price_window_sort:
+                    fx_rates = self.get_fx_rates(allow_fetch=False) or self.get_fx_rates() or {}
+                    fx_eur = float(fx_rates.get("EUR") or 0)
+                    fx_usd = float(fx_rates.get("USD") or 0)
+                    fx_cny = float(fx_rates.get("CNY") or 0)
+                    for row in items:
+                        if not isinstance(row, dict):
+                            continue
+                        row["display_price_rub"] = resolve_public_display_price_rub(
+                            row.get("total_price_rub_cached"),
+                            row.get("price_rub_cached"),
+                            calc_breakdown=row.get("calc_breakdown_json"),
+                            raw_price=row.get("price"),
+                            currency=row.get("currency"),
+                            fx_eur=fx_eur,
+                            fx_usd=fx_usd,
+                            fx_cny=fx_cny,
+                        )
+                        row["price_note"] = price_without_util_note(
+                            display_price=row.get("display_price_rub"),
+                            total_price_rub_cached=row.get("total_price_rub_cached"),
+                            calc_breakdown=row.get("calc_breakdown_json"),
+                            region=region,
+                            country=row.get("country"),
+                        )
+                    sort_items_by_display_price(items, sort=sort)
+                    offset = max(0, (page - 1) * page_size)
+                    items = items[offset: offset + page_size]
             if self._should_catalog_inline_price_refresh(page=page, page_size=page_size):
                 try:
                     if light:
