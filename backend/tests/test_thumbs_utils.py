@@ -35,6 +35,18 @@ def test_resolve_thumbnail_url_normalizes_scheme_relative_autoimg():
     assert thumbs.resolve_thumbnail_url(src) == "https://2sc2.autoimg.cn/escimg/test.jpg"
 
 
+def test_pick_classistatic_thumb_skips_remote_probe_by_default(monkeypatch):
+    src = "https://img.classistatic.de/api/v1/mo-prod/images/aa/aa.jpg?rule=mo-1024.jpg"
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("remote probe should not run in request path by default")
+
+    monkeypatch.delenv("THUMB_PROBE_REMOTE", raising=False)
+    monkeypatch.setattr(thumbs, "_probe_url", _boom)
+
+    assert thumbs.pick_classistatic_thumb(src) == src
+
+
 def test_lock_acquire_and_busy(tmp_path, monkeypatch):
     monkeypatch.setenv("THUMB_CACHE_DIR", str(tmp_path))
     src = "https://img.classistatic.de/api/v1/mo-prod/images/aa/aa.jpg?rule=mo-1024.jpg"

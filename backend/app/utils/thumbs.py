@@ -17,6 +17,10 @@ _UUID_RE = re.compile(
 )
 
 
+def _remote_probe_enabled() -> bool:
+    return os.getenv("THUMB_PROBE_REMOTE", "0") == "1"
+
+
 def _media_root() -> Path:
     return Path(__file__).resolve().parents[3] / "фото-видео"
 
@@ -116,6 +120,8 @@ def pick_classistatic_thumb(url: Optional[str], *, ttl_days: int = 14) -> Option
             if cached == "none":
                 return None
             return _apply_rule(normalized, cached)
+    if not _remote_probe_enabled():
+        return normalized
     timeout = (0.25, 0.6)
     for rule in _RULE_CANDIDATES:
         candidate = _apply_rule(normalized, rule)

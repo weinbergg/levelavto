@@ -922,12 +922,15 @@ def test_emavto_leasing_skip_and_cleanup_contracts():
     brands = _read("app/utils/brand_groups.py")
     service = _read("app/services/cars_service.py")
     catalog = _read("app/routers/catalog.py")
+    thumbs_utils = _read("app/utils/thumbs.py")
     assert "LEASING_MARKERS = (" in parser
     assert 'if detail.get("skip_reason") == "leasing":' in parser
     assert 'out["skip_reason"] = "leasing"' in parser
     assert '"emavto_is_leasing": True' in parser
     assert "def _detail_has_leasing_marker(" in parser
     assert 'if soup.select_one(".label-leasing"):' in parser
+    assert '"is_leasing": self._detail_has_leasing_marker(' in parser
+    assert '[emavto_klg] list skip ext_id=%s reason=leasing' in parser
     assert 'BRAND_FILTER_PRIORITY: List[str] = [' in brands
     assert '"Mercedes-Benz",' in brands
     assert '"Audi",' in brands
@@ -936,14 +939,17 @@ def test_emavto_leasing_skip_and_cleanup_contracts():
     assert "--include-inactive" in script
     assert "--select-batch" in script
     assert "--start-after-id" in script
+    assert "--workers" in script
+    assert "--detail-rps" in script
     assert "--delete" in script
     assert "_merge_leasing_payload" in script
     assert 'detail.get("skip_reason") == "leasing"' in script
-    assert 'car.is_available = False' in script
+    assert "car.is_available = False" in script
     assert "bump_dataset_version()" in script
     assert '"range rover": "Land Rover"' in service
     assert 'variants.update({"LandRover", "Range Rover"})' in service
     assert 'FILTER_CTX_BASE_INTERIOR_MAX_SCAN' in catalog
+    assert "if not _remote_probe_enabled():" in thumbs_utils
 
 
 def test_model_filters_use_canonical_labels_with_alias_restore():

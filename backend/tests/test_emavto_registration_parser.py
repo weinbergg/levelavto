@@ -219,3 +219,48 @@ def test_emavto_backfill_skips_leasing_listings():
 
     assert items == []
     assert parser.metrics["skipped_leasing"] == 1
+
+
+def test_emavto_list_skips_leasing_cards_without_detail_fetch():
+    parser = _parser()
+    html = """
+    <html><body>
+      <div id="korea-cars">
+        <div class="car-card">
+          <div class="car-labels">
+            <p class="label-leasing">Автомобиль в лизинге</p>
+          </div>
+          <a class="car-title" href="/car/dom-lease">Kia Carnival</a>
+          <p class="car-details">2022 · 10000 км · Бензин</p>
+          <p class="car-price">36052 $</p>
+          <img src="https://example.com/dom-lease.jpg" />
+        </div>
+      </div>
+      <div id="import-cars"></div>
+    </body></html>
+    """
+
+    class _Resp:
+        def __init__(self, text: str, url: str):
+            self.status_code = 200
+            self.text = text
+            self.url = url
+            self.headers = {}
+
+    parser._request_with_backoff = lambda url, params, bucket, is_detail, client=None, deadline=None: _Resp(  # type: ignore[assignment]
+        html,
+        f"{url}?{next(iter(params.keys()))}={next(iter(params.values()))}",
+    )
+
+    cars = parser.fetch_items(
+        {
+            "mode": "incremental",
+            "resume_page_full": 1,
+            "max_pages": 1,
+            "skip_details": True,
+            "max_runtime_sec": 30,
+        }
+    )
+
+    assert cars == []
+    assert parser.metrics["skipped_leasing"] == 1

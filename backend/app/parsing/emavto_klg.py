@@ -470,6 +470,13 @@ class EmAvtoKlgParser(BaseParser):
             if min_price_usd > 0 and price is not None and price < min_price_usd:
                 self.metrics["skipped_below_min_price"] += 1
                 continue
+            if bool(r.get("is_leasing")):
+                self.metrics["skipped_leasing"] = int(self.metrics.get("skipped_leasing", 0) or 0) + 1
+                logger.info(
+                    "[emavto_klg] list skip ext_id=%s reason=leasing",
+                    external_id or f"emavto_klg_{page}_{idx}",
+                )
+                continue
             if skip_details:
                 car = CarParsed(
                     source_key=self.config.key,
@@ -562,6 +569,10 @@ class EmAvtoKlgParser(BaseParser):
                     "image": (img_el.get("src") if img_el else None),
                     "details": details_el.get_text(strip=True) if details_el else None,
                     "details_html": str(details_el) if details_el else None,
+                    "is_leasing": self._detail_has_leasing_marker(
+                        card,
+                        card.get_text(" ", strip=True),
+                    ),
                 }
             )
         return items
