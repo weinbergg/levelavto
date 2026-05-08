@@ -928,6 +928,7 @@ def test_emavto_registration_recovery_and_stale_lock_contracts():
 def test_emavto_leasing_skip_and_cleanup_contracts():
     parser = _read("app/parsing/emavto_klg.py")
     script = _read("app/scripts/cleanup_emavto_leasing.py")
+    parsing_service = _read("app/services/parsing_data_service.py")
     brands = _read("app/utils/brand_groups.py")
     service = _read("app/services/cars_service.py")
     catalog = _read("app/routers/catalog.py")
@@ -955,6 +956,9 @@ def test_emavto_leasing_skip_and_cleanup_contracts():
     assert 'detail.get("skip_reason") == "leasing"' in script
     assert "car.is_available = False" in script
     assert "bump_dataset_version()" in script
+    assert "def _has_sticky_emavto_leasing_flag" in parsing_service
+    assert "def _merge_sticky_emavto_leasing_payload" in parsing_service
+    assert 'existing.is_available = False if sticky_emavto_leasing else True' in parsing_service
     assert '"range rover": "Land Rover"' in service
     assert 'variants.update({"LandRover", "Range Rover"})' in service
     assert 'FILTER_CTX_BASE_INTERIOR_MAX_SCAN' in catalog

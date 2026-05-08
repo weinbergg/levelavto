@@ -45,6 +45,34 @@ class ParsingDataService:
         self.db = db
         self.logger = logging.getLogger(__name__)
 
+    @staticmethod
+    def _has_sticky_emavto_leasing_flag(source: Source, payload: Any) -> bool:
+        if str(getattr(source, "key", "") or "") != "emavto_klg":
+            return False
+        if not isinstance(payload, dict):
+            return False
+        if payload.get("emavto_skip_reason") == "leasing":
+            return True
+        return bool(payload.get("emavto_is_leasing"))
+
+    @classmethod
+    def _merge_sticky_emavto_leasing_payload(
+        cls,
+        source: Source,
+        existing_payload: Any,
+        incoming_payload: Any,
+    ) -> Any:
+        if not cls._has_sticky_emavto_leasing_flag(source, existing_payload):
+            return incoming_payload
+        merged = dict(incoming_payload) if isinstance(incoming_payload, dict) else {}
+        if isinstance(existing_payload, dict):
+            for key in ("emavto_is_leasing", "emavto_skip_reason", "emavto_leasing_checked_at"):
+                if key in existing_payload:
+                    merged[key] = existing_payload[key]
+        merged["emavto_is_leasing"] = True
+        merged["emavto_skip_reason"] = "leasing"
+        return merged
+
     def ensure_source(self, *, key: str, name: str, country: str, base_url: str) -> Source:
         existing = self.db.execute(select(Source).where(
             Source.key == key)).scalar_one_or_none()
@@ -161,6 +189,13 @@ class ParsingDataService:
                     "thumbnail_url") or new_thumb
             existing = existing_by_eid.get(eid)
             if existing:
+                sticky_emavto_leasing = self._has_sticky_emavto_leasing_flag(source, existing.source_payload)
+                if payload.get("source_payload") is not None:
+                    payload["source_payload"] = self._merge_sticky_emavto_leasing_payload(
+                        source,
+                        existing.source_payload,
+                        payload.get("source_payload"),
+                    )
                 needs_recalc = False
                 if existing.hash != payload["hash"]:
                     for k, v in payload.items():
@@ -168,7 +203,7 @@ class ParsingDataService:
                             setattr(existing, k, v)
                     self._clear_inferred_specs(existing)
                     existing.last_seen_at = now
-                    existing.is_available = True
+                    existing.is_available = False if sticky_emavto_leasing else True
                     updated += 1
                     needs_recalc = True
                 else:
@@ -198,7 +233,7 @@ class ParsingDataService:
                         updated += 1
                         needs_recalc = True
                     existing.last_seen_at = now
-                    existing.is_available = True
+                    existing.is_available = False if sticky_emavto_leasing else True
                 car_row = existing
             else:
                 car = Car(

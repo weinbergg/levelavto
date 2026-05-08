@@ -151,3 +151,79 @@ def test_upsert_parsed_items_keeps_mirrored_local_images_without_rewrite(monkeyp
         new_images = db.query(CarImage).filter(CarImage.car_id == car.id).order_by(CarImage.position.asc()).all()
         assert [img.id for img in new_images] == preserved_ids
         assert [img.url for img in new_images] == ["/media/de-2-1.webp", "/media/de-2-2.webp"]
+
+
+def test_upsert_parsed_items_keeps_emavto_leasing_rows_inactive(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        source = Source(id=1, key="emavto_klg", name="EMAVTO", base_url="https://emavto.ru", country="KR")
+        db.add(source)
+        db.commit()
+
+        monkeypatch.setattr(
+            cars_service_mod.CarsService,
+            "get_fx_rates",
+            lambda self, allow_fetch=True: {"USD": 100.0, "EUR": 100.0, "CNY": 12.0, "RUB": 1.0},
+        )
+        monkeypatch.setattr(cars_service_mod.CarsService, "_maybe_infer_specs_for_calc", lambda self, car: False)
+        monkeypatch.setattr(
+            cfg_mod.CalculatorConfigService,
+            "ensure_default_from_yaml",
+            lambda self, path: SimpleNamespace(payload={"meta": {"version": "test"}}),
+        )
+        monkeypatch.setattr(
+            cfg_mod.CalculatorConfigService,
+            "ensure_default_from_path",
+            lambda self, path: SimpleNamespace(payload={"meta": {"version": "test"}}),
+        )
+
+        existing = Car(
+            source_id=source.id,
+            external_id="lease-1",
+            country="KR",
+            brand="BMW",
+            model="X5",
+            price=10000,
+            currency="USD",
+            source_url="https://emavto.ru/car/lease-1",
+            source_payload={
+                "emavto_is_leasing": True,
+                "emavto_skip_reason": "leasing",
+                "emavto_leasing_checked_at": "2026-05-08T00:00:00",
+            },
+            hash="old",
+            is_available=False,
+        )
+        db.add(existing)
+        db.commit()
+
+        service = ParsingDataService(db)
+        inserted, updated, seen = service.upsert_parsed_items(
+            source,
+            [
+                {
+                    "external_id": "lease-1",
+                    "country": "KR",
+                    "brand": "BMW",
+                    "model": "X5",
+                    "price": 12000,
+                    "currency": "USD",
+                    "engine_type": "Diesel",
+                    "engine_cc": 2993,
+                    "power_hp": 286,
+                    "source_url": "https://emavto.ru/car/lease-1",
+                    "source_payload": {"foo": "bar"},
+                }
+            ],
+        )
+
+        assert (inserted, seen) == (0, 1)
+        assert updated >= 1
+
+        car = db.query(Car).filter(Car.external_id == "lease-1").one()
+        assert car.is_available is False
+        assert isinstance(car.source_payload, dict)
+        assert car.source_payload["emavto_is_leasing"] is True
+        assert car.source_payload["emavto_skip_reason"] == "leasing"
+        assert car.source_payload["foo"] == "bar"
