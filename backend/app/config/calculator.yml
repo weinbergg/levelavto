@@ -1,4 +1,4 @@
-version: "2026_01"
+version: "2026_06_03_v1"
 fx:
   source: cbr
   cache_ttl_sec: 3600
@@ -11,18 +11,29 @@ rules:
   age_bucket_over_5y_as_3_5: true
   # prefer net price if available
   price_mode: netto_preferred
+  # Машина моложе 3 лет, пока её возраст в полных месяцах <= порога.
+  # 36 = «июньская машина 2023 года остаётся under_3 весь июнь 2026
+  # и становится 3_5 с 1 июля 2026» (правило заказчика).
+  under_3_max_age_months_inclusive: 36
+  # Страхование/брокер/наша комиссия (insurance_broker_commission_percent)
+  # для ДВС берётся только если ОБА порога не превышены:
+  #   power_hp <= insurance_max_hp_inclusive
+  #   engine_cc <= insurance_max_engine_cc_inclusive
+  # Для мощных/больших ДВС строка обнуляется. Для электро — всегда считается.
+  insurance_max_hp_inclusive: 160
+  insurance_max_engine_cc_inclusive: 1900
 
 scenarios:
   under_3:
     label: "ДВС до 3 лет"
     bank_transfer_eu: { percent: 0.014, fixed: 100 }
-    purchase_netto: { percent: 0.03, fixed: 0 }
+    purchase_netto: { percent: 0.025, fixed: 400 }
     inspection: 400
-    delivery_eu_minsk: 5500
+    delivery_eu_minsk: 5700
     customs_by_percent: 0.24
     customs_transfer_fee_percent: 0.005
     delivery_minsk_moscow: 400
-    elpts: 600
+    elpts: 400
     insurance_broker_commission_percent: 0.08
     investor_fee: 0
     broker_elpts_rub: 0

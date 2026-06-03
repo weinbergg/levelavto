@@ -132,9 +132,18 @@ def choose_scenario(req: EstimateRequest, payload: Dict[str, Any]) -> str:
         return req.scenario
     if age is None:
         raise ValueError("cannot determine scenario: no registration date")
-    if age < 36:
+    # Порог «до 3 лет» включительно. Берётся из rules.under_3_max_age_months_inclusive
+    # (по умолчанию 36): машина июня 2023 остаётся under_3 весь июнь 2026 (age=36)
+    # и становится 3_5 с 1 июля 2026 (age=37).
+    try:
+        under_3_max = int(
+            payload.get("rules", {}).get("under_3_max_age_months_inclusive", 36) or 36
+        )
+    except (TypeError, ValueError):
+        under_3_max = 36
+    if age <= under_3_max:
         return "under_3"
-    if 36 <= age <= 60:
+    if under_3_max < age <= 60:
         return "3_5"
     # >60 месяцев считаем по сценарию 3_5 (по требованию)
     if payload.get("rules", {}).get("age_bucket_over_5y_as_3_5", True):
@@ -213,6 +222,38 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
     cfg = scenarios[scenario_key]
     eur_rate = d(req.eur_rate or payload["meta"].get("eur_rate_default") or 95.0)
 
+    rules = payload.get("rules", {}) or {}
+
+    def _insurance_percent_for_ice() -> Decimal:
+        """
+        Страхование/брокер/наша комиссия для ДВС: применяется, только если
+        машина "лёгкая" по л.с. и объёму. Иначе строка обнуляется.
+        Пороги (по умолчанию hp<=160, cc<=1900) — из rules в calculator.yml.
+        Если данные о мощности/объёме отсутствуют — оставляем как есть
+        (не занижаем цену по неполным данным).
+        """
+        base_percent = d(cfg.get("insurance_broker_commission_percent"))
+        if base_percent == 0:
+            return base_percent
+        try:
+            max_hp = int(rules.get("insurance_max_hp_inclusive", 160) or 160)
+        except (TypeError, ValueError):
+            max_hp = 160
+        try:
+            max_cc = int(rules.get("insurance_max_engine_cc_inclusive", 1900) or 1900)
+        except (TypeError, ValueError):
+            max_cc = 1900
+        hp_val = req.power_hp
+        cc_val = req.engine_cc
+        if hp_val is None or cc_val is None:
+            return base_percent
+        try:
+            if float(hp_val) > max_hp or float(cc_val) > max_cc:
+                return Decimal("0")
+        except (TypeError, ValueError):
+            return base_percent
+        return base_percent
+
     breakdown = []
 
     if scenario_key in ("under_3", "3_5"):
@@ -234,7 +275,7 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
                 * d(cfg.get("customs_transfer_fee_percent"))
             )
             elpts = d(cfg.get("elpts"))
-            insurance_broker_commission = net_eur * d(cfg.get("insurance_broker_commission_percent"))
+            insurance_broker_commission = net_eur * _insurance_percent_for_ice()
             investor_fee = d(cfg.get("investor_fee"))
             eur_fields = {
                 "bank_transfer_eu": bank_transfer_eu,
@@ -250,7 +291,7 @@ def calculate(payload: Dict[str, Any], req: EstimateRequest) -> Dict[str, Any]:
             }
         else:
             delivery_eu_moscow = d(cfg.get("delivery_eu_moscow"))
-            insurance_broker_commission = net_eur * d(cfg.get("insurance_broker_commission_percent"))
+            insurance_broker_commission = net_eur * _insurance_percent_for_ice()
             eur_fields = {
                 "bank_transfer_eu": bank_transfer_eu,
                 "purchase_netto": purchase_netto,

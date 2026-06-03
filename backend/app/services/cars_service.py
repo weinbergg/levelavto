@@ -3517,7 +3517,17 @@ class CarsService:
                 age_months = max(0, (now_dt.year - reg_dt.year) * 12 + (now_dt.month - reg_dt.month))
             except Exception:
                 return "under_3"
-            return "under_3" if age_months < 36 else "3_5"
+            # См. rules.under_3_max_age_months_inclusive в calculator.yml.
+            # Машина моложе 3 лет, пока age_months <= порога (по умолч. 36).
+            under_3_max = 36
+            try:
+                cfg_payload = getattr(cfg, "payload", None) or {}
+                under_3_max = int(
+                    cfg_payload.get("rules", {}).get("under_3_max_age_months_inclusive", 36) or 36
+                )
+            except (TypeError, ValueError, AttributeError, NameError):
+                under_3_max = 36
+            return "under_3" if age_months <= under_3_max else "3_5"
 
         def _calculate_kr_total(*, bev: bool) -> dict | None:
             base_rub = raw_price_to_rub(

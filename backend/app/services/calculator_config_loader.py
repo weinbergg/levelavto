@@ -21,6 +21,16 @@ class FxConfig(BaseModel):
 class RuleConfig(BaseModel):
     age_bucket_over_5y_as_3_5: bool = True
     price_mode: str = "netto_preferred"  # netto_preferred | brutto | netto_only
+    # Машина считается «до 3 лет», пока её возраст в полных календарных
+    # месяцах <= этого порога (включительно). 36 означает: июньская машина
+    # 2023 года остаётся under_3 весь июнь 2026 и становится 3_5 с 1 июля 2026.
+    under_3_max_age_months_inclusive: int = 36
+    # Пороги для строки «Страхование, брокер, наша комиссия» в ДВС-сценариях.
+    # Если у машины hp > insurance_max_hp_inclusive ИЛИ
+    # engine_cc > insurance_max_engine_cc_inclusive — строка обнуляется.
+    # Для электро строка считается всегда (правило заказчика).
+    insurance_max_hp_inclusive: int = 160
+    insurance_max_engine_cc_inclusive: int = 1900
 
 
 class PercentFixed(BaseModel):
@@ -154,6 +164,9 @@ def to_runtime_payload(cfg: CalculatorConfigYaml) -> Dict[str, Any]:
         "rules": {
             "age_bucket_over_5y_as_3_5": cfg.rules.age_bucket_over_5y_as_3_5,
             "price_mode": cfg.rules.price_mode,
+            "under_3_max_age_months_inclusive": cfg.rules.under_3_max_age_months_inclusive,
+            "insurance_max_hp_inclusive": cfg.rules.insurance_max_hp_inclusive,
+            "insurance_max_engine_cc_inclusive": cfg.rules.insurance_max_engine_cc_inclusive,
         },
         "label_map": _LABEL_MAP,
         "scenarios": {
