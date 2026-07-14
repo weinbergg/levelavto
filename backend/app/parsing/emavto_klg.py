@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Set, Tuple
+import os
 import re
 import time
 import random
@@ -13,6 +14,38 @@ from .base import BaseParser, CarParsed, logger
 from .config import SiteConfig
 from ..utils.rate_limiter import TokenBucket
 from ..utils.spec_inference import infer_engine_cc_from_text
+
+
+_BRAND_ALIASES: Dict[str, str] = {
+    "mercedes": "mercedes-benz",
+    "mercedes benz": "mercedes-benz",
+    "mercedes-benz": "mercedes-benz",
+    "мерседес": "mercedes-benz",
+    "мерседес-бенц": "mercedes-benz",
+    "мерседес бенц": "mercedes-benz",
+    "bmw": "bmw",
+    "бмв": "bmw",
+}
+
+
+def _normalize_brand(name: Optional[str]) -> str:
+    if not name:
+        return ""
+    n = str(name).strip().lower()
+    n = re.sub(r"\s+", " ", n)
+    return _BRAND_ALIASES.get(n, n)
+
+
+def _load_brand_allowlist() -> Set[str]:
+    raw = os.environ.get("EMAVTO_ALLOWED_BRANDS", "").strip()
+    if not raw:
+        return set()
+    out: Set[str] = set()
+    for chunk in raw.replace(";", ",").split(","):
+        b = _normalize_brand(chunk)
+        if b:
+            out.add(b)
+    return out
 
 
 class EmAvtoKlgParser(BaseParser):
@@ -86,7 +119,16 @@ class EmAvtoKlgParser(BaseParser):
             "detail_latency": [],
             "skipped_below_min_price": 0,
             "skipped_leasing": 0,
+            "skipped_brand_not_allowed": 0,
         }
+        # Опциональный allowlist брендов: EMAVTO_ALLOWED_BRANDS="BMW,Mercedes-Benz".
+        # Работает case-insensitively и понимает алиасы ("Мерседес", "БМВ" и т.п.).
+        self.allowed_brands: Set[str] = _load_brand_allowlist()
+        if self.allowed_brands:
+            logger.info(
+                "[emavto_klg] brand allowlist enabled: %s",
+                sorted(self.allowed_brands),
+            )
         self.last_tasks_total: int = 0
         self.last_details_done: int = 0
         self.missing_tasks: List[Dict[str, Any]] = []
@@ -464,6 +506,12 @@ class EmAvtoKlgParser(BaseParser):
             external_id = (link or "")[-120:]
             title_text = r.get("title") or ""
             brand, model = self._split_brand_model(title_text)
+            if self.allowed_brands:
+                if _normalize_brand(brand) not in self.allowed_brands:
+                    self.metrics["skipped_brand_not_allowed"] = int(
+                        self.metrics.get("skipped_brand_not_allowed", 0) or 0
+                    ) + 1
+                    continue
             details_text = r.get("details") or ""
             mileage, year, fuel = self._parse_emavto_details(details_text)
             price = self._parse_price_usd(r.get("price"))
