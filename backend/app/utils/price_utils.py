@@ -2,7 +2,7 @@ import math
 import os
 from typing import Any, Optional
 
-PRICE_NOTE_WITHOUT_UTIL = "*Без учета утилизационного сбора РФ"
+PRICE_NOTE_WITHOUT_UTIL = "без утильсбора РФ"
 PRICE_NOTE_EUROPE = "Цена в Европе"
 PRICE_NOTE_CHINA = "Цена в Китае"
 PRICE_NOTE_MOSCOW = "Цена в Москве"

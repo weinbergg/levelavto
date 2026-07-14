@@ -1912,9 +1912,6 @@
         if (car.mileage != null) {
           specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/mileage.svg" alt="">${Number(car.mileage).toLocaleString('ru-RU')} км</span>`)
         }
-        if (car.engine_type) {
-          specLines.push(`<span class="spec-line"><img class="spec-icon" src="/static/img/icons/fuel.svg" alt="">${car.display_engine_type || car.engine_type}</span>`)
-        }
         if (car.power_hp) {
           specLines.push(`<span class="spec-line">Мощность: ${Math.round(car.power_hp)} л.с.</span>`)
         }

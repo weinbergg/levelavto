@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
+import os
 import re
-from typing import Iterable, Iterator, List, Optional, Any, Dict
+from typing import Iterable, Iterator, List, Optional, Any, Dict, Set
 from dataclasses import asdict
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
@@ -10,6 +12,40 @@ from .config import SiteConfig
 from ..importing.mobilede_csv import MobileDeCsvRow
 from ..services.cars_service import CarsService, normalize_brand, normalize_model_label
 from ..utils.spec_inference import normalize_engine_type as _normalize_engine_type_canonical
+
+_logger = logging.getLogger(__name__)
+
+
+_MOBILEDE_BRAND_ALIASES: Dict[str, str] = {
+    "mercedes": "mercedes-benz",
+    "mercedes benz": "mercedes-benz",
+    "mercedes-benz": "mercedes-benz",
+    "мерседес": "mercedes-benz",
+    "мерседес-бенц": "mercedes-benz",
+    "мерседес бенц": "mercedes-benz",
+    "bmw": "bmw",
+    "бмв": "bmw",
+}
+
+
+def _normalize_brand_key(name: Optional[str]) -> str:
+    if not name:
+        return ""
+    n = str(name).strip().lower()
+    n = re.sub(r"\s+", " ", n)
+    return _MOBILEDE_BRAND_ALIASES.get(n, n)
+
+
+def _load_mobilede_brand_allowlist() -> Set[str]:
+    raw = os.environ.get("MOBILEDE_ALLOWED_BRANDS", "").strip()
+    if not raw:
+        return set()
+    out: Set[str] = set()
+    for chunk in raw.replace(";", ",").split(","):
+        b = _normalize_brand_key(chunk)
+        if b:
+            out.add(b)
+    return out
 
 
 class MobileDeFeedParser:
@@ -61,6 +97,16 @@ class MobileDeFeedParser:
     def __init__(self, site_config: SiteConfig):
         self.config = site_config
         self._model_recovery_service = CarsService(None)  # type: ignore[arg-type]
+        # Опциональный allowlist брендов через env MOBILEDE_ALLOWED_BRANDS="BMW,Mercedes-Benz".
+        # Работает case-insensitively и понимает алиасы ("Мерседес", "БМВ" и т.п.).
+        # При пустом значении фильтр отключён — импортируются все бренды.
+        self.allowed_brands: Set[str] = _load_mobilede_brand_allowlist()
+        self.skipped_brand_not_allowed: int = 0
+        if self.allowed_brands:
+            _logger.info(
+                "[mobile_de_feed] brand allowlist enabled: %s",
+                sorted(self.allowed_brands),
+            )
 
     def _payload_from_row(self, row: MobileDeCsvRow) -> Dict[str, Any]:
         data = asdict(row)
@@ -348,6 +394,12 @@ class MobileDeFeedParser:
 
     def iter_parsed_from_csv(self, rows: Iterable[MobileDeCsvRow]) -> Iterator[CarParsed]:
         for row in rows:
+            # Brand allowlist (например, для демо-режима: только BMW/Mercedes).
+            if self.allowed_brands:
+                brand_key = _normalize_brand_key(row.mark)
+                if brand_key not in self.allowed_brands:
+                    self.skipped_brand_not_allowed += 1
+                    continue
             images: List[str] = list(row.image_urls) if row.image_urls else []
             thumb = images[0] if images else None
             option_values = list(row.options or [])
