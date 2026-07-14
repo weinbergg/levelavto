@@ -60,7 +60,7 @@
             referrerpolicy="no-referrer"
             data-thumb="{{ primary_fast_src or primary_thumb_src or '' }}"
             data-orig="{{ primary or '' }}"
-            onerror="if(this.dataset.inlineThumbTried!=='1' && this.dataset.thumb){this.dataset.inlineThumbTried='1';this.src=this.dataset.thumb;}else{this.onerror=null;this.src='/static/img/no-photo.svg';}"
+            onerror="if(this.dataset.inlineThumbTried!=='1' && this.dataset.thumb && this.src!==this.dataset.thumb){this.dataset.inlineThumbTried='1';this.src=this.dataset.thumb;}else if(this.dataset.origTried!=='1' && this.dataset.orig && this.src!==this.dataset.orig){this.dataset.origTried='1';this.src=this.dataset.orig;}else{this.onerror=null;this.src='/static/img/no-photo.svg';}"
             width="960"
             height="640"
           />
@@ -89,6 +89,7 @@
               decoding="async"
               referrerpolicy="no-referrer"
               data-orig="{{ im_raw }}"
+              onerror="if(this.dataset.origTried!=='1' && this.dataset.orig && this.src!==this.dataset.orig){this.dataset.origTried='1';this.src=this.dataset.orig;}else{this.onerror=null;this.src='/static/img/no-photo.svg';}"
               width="180"
               height="120"
             />

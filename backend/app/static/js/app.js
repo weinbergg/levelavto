@@ -1945,7 +1945,7 @@
               data-thumb="${thumbSrc}"
               data-orig="${origThumb}"
               data-id="${car.id}"
-              onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
+              onerror="if(this.dataset.origTried!=='1' && this.dataset.orig && this.src!==this.dataset.orig){this.dataset.origTried='1';this.src=this.dataset.orig;}else{this.onerror=null;this.src='/static/img/no-photo.svg';}"
               fetchpriority="low"
               width="320"
               height="200"
@@ -4195,7 +4195,7 @@
           const variantLine = car.variant ? `<div class="car-card__subtitle">${escapeHtml(car.variant)}</div>` : ''
           card.innerHTML = `
             <div class="thumb-wrap">
-              <img class="thumb" src="${thumb}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-thumb="${thumb}" data-orig="${origThumb}" data-id="${car.id}" onerror="this.onerror=null;this.src='/static/img/no-photo.svg';" />
+              <img class="thumb" src="${thumb}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-thumb="${thumb}" data-orig="${origThumb}" data-id="${car.id}" onerror="if(this.dataset.origTried!=='1' && this.dataset.orig && this.src!==this.dataset.orig){this.dataset.origTried='1';this.src=this.dataset.orig;}else{this.onerror=null;this.src='/static/img/no-photo.svg';}" />
             </div>
             <div class="car-card__body">
               <div>

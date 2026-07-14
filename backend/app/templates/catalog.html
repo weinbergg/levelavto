@@ -348,7 +348,7 @@
                   data-thumb="{{ thumb_src }}"
                   data-orig="{{ car.thumbnail_url or '' }}"
                   data-id="{{ car.id }}"
-                  onerror="this.onerror=null;this.src='/static/img/no-photo.svg';"
+                  onerror="if(this.dataset.origTried!=='1' && this.dataset.orig && this.src!==this.dataset.orig){this.dataset.origTried='1';this.src=this.dataset.orig;}else{this.onerror=null;this.src='/static/img/no-photo.svg';}"
                   width="320"
                   height="200"
                 />
