@@ -355,7 +355,20 @@ class CarsService:
         self._resolved_model_alias_cache: Dict[tuple, List[str]] = {}
 
     def _available_expr(self):
-        return Car.is_available.is_(True)
+        base = Car.is_available.is_(True)
+        # Env-flag guard: CATALOG_REQUIRE_PRICE=1 полностью прячет из выдачи
+        # машины без рассчитанной цены (обе колонки пустые). Полезно как
+        # аварийный фолбэк, пока recalc_calc_cache не догнал новые импорты
+        # и в шапке каталога висит "—" вместо цифры.
+        if os.getenv("CATALOG_REQUIRE_PRICE", "0") == "1":
+            return and_(
+                base,
+                or_(
+                    Car.total_price_rub_cached.is_not(None),
+                    Car.price_rub_cached.is_not(None),
+                ),
+            )
+        return base
 
     @staticmethod
     def _payload_json_expr():
@@ -1267,6 +1280,10 @@ class CarsService:
         condition: Optional[str],
         kr_type: Optional[str],
     ) -> bool:
+        # Агрегаты car_counts_* не знают о фильтре "только с ценой",
+        # поэтому при включённом флаге считаем вживую.
+        if os.getenv("CATALOG_REQUIRE_PRICE", "0") == "1":
+            return False
         if model:
             return False
         if any(
