@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -26,12 +27,39 @@ from ..services.phone_verification_service import (
 router = APIRouter()
 
 
+def _env_flag(name: str, default: str) -> bool:
+    """Читаем bool-env: 1/true/yes/on -> True, 0/false/no/off/'' -> False."""
+    raw = str(os.getenv(name, default) or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _email_verification_required() -> bool:
+    """Требуется ли обязательное подтверждение email при регистрации.
+
+    Управляется env-флагом EMAIL_VERIFICATION_REQUIRED. По умолчанию — False,
+    т.к. SMTP-провайдер может быть не настроен (тогда register 500-ит).
+    Включаем в 1, когда почтовый провайдер готов.
+    """
+    return _env_flag("EMAIL_VERIFICATION_REQUIRED", "0")
+
+
+def _phone_verification_required() -> bool:
+    """Требуется ли обязательное подтверждение телефона при регистрации.
+
+    Управляется env-флагом PHONE_VERIFICATION_REQUIRED. По умолчанию — False
+    (как и было до этого — телефон необязателен).
+    """
+    return _env_flag("PHONE_VERIFICATION_REQUIRED", "0")
+
+
 def _register_context(request: Request, *, error: str | None = None, form_data: Dict[str, Any] | None = None):
     return {
         "request": request,
         "error": error,
         "success": False,
         "form_data": form_data or {},
+        "email_verification_required": _email_verification_required(),
+        "phone_verification_required": _phone_verification_required(),
     }
 
 
@@ -115,6 +143,11 @@ def send_email_code(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    if not _email_verification_required():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Подтверждение email временно отключено",
+        )
     service = EmailVerificationService(db)
     try:
         email = normalize_email_address(payload.email)
@@ -134,6 +167,11 @@ def verify_email_code(
     payload: VerifyEmailCodePayload,
     db: Session = Depends(get_db),
 ):
+    if not _email_verification_required():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Подтверждение email временно отключено",
+        )
     service = EmailVerificationService(db)
     try:
         challenge = service.verify_register_code(payload.challenge_token, payload.email, payload.code)
@@ -152,6 +190,11 @@ def send_phone_code(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    if not _phone_verification_required():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Подтверждение телефона временно отключено",
+        )
     service = PhoneVerificationService(db)
     try:
         phone = normalize_phone_number(payload.phone)
@@ -171,6 +214,11 @@ def verify_phone_code(
     payload: VerifyPhoneCodePayload,
     db: Session = Depends(get_db),
 ):
+    if not _phone_verification_required():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Подтверждение телефона временно отключено",
+        )
     service = PhoneVerificationService(db)
     try:
         challenge = service.verify_register_code(payload.challenge_token, payload.phone, payload.code)
@@ -207,22 +255,35 @@ def register(
         "phone": phone,
         "phone_verification_token": phone_verification_token,
     }
+    email_required = _email_verification_required()
+    phone_required = _phone_verification_required()
     try:
-        email_challenge = email_verification.get_verified_registration(email, email_verification_token)
+        email_norm = normalize_email_address(email)
+        email_challenge = None
+        email_verified_at = None
+        if email_required:
+            email_challenge = email_verification.get_verified_registration(email, email_verification_token)
+            email_verified_at = email_challenge.verified_at
         phone_norm = normalize_phone_number(phone) if str(phone or "").strip() else None
         phone_challenge = None
-        if phone_norm and str(phone_verification_token or "").strip():
+        if phone_required:
+            if not phone_norm:
+                raise PhoneVerificationError("Введите номер телефона")
+            phone_challenge = verification.get_verified_registration(phone_norm, phone_verification_token)
+        elif phone_norm and str(phone_verification_token or "").strip():
+            # Юзер сам решил подтвердить номер — оставляем как раньше.
             phone_challenge = verification.get_verified_registration(phone_norm, phone_verification_token)
         user = auth.create_user(
-            email=email,
+            email=email_norm,
             password=password,
             full_name=full_name or None,
             phone=phone_norm,
-            email_verified_at=email_challenge.verified_at,
+            email_verified_at=email_verified_at,
             phone_verified_at=phone_challenge.verified_at if phone_challenge else None,
             is_admin=is_admin,
         )
-        email_verification.mark_registration_consumed(email_challenge)
+        if email_challenge is not None:
+            email_verification.mark_registration_consumed(email_challenge)
         if phone_challenge:
             verification.mark_registration_consumed(phone_challenge)
     except (ValueError, EmailVerificationError, PhoneVerificationError) as exc:
