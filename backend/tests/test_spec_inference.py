@@ -264,6 +264,31 @@ def test_infer_engine_cc_from_text_parses_explicit_liter_patterns():
     assert infer_engine_cc_from_text("5514 см³") == 5514
 
 
+def test_infer_engine_cc_from_text_after_engine_type_word():
+    """`benzin 1.8`, `diesel 2.0` — тип двигателя перед объёмом (мусорные объявления)."""
+    assert infer_engine_cc_from_text("Mercedes w123. 1983 benzin 1.8,") == 1800
+    assert infer_engine_cc_from_text("Ford Focus diesel 2.0 kombi") == 2000
+    assert infer_engine_cc_from_text("Opel Astra petrol 1.6 automatik") == 1600
+    # число без точки должно игнорироваться, чтобы не съесть ЛС
+    assert infer_engine_cc_from_text("BMW 320 diesel 220 hp") is None
+
+
+def test_infer_engine_cc_from_text_short_suffix_after_dot():
+    """`2.0T`, `1.8i`, `3.0d`, `2.0sd`, `2.0td` — литр перед короткими суффиксами."""
+    assert infer_engine_cc_from_text("BMW 320i 2.0T sport") == 2000
+    assert infer_engine_cc_from_text("Audi A4 3.0d quattro") == 3000
+    assert infer_engine_cc_from_text("BMW X5 3.0sd xdrive") == 3000
+    # `320i` (без точки) не должно давать false positive
+    assert infer_engine_cc_from_text("BMW 320i sport") is None
+    assert infer_engine_cc_from_text("BMW 330d M-Sport") is None
+
+
+def test_infer_engine_cc_from_text_liter_with_dash_or_cyrillic():
+    """`2.0-Liter`, `2.0 л` — тире перед единицей, кириллическая `л`."""
+    assert infer_engine_cc_from_text("Ford Escape 2.0-Liter EcoBoost") == 2000
+    assert infer_engine_cc_from_text("Lada Priora 1.6 л инжектор") == 1600
+
+
 def test_filter_candidates_by_target_power_prefers_close_matches_only():
     candidates = [
         {"power_hp": 551, "power_kw": 405.26, "engine_cc": 3996},

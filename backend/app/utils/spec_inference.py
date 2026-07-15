@@ -10,7 +10,7 @@ _TOKEN_RE = re.compile(r"[a-z0-9]+(?:[._+-][a-z0-9]+)?", re.IGNORECASE)
 _MULTISPACE_RE = re.compile(r"\s+")
 _ENGINE_CC_RE = re.compile(r"\b([1-9][0-9]{3,4})\s*(?:cc|ccm|cm3|cm³|см3|см³)\b", re.IGNORECASE)
 _ENGINE_LITER_RE = re.compile(
-    r"\b([0-9](?:[.,][0-9])?)\s*(?:l|liter|litre)\b",
+    r"\b([0-9](?:[.,][0-9])?)\s*[-–]?\s*(?:l|liter|litre|л)\b",
     re.IGNORECASE,
 )
 _ENGINE_LITER_CONTEXT_RE = re.compile(
@@ -23,6 +23,20 @@ _ENGINE_LITER_CONTEXT_RE = re.compile(
 _ENGINE_LITER_COMPACT_SUFFIX_RE = re.compile(
     r"\b([0-9](?:[.,][0-9])?)(?:tdi|tsi|tfsi|fsi|dci|cdi|mjt|hdi|crdi|crd|gdi|"
     r"multijet|ecoboost|tce|diesel|petrol|benzin|benzina|gasoline|hybrid|turbo|d)\b",
+    re.IGNORECASE,
+)
+# Литр СРАЗУ ПЕРЕД короткими односимвольными суффиксами (только для чисел с точкой,
+# чтобы не спутать с моделями BMW/Audi типа "320i", "330d").
+# Ловит: "2.0T", "1.8i", "3.0d", "2.0sd", "2.0td".
+_ENGINE_LITER_SHORT_SUFFIX_RE = re.compile(
+    r"\b([0-9][.,][0-9])(?:sd|td|d|t|i)\b",
+    re.IGNORECASE,
+)
+# Литр ПОСЛЕ ключевого слова о типе двигателя. Ловит "benzin 1.8", "diesel 2.0",
+# "petrol 3.0". Требуем число с точкой (0.6-9.9), чтобы не спутать с ЛС ("diesel 220").
+_ENGINE_LITER_AFTER_TYPE_RE = re.compile(
+    r"\b(?:turbo|hybrid|diesel|petrol|benzin|benzina|gasoline|engine|motor)\s+"
+    r"([0-9][.,][0-9])\b",
     re.IGNORECASE,
 )
 _POWER_KW_RE = re.compile(r"\b(\d{2,4})(?:[.,]\d+)?\s*k\s*w\b", re.IGNORECASE)
@@ -86,6 +100,9 @@ def normalize_spec_text(value: Any) -> str:
     raw = raw.replace("/", " ")
     raw = raw.replace("|", " ")
     raw = raw.replace(",", " ")
+    raw = raw.replace(";", " ")
+    raw = raw.replace(":", " ")
+    raw = raw.replace("—", " ").replace("–", " ")
     raw = raw.replace("(", " ")
     raw = raw.replace(")", " ")
     raw = raw.replace("[", " ")
@@ -359,7 +376,13 @@ def infer_engine_cc_from_text(*values: Any) -> Optional[int]:
                 first_seen.append(candidate)
                 scored[candidate] = 0
             scored[candidate] += 3
-        for regex in (_ENGINE_LITER_RE, _ENGINE_LITER_CONTEXT_RE, _ENGINE_LITER_COMPACT_SUFFIX_RE):
+        for regex in (
+            _ENGINE_LITER_RE,
+            _ENGINE_LITER_CONTEXT_RE,
+            _ENGINE_LITER_COMPACT_SUFFIX_RE,
+            _ENGINE_LITER_SHORT_SUFFIX_RE,
+            _ENGINE_LITER_AFTER_TYPE_RE,
+        ):
             for match in regex.finditer(text):
                 raw_value = str(match.group(1) or "").replace(",", ".")
                 try:

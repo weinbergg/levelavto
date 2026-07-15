@@ -1774,9 +1774,21 @@ class CarsService:
         return os.getenv("CATALOG_INLINE_PRICE_REFRESH", "0") != "0"
 
     def _cheap_public_price_sort_expr(self):
-        return func.coalesce(
+        # Fallback-машины (расчёт "без утильсбора РФ") имеют total = price_rub_cached
+        # и всплывают наверх при price_asc среди мусорных лотов за 500 EUR.
+        # Отжимаем их в конец сортировки: превращаем их цену в NULL, дальше
+        # обычный nullslast() ставит их после всех нормально рассчитанных.
+        without_util_marker_expr = cast(
+            func.coalesce(Car.calc_breakdown_json, "[]"),
+            String,
+        ).like("%__without_util_fee%")
+        base_price = func.coalesce(
             Car.total_price_rub_cached,
             Car.price_rub_cached,
+        )
+        return case(
+            (without_util_marker_expr, None),
+            else_=base_price,
         )
 
     def _cheap_light_price_order_clause(self, sort: Optional[str]) -> List[Any]:
